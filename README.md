@@ -3,7 +3,7 @@
 단백질 서열에서 복합체 구조를 예측하고, 나노바디를 설계하거나 후보와 변이를 비교하는 프로그램입니다.
 결과는 표, 3D 구조, PAE와 HTML 보고서로 확인합니다.
 
-**현재 공개 버전: [v0.4.0](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.0)** ·
+**현재 공개 버전: [v0.4.1](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.1)** ·
 [변경 기록](CHANGELOG.md) · [업데이트 방법](docs/UPGRADING.md)
 
 ## 1. 준비할 컴퓨터
@@ -20,9 +20,9 @@ CUDA Toolkit·Conda·Docker도 이 안내의 필수 준비물이 아닙니다. N
 
 ## 2. 내려받고 한 번에 설치
 
-1. [소스 ZIP 받기](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.0/NanoCoFold_public-0.4.0.zip)를 누릅니다.
+1. [소스 ZIP 받기](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.1/NanoCoFold_public-0.4.1.zip)를 누릅니다.
 2. Ubuntu에서 ZIP을 압축 해제합니다.
-3. 압축을 푼 **`NanoCoFold_public-0.4.0` 폴더 안에서** 터미널을 엽니다.
+3. 압축을 푼 **`NanoCoFold_public-0.4.1` 폴더 안에서** 터미널을 엽니다.
    그 폴더에 `README.md`, `install.sh`, `start.sh`가 보이면 맞습니다.
 4. 아래 명령을 실행합니다.
 
@@ -71,6 +71,11 @@ ssh -L 8765:127.0.0.1:8765 USER@SERVER
 
 그다음 자신의 PC에서 같은 브라우저 주소를 엽니다. 인터넷에 서버 포트를 공개할 필요는 없습니다.
 
+아래는 실제 프로그램에 공개 IL‑6·VHH 서열을 넣은 입력 화면입니다.
+직접 입력할 수도 있고, 처음에는 **5절의 배치 JSON 업로드**로 예제의 서열과 조건을 함께 불러오는 것이 편합니다.
+
+![NanoCoFold 실제 입력 화면: 분석 모드, 표적 FASTA, VHH 라이브러리와 실행 조건](docs/images/01-web-input.png)
+
 ## 4. 네 모드 중 하나 선택
 
 | 모드 | 하고 싶은 일 | 필요한 입력 | 얻는 결과 |
@@ -106,7 +111,42 @@ His tag 포함 132 aa 구성체입니다. 9VQ6은 나노바디 단독 구조이�
 IL‑6와의 결합 자세를 정답으로 제공하는 예제가 아닙니다.
 [서열 출처와 구성체 설명](examples/tutorial/README.md)을 확인하세요.
 
-먼저 가장 작은 복합체 예제를 실행하세요. **설치한 폴더**의 새 터미널에서:
+### 브라우저에서 실행
+
+`bash start.sh`로 서버를 연 뒤, 먼저 가장 작은 `complex` 예제로 시작하세요.
+브라우저는 입력·실행·결과 확인을 담당하고, 계산은 설치한 Ubuntu 컴퓨터의 GPU에서 진행됩니다.
+
+1. 상단 **배치 분석**을 누르고 **목적**에서 원하는 모드를 고릅니다.
+2. **입력 형식 → JSON · 항목별 조건**을 고릅니다.
+3. **파일 선택**으로 아래 파일 하나를 업로드합니다. JSON 안에 서열과 예제 조건이 모두 들어 있어
+   아래의 공통 VHH·WT·파트너 칸은 비워 둡니다. **현재 검토한 단일 분석의 조건 사용**도 체크하지 않습니다.
+
+| 모드 | 업로드할 파일 |
+|---|---|
+| complex | `examples/tutorial/complex_batch.json` |
+| design | `examples/tutorial/design_batch.json` |
+| screen | `examples/tutorial/screen_batch.json` |
+| mature | `examples/tutorial/mature_batch.json` |
+
+![실제 웹 화면에서 complex_batch.json 파일을 업로드한 상태](docs/images/02-public-example-upload.png)
+
+4. design·screen·mature는 **이 배치의 표적·후보 서열을 외부 MSA 서비스로 보내는 데 동의**를 체크합니다.
+   공개 예제의 표적·VHH 및 생성 후보 서열을 `api.colabfold.com`에 보내는 데 동의하는 항목입니다.
+   complex 예제는 이 동의가 필요하지 않습니다. 파일을 바꾸면 동의도 다시 확인하세요.
+5. **배치 입력 검토 · 계산 시작 전**을 누릅니다. 아래 표의 **검토 완료**를 확인합니다.
+   아래 캡처는 여기까지 진행한 실제 화면으로, **미제출**이므로 GPU 계산은 시작하지 않은 상태입니다.
+
+![입력 검토 완료 화면: barnase_barstar 1개 항목, 계산 미제출, 선택한 1개 분석 실행 버튼](docs/images/03-public-example-reviewed.png)
+
+6. **선택한 1개 분석 실행**을 누르면 계산을 제출합니다. **작업·로그**에서 진행 상황을 확인하고,
+   완료 후 **결과 탐색**에서 실행을 선택합니다. 같은 작업을 중복 제출하지 마세요.
+
+화면의 **JSON 데모 예제** 버튼은 합성 데이터로 흐름을 연습하는 기능입니다.
+위 공개 단백질의 실제 예측을 하려면 파일 선택으로 해당 JSON을 업로드하세요.
+
+### 터미널에서 실행
+
+같은 예제를 터미널에서도 실행할 수 있습니다. **설치한 폴더**의 새 터미널에서:
 
 ```bash
 bash run_example.sh complex
@@ -142,6 +182,17 @@ bash run_example.sh screen --review-only --allow-public-msa
 웹의 작업 목록에서 결과를 엽니다. 후보 표에서 행을 누르면 아래 3D 뷰어와 PAE를 확인할 수 있습니다.
 CSV/XLSX 표, FASTA 서열, 원본 좌표와 보고서 ZIP을 저장할 수 있습니다.
 **보고서 ZIP을 압축 해제한 뒤 HTML을 열면**, 별도 설치 없이 결과를 살펴볼 수 있습니다.
+
+<details>
+<summary>실제 결과 화면 보기 — CPU 데모로 촬영</summary>
+
+아래는 공개판의 **CPU 데모**를 직접 실행해 캡처한 결과 화면입니다.
+**MOCK · 실제 예측 아님** 표시는 합성 데이터라는 뜻입니다. 화면 위치를 설명하기 위한 자료이며,
+표시된 개수·점수·판정은 공개 예제의 GPU 예측 결과나 실험 결과가 아닙니다.
+
+![실제 NanoCoFold 결과 탐색 화면: CPU 데모의 후보·모델 수와 MOCK 실제 예측 아님 표시](docs/images/04-cpu-demo-results.png)
+
+</details>
 
 작업의 실제 성공·실패·미시작 수와 로그를 확인하세요. 예측 성공이 선별 통과를 의미하지 않으며,
 선별 통과가 실험 결합이나 KD 확인을 의미하지 않습니다. WT는 대조군입니다.
