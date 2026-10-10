@@ -37,8 +37,10 @@ if [ "$profile" != core ] || ! "$skip_system"; then
   if [ ! -r /etc/os-release ]; then echo "[오류] Ubuntu 버전을 확인할 수 없습니다." >&2; exit 1; fi
   # /etc/os-release is a trusted operating-system file.
   . /etc/os-release
-  case "${ID:-}:${VERSION_ID:-}" in ubuntu:22.04|ubuntu:24.04|ubuntu:26.04) ;; *)
-    echo "[오류] 지원 설치 대상은 Ubuntu 22.04/24.04/26.04 x86_64입니다." >&2; exit 1;; esac
+  if [ "${ID:-}" != ubuntu ]; then
+    echo "[오류] 전체 설치는 Ubuntu x86_64 컴퓨터에서 실행하세요." >&2; exit 1
+  fi
+  # Check actual runtime requirements below instead of enumerating Ubuntu releases.
 fi
 if [ "$profile" != core ]; then
   command -v nvidia-smi >/dev/null || { echo "[오류] nvidia-smi가 없습니다. NVIDIA 드라이버를 먼저 준비하세요." >&2; exit 1; }
