@@ -3,7 +3,7 @@
 단백질 서열에서 복합체 구조를 예측하고, 나노바디를 설계하거나 후보와 변이를 비교하는 프로그램입니다.
 결과는 표, 3D 구조, PAE와 HTML 보고서로 확인합니다.
 
-**현재 공개 버전: [v0.4.2](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.2)** ·
+**현재 공개 버전: [v0.4.3](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.3)** ·
 [변경 기록](CHANGELOG.md) · [업데이트 방법](docs/UPGRADING.md)
 
 ## 1. 준비할 컴퓨터
@@ -20,9 +20,9 @@ CUDA Toolkit·Conda·Docker도 이 안내의 필수 준비물이 아닙니다. N
 
 ## 2. 내려받고 한 번에 설치
 
-1. [소스 ZIP 받기](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.2/NanoCoFold_public-0.4.2.zip)를 누릅니다.
+1. [소스 ZIP 받기](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.3/NanoCoFold_public-0.4.3.zip)를 누릅니다.
 2. Ubuntu에서 ZIP을 압축 해제합니다.
-3. 압축을 푼 **`NanoCoFold_public-0.4.2` 폴더 안에서** 터미널을 엽니다.
+3. 압축을 푼 **`NanoCoFold_public-0.4.3` 폴더 안에서** 터미널을 엽니다.
    그 폴더에 `README.md`, `install.sh`, `start.sh`가 보이면 맞습니다.
 4. 아래 명령을 실행합니다.
 
@@ -46,6 +46,11 @@ bash install.sh --gpu GPU-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 다운로드 중단 후에는 **같은 명령**으로 다시 설치할 수 있습니다. 기존 모델·부분 다운로드·실패 기록은
 보존하며, 전체 파일 해시와 준비 점검을 통과해야 완료로 표시합니다.
 다른 설치나 분석이 실행 중일 때는 중복 실행하지 마세요.
+
+`Failed to initialize NVML: Driver/library version mismatch`가 보이면 NVIDIA 드라이버와
+라이브러리의 버전이 맞지 않는 상태입니다. Python 패키지를 다시 설치해도 해결되지 않습니다.
+드라이버 업데이트 뒤 재부팅이 아직 필요한지 관리자와 확인하고, `nvidia-smi`가 정상적으로
+GPU 표를 출력한 뒤 설치를 다시 실행하세요. `[설치 완료]` 전에는 `bash start.sh`를 실행하지 않습니다.
 
 기본 작업 공간은 `.nanocofold/workspace`입니다. 별도 디스크에 설치하려면
 `bash install.sh --workspace /절대/경로/workspace`를 사용합니다.

@@ -23,7 +23,11 @@ def shell_host(tmp_path):
     calls = tmp_path / "runtime-calls"
     for name, body in {
         "uname": 'case "$1" in -s) echo "${TEST_KERNEL}";; -m) echo "${TEST_ARCH}";; esac',
-        "nvidia-smi": 'exit "${TEST_NVIDIA_EXIT}"',
+        "nvidia-smi": '''case "$TEST_NVIDIA_STREAM" in
+stdout) printf '%s\\n' "$TEST_NVIDIA_MESSAGE";;
+stderr) printf '%s\\n' "$TEST_NVIDIA_MESSAGE" >&2;;
+esac
+exit "$TEST_NVIDIA_EXIT"''',
         "python3": 'printf "%s\\n" "$@" > "$HOST_CALLS"',
         "sudo": 'echo "Unexpected system mutation" >&2; exit 99',
     }.items():
@@ -31,14 +35,16 @@ def shell_host(tmp_path):
         path.write_text("#!/bin/sh\n" + body + "\n")
         path.chmod(0o755)
 
-    def check(distribution="ubuntu", version="25.10", kernel="Linux", architecture="x86_64", nvidia_exit=0):
+    def check(distribution="ubuntu", version="25.10", kernel="Linux", architecture="x86_64", nvidia_exit=0,
+              nvidia_stream="silent", nvidia_message="", arguments=("--check-host",)):
         release.write_text(f'ID="{distribution}"\nVERSION_ID="{version}"\n')
         environment = {
             **os.environ, "PATH": str(binaries) + os.pathsep + os.environ["PATH"],
             "TEST_KERNEL": kernel, "TEST_ARCH": architecture,
             "TEST_NVIDIA_EXIT": str(nvidia_exit), "HOST_CALLS": str(calls),
+            "TEST_NVIDIA_STREAM": nvidia_stream, "TEST_NVIDIA_MESSAGE": nvidia_message,
         }
-        result = subprocess.run(["bash", str(shell), "--check-host"],
+        result = subprocess.run(["bash", str(shell), *arguments],
                                 capture_output=True, text=True, env=environment, timeout=10)
         return result, calls
 
@@ -70,6 +76,24 @@ def test_nvidia_failure_still_stops_the_shell(shell_host):
     result, calls = shell_host(version="24.04", nvidia_exit=255)
     assert result.returncode == 255
     assert not calls.exists()
+
+
+@pytest.mark.parametrize("arguments", [("--check-host",), ()], ids=["host-check", "default-install"])
+@pytest.mark.parametrize("nvidia_exit", [18, 255])
+@pytest.mark.parametrize("stream", ["stdout", "stderr", "silent"])
+def test_nvidia_error_is_visible_and_stops_before_installation(shell_host, arguments, nvidia_exit, stream):
+    message = "Failed to initialize NVML: Driver/library version mismatch\nNVML library version: 595.99"
+    result, calls = shell_host(version="26.04", nvidia_exit=nvidia_exit, nvidia_stream=stream,
+                               nvidia_message=message, arguments=arguments)
+    assert result.returncode == nvidia_exit
+    assert "[설치 오류]" in result.stderr and "nvidia-smi" in result.stderr
+    assert f"exit {nvidia_exit}" in result.stderr
+    assert "드라이버" in result.stderr
+    if stream != "silent":
+        assert message in result.stderr
+    assert "Unexpected system mutation" not in result.stderr
+    assert not calls.exists()
+    assert not (calls.parent / ".nanocofold/install-location.json").exists()
 
 
 @pytest.mark.parametrize("libc,version", [("glibc", "2.33"), ("glibc", "N/A"), ("musl", "1.2")])

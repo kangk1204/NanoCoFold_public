@@ -44,7 +44,15 @@ if [ "$profile" != core ] || ! "$skip_system"; then
 fi
 if [ "$profile" != core ]; then
   command -v nvidia-smi >/dev/null || { echo "[오류] nvidia-smi가 없습니다. NVIDIA 드라이버를 먼저 준비하세요." >&2; exit 1; }
-  nvidia-smi -L >/dev/null
+  if nvidia_output="$(nvidia-smi -L 2>&1)"; then
+    :
+  else
+    nvidia_status=$?
+    echo "[설치 오류] nvidia-smi가 GPU를 읽지 못했습니다 (exit $nvidia_status)." >&2
+    if [ -n "$nvidia_output" ]; then printf '%s\n' "$nvidia_output" >&2; fi
+    echo "NVIDIA 드라이버 상태를 먼저 확인하세요. 설치나 드라이버 변경을 시작하지 않았습니다." >&2
+    exit "$nvidia_status"
+  fi
 fi
 if ! "$skip_system" && ! "$check_only"; then
   if [ "$(id -u)" -eq 0 ]; then
