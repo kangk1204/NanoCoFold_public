@@ -1497,8 +1497,10 @@ function focusButton(label, labels, text, measurement) {
   const button = el("button", label, "secondary");
   button.onclick = async () => {
     try {
+      const viewer = state.viewer, data = state.structure;
       await focusStructure(labels, text);
-      if (measurement) await state.viewer.distance(...measurement);
+      if (state.viewer !== viewer || state.structure !== data) return;
+      if (measurement) await viewer.distance(...measurement);
     } catch (error) { notice(error.message, true); }
   };
   return button;
@@ -1804,12 +1806,14 @@ function setupExplorer() {
   action("measure-result-distance", async () => {
     const a = $("residue-a").value, b = $("residue-b").value;
     if (!a || !b || a === b) throw Error("서로 다른 두 잔기를 선택하세요.");
-    const residues = state.structure?.chains.flatMap(c => c.residues) || [];
+    const viewer = state.viewer, data = state.structure;
+    const residues = data?.chains.flatMap(c => c.residues) || [];
     const caA = residues.find(r => r.label === a)?.ca, caB = residues.find(r => r.label === b)?.ca;
     if (!caA || !caB) throw Error("Cα 좌표가 없는 잔기입니다.");
     const distance = Math.hypot(...caA.map((v, i) => v - caB[i]));
     await focusStructure([a, b], `${a}:CA – ${b}:CA · ${distance.toFixed(3)} Å`);
-    await state.viewer.distance(a, b);
+    if (state.viewer !== viewer || state.structure !== data) return;
+    await viewer.distance(a, b);
   });
   action("export-result", exportResult);
 }
