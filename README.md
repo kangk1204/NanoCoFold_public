@@ -3,7 +3,7 @@
 단백질 서열에서 복합체 구조를 예측하고, 나노바디를 설계하거나 후보와 변이를 비교하는 프로그램입니다.
 결과는 표, 3D 구조, PAE와 HTML 보고서로 확인합니다.
 
-**현재 공개 버전: [v0.4.3](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.3)** ·
+**현재 공개 버전: [v0.4.4](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.4)** ·
 [변경 기록](CHANGELOG.md) · [업데이트 방법](docs/UPGRADING.md)
 
 ## 1. 준비할 컴퓨터
@@ -20,9 +20,9 @@ CUDA Toolkit·Conda·Docker도 이 안내의 필수 준비물이 아닙니다. N
 
 ## 2. 내려받고 한 번에 설치
 
-1. [소스 ZIP 받기](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.3/NanoCoFold_public-0.4.3.zip)를 누릅니다.
+1. [소스 ZIP 받기](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.4/NanoCoFold_public-0.4.4.zip)를 누릅니다.
 2. Ubuntu에서 ZIP을 압축 해제합니다.
-3. 압축을 푼 **`NanoCoFold_public-0.4.3` 폴더 안에서** 터미널을 엽니다.
+3. 압축을 푼 **`NanoCoFold_public-0.4.4` 폴더 안에서** 터미널을 엽니다.
    그 폴더에 `README.md`, `install.sh`, `start.sh`가 보이면 맞습니다.
 4. 아래 명령을 실행합니다.
 
@@ -145,6 +145,16 @@ IL‑6와의 결합 자세를 정답으로 제공하는 예제가 아닙니다.
 
 6. **선택한 1개 분석 실행**을 누르면 계산을 제출합니다. **작업·로그**에서 진행 상황을 확인하고,
    완료 후 **결과 탐색**에서 실행을 선택합니다. 같은 작업을 중복 제출하지 마세요.
+
+결과에서 후보를 고른 뒤 뷰어 위의 **표적 선택**·**나노바디 선택**을 누르면 해당 체인이 강조되고 확대됩니다.
+**전체 구조 보기**로 복합체 전체를 다시 보고, **선택 해제**로 강조를 지웁니다.
+complex 모드에서는 **기준 체인 선택**·**파트너 선택**으로 표시합니다. 아래 표적·VHH 체크박스는 표시/숨김을 조절합니다.
+
+![공개 IL-6 예제의 실제 결과: 확대된 MolStar와 표적·나노바디 선택 버튼](docs/images/05-result-chain-viewer.png)
+
+이 화면은 공개 예제의 실제 Boltz-2 예측을 보존한 보고서에 v0.4.4 UI를 적용한 모습입니다.
+원본 계산은 v0.4.1·RTX 5070 Ti에서 수행했고, 이 UI 변경으로 다시 계산하지 않았습니다.
+예측 점수와 선별 판정은 원본 그대로이며 실제 결합·KD 확인 결과는 아닙니다.
 
 화면의 **JSON 데모 예제** 버튼은 합성 데이터로 흐름을 연습하는 기능입니다.
 위 공개 단백질의 실제 예측을 하려면 파일 선택으로 해당 JSON을 업로드하세요.

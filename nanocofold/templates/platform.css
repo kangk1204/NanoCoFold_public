@@ -417,7 +417,8 @@ dd {
 #viewer-candidate-position{font-size:16px;white-space:nowrap}
 #candidate-status{overflow-wrap:anywhere;margin-bottom:12px}
 #candidate-details-panel{border-top:1px solid var(--line);margin-top:16px}
-.candidate-workbench #structure-view{height:clamp(260px,calc(100vh - 560px),420px)}
+.candidate-workbench #structure-view{height:clamp(520px,calc(200vh - 1120px),840px)}
+.viewer-chain-controls{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 #candidate-title{scroll-margin-top:16px}
 .report-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:stretch}
 .report-workbench .card{margin-bottom:0}.report-metrics .chart{height:300px;min-height:300px}
@@ -425,7 +426,7 @@ dd {
 .report-structure{width:100%}#structure-view{height:620px}
 @media(max-width:1100px){.report-metrics{grid-template-columns:minmax(0,1fr)}#structure-view{height:500px}}
 @media(max-width:700px){#view-results .card{padding:18px}#view-results h1{font-size:28px}.report-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.report-nav a{flex:1 1 160px}#view-results .inline{flex-wrap:wrap}#structure-view{height:390px}}
-@media(max-width:700px){.candidate-workbench #structure-view{height:360px}.candidate-navigation{flex-wrap:wrap}.candidate-navigation label{width:100%}.candidate-navigation select{flex-basis:100%}.candidate-step-controls{width:100%}.candidate-workbench .viewer-display-controls{gap:8px;padding:8px}}
+@media(max-width:700px){.candidate-workbench #structure-view{height:720px}.candidate-navigation{flex-wrap:wrap}.candidate-navigation label{width:100%}.candidate-navigation select{flex-basis:100%}.candidate-step-controls{width:100%}.candidate-workbench .viewer-display-controls{gap:8px;padding:8px}}
 @media(max-width:700px){.candidate-navigation label{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}}
 @media print{#view-results :is(.report-nav,.inline.toggles,button){display:none!important}#view-results .card{break-inside:avoid;border-color:#ccc;box-shadow:none}.report-workbench,.report-metrics{display:block}.report-workbench .card{margin-bottom:16px}#view-results .scroll{max-height:none;overflow:visible}#candidate-table td:first-child{position:static}#view-results pre{max-height:none;white-space:pre-wrap}#structure-view{height:380px!important}}
 @media print{.candidate-workbench{display:block}.candidate-workbench .report-structure{position:static}.candidate-navigation{display:none}}

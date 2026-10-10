@@ -1447,6 +1447,7 @@ function disposeResultViewer() {
   state.viewerRequest = (state.viewerRequest || 0) + 1;
   state.viewer?.dispose(); state.viewer = null; state.viewerData = null;
   $("structure-view").replaceChildren();
+  syncResultChainControls();
   for (const id of ["structure-actions", "cdr-actions"]) $(id).replaceChildren();
   $("reference-note").textContent = "";
   for (const id of ["residue-a", "residue-b"]) $(id).replaceChildren();
@@ -1456,6 +1457,33 @@ function resultLayers() {
 }
 function resultDisplay() {
   return Object.fromEntries([...document.querySelectorAll("[data-viewer-display]")].map(node => [node.dataset.viewerDisplay, node.checked]));
+}
+function resultChain(role) {
+  const data = state.structure;
+  const id = role === "target" ? data?.target_chain : data?.binder_chain;
+  return data?.chains?.find(chain => chain.id === id);
+}
+function syncResultChainControls() {
+  const complex = state.result?.mode === "complex";
+  for (const role of ["target", "binder"]) {
+    const button = $("select-result-" + role), chain = resultChain(role);
+    const label = role === "target" ? (complex ? "기준 체인" : "표적") : (complex ? "파트너" : "나노바디");
+    button.textContent = label + " 선택";
+    button.disabled = !state.viewer || !chain?.residues?.length;
+    button.title = chain?.residues?.length ? `체인 ${chain.id} · ${chain.residues.length}개 잔기를 선택하고 확대합니다.` : "해당 체인의 좌표가 없습니다.";
+  }
+}
+async function focusResultChain(role) {
+  const data = state.structure, viewer = state.viewer, chain = resultChain(role);
+  if (!viewer || !chain?.residues?.length) throw Error("선택할 체인의 구조가 준비되지 않았습니다.");
+  // Reveal a hidden chain before selecting its saved residue labels.
+  const toggle = document.querySelector(`[data-layer="${chain.role}"]`);
+  if (toggle) toggle.checked = true;
+  await viewer.layers(resultLayers());
+  if (state.structure !== data || state.viewer !== viewer) return;
+  await viewer.focus(chain.residues.map(residue => residue.label));
+  if (state.structure !== data || state.viewer !== viewer) return;
+  $("structure-note").textContent = `${$("select-result-" + role).textContent} · 체인 ${chain.id} · ${chain.residues.length}개 잔기`;
 }
 async function focusStructure(labels, text) {
   if (!state.viewer) throw Error("MolStar 구조가 준비될 때까지 기다리세요.");
@@ -1497,6 +1525,7 @@ async function renderStructure() {
     }
     if (request !== state.viewerRequest || state.structure !== data) { viewer.dispose(); return; }
     state.viewer = viewer;
+    syncResultChainControls();
   } else if (!state.viewer) {
     try { await state.viewerReady; } catch { return; }
     if (state.structure !== data || !state.viewer) return;
@@ -1751,6 +1780,8 @@ function setupExplorer() {
     }
   });
   action("fit-result-structure", () => state.viewer?.fit());
+  for (const role of ["target", "binder"])
+    action("select-result-" + role, () => focusResultChain(role));
   action("clear-result-selection", async () => {
     await state.viewer?.clearSelection();
     $("structure-note").textContent = "잔기 선택 강조를 해제했습니다.";

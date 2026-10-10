@@ -427,7 +427,12 @@
                 </div>
               </div>
               <p id="candidate-status" class="muted" role="status"></p>
-
+              <div class="inline viewer-chain-controls" aria-label="체인 선택과 구조 확대">
+                <button id="select-result-target" type="button" class="secondary" disabled>표적 선택</button>
+                <button id="select-result-binder" type="button" class="secondary" disabled>나노바디 선택</button>
+                <button id="fit-result-structure" type="button" class="secondary">전체 구조 보기</button>
+                <button id="clear-result-selection" type="button" class="secondary">선택 해제</button>
+              </div>
               <div
                 id="structure-view"
                 role="region"
@@ -436,10 +441,8 @@
               <div class="viewer-display-controls" aria-label="구조 표시 옵션">
                 <label><input type="checkbox" data-viewer-display="sequence" >서열 패널 표시</label>
                 <label><input type="checkbox" data-viewer-display="residues" >잔기·곁사슬 표시</label>
-                <button id="clear-result-selection" type="button" class="secondary">선택 해제</button>
               </div>
               <div class="inline">
-                <button id="fit-result-structure" type="button" class="secondary">전체 구조 보기</button>
                 <button id="save-result-structure" type="button" class="secondary">선택 예측 구조 저장</button>
                 <label for="residue-a">잔기 1</label><select id="residue-a"></select>
                 <label for="residue-b">잔기 2</label><select id="residue-b"></select>

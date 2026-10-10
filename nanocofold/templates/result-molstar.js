@@ -38,6 +38,7 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
       });
       await result.display({sequence: false, residues: false});
       result.fit();
+      result.observeResize(host);
       return result;
     } catch (error) { result.dispose(); throw error; }
   }
@@ -167,5 +168,38 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     return {label, chain, number, icode, mapping};
   }
   fit() { if (!this.disposed) this.viewer.plugin.managers.camera.reset(); }
-  dispose() { if (!this.disposed) { this.disposed = true; this.viewer.dispose(); } }
+  observeResize(host) {
+    if (typeof ResizeObserver === "undefined") return;
+    this.resizeObserver = new ResizeObserver(() => {
+      cancelAnimationFrame(this.resizeFrame);
+      this.viewer.handleResize();
+      let remaining = 120;
+      const fitWhenReady = () => {
+        if (this.disposed || host.clientWidth === 0 || host.clientHeight === 0) return;
+        const canvas = host.querySelector("canvas"), viewport = this.viewer.plugin.canvas3d?.camera.viewport;
+        if (!canvas || !viewport) return;
+        const rect = canvas.getBoundingClientRect();
+        // MolStar resizes its drawing buffer after the CSS layout changes.
+        // Fit only once the camera uses the new aspect ratio.
+        if (Math.abs(viewport.width / viewport.height - rect.width / rect.height) > 0.002) {
+          if (--remaining > 0) this.resizeFrame = requestAnimationFrame(fitWhenReady);
+          return;
+        }
+        const camera = this.viewer.plugin.managers.camera;
+        if (this.selectedLabels?.length)
+          camera.focusLoci(this.loci(this.selectedLabels), {durationMs: 0});
+        else camera.reset(undefined, 0);
+      };
+      this.resizeFrame = requestAnimationFrame(fitWhenReady);
+    });
+    this.resizeObserver.observe(host);
+  }
+  dispose() {
+    if (!this.disposed) {
+      this.disposed = true;
+      this.resizeObserver?.disconnect();
+      cancelAnimationFrame(this.resizeFrame);
+      this.viewer.dispose();
+    }
+  }
 };
