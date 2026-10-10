@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "mode": "complex",
+  "name": "tutorial-barnase-barstar",
+  "api_consent": false,
+  "entries": [
+    {
+      "id": "barnase_barstar",
+      "proteins": [
+        {
+          "name": "Barnase_1BRS",
+          "sequence": "AQVINTFDGVADYLQTYHKLPDNYITKSEAQALGWVASKGNLADVAPGKSIGGDIFSNREGKLPGKSGRTWREADINYTSGFRNSDRILYSSDWLIYKTTDHYQTFTKIR",
+          "copies": 1,
+          "reference_chain": "A",
+          "source": "RCSB PDB 1BRS entity 1"
+        },
+        {
+          "name": "Barstar_1BRS_C40A_C82A",
+          "sequence": "KKAVINGEQIRSISDLHQTLKKELALPEYYGENLDALWDALTGWVEYPLVLEWRQFEQSKQLTENGAESVLQVFREAKAEGADITIILS",
+          "copies": 1,
+          "reference_chain": "D",
+          "source": "RCSB PDB 1BRS entity 2; deposited C40A/C82A construct"
+        }
+      ],
+      "settings": {
+        "engine": "boltz2",
+        "seeds": [
+          42
+        ],
+        "recycles": 3,
+        "diffusion_steps": 200,
+        "models_per_seed": 1
+      },
+      "config": {
+        "report": {
+          "pymol_sessions": false
+        }
+      }
+    }
+  ]
+}

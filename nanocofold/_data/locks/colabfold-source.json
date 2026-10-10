@@ -1,0 +1,338 @@
+{
+  "schema_version": 1,
+  "python": "3.12",
+  "platform": "linux-x86_64",
+  "origin": "Pinned dependency inventory for the public distribution; installation readiness is checked on the destination host.",
+  "packages": [
+    {
+      "name": "absl-py",
+      "version": "1.4.0",
+      "direct_url": null
+    },
+    {
+      "name": "alphafold-colabfold",
+      "version": "2.3.20",
+      "direct_url": null
+    },
+    {
+      "name": "appdirs",
+      "version": "1.4.4",
+      "direct_url": null
+    },
+    {
+      "name": "attrs",
+      "version": "26.1.0",
+      "direct_url": null
+    },
+    {
+      "name": "biopython",
+      "version": "1.85",
+      "direct_url": null
+    },
+    {
+      "name": "certifi",
+      "version": "2026.7.22",
+      "direct_url": null
+    },
+    {
+      "name": "charset-normalizer",
+      "version": "3.5.2",
+      "direct_url": null
+    },
+    {
+      "name": "chex",
+      "version": "0.1.90",
+      "direct_url": null
+    },
+    {
+      "name": "colabfold",
+      "version": "1.6.3",
+      "direct_url": null
+    },
+    {
+      "name": "colabfold-binaries",
+      "version": "0.1.0",
+      "direct_url": null
+    },
+    {
+      "name": "colabfold-legacy-kernels",
+      "version": "0.2.0",
+      "direct_url": null
+    },
+    {
+      "name": "contourpy",
+      "version": "1.4.0",
+      "direct_url": null
+    },
+    {
+      "name": "cycler",
+      "version": "0.12.1",
+      "direct_url": null
+    },
+    {
+      "name": "dm-haiku",
+      "version": "0.0.17",
+      "direct_url": null
+    },
+    {
+      "name": "dm-tree",
+      "version": "0.1.10",
+      "direct_url": null
+    },
+    {
+      "name": "fonttools",
+      "version": "4.66.1",
+      "direct_url": null
+    },
+    {
+      "name": "idna",
+      "version": "3.20",
+      "direct_url": null
+    },
+    {
+      "name": "immutabledict",
+      "version": "4.3.1",
+      "direct_url": null
+    },
+    {
+      "name": "importlib-metadata",
+      "version": "8.9.0",
+      "direct_url": null
+    },
+    {
+      "name": "jax",
+      "version": "0.11.2",
+      "direct_url": null
+    },
+    {
+      "name": "jax-cuda13-pjrt",
+      "version": "0.11.2",
+      "direct_url": null
+    },
+    {
+      "name": "jax-cuda13-plugin",
+      "version": "0.11.2",
+      "direct_url": null
+    },
+    {
+      "name": "jaxlib",
+      "version": "0.11.2",
+      "direct_url": null
+    },
+    {
+      "name": "jmp",
+      "version": "0.0.4",
+      "direct_url": null
+    },
+    {
+      "name": "kiwisolver",
+      "version": "1.5.1",
+      "direct_url": null
+    },
+    {
+      "name": "matplotlib",
+      "version": "3.11.2",
+      "direct_url": null
+    },
+    {
+      "name": "ml-collections",
+      "version": "1.1.0",
+      "direct_url": null
+    },
+    {
+      "name": "ml-dtypes",
+      "version": "0.6.0",
+      "direct_url": null
+    },
+    {
+      "name": "numpy",
+      "version": "2.5.3",
+      "direct_url": null
+    },
+    {
+      "name": "nvidia-cublas",
+      "version": "13.8.1.7",
+      "direct_url": null
+    },
+    {
+      "name": "nvidia-cuda-cccl",
+      "version": "13.3.4.3.1",
+      "direct_url": null
+    },
+    {
+      "name": "nvidia-cuda-crt",
+      "version": "13.4.92",
+      "direct_url": null
+    },
+    {
+      "name": "nvidia-cuda-cupti",
+      "version": "13.4.92",
+      "direct_url": null
+    },
+    {
+      "name": "nvidia-cuda-nvcc",
+      "version": "13.4.92",
+      "direct_url": null
+    },
+    {
+      "name": "nvidia-cuda-nvrtc",
+      "version": "13.4.92",
+      "direct_url": null
+    },
+    {
+      "name": "nvidia-cuda-runtime",
+      "version": "13.4.92",
+      "direct_url": null
+    },
+    {
+      "name": "nvidia-cudnn-cu13",
+      "version": "9.27.0.42",
+      "direct_url": null
+    },
+    {
+      "name": "nvidia-cufft",
+      "version": "12.4.0.43",
+      "direct_url": null
+    },
+    {
+      "name": "nvidia-cusolver",
+      "version": "12.3.4.7",
+      "direct_url": null
+    },
+    {
+      "name": "nvidia-cusparse",
+      "version": "12.8.6.72",
+      "direct_url": null
+    },
+    {
+      "name": "nvidia-nccl-cu13",
+      "version": "2.32.3",
+      "direct_url": null
+    },
+    {
+      "name": "nvidia-nvjitlink",
+      "version": "13.4.92",
+      "direct_url": null
+    },
+    {
+      "name": "nvidia-nvshmem-cu13",
+      "version": "3.8.0",
+      "direct_url": null
+    },
+    {
+      "name": "nvidia-nvvm",
+      "version": "13.4.92",
+      "direct_url": null
+    },
+    {
+      "name": "opt-einsum",
+      "version": "3.4.0",
+      "direct_url": null
+    },
+    {
+      "name": "orjson",
+      "version": "3.12.0",
+      "direct_url": null
+    },
+    {
+      "name": "packaging",
+      "version": "26.3",
+      "direct_url": null
+    },
+    {
+      "name": "pandas",
+      "version": "2.3.3",
+      "direct_url": null
+    },
+    {
+      "name": "pillow",
+      "version": "12.3.0",
+      "direct_url": null
+    },
+    {
+      "name": "py3dmol",
+      "version": "2.5.5",
+      "direct_url": null
+    },
+    {
+      "name": "pyparsing",
+      "version": "3.3.3",
+      "direct_url": null
+    },
+    {
+      "name": "python-dateutil",
+      "version": "2.9.0.post0",
+      "direct_url": null
+    },
+    {
+      "name": "pytz",
+      "version": "2026.4",
+      "direct_url": null
+    },
+    {
+      "name": "pyyaml",
+      "version": "6.0.3",
+      "direct_url": null
+    },
+    {
+      "name": "requests",
+      "version": "2.34.2",
+      "direct_url": null
+    },
+    {
+      "name": "scipy",
+      "version": "1.18.1",
+      "direct_url": null
+    },
+    {
+      "name": "setuptools",
+      "version": "84.0.0",
+      "direct_url": null
+    },
+    {
+      "name": "six",
+      "version": "1.17.0",
+      "direct_url": null
+    },
+    {
+      "name": "tabulate",
+      "version": "0.10.0",
+      "direct_url": null
+    },
+    {
+      "name": "toolz",
+      "version": "1.1.0",
+      "direct_url": null
+    },
+    {
+      "name": "tqdm",
+      "version": "4.70.1",
+      "direct_url": null
+    },
+    {
+      "name": "typing-extensions",
+      "version": "4.16.0",
+      "direct_url": null
+    },
+    {
+      "name": "tzdata",
+      "version": "2026.4",
+      "direct_url": null
+    },
+    {
+      "name": "urllib3",
+      "version": "2.8.0",
+      "direct_url": null
+    },
+    {
+      "name": "wrapt",
+      "version": "2.5.0",
+      "direct_url": null
+    },
+    {
+      "name": "zipp",
+      "version": "4.1.0",
+      "direct_url": null
+    }
+  ]
+}

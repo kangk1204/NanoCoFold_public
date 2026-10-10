@@ -1,0 +1,121 @@
+<style>
+/* Report inputs use 48px hit targets; MolStar's sequence bar is 24px tall.
+   Keep the report rule from enlarging selects inside that fixed vendor bar. */
+#native-molstar .msp-plugin button,
+#native-molstar .msp-plugin input,
+#native-molstar .msp-plugin select { min-height:initial; }
+#native-molstar .msp-viewport-controls-panel {
+  max-width:var(--molstar-menu-width,290px);
+}
+#native-molstar .msp-viewport-controls-panel-controls {
+  max-height:var(--molstar-menu-height,400px);
+}
+@media(max-width:700px) {
+  #native-molstar .msp-sequence-select {
+    display:flex; flex-wrap:wrap; align-content:flex-start; height:48px;
+  }
+  #native-molstar .msp-sequence-select > span,
+  #native-molstar .msp-sequence-select > select { flex:none; }
+  #native-molstar .msp-sequence-wrapper-non-empty { top:49px; }
+}
+</style>
+<div class="native-viewer-controls">
+  <label>선택 모델 <select id="native-model"></select></label>
+  <label>좌표 보기 <select id="native-frame"><option value="raw">원본 예측 좌표</option><option value="overlay">표적 Cα 정렬 · 정답 중첩</option><option value="reference">실험 정답 구조</option></select></label>
+</div>
+<div id="native-metrics" class="native-metrics" aria-live="polite"></div>
+<p id="native-loading" role="status">MolStar를 준비하는 중…</p>
+<div id="native-molstar" style="height:560px;position:relative" aria-label="선택 모델의 MolStar 구조"></div>
+<div class="native-viewer-controls">
+  <button type="button" id="native-fit">전체 보기</button><button type="button" data-focus-chain="A">표적</button><button type="button" data-focus-chain="B">VHH</button>
+  <button type="button" id="native-download">원본 예측 구조 저장</button><button type="button" id="native-reference-download">정답 구조 저장</button>
+</div>
+<p class="muted">파랑: 표적 · 황토색: VHH · 중첩 시 회색: 실험 정답. ‘표적 Cα 정렬’은 보존된 정렬 좌표를 표시합니다. 원본 좌표와 점수는 변경하지 않습니다. 아래 모델 표의 ‘3D 보기’로도 선택할 수 있습니다.</p>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const data = window.NANOCOFOLD_NATIVE_DELIVERY, select = document.getElementById('native-model');
+  const frame = document.getElementById('native-frame'), status = document.getElementById('native-loading');
+  let viewerPromise, queue = Promise.resolve(), serial = 0, currentStructure;
+  const host = document.getElementById('native-molstar');
+  const resizeMenus = () => {
+    host.style.setProperty('--molstar-menu-width', Math.max(120, host.clientWidth - 68) + 'px');
+    host.style.setProperty('--molstar-menu-height', Math.max(160, host.clientHeight - 80) + 'px');
+  };
+  resizeMenus();
+  new ResizeObserver(resizeMenus).observe(host);
+  const format = value => Number.isFinite(value) ? value.toFixed(3) : '미평가';
+  const labels = {colabfold:'ColabFold',boltz2:'Boltz-2',chai1:'Chai-1'};
+  for (const row of data.rows) {
+    const option = document.createElement('option');option.value = row.id;
+    option.textContent = `${row.pdb_id} · ${labels[row.engine]||row.engine} · hotspot ${row.arm==='on'?'사용':'미사용'}`;
+    select.append(option);
+  }
+  const record = () => data.rows.find(row => row.id === select.value);
+  const getViewer = () => viewerPromise ||= molstar.Viewer.create('native-molstar', {
+    extensions:[],layoutIsExpanded:false,layoutShowControls:true,layoutShowRemoteState:false,
+    layoutShowSequence:true,layoutShowLog:false,layoutShowLeftPanel:false,collapseRightPanel:true,
+    viewportShowExpand:false,viewportShowToggleFullscreen:false,viewportShowControls:true,
+    viewportShowSelectionMode:true,viewportShowAnimation:false,volumeStreamingDisabled:true,viewportBackgroundColor:'#ffffff'
+  });
+  async function load(plugin, key, label, reference=false) {
+    const asset = data.coordinates[key];
+    if (!asset) throw Error('이 모델의 구조는 미평가 또는 파일 누락입니다.');
+    const raw = await plugin.builders.data.rawData({data:asset.content,label});
+    const trajectory = await plugin.builders.structure.parseTrajectory(raw,asset.format==='cif'?'mmcif':'pdb');
+    const model = await plugin.builders.structure.createModel(trajectory);
+    const structure = await plugin.builders.structure.createStructure(model,{name:'model',params:{}});
+    const {StructureElement} = molstar.lib.structure;
+    for (const [chain,color] of [['A',0x3b82b2],['B',0xc49a40]]) {
+      const loci = StructureElement.Loci.fromSchema(structure.obj.data,{items:[{auth_asym_id:chain}]});
+      const component = await plugin.builders.structure.tryCreateComponent(structure,{
+        type:{name:'bundle',params:StructureElement.Bundle.fromLoci(loci)},nullIfEmpty:true,label:reference?'실험 정답 '+chain:chain==='A'?'표적':'VHH'
+      },`${reference?'ref':'pred'}-${chain}`);
+      if (component) await plugin.builders.structure.representation.addRepresentation(component,{
+        type:'cartoon',color:'uniform',colorParams:{value:reference?0x7a7f83:color},typeParams:{alpha:reference ? 0.38 : 1}
+      });
+    }
+    return structure;
+  }
+  function update() {
+    const row = record(), mode = frame.value, version = ++serial;
+    if (!row) return;
+    const metrics = document.getElementById('native-metrics');metrics.replaceChildren();
+    for (const [label,value] of [['DockQ ↑',row.DockQ],['ipTM ↑',row.iptm],['ipSAE ↑',row.ipsae],['계면 iRMSD (Å) ↓',row.DockQ_iRMSD_A]]) {
+      const box = document.createElement('div'), title = document.createElement('span'), number = document.createElement('strong');
+      title.textContent = label;number.textContent = format(value);number.title = Number.isFinite(value) ? String(value) : '미평가';box.append(title,number);metrics.append(box);
+    }
+    document.querySelectorAll('#models tbody tr').forEach(tr=>{tr.classList.toggle('native-selected',tr.dataset.id===row.id)});
+    status.textContent = `${row.pdb_id} · ${labels[row.engine]} 구조를 읽는 중…`;
+    queue = queue.catch(()=>{}).then(async () => {
+      if (version !== serial) return;
+      try {
+        const viewer = await getViewer(), plugin = viewer.plugin;
+        await plugin.clear();currentStructure = null;
+        currentStructure = await load(plugin,mode==='reference'?row.reference:mode==='overlay'?row.aligned:row.raw,
+          `${row.pdb_id} · ${mode==='reference'?'실험 정답':labels[row.engine]}`);
+        if (mode==='overlay') await load(plugin,row.reference,'실험 정답 · 표적 Cα 정렬',true);
+        plugin.managers.camera.reset({durationMs:0});
+        if (version === serial) status.textContent = `${row.pdb_id} · ${labels[row.engine]} · hotspot ${row.arm==='on'?'사용':'미사용'} · ${frame.options[frame.selectedIndex].text}`;
+      } catch(error) {if (version === serial) status.textContent = '구조 표시 오류: '+error.message;}
+    });
+  }
+  function download(key,name) {
+    const asset = data.coordinates[key];if (!asset) return;
+    const url = URL.createObjectURL(new Blob([asset.content],{type:'text/plain;charset=utf-8'}));
+    const link = document.createElement('a');link.href=url;link.download=name+'.'+asset.format;link.click();setTimeout(()=>URL.revokeObjectURL(url),10000);
+  }
+  select.addEventListener('change',update);frame.addEventListener('change',update);
+  document.getElementById('native-fit').addEventListener('click',async()=>{await queue;if(viewerPromise)(await viewerPromise).plugin.managers.camera.reset({durationMs:0})});
+  for (const button of document.querySelectorAll('[data-focus-chain]')) button.addEventListener('click',async()=>{
+    await queue;if (!currentStructure) return;
+    const loci = molstar.lib.structure.StructureElement.Loci.fromSchema(currentStructure.obj.data,{items:[{auth_asym_id:button.dataset.focusChain}]});
+    (await viewerPromise).plugin.managers.camera.focusLoci(loci);
+  });
+  document.getElementById('native-download').addEventListener('click',()=>{const r=record();download(r.raw,r.id+'_original')});
+  document.getElementById('native-reference-download').addEventListener('click',()=>{const r=record();download(r.reference,r.pdb_id+'_native')});
+  for (const button of document.querySelectorAll('[data-native-model]')) button.addEventListener('click',()=>{
+    select.value=button.dataset.nativeModel;update();document.getElementById('native-model').focus();document.getElementById('native-metrics').scrollIntoView({block:'start',behavior:'smooth'});
+  });
+  update();
+});
+</script>

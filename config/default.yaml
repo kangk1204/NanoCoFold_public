@@ -1,0 +1,329 @@
+# NanoCoFold 기본 설정
+# 모든 경로는 프로젝트 루트 기준 상대경로 또는 절대경로.
+# 이 파일을 복사해 프로젝트별 config를 만들고 CLI에서 --config 로 지정한다.
+
+run:
+  name: default            # 실행 ID 접두어 (비우면 타임스탬프 자동)
+  mode: design             # complex | design | screen | mature
+  analysis_preset: null    # optional input preset label; does not alter conditions
+  outdir: runs
+  seed: 42
+  dry_run: false           # true면 명령만 생성하고 실행하지 않음
+  mock: false              # true면 GPU/모델 없이 합성 데이터로 전체 흐름 검증
+  resume: true             # 이미 생성된 산출물은 재사용
+
+target:
+  name: target
+  sequence: ""             # 타깃 아미노산 서열 (fasta 보다 우선)
+  fasta: null              # 또는 FASTA 경로
+  pdb: null                # 실험 구조가 있으면 경로 지정 (.pdb/.cif)
+  chain: A                 # 타깃 체인 ID (구조 사용 시)
+  hotspots: auto           # auto | 정수 목록/문자열 예: [34, 67, "A:88"]
+  hotspot_set: null        # auto 세트 중 선택 (예: auto2). null이면 최상위 세트
+  aux_chains: []           # 복합체 문맥 보존용 보조 체인 [{name: partner, sequence: "..."}]
+                           # 필요한 단백질 파트너를 함께 폴딩/예측에 포함
+
+structure:
+  provider: boltz2         # boltz2 | chai1 | none | mock
+  boltz2:
+    env: envs/boltz2
+    extra_args: ["--no_kernels"]   # cu128/sm_120에서 cuequivariance 미지원 시 필수
+    recycling_steps: 3
+    diffusion_samples: 1
+  chai1:
+    env: envs/chai1
+    extra_args: []
+    seed: null            # null이면 run.seed를 사용; 결정론적 CUDA 래퍼
+    num_trunk_recycles: 3
+    num_diffn_timesteps: 200
+    num_diffn_samples: 1   # 모든 sample을 보존하고 표적 준비는 첫 sample 사용
+    msa_mode: single       # single(무MSA, 고속) | msa(공용 서버, allow_public_msa_server 필요)
+  allow_public_msa_server: false  # ColabFold 공용 MSA 서버 사용 명시 허용(기본 차단)
+  msa:
+    backend: cache         # cache | mmseqs | colabfold_search | empty
+    cache_dir: data/msa_cache
+    mmseqs_binary: tools/mmseqs/bin/mmseqs  # backend: mmseqs
+    db: null               # MMseqs DB 경로 (예: data/msa_db/uniref50_db)
+    threads: 8
+    sensitivity: 5.7       # 4.0 빠름 / 7.5 민감 (검색 시간에 큰 영향)
+    max_seqs: 300          # 프리필터 최대 히트 수
+    colabfold_search: null # colabfold_search 실행 파일 경로 (backend: colabfold_search)
+
+truncate:
+  enabled: true
+  radius: 30.0             # 핫스팟 CA 기준 유지 반경 (Å)
+  min_segment: 5           # 이 길이 미만 연속 구간 제거
+  keep_hetatm: false
+  keep_other_chains: false # 다중 체인 타깃에서 파트너 체인 유지
+
+hotspots:
+  auto:
+    num_sets: 3            # 제안할 핫스팟 세트 수
+    residues_per_set: [3, 6]
+    exposure_weight: 1.0
+    hydrophobicity_weight: 0.6
+    conservation_weight: 0.3
+    patch_radius: 12.0     # Å, 패치 클러스터 반경
+    exclude_terminal: 3    # 양끝 잔기 제외 수 (말단 아티팩트 방지)
+    min_relative_sasa: 0.25
+
+design:
+  engine: rfantibody
+  hotspot_mode: none
+  env: envs/rfantibody
+  env_vars: {}              # 모든 설계 하위 프로세스에 전달 (예: {OMP_NUM_THREADS: "4"})
+  framework: data/frameworks/h-NbBCII10.pdb
+  num_designs: 1000
+  loops: "H1:7,H2:6,H3:5-13"
+  chunk_size: 250
+  mpnn:
+    seqs_per_struct: 4
+    temperature: 0.2
+  rf2:
+    num_recycles: 10
+  extra_args: []           # Hydra 오버라이드. CPU는 env_vars: {CUDA_VISIBLE_DEVICES: ""}로 선택
+  deterministic: false     # rfdiffusion --deterministic 플래그
+  boltzgen:
+    env: envs/boltzgen
+    cache_dir: models/boltzgen
+    env_vars: {}
+    scaffold: null  # null uses design.framework
+    scaffold_chain: null  # required when scaffold has multiple chains
+    cdr_regions: null  # ANARCI(IMGT), or explicit 1-based sequence intervals
+    diffusion_batch_size: 1
+    inverse_fold_num_sequences: 1
+    num_workers: 1
+    sampling_steps: 500
+    folding_sampling_steps: 200
+    recycling_steps: 3
+    use_kernels: "false"
+  refinement:
+    enabled: false
+    library_size: 1000
+    parents_per_engine: 2
+    min_mutations: 1
+    max_mutations: 5
+    final_count: 100
+  filters:
+    enabled: true         # false면 RF2 점수를 보존하고 사전 탈락 없이 평가 풀 구성
+    rf2_pae: 10.0          # RF2 pAE 상한
+    design_rmsd: 2.0       # 설계 백본 vs RF2 예측 RMSD (Å)
+    top_n_to_score: 300    # 구조 스코어링 코어로 넘길 후보 수
+
+screen:
+  opendde:
+    enabled: true           # 네 엔진 독립 비교에 포함; 실행 전 환경·가중치를 검증
+    env: envs/opendde
+    data_dir: models/opendde
+    checkpoint: opendde_abag.pt
+    cycles: 10
+    steps: 200
+    samples: 1
+    dtype: fp32
+    attention_chunk_size: 4  # null keeps upstream chunk policy; 4 bounds triangle-attention memory
+  comparison:
+    enabled: false
+    engines: [colabfold, boltz2, chai1, opendde]
+    continue_on_error: true  # 실패도 엔진별 행으로 보존, 취소/시간 한도는 전파
+  colabfold:
+    env: envs/colabfold
+    data_dir: models/colabfold
+    num_recycles: 1
+    num_models: 1
+    num_seeds: 1
+    batch_size: 32
+    fast_kernels: true
+    msa_mode: precomputed    # validated local A3M; legacy single_sequence is read/mock only
+    msa_dir: null            # immutable run-local manifest; generated parent queries stay local
+    msa_cache_dir: msa/monomer_cache  # approved public/local monomer cache, never implicit network
+    msa_source: cache        # cache | local_mmseqs2 | public_mmseqs2(preset only) | public_api(explicit upload consent)
+    msa_max_sequences: 2048  # query + unique homologs per chain, bounded 2..10000
+  engine: chai1
+  env: envs/chai1
+  boltz2_env: envs/boltz2
+  vhh_fasta: null           # screen 모드 후보 나노바디 FASTA (CLI --vhh-fasta 보다 우선순위 낮음)
+  msa_mode: single          # single(무MSA, 고속) | msa
+  restraint:
+    enabled: true          # specificity 캠페인은 양쪽 모두 false로 비교
+    connection_type: pocket
+    max_distance: 11.0
+  num_trunk_recycles: 1     # 스크리닝 고속화 (정밀 평가는 Boltz-2 담당)
+  num_diffn_timesteps: 50
+  num_diffn_samples: 1
+  extra_args: []
+  env_vars: {}               # 예: {PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True}
+  binder_msa: false          # true면 나노바디 체인도 MSA 생성 (Boltz-2 정확도 향상, 시간 증가)
+  allow_public_msa_server: false  # ColabFold 공용 서버 사용 명시 허용(기본 차단, 라이선스)
+  tier2_n: 50               # 구조 스코어링 코어로 넘길 후보 수
+  boltz2_rescore_top: 0     # >0 이면 상위 N종을 Boltz-2로 정밀 재평가 (MSA 필요)
+  boltz2_pocket_max_distance: 6.0
+  cascade:
+    enabled: false         # opt-in: ColabFold 구조 탐색 후 별도 Boltz-2 최종 평가
+    top_n: 20              # 1차 지표 상위 후보 수 (WT/대조 후보는 추가)
+    ranking_metric: iptm   # 엔진 간 점수 합산 없이 ColabFold 안에서만 선별
+    diversity_n: 0         # 상위 후보와 다른 CDR3 후보 추가
+    diversity_identity: 0.85
+    audit_n: 2             # 상위/다양성 밖 후보를 Boltz-2로 평가하여 탈락 편향 탐색
+    audit_seed: null       # null이면 run.seed; 재현 가능한 hash 순서로 선택
+
+mature:
+  wt_sequence: ""          # 야생형 VHH 서열
+  wt_fasta: null
+  wt_structure: null       # WT 복합체/VHH 구조 (AntiFold 입력)
+  library:
+    strategy: dms          # dms(단일 변이 전수) | random(CDR 다중 변이 표본)
+    size: 10000            # random: WT 1개를 포함한 총 고유 서열 수
+    min_mutations: 1
+    max_mutations: 5
+    seed: null             # null이면 run.seed; 재개 시 동일 라이브러리
+  cdr:
+    scheme: imgt
+    source: auto           # auto(ANARCI) | config
+    regions: {}             # source=config: explicit 1-based sequence positions, not IMGT labels
+  anarci:
+    env: envs/antibody
+  exclude:
+    cys_substitution: true
+    wt_cys: true           # 야생형 Cys 위치 보호 (구조 이황화 결합)
+    wt_residue: true
+  prefilter:
+    mode: esm2             # esm2 | none | mock
+    enforce_threshold: true # false면 ESM/AntiFold를 계산하되 점수 컷으로 제외하지 않음
+    threshold_mode: absolute  # absolute | percentile
+    threshold: -2.0        # absolute 모드 컷오프 (ΔLLR)
+    percentile: 50         # percentile 모드: 상위 N% 유지
+    top_n: 200
+  esm:
+    env: envs/esm
+    model: esm2_t33_650M_UR50D
+  antifold:
+    enabled: true
+    env: envs/esm
+
+score:
+  contact_cutoff: 5.0      # 계면 접촉 (Å, 중원자)
+  hbond_cutoff: 3.5
+  salt_bridge_cutoff: 4.0
+  clash_cutoff: 2.0
+  interface_pae_cutoff: 10.0
+  thresholds:
+    ipsae: 0.60            # ipSAE 통과 기준
+    ipsae_gray: 0.40       # 회색지대 하한
+    iptm: 0.70
+    plddt_interface: 70.0
+    hotspot_contact_frac: 0.50
+    max_clashes: 0
+  ipsae:
+    official_script: null  # ipSAE 공식 스크립트 경로 (있으면 사용, MIT)
+    use_official: true     # 공식 스크립트가 있으면 결과를 우선 사용
+    dist_cutoff: 10.0      # 공식 출력 파일명·거리 보조 컬럼용; ipSAE의 PAE mask에는 무영향
+  boltz2_recycling_steps: 3
+  boltz2:
+    seed: null             # null이면 run.seed 사용
+  boltz2_num_subsampled_msa: 512
+  boltz2_extra_args: ["--no_kernels"]
+  boltz2_cpu_fp32: false   # CPU 전용 선택 옵션. extra_args의 --accelerator cpu 필요. 기본 GPU 경로는 유지
+
+developability:
+  reference_sequence: null # 서열 PLL 비교 기준 (null이면 첫 후보 사용)
+  hydrophobic_window: 5
+  hydrophobic_mean_kd: 1.6
+  max_cys: 2               # 정상 VHH: 프레임워크 2개 (추가 Cys 금지)
+  deamidation: ["NG", "NS", "DG", "DS"]
+  isomerization: ["DP", "DG"]
+  oxidation: ["M"]
+  glycosylation: "N[^P][ST]"
+  pI_min: 5.0
+  pI_max: 9.5
+  net_charge_min: -6.0
+  net_charge_max: 6.0
+
+rank:
+  # 탐색용 구조 검토 정책. 기존 final_eligible·엔진별 점수와 별도이며,
+  # 실험 결합/KD에 대해 보정된 기준이 아닙니다. 임계값과 판정 버전을 기록합니다.
+  pose_assessment:
+    enabled: true
+    contact_distance_A: 5.0
+    max_target_rmsd_A: 3.0
+    min_ca_coverage: 0.9
+    max_binder_rmsd_A: 5.0
+    min_contact_jaccard: 0.5
+    min_supporting_engines: 2
+    max_design_binder_rmsd_A: 5.0
+  weights:
+    ipsae: 1.0
+    iptm: 0.4
+    hotspot_contact_frac: 0.5
+    interface_pae: -0.3    # 음수 = 낮을수록 좋음
+    esm_score: 0.3         # 서열/폴딩 prior: mature=ΔLLR, design/screen=배치 mean log-prob z-score; 친화도 아님
+    antifold: 0.2          # 구조 조건부 서열 prior; 친화도 아님
+    n_clashes: -0.5        # 실제 컬럼명(n_clashes)과 일치해야 적용됨
+    dev_flags: -0.4        # 전체 평가 위험 수; 심한 5종만 세는 dev_severe 게이트와 다름
+  cdr3:
+    cluster_identity: 0.85
+    per_cluster: 1
+  final_n: 30
+  max_dev_severe: 1        # 이 개수 초과 시 final_eligible 제외
+  require_hotspot: false  # 접촉률은 결과 화면의 선택 필터. true는 기존 필수 선별 정책
+  fallback_to_ineligible: false  # true면 적격 후보가 없을 때 부적격 후보를 합성 목록에 포함
+  include_wt_control: false # true면 mature에서 WT를 대조군으로 함께 스코어링(선별/발주 제외)
+  diversity_pool: 200      # 랭킹 상위 이 풀에서 다양성 선별
+
+report:
+  title: "NanoCoFold"
+  top_n_table: 50
+  viewer: 3dmol            # 3dmol | none
+  allow_external_viewer: false # true와 HTTPS URL을 함께 명시할 때만 외부 뷰어 허용(인터넷 필요)
+  viewer_cdn: null         # 기본은 설치된 로컬 자산 필수
+  pymol_sessions: true
+
+handoff:
+  # true 이면 파이프라인 종료 시 handoff 게이트를 통과하지 못한 run 을 실패로 처리합니다(사람이
+  # 검토를 마치기 전에는 발주할 수 없으므로 기본 false).
+  # 미통과 시 리포트와 05_final/handoff_gate.json 을 남기고 종료 코드 3 을 반환합니다.
+  # mock 실행은 어차피 발주할 수 없으므로 이 차단에서 제외합니다(경고와 게이트 기록은 남습니다).
+  require_gate: false
+
+expression:
+  host: ecoli_periplasmic  # ecoli_periplasmic | mammalian
+  signal_peptide: "MKYLLPTAAAGLLLLAAQPAMA"   # pelB
+  tag: "GGGSGGGSHHHHHH"                        # C-terminal linker-His6
+  codon_optimize: true
+  organism_codons: ecoli
+  vector: null             # 발주 전 명시
+  order_format: dna        # dna | aa
+  construct_reviewed: false
+  vendor_constraints_reviewed: false
+
+specificity:
+  enabled: false
+  species: null
+  isoform: null
+  sequence_source: null
+  context: isolated        # isolated | complex (target.aux_chains 필요)
+  cleavage:
+    after: null            # 전장 서열의 1-based 절단 결합 왼쪽 위치
+    retain: null           # N | C: 남는 조각
+  cleaved_sequence: null   # 선택 검증용; 전장으로부터 계산한 서열과 일치해야 함
+  cleaved_pdb: null        # 전장 PDB를 잘라 절단형 구조로 확정하지 않음
+  cleaved_chain: A
+  epitope_mode: both       # terminal | exposed | both
+  hotspots_full: []        # 전장 서열 위치; 말단 인식은 새 말단 잔기 포함
+  hotspot_rationale: null
+  engine: boltz2
+  seeds: [42, 43, 44]
+  stage1_n: 48
+  stage2_n: 32
+  final_n: 24
+  budget_hours: 48         # 캠페인 외부 작업 누적 벽시계 시간; 재개해도 누적
+  weight_files: []         # 추가 가중치 provenance 경로
+  secondary_chai: false    # 로컬 smoke 통과 후 보조 평가 활성화
+  antigen_constructs:
+    full: {n_tag: null, c_tag: null}
+    cleaved: {n_tag: null, c_tag: null}  # null=미확정, ""=태그 없음
+
+experiment:
+  assay: null
+  antigen_qc_confirmed: false
+  controls_confirmed: false
+  terminal_review_confirmed: false

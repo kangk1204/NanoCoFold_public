@@ -1,0 +1,72 @@
+# Small real sequence-only design comparison. quickstart.sh supplies the target,
+# absolute workspace/output paths, selected GPU and explicit upload consent.
+run:
+  name: collaborator_api
+  mode: design
+  seed: 42
+  mock: false
+  dry_run: false
+  resume: true
+target:
+  sequence: ""
+  fasta: null
+  pdb: null
+  hotspots: []
+  aux_chains: []
+structure:
+  provider: boltz2
+  allow_public_msa_server: false
+  msa:
+    backend: empty
+truncate:
+  enabled: false
+design:
+  engine: both
+  hotspot_mode: none
+  num_designs: 2
+  chunk_size: 2
+  mpnn:
+    seqs_per_struct: 1
+  rf2:
+    num_recycles: 1
+  refinement:
+    enabled: false
+  filters:
+    enabled: false
+    top_n_to_score: 4
+screen:
+  comparison:
+    enabled: true
+    engines: [colabfold, boltz2, chai1, opendde]
+    continue_on_error: true
+  opendde:
+    enabled: true
+  colabfold:
+    msa_source: public_api
+    msa_mode: precomputed
+    msa_dir: null
+    msa_max_sequences: 2048
+    num_recycles: 1
+    num_models: 1
+    num_seeds: 1
+    batch_size: 4
+  # The example alone grants no upload consent. The launch flag sets this true.
+  allow_public_msa_server: false
+  restraint:
+    enabled: false
+  tier2_n: 4
+  boltz2_rescore_top: 0
+  cascade:
+    enabled: false
+mature:
+  prefilter:
+    mode: none
+  esm:
+    env: null  # keep this small comparison unassessed even in a reused workspace
+rank:
+  require_hotspot: false
+  fallback_to_ineligible: false
+handoff:
+  require_gate: false
+specificity:
+  enabled: false

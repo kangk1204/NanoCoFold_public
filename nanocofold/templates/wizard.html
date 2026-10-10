@@ -1,0 +1,737 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NanoCoFold 입력 마법사</title>
+  <script src="/assets/3dmol-min.js"></script>
+  <style>
+    :root {
+      --bg: #f7f3ed;
+      --panel: #fffdf9;
+      --line: #ddd2c3;
+      --text: #21302d;
+      --muted: #66736f;
+      --teal: #0f766e;
+      --teal-dark: #115e59;
+      --amber: #a35f00;
+      --red: #a33a32;
+      --hot: #f97316;
+      --gray: #87908c;
+      --focus: #0ea5a4;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      background: var(--bg);
+      font: 15px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main { width: min(1280px, calc(100% - 28px)); margin: 0 auto; padding: 24px 0 40px; }
+    h1 { margin: 0 0 8px; font-size: clamp(24px, 4vw, 38px); letter-spacing: 0; }
+    h2 { margin: 0 0 12px; font-size: 20px; }
+    h3 { margin: 0 0 8px; font-size: 16px; }
+    p { margin: 0 0 10px; }
+    code, pre, textarea, input[type="text"] { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    button, input, select, textarea { font: inherit; }
+    button {
+      min-height: 42px;
+      border: 1px solid var(--teal-dark);
+      border-radius: 8px;
+      padding: 8px 14px;
+      color: #fff;
+      background: var(--teal);
+      cursor: pointer;
+    }
+    button.secondary { color: var(--teal-dark); background: #eef8f6; }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+    textarea, input[type="text"] {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 9px 10px;
+      background: #fff;
+      color: var(--text);
+    }
+    textarea { min-height: 150px; resize: vertical; }
+    fieldset {
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+    legend { font-weight: 700; margin-bottom: 8px; }
+    .intro { margin-bottom: 20px; }
+    .note { color: var(--muted); }
+    .steps { display: grid; gap: 16px; }
+    .panel {
+      min-width: 0;
+      max-width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      padding: 18px;
+      box-shadow: 0 1px 5px rgba(61, 52, 41, .06);
+    }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: end; }
+    .row > *, .grid > *, .split > *, .steps > *, .actions > *, details { min-width: 0; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
+    .status {
+      min-height: 24px;
+      margin: 10px 0 0;
+      color: var(--muted);
+    }
+    .error { color: var(--red); font-weight: 700; }
+    .warning { color: var(--amber); }
+    .ok { color: var(--teal-dark); }
+    .grid { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(300px, 420px); gap: 14px; }
+    .viewer {
+      position: relative;
+      height: 430px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #ebe5dc;
+      overflow: hidden;
+    }
+    .table-wrap { max-width: 100%; min-width: 0; overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; min-width: 720px; }
+    caption { text-align: left; padding: 10px; color: var(--muted); }
+    th, td { padding: 9px 10px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: #f4eee5; font-weight: 700; }
+    .chain-choice, .patch, .residue {
+      display: grid;
+      gap: 4px;
+      margin: 8px 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+    .chain-choice label, .residue label, .ack label {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    .patch button { justify-self: start; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      margin: 3px 5px 3px 0;
+      padding: 3px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: #fff;
+    }
+    .list { max-height: 310px; overflow: auto; padding-right: 4px; }
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 8px 0 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f3efe8;
+    }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    @media (max-width: 850px) {
+      main { width: min(100% - 18px, 760px); padding-top: 14px; }
+      .row, .grid, .split { grid-template-columns: 1fr; }
+      .viewer { height: 340px; }
+      .panel { padding: 14px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header class="intro">
+    <h1>NanoCoFold 입력 마법사</h1>
+    <p class="note">PDB ID 또는 로컬 구조에서 표적, 함께 유지할 단백질, 결합 유도 부위를 확인하고 실행 설정만 저장합니다. GPU 작업은 여기서 시작하지 않습니다.</p>
+  </header>
+
+  <div id="live" class="sr-only" aria-live="polite"></div>
+  <section class="steps" aria-label="입력 준비 단계">
+    <section class="panel" aria-labelledby="step1">
+      <h2 id="step1">1. 구조 불러오기</h2>
+      <div class="row">
+        <div>
+          <label for="pdbId">PDB ID</label>
+          <input id="pdbId" type="text" inputmode="latin" autocomplete="off" placeholder="예: 1BRS">
+        </div>
+        <div>
+          <label for="assemblyId">복합체 번호(assembly)</label>
+          <input id="assemblyId" type="text" inputmode="numeric" value="1">
+          <p class="note">등록된 복합체 1번을 기본으로 읽습니다. 최적 구조라는 뜻은 아닙니다.</p>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="loadPdb">PDB ID로 불러오기</button>
+        <span class="note">인터넷이 느리거나 실패하면 아래 로컬 업로드를 사용하세요.</span>
+      </div>
+      <div>
+        <label for="fileInput">로컬 PDB/mmCIF 파일</label>
+        <input id="fileInput" type="file" accept=".pdb,.cif,.mmcif,.ent,.txt">
+      </div>
+      <details>
+        <summary>고급: 구조 텍스트 직접 붙여넣기</summary>
+        <textarea id="fileText" placeholder="파일 선택이 어렵다면 PDB/mmCIF 내용을 여기에 붙여넣을 수 있습니다."></textarea>
+      </details>
+      <div class="actions">
+        <button id="loadFile" class="secondary">로컬 구조 불러오기</button>
+      </div>
+      <p id="loadStatus" class="status" aria-live="polite"></p>
+      <div id="sourceInfo"></div>
+      <div id="warnings"></div>
+    </section>
+
+    <section class="panel" aria-labelledby="step2">
+      <h2 id="step2">2. 표적과 함께 유지할 단백질 선택</h2>
+      <p class="note">표적은 반드시 직접 선택해야 합니다. 기본값은 없음입니다. 표적이 아닌 다른 단백질은 문맥으로 보존됩니다.</p>
+      <div id="chainTable"></div>
+      <div class="split">
+        <fieldset>
+          <legend>표적</legend>
+          <div id="targetChoices"><p class="note">구조를 먼저 불러오세요.</p></div>
+        </fieldset>
+        <fieldset>
+          <legend>함께 유지할 단백질</legend>
+          <div id="contextChoices"><p class="note">표적을 고르면 나머지 체인이 표시됩니다.</p></div>
+        </fieldset>
+      </div>
+      <div class="actions">
+        <button id="analyze" disabled>Hotspot 후보 계산</button>
+        <span id="selectionHint" class="note">표적을 선택하면 계산할 수 있습니다.</span>
+      </div>
+      <p id="analyzeStatus" class="status" aria-live="polite"></p>
+    </section>
+
+    <section class="panel" aria-labelledby="step3">
+      <h2 id="step3">3. Hotspot 확인</h2>
+      <p class="note">자동 후보는 표면 노출, 주변 환경, 당질 거리 등을 이용한 휴리스틱입니다. 최적 결합부위나 검증된 결합을 뜻하지 않습니다. PDB B열 원값은 pLDDT나 신뢰도 퍼센트가 아닙니다.</p>
+      <div class="grid">
+        <div>
+          <div id="viewer" class="viewer" role="img" aria-label="3D 구조 뷰어"></div>
+          <p class="note">3D에서 표적 원자를 클릭하거나 오른쪽 잔기 목록을 키보드로 선택하세요. 표적은 청록색, 파트너는 회색, 선택 hotspot은 주황색입니다.</p>
+        </div>
+        <div>
+          <h3>자동 후보</h3>
+          <div id="patches" class="list"><p class="note">아직 계산 결과가 없습니다.</p></div>
+          <h3>수동 잔기 선택</h3>
+          <label for="manualOriginal">원본 번호로 추가 선택</label>
+          <input id="manualOriginal" type="text" placeholder="원본 번호/라벨 예: 52, 53A">
+          <div class="actions">
+            <button id="addManual" class="secondary" disabled>원본 번호 적용</button>
+          </div>
+          <div id="residueList" class="list"></div>
+        </div>
+      </div>
+      <p id="hotspotStatus" class="status" aria-live="polite"></p>
+    </section>
+
+    <section class="panel" aria-labelledby="step4">
+      <h2 id="step4">4. 검토와 내보내기</h2>
+      <div id="review"><p class="note">분석 후 선택 내용을 검토할 수 있습니다.</p></div>
+      <div class="ack">
+        <label>
+          <input id="ack" type="checkbox">
+          <span>이 파일은 입력 준비 산출물이며, 결합 성공·발현·친화도 검증이 아님을 확인했습니다.</span>
+        </label>
+      </div>
+      <div class="actions">
+        <button id="export" disabled>설정 저장하기</button>
+      </div>
+      <p id="exportStatus" class="status" aria-live="polite"></p>
+      <div id="exportResult" hidden>
+        <h3>저장 결과</h3>
+        <p id="exportDir"></p>
+        <p id="configPath"></p>
+        <p id="fingerprint"></p>
+        <p class="note">먼저 doctor로 실행 환경을 점검하세요. 모델 환경·가중치·framework 파일은 별도 설치가 필요합니다. prepare는 입력 준비, design과 screen은 GPU 추론 단계입니다. screen의 YOUR_VHH.fasta는 보유 나노바디 FASTA 경로로 바꾸세요.</p>
+        <pre id="commands"></pre>
+        <div id="chainMapping"></div>
+      </div>
+    </section>
+  </section>
+</main>
+
+<script>
+(() => {
+  const TOKEN = "__TOKEN__";
+  const state = {
+    loadGen: 0, analyzeGen: 0, exportGen: 0,
+    input: null, selection: null, target: "", context: [], hotspots: new Set(),
+    residues: [], pdb: "", staleExport: true, exportBusy: false, exportReq: 0, viewer: null, viewerSelectionId: ""
+  };
+  const $ = (id) => document.getElementById(id);
+  const ids = ["loadPdb","loadFile","analyze","addManual","export","ack","pdbId","assemblyId","fileInput","fileText","manualOriginal"];
+  const el = Object.fromEntries(ids.map((id) => [id, $(id)]));
+
+  function announce(text) { $("live").textContent = text; }
+  function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+  function text(tag, value, className) {
+    const n = document.createElement(tag);
+    if (className) n.className = className;
+    n.textContent = value == null || value === "" ? "-" : String(value);
+    return n;
+  }
+  function button(label, className) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = label;
+    if (className) b.className = className;
+    return b;
+  }
+  function setStatus(id, msg, cls) {
+    const n = $(id);
+    n.className = "status" + (cls ? " " + cls : "");
+    n.textContent = msg || "";
+    if (msg) announce(msg);
+  }
+  async function api(path, body) {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: {"Content-Type": "application/json", "X-Wizard-Token": TOKEN},
+      body: JSON.stringify(body)
+    });
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
+    if (!res.ok) throw new Error(data.error || "요청을 처리하지 못했습니다.");
+    return data;
+  }
+  function invalidate(level) {
+    if (level <= 1) {
+      state.loadGen++;
+      state.input = null; state.selection = null; state.target = ""; state.context = []; state.residues = []; state.pdb = "";
+      clear($("targetChoices")); clear($("contextChoices")); clear($("patches")); clear($("residueList"));
+      clear($("sourceInfo")); clear($("warnings")); clear($("chainTable"));
+      $("targetChoices").append(text("p", "구조를 먼저 불러오세요.", "note"));
+      $("contextChoices").append(text("p", "표적을 고르면 나머지 체인이 표시됩니다.", "note"));
+      $("patches").append(text("p", "아직 계산 결과가 없습니다.", "note"));
+      el.analyze.disabled = true; el.addManual.disabled = true;
+    }
+    if (level <= 2) {
+      state.analyzeGen++;
+      state.selection = null; state.residues = []; state.pdb = ""; state.hotspots.clear();
+      state.viewer = null; state.viewerSelectionId = "";
+      clear($("viewer"));
+      setStatus("analyzeStatus", "", ""); setStatus("hotspotStatus", "", "");
+      clear($("review")); $("review").append(text("p", "분석 후 선택 내용을 검토할 수 있습니다.", "note"));
+      clear($("patches")); $("patches").append(text("p", "아직 계산 결과가 없습니다.", "note"));
+      clear($("residueList")); el.addManual.disabled = true;
+    }
+    state.exportGen++;
+    state.staleExport = true;
+    state.exportBusy = false;
+    el.ack.checked = false;
+    el.export.disabled = true;
+    $("exportResult").hidden = true;
+    setStatus("exportStatus", "", "");
+  }
+  function chainLabel(c) {
+    return `${c.id} (원본 ${c.original_id || "-"}, author ${c.author_chain || "-"})`;
+  }
+  function observedRange(c) {
+    const rs = Array.isArray(c.residues) ? c.residues : [];
+    if (!rs.length) return "-";
+    return `${rs[0].original_label || rs[0].original_number} - ${rs[rs.length - 1].original_label || rs[rs.length - 1].original_number}`;
+  }
+  function renderMessages(node, title, items, cls) {
+    if (!items || !items.length) return;
+    node.append(text("h3", title, cls));
+    const ul = document.createElement("ul");
+    for (const item of items) {
+      const li = document.createElement("li");
+      li.textContent = formatValue(item);
+      ul.append(li);
+    }
+    node.append(ul);
+  }
+  function formatValue(value) {
+    if (value == null) return "-";
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+  }
+  function formatSource(source) {
+    if (!source || typeof source !== "object") return "local";
+    if (source.kind === "rcsb") return `RCSB 등록 복합체 ${source.pdb_id || "-"} assembly ${source.assembly_id || "-"}`;
+    if (source.kind === "upload") return `업로드 ${source.filename || "-"} / 생물학적 복합체 여부 미확인`;
+    return formatValue(source);
+  }
+  function summarizeRemoved(removed) {
+    const rows = Array.isArray(removed) ? removed : [];
+    const counts = new Map();
+    for (const item of rows) {
+      const kind = item && typeof item === "object" ? item.kind || item.type || "removed" : "removed";
+      const residue = item && typeof item === "object" ? item.residue || item.resname || item.name || "" : "";
+      const key = residue ? `${kind} / ${residue}` : kind;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return {rows, counts: Array.from(counts.entries()).sort((a, b) => b[1] - a[1])};
+  }
+  function renderRemoved(node, removed) {
+    const summary = summarizeRemoved(removed);
+    if (!summary.rows.length) return;
+    node.append(text("h3", `제거/분리된 항목 요약 ${summary.rows.length}개`, "warning"));
+    const ul = document.createElement("ul");
+    for (const [label, count] of summary.counts.slice(0, 12)) {
+      const li = document.createElement("li");
+      li.textContent = `${label}: ${count}개`;
+      ul.append(li);
+    }
+    node.append(ul);
+    const details = document.createElement("details");
+    details.append(text("summary", `상세 예시 보기(최대 20개 / 전체 ${summary.rows.length}개)`));
+    const list = document.createElement("ul");
+    for (const item of summary.rows.slice(0, 20)) {
+      const li = document.createElement("li");
+      li.textContent = formatValue(item);
+      list.append(li);
+    }
+    details.append(list);
+    node.append(details);
+  }
+  function renderLoaded(data) {
+    state.input = data; invalidate(2);
+    const source = $("sourceInfo"); clear(source);
+    source.append(text("h3", "출처와 assembly"));
+    source.append(text("p", formatSource(data.source)));
+    const sourceDetails = document.createElement("details");
+    sourceDetails.append(text("summary", "기술 세부정보"));
+    sourceDetails.append(text("p", `input_id: ${data.input_id}`));
+    sourceDetails.append(text("pre", formatValue(data.source)));
+    source.append(sourceDetails);
+    const warn = $("warnings"); clear(warn);
+    renderMessages(warn, "주의", data.warnings, "warning");
+    renderRemoved(warn, data.removed);
+    const tableHost = $("chainTable"); clear(tableHost);
+    const wrap = document.createElement("div"); wrap.className = "table-wrap";
+    const table = document.createElement("table");
+    const caption = document.createElement("caption"); caption.textContent = "불러온 체인: 이름, 생물종, 관찰된 원본 번호 범위";
+    table.append(caption);
+    const head = document.createElement("tr");
+    ["계산 체인", "원본/author", "이름", "생물종", "길이", "관찰 범위"].forEach((h) => head.append(text("th", h)));
+    table.append(head);
+    for (const c of data.chains || []) {
+      const tr = document.createElement("tr");
+      [c.id, `${c.original_id || "-"} / ${c.author_chain || "-"}`, c.name || "이름 미상", c.organism || "생물종 미상", c.length, observedRange(c)]
+        .forEach((v) => tr.append(text("td", v)));
+      table.append(tr);
+    }
+    wrap.append(table); tableHost.append(wrap);
+    renderChainControls();
+  }
+  function renderChainControls() {
+    clear($("targetChoices")); clear($("contextChoices"));
+    const none = document.createElement("label");
+    const r = document.createElement("input"); r.type = "radio"; r.name = "target"; r.value = ""; r.checked = !state.target;
+    r.addEventListener("change", () => chooseTarget(""));
+    none.append(r, text("span", "선택 없음"));
+    $("targetChoices").append(none);
+    for (const c of state.input.chains || []) {
+      const box = document.createElement("div"); box.className = "chain-choice";
+      const label = document.createElement("label");
+      const radio = document.createElement("input"); radio.type = "radio"; radio.name = "target"; radio.value = c.id; radio.checked = state.target === c.id;
+      radio.addEventListener("change", () => chooseTarget(c.id));
+      label.append(radio, text("span", `${c.name || "이름 미상"} · ${chainLabel(c)} · 원본 ${observedRange(c)} · ${c.organism || "생물종 미상"}`));
+      box.append(label); $("targetChoices").append(box);
+    }
+    const chains = state.input.chains || [];
+    for (const c of chains.filter((x) => x.id !== state.target)) {
+      const label = document.createElement("label");
+      const check = document.createElement("input"); check.type = "checkbox"; check.value = c.id;
+      check.checked = state.context.includes(c.id) || (state.target && !state.context.length);
+      check.addEventListener("change", () => updateContext(true));
+      label.append(check, text("span", `${c.name || "이름 미상"} · ${chainLabel(c)} · 원본 ${observedRange(c)}`));
+      const div = document.createElement("div"); div.className = "chain-choice"; div.append(label);
+      $("contextChoices").append(div);
+    }
+    updateContext(false);
+    el.analyze.disabled = !state.input || !state.target;
+    $("selectionHint").textContent = state.target ? "선택한 문맥에서 표면 후보를 계산합니다." : "표적을 선택하면 계산할 수 있습니다.";
+  }
+  function chooseTarget(id) {
+    state.target = id; state.context = [];
+    invalidate(2); renderChainControls();
+  }
+  function updateContext(changed) {
+    state.context = Array.from($("contextChoices").querySelectorAll("input:checked")).map((x) => x.value);
+    if (changed) invalidate(2);
+    state.staleExport = true; $("exportResult").hidden = true; el.export.disabled = true; el.ack.checked = false;
+  }
+  async function loadFromPdb() {
+    invalidate(1);
+    const pdb_id = el.pdbId.value.trim();
+    const assembly_id = el.assemblyId.value.trim() || "1";
+    const gen = ++state.loadGen;
+    setStatus("loadStatus", "PDB assembly를 불러오는 중입니다.", "");
+    try {
+      const data = await api("/api/load", {pdb_id, assembly_id});
+      if (gen !== state.loadGen) return;
+      renderLoaded(data); setStatus("loadStatus", "구조를 불러왔습니다.", "ok");
+    } catch (e) { if (gen === state.loadGen) setStatus("loadStatus", e.message, "error"); }
+  }
+  async function loadFromFile() {
+    invalidate(1);
+    const gen = ++state.loadGen;
+    const file = el.fileInput.files[0];
+    const content = file ? await file.text() : el.fileText.value;
+    const firstContentLine = content.split(/\r?\n/).find((line) => line.trim() && !line.trimStart().startsWith("#")) || "";
+    const filename = file ? file.name : (/^data_/i.test(firstContentLine.trimStart()) ? "pasted-structure.cif" : "pasted-structure.pdb");
+    if (gen !== state.loadGen) return;
+    setStatus("loadStatus", "로컬 구조를 읽는 중입니다.", "");
+    try {
+      const data = await api("/api/load", {filename, content});
+      if (gen !== state.loadGen) return;
+      renderLoaded(data); setStatus("loadStatus", "로컬 구조를 불러왔습니다.", "ok");
+    } catch (e) { if (gen === state.loadGen) setStatus("loadStatus", e.message, "error"); }
+  }
+  async function analyze() {
+    invalidate(2);
+    const gen = ++state.analyzeGen;
+    setStatus("analyzeStatus", "선택한 표적과 문맥으로 hotspot 후보를 계산하는 중입니다.", "");
+    try {
+      const data = await api("/api/analyze", {input_id: state.input.input_id, target: state.target, context: state.context});
+      if (gen !== state.analyzeGen) return;
+      state.selection = data; state.residues = data.residues || []; state.pdb = data.pdb || "";
+      state.hotspots.clear(); state.staleExport = true; el.addManual.disabled = false;
+      renderAnalysis(data); setStatus("analyzeStatus", "분석 결과가 준비되었습니다.", "ok");
+    } catch (e) { if (gen === state.analyzeGen) setStatus("analyzeStatus", e.message, "error"); }
+  }
+  function renderAnalysis(data) {
+    renderPatches(data.patches || []); renderResidues(); renderViewer(); renderReview(data);
+    if (data.blockers && data.blockers.length) {
+      setStatus("hotspotStatus", "입력 QC 차단 항목이 있습니다. 해결 전에는 내보낼 수 없습니다.", "error");
+    } else if (data.design_blockers && data.design_blockers.length) {
+      setStatus("hotspotStatus", "새 나노바디 자동 설계는 제한됩니다. 구조 준비와 보유 VHH screen 입력 저장은 계속 가능합니다.", "warning");
+    } else {
+      setStatus("hotspotStatus", "표적 원자를 클릭하거나 후보를 선택하세요.", "");
+    }
+  }
+  function renderPatches(patches) {
+    clear($("patches"));
+    if (!patches.length) { $("patches").append(text("p", "자동 후보가 없습니다. 수동으로 선택할 수 있습니다.", "note")); return; }
+    for (const p of patches) {
+      const card = document.createElement("div"); card.className = "patch";
+      card.append(text("strong", `후보 ${p.set_id || ""} · 점수 ${p.score ?? "-"}`));
+      const originals = (p.positions || []).map((pos) => {
+        const r = residueByPosition(pos);
+        return r ? `${r.original_label} (${r.aa})` : "미확인";
+      });
+      card.append(text("span", `원본 잔기: ${originals.join(", ")}`));
+      card.append(text("span", `계산용 위치: ${(p.positions || []).join(", ")}`, "note"));
+      card.append(text("span", p.reason || "근거 설명 없음", "note"));
+      const patchResidues = (p.positions || []).map(residueByPosition);
+      const patchBuried = patchResidues.filter(isBuried);
+      const patchTooLarge = (p.positions || []).length > 12;
+      if (patchBuried.length) card.append(text("span", "매몰 잔기가 포함되어 내보낼 수 없습니다.", "warning"));
+      if (patchTooLarge) card.append(text("span", "12개를 초과해 내보낼 수 없습니다.", "warning"));
+      renderMessages(card, "경고", p.warnings, "warning");
+      const b = button("이 후보로 교체", "secondary");
+      b.disabled = patchBuried.length > 0 || patchTooLarge;
+      b.addEventListener("click", () => { state.hotspots = new Set(p.positions || []); markHotspotsChanged(); });
+      card.append(b); $("patches").append(card);
+    }
+  }
+  function targetChain() {
+    if (!state.selection) return null;
+    return (state.selection.retained_chains || []).find((c) => c.id === state.selection.target) || null;
+  }
+  function residueLabel(r) {
+    const chain = targetChain();
+    const chainText = chain ? (chain.author_chain || chain.original_id || chain.id) : "?";
+    const original = r.original_label || r.original_number || "?";
+    return `원본 ${chainText}:${original} (${r.aa || "?"}) / 계산 #${r.position}`;
+  }
+  function isBuried(r) {
+    return r && (r.relative_sasa == null || Number(r.relative_sasa) < 0.15);
+  }
+  function residueByPosition(pos) {
+    return state.residues.find((r) => r.position === pos);
+  }
+  function exportIssues() {
+    const selected = Array.from(state.hotspots);
+    const buried = selected.map(residueByPosition).filter(isBuried);
+    const issues = [];
+    if (state.selection && state.selection.blockers && state.selection.blockers.length) issues.push("입력 QC 차단 항목이 남아 있습니다.");
+    if (!selected.length) issues.push("hotspot을 1개 이상 선택하세요.");
+    if (selected.length > 12) issues.push("hotspot은 최대 12개까지 내보낼 수 있습니다.");
+    if (buried.length) issues.push("상대 SASA 0.15 미만의 매몰 잔기는 내보낼 수 없습니다.");
+    if (!el.ack.checked) issues.push("한계 확인란을 선택하세요.");
+    return issues;
+  }
+  function tryTogglePosition(pos, nextChecked) {
+    const r = residueByPosition(pos);
+    if (!r) return false;
+    if (nextChecked && isBuried(r)) {
+      setStatus("hotspotStatus", `${residueLabel(r)}: 상대 SASA 0.15 미만의 매몰 잔기라 내보낼 수 없습니다.`, "warning");
+      return false;
+    }
+    if (nextChecked && !state.hotspots.has(pos) && state.hotspots.size >= 12) {
+      setStatus("hotspotStatus", "hotspot은 최대 12개까지 선택할 수 있습니다.", "warning");
+      return false;
+    }
+    nextChecked ? state.hotspots.add(pos) : state.hotspots.delete(pos);
+    markHotspotsChanged();
+    return true;
+  }
+  function renderResidues() {
+    clear($("residueList"));
+    for (const r of state.residues) {
+      const div = document.createElement("div"); div.className = "residue";
+      const label = document.createElement("label");
+      const check = document.createElement("input"); check.type = "checkbox"; check.value = String(r.position); check.checked = state.hotspots.has(r.position);
+      check.dataset.position = String(r.position);
+      check.disabled = isBuried(r);
+      check.addEventListener("change", () => { if (!tryTogglePosition(r.position, check.checked)) check.checked = state.hotspots.has(r.position); });
+      const suffix = isBuried(r) ? " · 매몰 잔기: 내보내기 불가" : "";
+      label.append(check, text("span", `${residueLabel(r)} · SASA ${r.relative_sasa ?? "-"} · B열 원값 ${r.bfactor ?? "-"} · 당질거리 ${r.dist_to_glycan ?? "-"}${suffix}`));
+      div.append(label); $("residueList").append(div);
+    }
+  }
+  function updateResidueChecks() {
+    for (const check of $("residueList").querySelectorAll("input[data-position]")) {
+      check.checked = state.hotspots.has(Number(check.dataset.position));
+    }
+  }
+  function renderViewer() {
+    if (!window.$3Dmol || !state.pdb) return;
+    clear($("viewer"));
+    state.viewer = $3Dmol.createViewer("viewer", {backgroundColor: "#ebe5dc"});
+    state.viewerSelectionId = state.selection.selection_id;
+    state.viewer.addModel(state.pdb, "pdb");
+    applyViewerStyles();
+    state.viewer.setClickable({chain: state.selection.target}, true, (atom) => {
+      const found = state.residues.find((r) => r.position === atom.resi);
+      if (found) tryTogglePosition(found.position, !state.hotspots.has(found.position));
+    });
+    state.viewer.zoomTo(); state.viewer.render();
+  }
+  function applyViewerStyles() {
+    if (!state.viewer || !state.selection) return;
+    state.viewer.setStyle({}, {cartoon: {color: "#87908c"}});
+    state.viewer.setStyle({chain: state.selection.target}, {cartoon: {color: "#0f766e"}});
+    state.viewer.setStyle({chain: state.selection.target, resi: Array.from(state.hotspots)}, {stick: {color: "#f97316", radius: .28}});
+  }
+  function updateViewerHotspots() {
+    if (!state.viewer || !state.selection || state.viewerSelectionId !== state.selection.selection_id) return;
+    applyViewerStyles();
+    state.viewer.render();
+  }
+  function markHotspotsChanged() {
+    state.exportGen++;
+    state.staleExport = true; $("exportResult").hidden = true; el.ack.checked = false;
+    updateResidueChecks(); renderReview(state.selection); updateViewerHotspots();
+    const issues = exportIssues().filter((x) => !x.includes("한계 확인란"));
+    setStatus("hotspotStatus", issues.length ? issues.join(" ") : `선택된 hotspot ${state.hotspots.size}개`, issues.length ? "warning" : "ok");
+    updateExportButton();
+  }
+  function addManual() {
+    const tokens = el.manualOriginal.value.split(/[,\s]+/).map((x) => x.trim()).filter(Boolean);
+    const added = [], skipped = [];
+    for (const t of tokens) {
+      const byLabel = state.residues.filter((x) => String(x.original_label) === t);
+      const matches = byLabel.length ? byLabel : state.residues.filter((x) => String(x.original_number) === t);
+      if (matches.length !== 1) { skipped.push(`${t}: 원본 번호가 없거나 삽입코드 때문에 모호합니다.`); continue; }
+      const r = matches[0];
+      if (isBuried(r)) { skipped.push(`${t}: 매몰 잔기입니다.`); continue; }
+      if (state.hotspots.size >= 12 && !state.hotspots.has(r.position)) { skipped.push(`${t}: 12개 한도를 넘습니다.`); continue; }
+      state.hotspots.add(r.position); added.push(residueLabel(r));
+    }
+    markHotspotsChanged();
+    setStatus("hotspotStatus", added.length ? `추가됨: ${added.join(", ")}${skipped.length ? " / 제외: " + skipped.join(" ") : ""}` : skipped.join(" ") || "일치하는 원본 표적 잔기를 찾지 못했습니다.", added.length && !skipped.length ? "ok" : "warning");
+  }
+  function renderReview(data) {
+    clear($("review"));
+    if (!data) { $("review").append(text("p", "분석 후 선택 내용을 검토할 수 있습니다.", "note")); return; }
+    renderMessages($("review"), "입력 QC 차단 - 해결 전 내보내기 불가", data.blockers, "error");
+    const target = targetChain();
+    $("review").append(text("p", `표적: ${target ? `${target.name} · ${chainLabel(target)}` : data.target}`));
+    const describeChain = (c) => `${c.name || "이름 미상"} (${c.id}, 원본 ${observedRange(c)})`;
+    $("review").append(text("p", `보존 체인: ${(data.retained_chains || []).map(describeChain).join(" / ") || "없음"}`));
+    $("review").append(text("p", `제거 체인: ${(data.removed_chains || []).map(describeChain).join(" / ") || "없음"}`));
+    if ((data.retained_nonprotein_chains || []).length) {
+      $("review").append(text("p", `표면 분석에 유지한 별도 비단백질 체인: ${data.retained_nonprotein_chains.join(", ")}. 단백질과의 소속 관계는 자동 추정하지 않으며 설계·평가 좌표에는 포함하지 않습니다.`, "warning"));
+    }
+    const selected = Array.from(state.hotspots).sort((a, b) => a - b);
+    $("review").append(text("p", `선택 hotspot: ${selected.length}개`));
+    for (const pos of selected) {
+      const r = residueByPosition(pos);
+      if (r) $("review").append(text("span", residueLabel(r), "pill"));
+    }
+    const issues = exportIssues();
+    renderMessages($("review"), "내보내기 전 확인", issues, issues.some((x) => x.includes("차단") || x.includes("매몰")) ? "warning" : "note");
+    renderMessages($("review"), "새 나노바디 설계 제한 - prepare/screen 입력 저장은 가능", data.design_blockers, "warning");
+    renderMessages($("review"), "스크리닝 제한", data.screen_blockers, "warning");
+    if ((data.warnings || []).length) {
+      const details = document.createElement("details");
+      details.append(text("summary", `입력·분석 주의사항 ${data.warnings.length}개`));
+      renderMessages(details, "확인할 내용", data.warnings, "warning");
+      $("review").append(details);
+    }
+    updateExportButton();
+  }
+  function updateExportButton() {
+    el.export.disabled = state.exportBusy || !state.selection || exportIssues().length > 0;
+  }
+  async function doExport() {
+    const selection_id = state.selection && state.selection.selection_id;
+    const hotspots = Array.from(state.hotspots).sort((a, b) => a - b);
+    const gen = ++state.exportGen;
+    state.exportBusy = true;
+    state.exportReq = gen;
+    el.export.disabled = true;
+    setStatus("exportStatus", "설정을 저장하는 중입니다.", "");
+    try {
+      const data = await api("/api/export", {selection_id, hotspots, acknowledge: true});
+      if (gen !== state.exportGen) return;
+      state.exportBusy = false;
+      state.staleExport = false; renderExport(data); setStatus("exportStatus", "내보내기가 완료되었습니다. GPU 작업은 실행하지 않았습니다.", "ok");
+    } catch (e) {
+      if (gen === state.exportGen) setStatus("exportStatus", e.message, "error");
+    } finally {
+      // hotspot 변경(exportGen 증가)으로 결과가 무효가 되어도, 이 요청이 켠 busy 는 반드시 해제한다.
+      if (state.exportReq === gen) {
+        state.exportReq = 0;
+        state.exportBusy = false;
+      }
+      updateExportButton();
+    }
+  }
+  function renderExport(data) {
+    $("exportResult").hidden = false;
+    $("exportDir").textContent = `폴더: ${data.export_dir || "-"}`;
+    $("configPath").textContent = `설정: ${data.config_path || "-"}`;
+    $("fingerprint").textContent = `스냅샷 fingerprint: ${data.fingerprint || "-"}`;
+    $("commands").textContent = [data.doctor_command, data.prepare_command, data.design_command, data.screen_command].filter(Boolean).join("\n");
+    const host = $("chainMapping"); clear(host);
+    host.append(text("h3", "체인 대응표"));
+    host.append(text("pre", JSON.stringify(data.chain_mapping || {}, null, 2)));
+    renderMessages(host, "주의", data.warnings, "warning");
+  }
+  el.loadPdb.addEventListener("click", loadFromPdb);
+  el.loadFile.addEventListener("click", loadFromFile);
+  el.analyze.addEventListener("click", analyze);
+  el.addManual.addEventListener("click", addManual);
+  el.export.addEventListener("click", doExport);
+  el.ack.addEventListener("change", updateExportButton);
+  ["pdbId","assemblyId","fileText"].forEach((id) => el[id].addEventListener("input", () => invalidate(1)));
+  el.fileInput.addEventListener("change", () => invalidate(1));
+})();
+</script>
+</body>
+</html>

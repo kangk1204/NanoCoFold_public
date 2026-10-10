@@ -1,0 +1,4 @@
+# Preserve exact upstream browser bundles and license text.
+assets/plotly.min.js -whitespace
+assets/molstar.js -whitespace
+assets/3DMOL_LICENSE.txt whitespace=-blank-at-eol,-blank-at-eof

@@ -1,0 +1,20 @@
+# Upstream public fixture for an optional engine execution check.
+run:
+  mode: design
+structure:
+  provider: none
+screen:
+  # design 모드 doctor 는 tier2 에서 쓰는 엔진의 설치·가중치도 요구한다. 이 점검은 RFantibody 실행이 목적이므로
+  # 기본값(Chai-1, 14GB 환경) 대신 Boltz-2 를 지정해 필요한 환경만 요구한다.
+  engine: boltz2
+design:
+  env: envs/rfantibody
+  framework: data/frameworks/h-NbBCII10.pdb
+  env_vars:
+    DGLBACKEND: pytorch
+    OMP_NUM_THREADS: "4"
+mature:
+  cdr:
+    source: config
+specificity:
+  enabled: false

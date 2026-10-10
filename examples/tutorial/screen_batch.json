@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "mode": "screen",
+  "name": "tutorial-il6-screen",
+  "api_consent": false,
+  "entries": [
+    {
+      "id": "il6_screen",
+      "content": ">human_IL6_P05231_30_212\nVPPGEDSKDVAAPHRQPLTSSERIDKQIRYILDGISALRKETCNKSNMCESSKEALAENNLNLPKMAEKDGCFQSGFNEETCLVKIITGLLEFEVYLEYLQNRFESSEEQARAVQMSTKVLIQFLQKKAKNLDAITTPDPTTNASLLTKLQAQNQWLQDMTTHLILRSFKEFLQSSLRALRQM\n",
+      "hotspots": [],
+      "config": {
+        "run": {
+          "seed": 42,
+          "mock": false,
+          "resume": true
+        },
+        "truncate": {
+          "enabled": false
+        },
+        "screen": {
+          "comparison": {
+            "enabled": true,
+            "engines": [
+              "colabfold",
+              "boltz2",
+              "chai1",
+              "opendde"
+            ],
+            "continue_on_error": true
+          },
+          "colabfold": {
+            "msa_source": "public_api",
+            "msa_cache_dir": "msa/monomer_cache",
+            "num_recycles": 1,
+            "num_models": 1,
+            "num_seeds": 1
+          },
+          "allow_public_msa_server": true,
+          "restraint": {
+            "enabled": false
+          },
+          "num_trunk_recycles": 3,
+          "num_diffn_timesteps": 200
+        },
+        "rank": {
+          "fallback_to_ineligible": false
+        },
+        "report": {
+          "pymol_sessions": false
+        }
+      },
+      "vhh_fasta": ">anti_IL6_NB_9VQ6\nMAQVQLVESGGGLVQPGGSLRLSCAASGFTFSSYRMYWFRQAPGQGLEAVAAISAGGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCANRAGWGMGDYWGQGTLVTVSKLAAALEHHHHHH\n"
+    }
+  ]
+}

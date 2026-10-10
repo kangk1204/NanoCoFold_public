@@ -1,0 +1,74 @@
+[project]
+name = "nanocofold"
+version = "0.4.0"
+description = "Protein complex prediction and nanobody design, screening, and variant evaluation"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.1",
+    "biopython>=1.83",
+    "pyyaml>=6.0",
+    "jinja2>=3.1",
+    "openpyxl>=3.1",
+    "fastapi==0.142.2",
+    "uvicorn==0.54.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/kangk1204/NanoCoFold_public"
+Issues = "https://github.com/kangk1204/NanoCoFold_public/issues"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "httpx==0.28.1", "playwright==1.63.0", "pyflakes>=3.0", "build>=1.2"]
+
+[project.scripts]
+nanocofold = "nanocofold.entrypoint:main"
+
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["nanocofold"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"config/default.yaml" = "nanocofold/_data/config/default.yaml"
+"config/researcher_exploration.yaml" = "nanocofold/_data/config/researcher_exploration.yaml"
+"config/collaborator_api.yaml" = "nanocofold/_data/config/collaborator_api.yaml"
+"config/rfantibody_smoke.yaml" = "nanocofold/_data/config/rfantibody_smoke.yaml"
+"LICENSE_MANIFEST.md" = "nanocofold/_data/LICENSE_MANIFEST.md"
+"assets/3dmol-min.js" = "nanocofold/_data/assets/3dmol-min.js"
+"assets/plotly.min.js" = "nanocofold/_data/assets/plotly.min.js"
+"assets/molstar.js" = "nanocofold/_data/assets/molstar.js"
+"assets/molstar.css" = "nanocofold/_data/assets/molstar.css"
+"assets/MOLSTAR_LICENSE.txt" = "nanocofold/_data/assets/MOLSTAR_LICENSE.txt"
+"assets/PLOTLY_LICENSE.txt" = "nanocofold/_data/assets/PLOTLY_LICENSE.txt"
+"assets/3DMOL_LICENSE.txt" = "nanocofold/_data/assets/3DMOL_LICENSE.txt"
+"assets/vendor_manifest.json" = "nanocofold/_data/assets/vendor_manifest.json"
+"envs/setup_boltz2.sh" = "nanocofold/_data/install/envs/setup_boltz2.sh"
+"envs/setup_colabfold.sh" = "nanocofold/_data/install/envs/setup_colabfold.sh"
+"envs/setup_boltzgen.sh" = "nanocofold/_data/install/envs/setup_boltzgen.sh"
+"envs/setup_chai1.sh" = "nanocofold/_data/install/envs/setup_chai1.sh"
+"envs/setup_opendde.sh" = "nanocofold/_data/install/envs/setup_opendde.sh"
+"envs/setup_antibody.sh" = "nanocofold/_data/install/envs/setup_antibody.sh"
+"envs/setup_esm.sh" = "nanocofold/_data/install/envs/setup_esm.sh"
+"envs/install_locked.sh" = "nanocofold/_data/install/envs/install_locked.sh"
+"envs/setup_rfantibody.sh" = "nanocofold/_data/install/envs/setup_rfantibody.sh"
+"envs/setup_rfantibody_blackwell.sh" = "nanocofold/_data/install/envs/setup_rfantibody_blackwell.sh"
+"envs/requirements-rfantibody-blackwell.txt" = "nanocofold/_data/install/envs/requirements-rfantibody-blackwell.txt"
+
+"examples/tutorial/complex.fasta" = "nanocofold/_data/examples/tutorial/complex.fasta"
+"examples/tutorial/target.fasta" = "nanocofold/_data/examples/tutorial/target.fasta"
+"examples/tutorial/vhh_library.fasta" = "nanocofold/_data/examples/tutorial/vhh_library.fasta"
+"examples/tutorial/wt_vhh.fasta" = "nanocofold/_data/examples/tutorial/wt_vhh.fasta"
+"examples/tutorial/complex_batch.json" = "nanocofold/_data/examples/tutorial/complex_batch.json"
+"examples/tutorial/screen_batch.json" = "nanocofold/_data/examples/tutorial/screen_batch.json"
+"examples/tutorial/mature_batch.json" = "nanocofold/_data/examples/tutorial/mature_batch.json"
+"examples/tutorial/design_batch.json" = "nanocofold/_data/examples/tutorial/design_batch.json"
+"examples/tutorial/manifest.json" = "nanocofold/_data/examples/tutorial/manifest.json"
+"examples/tutorial/sources.json" = "nanocofold/_data/examples/tutorial/sources.json"
+"examples/tutorial/README.md" = "nanocofold/_data/examples/tutorial/README.md"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

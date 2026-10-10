@@ -1,0 +1,2 @@
+opendde @ https://github.com/aurekaresearch/OpenDDE/archive/ddfa1df8aff1babf1fddac4247b7d2351bd0ce9f.tar.gz \
+    --hash=sha256:b240db00052edb9d37325b02fe090df572026a2368c2704573fb117d7da2c7fd

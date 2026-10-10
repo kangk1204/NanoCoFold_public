@@ -1,0 +1,5 @@
+# Pinned Linux x86_64 dependencies; every requirement is enumerated.
+# Install with --no-deps: upstream RFantibody/Chai pins require documented CUDA overrides.
+torch==2.8.0+cu128
+torchaudio==2.8.0+cu128
+torchvision==0.23.0+cu128

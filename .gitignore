@@ -1,0 +1,28 @@
+# Local installations, inputs and results stay on your computer.
+.nanocofold/
+.venv*/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.env
+.env.*
+!.env.example
+runs/
+models/
+prepared_targets/
+logs/
+results/
+reports/
+*.log
+.DS_Store
+# Engine environments contain downloaded dependencies and model weights.
+envs/*/
+# Local credentials and editor settings
+*.pem
+*.key
+.vscode/
+.idea/

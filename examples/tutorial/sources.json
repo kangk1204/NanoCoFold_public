@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "sequence_records": [
+    {
+      "id": "barnase",
+      "pdb_id": "1BRS",
+      "entity_id": "1",
+      "url": "https://data.rcsb.org/rest/v1/core/polymer_entity/1BRS/1",
+      "entry_url": "https://www.rcsb.org/structure/1BRS",
+      "retrieved_utc_date": "2026-10-10",
+      "response_sha256": "f5e1c5fb17feb243d070e3485f9490f42e7dc5f4551c53475c8960ddb8fde05d",
+      "deposited_one_letter_code": "AQVINTFDGVADYLQTYHKLPDNYITKSEAQALGWVASKGNLADVAPGKSIGGDIFSNREGKLPGKSGRTWREADINYTSGFRNSDRILYSSDWLIYKTTDHYQTFTKIR",
+      "deposited_canonical_sequence": "AQVINTFDGVADYLQTYHKLPDNYITKSEAQALGWVASKGNLADVAPGKSIGGDIFSNREGKLPGKSGRTWREADINYTSGFRNSDRILYSSDWLIYKTTDHYQTFTKIR",
+      "input_sequence": "AQVINTFDGVADYLQTYHKLPDNYITKSEAQALGWVASKGNLADVAPGKSIGGDIFSNREGKLPGKSGRTWREADINYTSGFRNSDRILYSSDWLIYKTTDHYQTFTKIR",
+      "input_length": 110,
+      "input_sha256": "de6ee3cdb0fd76b4756d3c3bacbc6b22567b1cee43248044f4385c3b9af675c2",
+      "transformation": "none; deposited canonical polymer sequence"
+    },
+    {
+      "id": "barstar",
+      "pdb_id": "1BRS",
+      "entity_id": "2",
+      "url": "https://data.rcsb.org/rest/v1/core/polymer_entity/1BRS/2",
+      "entry_url": "https://www.rcsb.org/structure/1BRS",
+      "retrieved_utc_date": "2026-10-10",
+      "response_sha256": "be7f93cbfa91140da9f580c7f3caa87dd3c4d2ad7fed26fc19c7e2079129e719",
+      "deposited_one_letter_code": "KKAVINGEQIRSISDLHQTLKKELALPEYYGENLDALWDALTGWVEYPLVLEWRQFEQSKQLTENGAESVLQVFREAKAEGADITIILS",
+      "deposited_canonical_sequence": "KKAVINGEQIRSISDLHQTLKKELALPEYYGENLDALWDALTGWVEYPLVLEWRQFEQSKQLTENGAESVLQVFREAKAEGADITIILS",
+      "input_sequence": "KKAVINGEQIRSISDLHQTLKKELALPEYYGENLDALWDALTGWVEYPLVLEWRQFEQSKQLTENGAESVLQVFREAKAEGADITIILS",
+      "input_length": 89,
+      "input_sha256": "a55f4f6f8034de8530775b266225c907bb62c3a97b6e4d2716da47ed535c73bb",
+      "transformation": "none; deposited canonical polymer sequence"
+    },
+    {
+      "id": "human_il6",
+      "accession": "P05231",
+      "url": "https://rest.uniprot.org/uniprotkb/P05231.json",
+      "entry_url": "https://www.uniprot.org/uniprotkb/P05231/entry",
+      "retrieved_utc_date": "2026-10-10",
+      "response_sha256": "0b6ef70a3ade06ce29a505f2dc6b4410f302d011120a674388b7d52085251d18",
+      "deposited_one_letter_code": "MNSFSTSAFGPVAFSLGLLLVLPAAFPAPVPPGEDSKDVAAPHRQPLTSSERIDKQIRYILDGISALRKETCNKSNMCESSKEALAENNLNLPKMAEKDGCFQSGFNEETCLVKIITGLLEFEVYLEYLQNRFESSEEQARAVQMSTKVLIQFLQKKAKNLDAITTPDPTTNASLLTKLQAQNQWLQDMTTHLILRSFKEFLQSSLRALRQM",
+      "deposited_canonical_sequence": "MNSFSTSAFGPVAFSLGLLLVLPAAFPAPVPPGEDSKDVAAPHRQPLTSSERIDKQIRYILDGISALRKETCNKSNMCESSKEALAENNLNLPKMAEKDGCFQSGFNEETCLVKIITGLLEFEVYLEYLQNRFESSEEQARAVQMSTKVLIQFLQKKAKNLDAITTPDPTTNASLLTKLQAQNQWLQDMTTHLILRSFKEFLQSSLRALRQM",
+      "feature": {
+        "type": "Chain",
+        "location": {
+          "start": {
+            "value": 30,
+            "modifier": "EXACT"
+          },
+          "end": {
+            "value": 212,
+            "modifier": "EXACT"
+          }
+        },
+        "description": "Interleukin-6",
+        "featureId": "PRO_0000015582"
+      },
+      "input_sequence": "VPPGEDSKDVAAPHRQPLTSSERIDKQIRYILDGISALRKETCNKSNMCESSKEALAENNLNLPKMAEKDGCFQSGFNEETCLVKIITGLLEFEVYLEYLQNRFESSEEQARAVQMSTKVLIQFLQKKAKNLDAITTPDPTTNASLLTKLQAQNQWLQDMTTHLILRSFKEFLQSSLRALRQM",
+      "input_length": 183,
+      "input_sha256": "49017e62426d5cda55e4902d3e43bb63e3ff781530c280643c840dfacce10b59",
+      "transformation": "Use the UniProt-annotated mature Interleukin-6 chain, residues 30 through 212 inclusive (1-based). Remove annotated signal peptide residues 1-29; no residue substitutions."
+    },
+    {
+      "id": "anti_il6_nb",
+      "pdb_id": "9VQ6",
+      "entity_id": "1",
+      "url": "https://data.rcsb.org/rest/v1/core/polymer_entity/9VQ6/1",
+      "entry_url": "https://www.rcsb.org/structure/9VQ6",
+      "retrieved_utc_date": "2026-10-10",
+      "response_sha256": "09ec192ca87173d4a2a9b81f21ea0c7633b933ead926d0e61996ff26ab60b3aa",
+      "deposited_one_letter_code": "MAQVQLVESGGGLVQPGGSLRLSCAASGFTFSSYRMYWFRQAPGQGLEAVAAISAGGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCANRAGWGMGDYWGQGTLVTVSKLAAALEHHHHHH",
+      "deposited_canonical_sequence": "MAQVQLVESGGGLVQPGGSLRLSCAASGFTFSSYRMYWFRQAPGQGLEAVAAISAGGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCANRAGWGMGDYWGQGTLVTVSKLAAALEHHHHHH",
+      "input_sequence": "MAQVQLVESGGGLVQPGGSLRLSCAASGFTFSSYRMYWFRQAPGQGLEAVAAISAGGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCANRAGWGMGDYWGQGTLVTVSKLAAALEHHHHHH",
+      "input_length": 132,
+      "input_sha256": "8a73d4d27c20f0c41aa84cc4e880673a0bb73dc6085a296e5b31f4878f4f8e8e",
+      "transformation": "none; entire deposited 132 aa construct including termini and C-terminal histidine tag. 9VQ6 is the nanobody alone, not an antigen-nanobody complex."
+    }
+  ],
+  "additional_sources": [
+    {
+      "url": "https://doi.org/10.1016/j.cej.2025.170017",
+      "fact": "Published IL-6 nanobody biosensor study linked by PDB 9VQ6. The tutorial supplies input sequences, not precomputed prediction or experimental outcomes."
+    },
+    {
+      "url": "https://doi.org/10.1021/bi00196a004",
+      "fact": "1BRS deposited barstar construct has C40A/C82A substitutions."
+    },
+    {
+      "url": "https://www.uniprot.org/help/license",
+      "fact": "UniProt data are licensed under CC BY 4.0."
+    }
+  ]
+}

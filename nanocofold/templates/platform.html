@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>NanoCoFold 연구자 플랫폼</title>
+    <link rel="stylesheet" href="/assets/molstar.css" />
+    <link rel="stylesheet" href="/assets/platform.css" />
+    <script src="/assets/plotly.min.js" defer></script>
+    <script src="/assets/3dmol-min.js" defer></script>
+    <script src="/assets/molstar.js" defer></script>
+    <script src="/assets/input-molstar.js" defer></script>
+    <script src="/assets/result-molstar.js" defer></script>
+    <script>
+      window.PLATFORM_TOKEN = "__TOKEN__";
+    </script>
+    <script src="/assets/platform.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <div>
+        <strong>NanoCoFold</strong><span>나노바디 분석 · 개인 작업 공간</span>
+      </div>
+      <nav aria-label="주 메뉴">
+        <button data-view="input" aria-current="page">입력·실행</button
+        ><button data-view="batch">배치 분석</button
+        ><button data-view="jobs">작업·로그</button
+        ><button data-view="results">결과 탐색</button
+        ><button data-view="catalog">결과 DB</button
+        ><button data-view="environment">환경·설치</button>
+      </nav>
+    </header>
+    <main>
+      <div id="notice" role="status" aria-live="polite" hidden></div>
+      <section id="view-input">
+        <h1>새 분석 시작</h1>
+        <p>
+          입력을 검토하고 실제 적용 설정을 확인한 뒤 실행하세요. CPU 데모는 합성
+          결과로 사용 흐름을 연습합니다.
+        </p>
+        <div class="grid">
+          <div class="card">
+            <h2>1. 모드와 입력</h2>
+            <label for="mode">분석 모드</label
+            ><select id="mode">
+              <option value="design">design · 새 VHH 설계</option>
+              <option value="screen">screen · VHH 라이브러리 비교</option>
+              <option value="mature">mature · WT 변이 후보 평가</option>
+            </select>
+            <label for="job-name">실행 이름</label
+            ><input id="job-name" value="my-analysis" maxlength="100" />
+            <label for="input-kind">표적 입력</label
+            ><select id="input-kind">
+              <option value="structure">PDB / mmCIF 구조</option>
+              <option value="fasta">FASTA 서열</option>
+            </select>
+            <div id="structure-fields">
+              <label for="structure-file">구조 파일</label
+              ><input
+                id="structure-file"
+                type="file"
+                accept=".pdb,.cif,.mmcif"
+              />
+              <p class="muted">
+                실험 구조의 체인과 원본 잔기 번호를 보존합니다.
+              </p>
+              <div class="inline">
+                <input
+                  id="pdb-id"
+                  placeholder="PDB ID (예: 9VQ6)"
+                  aria-label="PDB ID"
+                /><input
+                  id="assembly-id"
+                  value="1"
+                  aria-label="생물학적 assembly 번호"
+                  style="max-width: 6em"
+                /><button id="load-structure">구조 불러오기</button>
+              </div>
+              <label for="model-index">구조 model 번호 · NMR 등 여러 model일 때 선택</label>
+              <input id="model-index" type="number" value="1" min="1" step="1" />
+              <div id="chain-review" hidden>
+                <h3>MolStar · 진행할 체인 선택</h3>
+                <p id="chain-pick-help" class="muted">
+                  Ctrl+클릭: 표적 체인 선택 · Ctrl+Shift+클릭: 파트너 추가·해제.
+                  Mac에서는 ⌘ 키도 사용할 수 있습니다. 표적은 한 체인, 파트너는 여러 체인을 선택할 수 있습니다.
+                </p>
+                <div id="input-structure-view" role="region" aria-label="입력 구조 MolStar 뷰어" aria-describedby="chain-pick-help"></div>
+                <p id="input-viewer-status" role="status" class="muted"></p>
+                <p id="input-chain-hover" class="muted"></p>
+                <div class="inline">
+                  <button id="fit-input-structure" class="secondary" type="button">전체 구조 보기</button>
+                  <button id="clear-partners" class="secondary" type="button">파트너 선택 해제</button>
+                </div>
+                <p id="chain-selection" role="status" aria-live="polite"></p>
+                <label for="target-chain">표적 체인</label
+                ><select id="target-chain"></select>
+                <fieldset>
+                  <legend>보존할 파트너 체인</legend>
+                  <div id="partner-chains"></div>
+                </fieldset>
+                <button id="analyze-structure">체인·노출도 검토</button>
+                <div id="hotspot-review" hidden>
+                  <h3>단백질 입력 판정</h3>
+                  <div id="input-assessment"></div>
+                  <label for="input-preparation">입력 준비 방식</label>
+                  <select id="input-preparation">
+                    <option value="coordinates">실험 좌표 사용 · 관측된 잔기</option>
+                    <option value="sequence_prediction">전체 서열로 구조 예측 · 결손·수정 잔기 검토</option>
+                  </select>
+                  <div id="prediction-fields" hidden>
+                    <label for="prediction-provider">새 표적 구조 예측 엔진</label>
+                    <select id="prediction-provider"><option value="boltz2">Boltz-2</option><option value="chai1">Chai-1</option></select>
+                    <label for="prediction-sequences">전체 단백질 FASTA · 선택한 체인 ID를 이름으로 사용</label>
+                    <textarea id="prediction-sequences" rows="6" spellcheck="false" placeholder=">A&#10;ACDEFGHIKLMNPQRSTVWY"></textarea>
+                    <p class="muted">파일에 기록된 전체 서열을 자동으로 채웁니다. X 등 불명확한 위치와 실제 construct를 확인하세요.
+                      정보가 없는 체인은 확인한 전체 서열을 입력하세요. 알려진 잔기의 변경이나 모호한 대응은 차단합니다.</p>
+                    <label for="prediction-hotspots">Hotspot 처리</label>
+                    <select id="prediction-hotspots"><option value="auto">예측한 구조에서 자동 추천</option><option value="reference">아래 선택한 부위를 전체 서열 위치로 대응</option></select>
+                    <p class="muted">원본 좌표는 참조로 보존합니다. 새 예측은 단백질 서열 모델이며 수정 잔기·chromophore·당질·리간드·핵산·막 환경을 재현하지 않습니다.</p>
+                  </div>
+                  <div id="reference-hotspot-fields">
+                  <h3>원본 좌표에서 Hotspot 검토</h3>
+                  <div id="hotspot-patches"></div>
+                  <label for="hotspots"
+                    >Hotspot 위치 (표적 서열의 1-based 위치)</label
+                  ><input id="hotspots" placeholder="예: 34, 67, 88" />
+                  <details>
+                    <summary>원본 번호·노출도 대응표</summary>
+                    <div id="residue-review" class="scroll"></div>
+                  </details>
+                  </div>
+                  <div id="input-warnings"></div>
+                  <label class="check"
+                    ><input
+                      id="acknowledge"
+                      type="checkbox"
+                    />표적·파트너·서열·입력 준비 방식·hotspot과 경고를 확인했습니다.</label
+                  >
+                </div>
+              </div>
+            </div>
+            <div id="fasta-fields" hidden>
+              <label for="target-fasta">표적 FASTA</label
+              ><textarea
+                id="target-fasta"
+                rows="5"
+                spellcheck="false"
+                placeholder=">target&#10;ACDEFGHIKLMNPQRSTVWY"
+              ></textarea
+              ><label for="provider">표적 구조 예측 엔진</label
+              ><select id="provider">
+                <option value="boltz2">Boltz-2</option>
+                <option value="chai1">Chai-1</option>
+              </select>
+              <p class="muted">
+                서열 입력의 구조와 hotspot은 예측됩니다. 기본 MSA는 empty이며
+                외부 서버로 서열을 보내지 않습니다.
+              </p>
+            </div>
+            <details id="region-fields">
+              <summary>표적 분석 구간 · Hotspot 제외 영역</summary>
+              <p id="region-basis" class="muted">비워 두면 전체 표적을 분석합니다. 좌표 사용은 관측 서열, 새 구조 예측·FASTA는 검토한 전체 서열의 1-based 위치입니다.</p>
+              <div class="inline">
+                <label for="region-start">분석 시작</label><input id="region-start" type="number" min="1" step="1" placeholder="1" />
+                <label for="region-end">분석 끝</label><input id="region-end" type="number" min="1" step="1" placeholder="표적 끝" />
+              </div>
+              <label for="hotspot-exclusions">Hotspot 추천 제외 구간 · 한 줄에 시작-끝 이름</label>
+              <textarea id="hotspot-exclusions" rows="3" placeholder="1-20 정제 태그&#10;150-170 융합 구간"></textarea>
+              <p class="muted">제외 구간은 좌표·접촉 평가를 유지합니다. 분석 구간 선택은 실제 표적 construct를 절단합니다. 도메인·태그 이름은 연구자가 지정하며 자동 확정하지 않습니다.</p>
+            </details>
+            <div id="library-fields" hidden>
+              <label for="vhh-fasta">VHH 라이브러리 FASTA</label
+              ><input
+                id="vhh-file"
+                type="file"
+                accept=".fa,.fasta,.faa,.txt"
+              /><textarea id="vhh-fasta" rows="5" spellcheck="false"></textarea>
+            </div>
+            <div id="wt-fields" hidden>
+              <label for="wt-fasta">WT VHH FASTA</label
+              ><input
+                id="wt-file"
+                type="file"
+                accept=".fa,.fasta,.faa,.txt"
+              /><textarea id="wt-fasta" rows="4" spellcheck="false"></textarea
+              ><label for="wt-structure">WT 구조 (AntiFold 사용 시 필수)</label
+              ><input id="wt-structure" type="file" accept=".pdb,.cif,.mmcif" />
+              <p class="muted">
+                아래 고급 설정에서 AntiFold를 끄면 WT 구조 없이 평가할 수
+                있습니다.
+              </p>
+            </div>
+            <label class="check"
+              ><input id="mock" type="checkbox" />CPU 데모 · mock (실제 예측이
+              아님)</label
+            ><button id="fill-demo" class="secondary">
+              CPU 데모 입력 채우기
+            </button>
+          </div>
+          <div class="card">
+            <h2>2. 설정 검토와 실행</h2>
+            <label for="analysis-preset">후보 탐색 설정</label>
+            <select id="analysis-preset">
+              <option value="researcher_exploration">연구자 탐색 · 후보 폭넓게 평가 (기본)</option>
+              <option value="standard">기존 기본 설정 · 사전 필터 적용</option>
+            </select>
+            <p class="muted">연구자 탐색은 RF2·ESM 사전 탈락을 해제하고 hotspot restraint·랭킹 가중치를 끕니다.
+              design은 1,000개 백본을 생성하고 최대 500개 복합체를 평가합니다.
+              mature는 최대 500개와 WT 대조군을 평가합니다. screen은 입력 라이브러리 전체를 평가합니다.
+              품질 판정·충돌·개발가능성 경고를 유지하며 결과는 전체 후보를 표시합니다.
+              design 구조 생성은 선택한 hotspot에 조건화됩니다. 후보 수가 늘면 계산 시간도 늘어납니다.</p>
+            <label for="candidate-limit">복합체 평가 후보 상한 · design/mature (WT는 별도 추가 가능)</label>
+            <input id="candidate-limit" type="number" min="1" step="1" placeholder="기본 500 · 비우면 설정값 사용" />
+            <label for="design-count">생성할 백본 수 · design</label>
+            <input id="design-count" type="number" min="1" step="1" placeholder="기본 1000 · 비우면 설정값 사용" />
+            <label for="screen-engine">복합체 예측 엔진</label
+            ><select id="screen-engine">
+              <option value="chai1">Chai-1</option>
+              <option value="boltz2">Boltz-2</option></select
+            ><label for="seed">Seed</label
+            ><input id="seed" type="number" value="42" min="0" /><label
+              for="budget"
+              >시간 한도 (분, 비우면 없음)</label
+            ><input id="budget" type="number" min="1" placeholder="예: 120" />
+            <label class="check"><input id="force-rerun" type="checkbox" />과거 결과를 재사용하지 않고 새로 계산</label>
+            <p class="muted">입력·설정·도구·가중치·MSA 정체성이 확인된 완료 결과만 재사용합니다. 공개 API의 변경 가능한 DB는 자동으로 동일 실행으로 간주하지 않습니다.</p>
+            <details>
+              <summary>고급 설정 · YAML 가져오기</summary>
+              <label for="yaml-file">기존 YAML 가져오기</label
+              ><input id="yaml-file" type="file" accept=".yaml,.yml" /><label
+                for="advanced"
+                >고급 설정 JSON (기본 흐름에서는 불필요)</label
+              ><textarea id="advanced" rows="9" spellcheck="false">{}</textarea>
+              <p class="muted">
+                서로 다른 조건의 점수는 비교 시 개별로 표시합니다. 입력 검토가
+                확정한 표적·hotspot은 고급 설정으로 덮어쓰지 않습니다.
+              </p>
+            </details>
+            <button id="review-input">입력·적용 설정 확인</button>
+            <div id="review-output" hidden>
+              <h3>적용 설정</h3>
+              <pre id="resolved-config"></pre>
+              <div id="review-summary"></div>
+              <div class="inline">
+                <button id="diagnose-input" class="secondary">
+                  이 입력의 환경 점검</button
+                ><button id="start-job">분석 실행</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section id="view-batch" hidden>
+        <h1>배치 분석</h1>
+        <p>최대 200개 독립 분석을 검토한 뒤 GPU 큐에 제출합니다. 한 표적의 여러 VHH는 라이브러리 FASTA로 분석 하나 안에서 비교합니다.</p>
+        <article><div class="grid">
+          <label>목적<select id="batch-mode"><option value="design">새 나노바디 설계</option><option value="screen">보유 나노바디 비교</option><option value="mature">기존 나노바디 변이 평가</option><option value="complex">단백질 복합체 예측</option></select></label>
+          <label>입력 형식<select id="batch-format"><option value="fasta">표적 multi-FASTA</option><option value="json">JSON · 항목별 조건</option></select></label>
+        </div><label>배치 이름<input id="batch-name" value="배치 분석" /></label>
+        <label>표적 multi-FASTA 또는 배치 JSON<textarea id="batch-content" rows="8"></textarea><input id="batch-file" type="file" accept=".fa,.faa,.fasta,.json,.txt" /></label>
+        <label>공통 전체 VHH 라이브러리 · 보유 나노바디 비교<textarea id="batch-library" rows="3"></textarea></label>
+        <label>공통 WT VHH · 변이 평가<textarea id="batch-wt" rows="3"></textarea></label>
+        <label>각 표적의 공통 파트너 FASTA · 복합체 예측<textarea id="batch-partners" rows="3"></textarea></label>
+        <p>multi-FASTA는 기본 설치 설정을 적용합니다. 현재 검토한 단일 분석의 조건을 쓰거나, JSON의 config로 항목별 조건을 지정할 수 있습니다. CDR3는 JSON의 cdr3_library에 기준 VHH와 교체 구간을 명시하세요.</p>
+        <label><input type="checkbox" id="batch-use-config"/> 현재 검토한 단일 분석의 조건 사용</label>
+        <label><input type="checkbox" id="batch-api-consent"/> 이 배치의 표적·후보 서열을 외부 MSA 서비스로 보내는 데 동의</label>
+        <div class="actions"><button id="batch-review">배치 입력 검토 · 계산 시작 전</button><button id="batch-example">JSON 데모 예제</button></div>
+        <p id="batch-activity" role="status" aria-live="polite"></p></article>
+        <article><h2>검토한 항목·작업</h2><div id="batch-summary"></div><div id="batch-rows" class="table-scroll"></div><div class="actions"><button id="batch-submit" disabled>검토한 전체 분석 실행</button><button id="batch-refresh">현재 상태 확인</button><button id="batch-cancel" disabled>미완료 작업 취소</button></div></article>
+        <article><h2>저장된 배치</h2><div id="batch-history"></div></article>
+      </section>
+      <section id="view-jobs" hidden>
+        <h1>작업과 진행 상태</h1>
+        <p>
+          브라우저를 닫아도 실행됩니다. 중단된 작업은 입력·설정과 완료 단계의
+          출처를 확인한 뒤 직접 재개하세요.
+        </p>
+        <button id="refresh-jobs" class="secondary">새로고침</button>
+        <div class="grid">
+          <div id="job-list" class="card"></div>
+          <div class="card">
+            <h2 id="job-title">작업 선택</h2>
+            <div id="job-detail"></div>
+            <div id="job-actions" class="inline"></div>
+            <h3>실시간 로그</h3>
+            <pre id="job-log" class="log" tabindex="0"></pre>
+          </div>
+        </div>
+      </section>
+      <section id="view-catalog" hidden>
+        <h1>저장된 결과 DB</h1>
+        <p>핵심 정보로 검색하고 제목을 눌러 정렬하세요. 결과는 새 탭에서 열립니다.</p>
+        <div class="inline">
+          <input id="catalog-search" placeholder="분석 이름 또는 결과 ID" aria-label="결과 검색" />
+          <select id="catalog-retention" aria-label="보관 상태">
+            <option value="">모든 보관 상태</option><option value="full">원본 보관</option><option value="minimal">핵심 보관</option>
+          </select>
+          <button id="catalog-refresh">검색</button>
+        </div>
+        <p id="catalog-status" role="status" aria-live="polite"></p>
+        <div class="table-scroll" id="catalog-table"></div>
+        <p class="muted">작은 화면에서는 표를 좌우로 이동해 나머지 항목을 볼 수 있습니다.</p>
+        <div class="inline"><button id="catalog-first" class="secondary">처음</button><button id="catalog-next" class="secondary" disabled>다음 25개</button></div>
+        <p class="muted">용량은 해당 서버 결과 폴더의 측정값입니다. 공용 캐시·모델 가중치·클라우드 사본 용량은 포함하지 않습니다.</p>
+      </section>
+      <section id="view-results" hidden>
+        <h1>분석 결과 보고서</h1><p class="muted">NanoCoFold · 저장된 데이터로 탐색하는 독립 보고서</p><nav class="report-nav" aria-label="보고서 내 탐색"><a href="#report-input">01 입력·설정</a><a href="#result-summary">02 후보·모델 수</a><a href="#report-comparison">03 후보 비교</a><a href="#report-exclusions">04 제외·미평가</a><a href="#candidate-title">05 구조·PAE</a><a href="#report-provenance">06 출처·산출물</a></nav>
+        <p>
+          기존 결과 열기는 읽기 전용입니다. 예측 점수는 실제 결합·친화도
+          향상·KD를 확정하지 않습니다.
+        </p>
+        <div class="card">
+          <div class="inline">
+            <label for="result-select">실행 선택</label
+            ><select id="result-select"></select
+            ><button id="refresh-results" class="secondary">새로고침</button
+            ><input
+              id="result-path"
+              placeholder="작업 공간 안 기존 결과 경로"
+              aria-label="기존 결과 경로"
+            ><button id="open-result" class="secondary">기존 결과 열기</button>
+          </div>
+          <h2 id="report-input">01 입력·설정</h2>
+          <div id="result-input"></div>
+          <details><summary>입력과 실행 설정 원문</summary><pre id="result-input-config"></pre></details>
+          <div id="result-summary"></div>
+          <div id="result-issues"></div>
+          <details id="result-retention-panel">
+            <summary>용량 정리 · 지표와 모든 최종 구조 보관</summary>
+            <p>서열·점수·모든 최종 구조는 유지합니다. PAE 배열·MSA·중간 파일은 삭제되며, 이 자료가 다시 필요하면 새 분석을 실행해야 합니다.</p>
+            <button id="retention-preview" class="secondary">정리할 파일·예상 용량 확인</button>
+            <div id="retention-plan" role="status" aria-live="polite"></div>
+            <div id="retention-confirmation" hidden>
+              <label class="check"><input id="retention-consent" type="checkbox" />위 목록의 파일 삭제에 동의합니다.</label>
+              <button id="retention-apply" class="danger" disabled>확인한 중간 파일 삭제</button>
+            </div>
+          </details>
+          <div class="inline">
+            <label for="compare-select">비교 실행</label
+            ><select id="compare-select"></select
+            ><button id="compare-runs" class="secondary">
+              조건·결과 나란히 비교
+            </button>
+          </div>
+          <div id="comparison"></div>
+        </div>
+        <div id="explorer" hidden>
+          <div class="card">
+            <h2 id="report-comparison">03 후보 비교</h2>
+            <p class="muted">예측 신뢰도와 지정 위치 충족은 별개입니다. hotspot 접촉 수와 판정을 함께 확인하세요. 동일 엔진·실행 조건 안에서 지표를 비교하세요. 정렬은 탐색 순서이며 엔진을 합친 최종 순위가 아닙니다.</p>
+            <div class="inline">
+              <label for="candidate-search">후보 검색</label
+              ><input
+                id="candidate-search"
+                type="search"
+                placeholder="ID, 서열, 제외 사유"
+              ><label for="eligibility-basis">적격 판정</label
+              ><select id="eligibility-basis">
+                <option value="quality">품질 적격 · hotspot 제외</option>
+                <option value="recorded">실행 당시 기록 적격</option></select
+              ><label for="eligibility">적격 여부</label
+              ><select id="eligibility">
+                <option value="all">전체</option>
+                <option value="true">적격</option>
+                <option value="false">부적격</option>
+                <option value="missing">미평가</option></select
+              ><label for="sort-metric">정렬</label
+              ><select id="sort-metric">
+                <option value="ipsae">ipSAE ↑</option>
+                <option>composite_score</option>
+                <option>iptm</option>
+                <option>interface_plddt</option>
+                <option>interface_pae</option>
+                <option>pdockq</option>
+                <option>ptm</option>
+                <option>complex_plddt</option>
+                <option>binder_plddt</option>
+                <option>target_plddt</option>
+                <option>interface_pae_p90</option>
+                <option>interface_pae_median</option>
+                <option>interface_pae_ba</option>
+                <option>interface_pae_ab</option>
+                <option>pdockq2</option>
+                <option value="pdockq2_target">pDockQ2 표적 방향</option>
+                <option value="pdockq2_binder">pDockQ2 VHH 방향</option>
+                <option>n_clashes</option>
+                <option>dev_flags</option><option>n_hbonds</option><option>n_salt_bridges</option><option>esm_score</option>
+                <option>candidate_id</option></select
+              ><label for="engine-filter">예측 엔진</label><select id="engine-filter"><option value="all">전체 엔진</option></select>
+              <label class="check"
+                ><input
+                  id="descending"
+                  type="checkbox"
+                  checked
+                >내림차순</label
+              >
+            </div>
+            <div class="inline">
+              <label class="check"><input id="hotspot-filter" type="checkbox" >Hotspot 접촉률로 후필터</label>
+              <label for="hotspot-min">최소 접촉률 (%)</label>
+              <input id="hotspot-min" type="number" min="0" max="100" step="1" value="50" disabled >
+            </div>
+            <p class="muted">Hotspot 후필터는 기본 해제입니다. 켜면 미지정·접촉률 미평가·번호 대응 실패·기록 불일치 후보는 표시하지 않습니다. 접촉률만 저장된 이전 결과는 기록된 비율로 필터하며 상세 접촉 수·판정은 미평가로 남습니다.
+              기존 결과의 적격 판정과 선별 목록은 보존하며, 품질 적격은 기록된 판정에서 hotspot만 제외한 탐색 값입니다.</p>
+            <p id="candidate-count"></p><p id="candidate-sort-note" class="muted" role="status"></p>
+          </div>
+          <div class="candidate-workbench">
+            <section class="card candidate-list-panel">
+              <h3>후보 목록 · 클릭해서 구조 비교</h3>
+            <div class="scroll candidate-scroll">
+              <table id="candidate-table">
+                <thead></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+
+            </section>
+            <section class="card report-structure">
+              <h2 id="candidate-title">후보 선택</h2>
+              <div class="candidate-navigation" aria-label="후보 구조 빠른 탐색">
+                <label for="viewer-candidate-select">현재 목록의 후보</label>
+                <select id="viewer-candidate-select" aria-describedby="viewer-candidate-position"></select>
+                <div class="candidate-step-controls">
+                  <button id="previous-candidate" type="button" class="secondary">이전</button>
+                  <span id="viewer-candidate-position" role="status" aria-live="polite"></span>
+                  <button id="next-candidate" type="button" class="secondary">다음</button>
+                </div>
+              </div>
+              <p id="candidate-status" class="muted" role="status"></p>
+
+              <div
+                id="structure-view"
+                role="region"
+                aria-label="선택한 후보의 MolStar 구조와 서열"
+              ></div>
+              <div class="viewer-display-controls" aria-label="구조 표시 옵션">
+                <label><input type="checkbox" data-viewer-display="sequence" >서열 패널 표시</label>
+                <label><input type="checkbox" data-viewer-display="residues" >잔기·곁사슬 표시</label>
+                <button id="clear-result-selection" type="button" class="secondary">선택 해제</button>
+              </div>
+              <div class="inline">
+                <button id="fit-result-structure" type="button" class="secondary">전체 구조 보기</button>
+                <button id="save-result-structure" type="button" class="secondary">선택 예측 구조 저장</button>
+                <label for="residue-a">잔기 1</label><select id="residue-a"></select>
+                <label for="residue-b">잔기 2</label><select id="residue-b"></select>
+                <button id="focus-result-residues" type="button" class="secondary">잔기 선택</button>
+                <button id="measure-result-distance" type="button" class="secondary">Cα 거리 측정</button>
+              </div>
+              <p id="structure-note" role="status"></p>
+              <label for="observation-select">구조·PAE 관측 선택</label
+              ><select id="observation-select"></select>
+              <div class="inline toggles">
+                <label class="check"
+                  ><input
+                    type="checkbox"
+                    data-layer="target"
+                    checked
+                  >표적</label
+                ><label class="check"
+                  ><input
+                    type="checkbox"
+                    data-layer="binder"
+                    checked
+                  >VHH</label
+                ><label class="check"
+                  ><input
+                    type="checkbox"
+                    data-layer="context"
+                    checked
+                  >파트너</label
+                ><label class="check"
+                  ><input
+                    type="checkbox"
+                    data-layer="hotspots"
+
+                  >Hotspot</label
+                ><label class="check"
+                  ><input type="checkbox" data-layer="contacts" >접촉</label
+                ><label class="check"
+                  ><input
+                    type="checkbox"
+                    data-layer="clashes"
+
+                  >충돌</label
+                >
+                <label class="check"><input type="checkbox" data-layer="cdr" >CDR</label>
+                <label class="check"><input type="checkbox" data-layer="reference" >입력 좌표 중첩</label>
+              </div>
+              <div id="structure-actions" class="inline" aria-label="제외 사유 구조 탐색"></div>
+              <div id="cdr-actions" class="inline"></div>
+              <p id="reference-note" class="muted"></p>
+              <details id="candidate-details-panel">
+                <summary>선택 후보의 수치·판정·서열 상세</summary>
+                <div id="candidate-detail"></div>
+              </details>
+              <details>
+                <summary>접촉·충돌·원본 잔기 대응</summary>
+                <div id="structure-details" class="scroll"></div>
+              </details>
+            </section>
+          </div>
+          <div class="card report-export">
+            <div class="inline">
+              <label for="export-format">전체 결과 저장</label
+              ><select id="export-format">
+                <option value="report_zip">전달용 보고서 ZIP · MolStar·PAE 포함</option>
+                <option value="zip">전체 패키지 ZIP</option>
+                <option value="html">오프라인 대화형 HTML</option>
+                <option value="csv">CSV</option>
+                <option value="xlsx">XLSX · 출처 포함</option>
+                <option value="fasta">FASTA</option></select
+              ><button id="export-result">저장</button>
+            </div>
+            <p class="muted">
+              전달용 ZIP은 전체 모델·구조·PAE를 포함합니다. 압축을 풀고 report.html을 열면
+              인터넷 없이 탐색할 수 있습니다. MSA·로그·중간 계산 파일은 전체 패키지 ZIP에 보관합니다.
+            </p>
+          </div>
+          <div class="card">
+            <h2 id="report-exclusions">04 제외·미평가 이유</h2>
+            <p class="muted">전체 모델 기록에서 사유별로 모델당 한 번 집계합니다. 한 모델에 여러 사유가 있을 수 있습니다. 필터를 바꿔도 집계의 기준은 전체 기록입니다.</p>
+            <div id="exclusion-summary" class="scroll"></div>
+          </div>
+          <div class="report-workbench">
+            <div class="report-metrics">
+              <section class="card">
+              <h2>seed별 관측</h2>
+              <p id="observation-note" class="muted"></p>
+              <div id="distribution" class="chart"></div>
+              </section>
+              <section class="card">
+                <h2>PAE · 예측 정렬 오차</h2>
+                <div id="pae" class="chart"></div>
+                <p class="muted">PAE 단위는 Å입니다. 셀을 클릭하면 두 잔기를 3D 구조에서 선택합니다.</p>
+              </section>
+              <section class="card">
+              <h2>계면 점수 비교</h2>
+              <div class="inline">
+                <label for="plot-x">산점도 X</label
+                ><select id="plot-x">
+                  <option>ipsae</option>
+                  <option>iptm</option>
+                  <option>interface_plddt</option>
+                  <option>interface_pae</option>
+                <option>pdockq</option>
+                <option>ptm</option>
+                <option>complex_plddt</option>
+                <option>binder_plddt</option>
+                <option>target_plddt</option>
+                <option>interface_pae_p90</option>
+                <option>interface_pae_median</option>
+                <option>interface_pae_ba</option>
+                <option>interface_pae_ab</option>
+                <option>pdockq2</option>
+                <option value="pdockq2_target">pDockQ2 표적 방향</option>
+                <option value="pdockq2_binder">pDockQ2 VHH 방향</option>
+                  <option>n_clashes</option>
+                  <option>dev_flags</option><option>n_hbonds</option><option>n_salt_bridges</option><option>esm_score</option></select
+                ><label for="plot-y">Y</label
+                ><select id="plot-y">
+                  <option>interface_plddt</option>
+                  <option>ipsae</option>
+                  <option>iptm</option>
+                  <option>interface_pae</option>
+                <option>pdockq</option>
+                <option>ptm</option>
+                <option>complex_plddt</option>
+                <option>binder_plddt</option>
+                <option>target_plddt</option>
+                <option>interface_pae_p90</option>
+                <option>interface_pae_median</option>
+                <option>interface_pae_ba</option>
+                <option>interface_pae_ab</option>
+                <option>pdockq2</option>
+                <option value="pdockq2_target">pDockQ2 표적 방향</option>
+                <option value="pdockq2_binder">pDockQ2 VHH 방향</option>
+                  <option>n_clashes</option>
+                <option>dev_flags</option><option>n_hbonds</option><option>n_salt_bridges</option><option>esm_score</option></select>
+              </div>
+              <div id="scatter" class="chart"></div>
+              </section>
+            </div>
+
+          </div>
+        </div>
+        <div class="card">
+          <h2 id="report-provenance">06 출처·산출물</h2>
+          <p class="muted">MSA 출처와 예측 조건이 다른 관측은 각 조건을 확인해 따로 해석하세요. 전체 원본 ID·수치·모델·관측은 저장 데이터에 보존됩니다.</p>
+          <details>
+            <summary>실행 조건·원본 출처 전체 기록</summary>
+            <pre id="result-conditions"></pre>
+            <button id="reanalyze" class="secondary">
+              설정을 새 분석으로 가져오기
+            </button>
+          </details>
+          <details><summary>파일 해시·출처 원문</summary><pre id="result-provenance"></pre></details>
+        </div>
+      </section>
+      <section id="view-environment" hidden>
+        <h1>환경과 설치</h1>
+        <p>
+          계산은 Linux x86_64 NVIDIA GPU 호스트에서 실행합니다. 연구자 PC는
+          브라우저와 SSH 포트포워딩으로 접속합니다.
+        </p>
+        <div class="card">
+          <h2>설치 프로필</h2>
+          <p>
+            core는 본체와 CPU 데모, design은 RFantibody·BoltzGen과 Boltz-2·Chai-1,
+            screen은 보유 VHH 비교, mature는 변이 평가 환경을 준비합니다.
+            네 엔진 독립 비교에는 design 또는 screen 설치 후 colabfold와 opendde를
+            각각 추가하세요. all에도 이 두 선택 엔진은 포함되지 않습니다. 대형 MSA DB는 선택 설치입니다.
+          </p>
+          <div class="inline">
+            <label for="install-profile">프로필</label
+            ><select id="install-profile">
+              <option>core</option>
+              <option>complex</option>
+              <option>design</option>
+              <option>screen</option>
+              <option>mature</option>
+              <option>boltzgen</option>
+              <option>colabfold</option>
+              <option>opendde</option>
+              <option>all</option></select
+            ><button id="install-profile-button">프로필 설치</button
+            ><button id="diagnose-environment" class="secondary">
+              현재 입력·모드 환경 점검
+            </button>
+          </div>
+          <p class="muted">
+            설치·점검은 작업 탭에서 다운로드 진행과 로그를 확인합니다. 실패한
+            필수 엔진이 있으면 실제 분석을 시작하지 않습니다.
+          </p>
+          <div id="diagnostics-output"></div>
+        </div>
+        <div class="card">
+          <h2>시작 안내</h2>
+          <p>작업 공간: <code id="workspace-path"></code></p>
+          <pre>
+nanocofold init --workspace ~/nanocofold-workspace
+nanocofold setup --workspace ~/nanocofold-workspace --profile all
+nanocofold setup --workspace ~/nanocofold-workspace --profile colabfold
+nanocofold setup --workspace ~/nanocofold-workspace --profile opendde
+nanocofold serve --workspace ~/nanocofold-workspace --no-browser
+# 연구자 PC에서:
+ssh -L 8765:127.0.0.1:8765 USER@GPU_HOST</pre
+          >
+          <p>
+            접속 주소: http://127.0.0.1:8765 · 파일과 결과는 계산 호스트에
+            보관됩니다.
+          </p>
+        </div>
+      </section>
+    </main>
+    <footer>
+      로컬 자산 · 전체 후보 보존 · 예측 점수는 실험 검증과 함께 해석하세요.
+    </footer>
+  </body>
+</html>

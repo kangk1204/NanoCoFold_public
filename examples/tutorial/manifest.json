@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "title": "Public tutorial inputs",
+  "source_file": "sources.json",
+  "sequence_records": [
+    {
+      "id": "barnase",
+      "input_length": 110,
+      "input_sha256": "de6ee3cdb0fd76b4756d3c3bacbc6b22567b1cee43248044f4385c3b9af675c2"
+    },
+    {
+      "id": "barstar",
+      "input_length": 89,
+      "input_sha256": "a55f4f6f8034de8530775b266225c907bb62c3a97b6e4d2716da47ed535c73bb"
+    },
+    {
+      "id": "human_il6",
+      "input_length": 183,
+      "input_sha256": "49017e62426d5cda55e4902d3e43bb63e3ff781530c280643c840dfacce10b59"
+    },
+    {
+      "id": "anti_il6_nb",
+      "input_length": 132,
+      "input_sha256": "8a73d4d27c20f0c41aa84cc4e880673a0bb73dc6085a296e5b31f4878f4f8e8e"
+    }
+  ],
+  "files_sha256": {
+    "complex.fasta": "1b96a683bcc7971859e63fce4f5e76c3b80bc04b09999f1c04c41cb2db015c01",
+    "complex_batch.json": "cd83f6afe36f4fda498e8a7e134fad5fd621a25483a0411f3992a0bdb3de044f",
+    "design_batch.json": "929a68c837434f47a631fd09ac5dc1439fe37071291910a40a7d7e25b2b64b73",
+    "mature_batch.json": "ef671fa8e0f415cf568ec73a2b9799ce41173dfbb27183e10aea617bec3f4f46",
+    "screen_batch.json": "6684e71275b67b90b9759469bc78a3a2f1cc0bd3c0657977e5fcd83a9e5965c5",
+    "sources.json": "2d4a1d2ee3a96a5dafd7cb01108c7b6d5b09290f2cfc36c37057b2e0ab0772ec",
+    "target.fasta": "a1e2fcd2b0ac018ff3ec67e2ca811540fc2d41c31fe39105b046e823f1fa3128",
+    "vhh_library.fasta": "325fe7a555e5ad9246be7f6fcab8fa1c1aeaa73c4da6ee5936d1669ee2c04995",
+    "wt_vhh.fasta": "325fe7a555e5ad9246be7f6fcab8fa1c1aeaa73c4da6ee5936d1669ee2c04995"
+  },
+  "modes": {
+    "complex": {
+      "file": "complex_batch.json",
+      "jobs": 1,
+      "maximum_representative_models": 1
+    },
+    "screen": {
+      "file": "screen_batch.json",
+      "jobs": 1,
+      "maximum_representative_models": 4
+    },
+    "mature": {
+      "file": "mature_batch.json",
+      "jobs": 1,
+      "maximum_representative_models": 12
+    },
+    "design": {
+      "file": "design_batch.json",
+      "jobs": 1,
+      "maximum_representative_models": 8
+    }
+  },
+  "contains_precomputed_predictions": false
+}

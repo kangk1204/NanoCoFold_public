@@ -1,0 +1,1171 @@
+"""Read-only adapters for legacy and current runs. No analysis is rerun here."""
+from __future__ import annotations
+
+import csv
+import copy
+import io
+import json
+import math
+import re
+import zipfile
+import os
+import tempfile
+from pathlib import Path
+
+import yaml
+
+from ..config import ASSET_ROOT, resolve_run_artifact
+from ..binding_site_assessment import hotspot_filter_fraction
+from ..utils.metric_provenance import metric_provenance
+from .paths import contained, native, sha256
+
+METRICS = ("ipsae", "iptm", "interface_plddt", "hotspot_contact_frac", "n_clashes", "interface_pae", "dev_severe")
+GEOMETRY_METRICS = ("n_hbonds", "n_salt_bridges", "n_clashes")
+GEOMETRY_METADATA = tuple(metric + suffix for metric in GEOMETRY_METRICS
+                          for suffix in ("_method", "_unit", "_cutoff_angstrom"))
+ADDITIONAL_METRICS = ("ptm", "pdockq", "pdockq_method", "pdockq2", "pdockq2_target", "pdockq2_binder",
+                      "pdockq_status", "pdockq_n_contacts", "pdockq_raw_author_value",
+                      "pdockq2_n_contacts", "pdockq2_method", "pdockq2_status",
+                      "n_hbonds", "n_salt_bridges", *GEOMETRY_METADATA,
+                      "dev_flags", "esm_score", "antifold",
+                      "interface_pae_ab", "interface_pae_ba", "interface_pae_median",
+                      "interface_pae_p90", "target_plddt", "binder_plddt", "complex_plddt")
+SEARCH_FIELDS = ("candidate_id", "sequence", "exclusion_reason", "exclusion_reasons", "error")
+TABLES = ("03_score/scored_candidates.csv", "02_screen/candidates.csv", "02_design/design_candidates.csv",
+          "02_mature/esm2_scored_library.csv", "02_mature/prefiltered_candidates.csv", "02_design/all_generated_candidates.csv")
+METRIC_HELP = {
+    "ipsae": "계면의 PAE 기반 구조 일관성 점수입니다. 알려진 결합 위치와의 일치·결합 확률·KD를 평가하지 않습니다.",
+    "iptm": "예측 복합체의 상대 배치 신뢰도 점수입니다. 알려진 결합 위치 일치나 실제 결합을 확정하지 않습니다.",
+    "interface_plddt": "계면 잔기의 예측 구조 신뢰도입니다. 실험 구조의 B-factor와 구분하세요.",
+    "hotspot_contact_frac": "평가 가능한 hotspot 중 접촉 거리 조건을 만족한 비율입니다.",
+    "n_clashes": "고정 거리 기준 이내의 무거운 원자쌍 수입니다. 표적·보존 파트너와 VHH 사이를 합산합니다. 잔기 수나 원소별 반데르발스 충돌 판정이 아닙니다.",
+    "n_hbonds": "거리 기준의 N/O 근접 원자쌍 수입니다. 공여·수용체와 각도 검증을 하지 않으므로 확인된 수소결합 수가 아닙니다.",
+    "n_salt_bridges": "Lys/Arg 양전하 곁사슬과 Asp/Glu 음전하 곁사슬의 거리 기준 원자쌍 수입니다. His의 양성자화나 중성 Asn/Gln은 가정하지 않습니다. 기존 계산법 미기록 결과는 별도로 읽으세요.",
+    "pdockq": "CB 8 Å 접촉(Gly는 CA)과 신뢰도를 사용하는 탐색 지표입니다. 계면 없음·신뢰도 누락은 미평가 상태이며 원저자 반환값은 별도로 기록됩니다.",
+    "interface_pae": "계면 접촉 잔기 사이의 예측 정렬 오차입니다. 참조 실험 구조와의 실측 거리 오차가 아닙니다.",
+    "pdockq2": "PAE와 계면 pLDDT를 이용한 pDockQ2입니다. 두 방향 중 최소값이며 CA 8 Å 접촉을 사용합니다. AlphaFold-Multimer에서 보정된 지표로 다른 엔진의 값은 탐색용입니다. 실측 DockQ나 KD가 아닙니다.",
+    "interface_pae_ab": "접촉 쌍의 PAE 행 표적·열 VHH 평균(Å)입니다. 반대 방향과 다를 수 있습니다.",
+    "interface_pae_ba": "접촉 쌍의 PAE 행 VHH·열 표적 평균(Å)입니다.",
+    "interface_pae_median": "양방향 접촉 쌍 PAE의 중앙값(Å)입니다.",
+    "interface_pae_p90": "양방향 접촉 쌍 PAE의 90백분위(Å)입니다. 높은 오차 구간을 요약합니다.",
+    "dev_severe": "free_cys·glycosylation·deamidation_cdr·isomerization_cdr·hydrophobic_patch_cdr의 5종 심한 위험 수입니다. 선별 게이트에 사용하며 전체 위험 dev_flags와 다릅니다.",
+    "dev_flags": "평가된 True 위험 플래그의 전체 수입니다. 심한 5종에 oxidation_cdr·pi_out_of_range·charge_out_of_range가 추가되며 종합점수 가중치에 사용됩니다. CDR 미평가는 위험 없음이 아닙니다.",
+    "composite_score": "실행 당시 배치의 지표를 z-score 가중합한 상대 점수입니다. 정규화 범위는 ranking_policy를 확인하세요. 독립 비교는 엔진별이며 기존 부분 재평가 경로는 혼합 배치일 수 있습니다. 선별 순위에는 게이트와 다양성 제한이 추가됩니다. 결합 확률·KD나 검증된 친화도 순위가 아닙니다.",
+    "esm_score": "서열/폴딩 적합도 prior입니다. esm_llr가 기록된 성숙화는 단일 치환 ΔLLR를 사용합니다. ΔLLR가 없는 랜덤 성숙화와 design/screen은 예측 후 계산한 평균 로그확률의 배치 내 z-score를 사용합니다. 미평가는 0점이 아니며 실측 결합·친화도 판별값이 아닙니다.",
+    "site_selection_eligible": "실행 당시 기록 적격에 지정 hotspot 접촉을 별도로 확인한 값입니다. 기존 final_eligible와 선별 목록은 보존합니다.",
+    "pose_supporting_engines": "표적만 정렬한 뒤 같은 정확한 후보 서열의 자세가 일치하는 서로 다른 엔진 수입니다. 독립 실험 횟수나 점수 평균이 아닙니다.",
+    "pose_quality_supporting_engines": "자세가 일치하고 기록 적격·지정 부위를 함께 충족한 서로 다른 엔진 수입니다.",
+    "design_binder_rmsd_A": "동일 후보의 생성 구조와 독립 재예측 구조를 표적만 정렬한 후 계산한 VHH Cα RMSD입니다. 기존 VHH 참조 구조와의 RMSD가 아닙니다.",
+    "review_rank": "동일 표적·조건·실행 범위 안의 탐색적 후보 검토 순위입니다. 동률을 허용하며 1위도 보류일 수 있습니다. 결합 확률이나 엔진 점수 평균이 아닙니다.",
+    "review_priority": "검토 정책 v3는 품질·지정 부위를 충족한 엔진별 단독 유망 예측과 같은 자세의 다중 엔진 지지를 구분합니다. 엔진 간 자세 차이와 설계 재현은 별도 진단이며 자동 탈락 사유가 아닙니다. 실제 결합·KD를 입증하지 않습니다.",
+}
+POSE_ANNOTATIONS = ("site_satisfied", "site_selection_eligible", "pose_cluster_id", "pose_supporting_engines",
+                    "pose_quality_supporting_engines", "pose_consensus_status", "design_consistency_status",
+                    "design_binder_rmsd_A", "review_priority", "review_rank", "review_rank_scope",
+                    "review_priority_reason", "candidate_review_priority", "pose_assessment")
+
+
+def _geometry_metadata(row):
+    """Keep method receipts attached only to their own recorded stage values."""
+    for prefix in ("", "colabfold_", "boltz_"):
+        for metric in GEOMETRY_METRICS:
+            value = row.get(prefix + metric)
+            available = (not isinstance(value, bool) and isinstance(value, (int, float))
+                         and math.isfinite(value))
+            if not available:
+                for suffix in ("_method", "_unit", "_cutoff_angstrom"):
+                    key = prefix + metric + suffix
+                    if key in row:
+                        row[key] = None
+    return row
+
+
+def _cell(value, key):
+    # Identifiers are opaque strings. A valid FASTA ID such as "false" or
+    # "nan" must not become a boolean, missing value or fallback row ID.
+    if key.endswith("_id") or key in {"label", "sequence", "target_chain", "binder_chain"}:
+        return value if value is not None and value != "" else None
+    if value is None or value.strip().lower() in {"", "nan", "null", "none", "inf", "-inf"}:
+        return None
+    if value.lower() in {"true", "false"}:
+        return value.lower() == "true"
+    if re.fullmatch(r"[-+]?\d+", value):
+        return int(value)
+    try:
+        number = float(value)
+        return number if math.isfinite(number) else None
+    except ValueError:
+        return value
+
+
+def _exploration(filters):
+    """Preserve display state as typed data; never forward UI-only keys to queries."""
+    if not isinstance(filters, dict):
+        raise ValueError("탐색 조건은 JSON 객체여야 합니다.")
+    allowed = {}
+    text_limits = {"search": 10000, "sort": 100, "selected_candidate_id": 1000,
+                   "selected_observation_id": 2048, "plot_x": 100, "plot_y": 100,
+                   "engine_filter": 100}
+    for key, limit in text_limits.items():
+        if key not in filters:
+            continue
+        value = filters[key]
+        if value is None and key.startswith("selected_"):
+            allowed[key] = None
+        elif not isinstance(value, str) or len(value) > limit:
+            raise ValueError(f"탐색 조건 {key} 형식이 잘못되었습니다.")
+        else:
+            allowed[key] = value
+    for key in ("descending", "eligible"):
+        if key in filters:
+            if not isinstance(filters[key], bool):
+                raise ValueError(f"탐색 조건 {key}는 true/false여야 합니다.")
+            allowed[key] = filters[key]
+    if "eligibility" in filters:
+        value = filters["eligibility"]
+        if value not in ("all", "true", "false", "missing"):
+            raise ValueError("적격 탐색 조건은 all/true/false/missing 중 하나여야 합니다.")
+        allowed["eligibility"] = value
+    if "eligibility_basis" in filters:
+        if filters["eligibility_basis"] not in ("recorded", "quality"):
+            raise ValueError("적격 판정 기준은 recorded/quality 중 하나여야 합니다.")
+        allowed["eligibility_basis"] = filters["eligibility_basis"]
+    if "hotspot_min" in filters:
+        allowed["hotspot_min"] = _hotspot_minimum(filters["hotspot_min"])
+    if "result_layers" in filters:
+        layers = filters["result_layers"]
+        keys = {"target", "binder", "context", "hotspots", "contacts", "clashes", "cdr", "reference"}
+        if not isinstance(layers, dict) or not set(layers) <= keys or any(type(v) is not bool for v in layers.values()):
+            raise ValueError("구조 레이어 탐색 조건 형식 오류")
+        allowed["result_layers"] = layers
+    if "viewer_display" in filters:
+        display = filters["viewer_display"]
+        if not isinstance(display, dict) or not set(display) <= {"sequence", "residues"} or any(type(v) is not bool for v in display.values()):
+            raise ValueError("구조 표시 탐색 조건 형식 오류")
+        allowed["viewer_display"] = display
+    if "selected_residues" in filters:
+        labels = filters["selected_residues"]
+        if not isinstance(labels, list) or len(labels) > 10000 or any(not isinstance(v, str) or len(v) > 128 for v in labels):
+            raise ValueError("선택 잔기 탐색 조건 형식 오류")
+        allowed["selected_residues"] = labels
+    if "distance_selection" in filters:
+        pair = filters["distance_selection"]
+        if not isinstance(pair, dict) or set(pair) != {"a", "b"} or any(not isinstance(v, str) or len(v) > 128 for v in pair.values()):
+            raise ValueError("거리 선택 탐색 조건 형식 오류")
+        allowed["distance_selection"] = pair
+    return allowed
+
+
+def _hotspot_minimum(value):
+    if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float))
+                              or not math.isfinite(value) or not 0 <= value <= 1):
+        raise ValueError("hotspot 최소 접촉률은 0–1 사이의 유한한 숫자여야 합니다.")
+    return value
+
+
+class ResultReader:
+    def __init__(self, run_dir: Path):
+        self.root = Path(run_dir).resolve()
+        if not self.root.is_dir():
+            raise FileNotFoundError("결과 디렉터리가 없습니다.")
+        self.issues: list[str] = []
+        self.config = self._yaml("run_config.yaml")
+        self.state = self._json("run_state.json")
+        self.platform_status = self._json("platform_status.json")
+        # A verified compact record is authoritative after storage cleanup.
+        # Reading it never regenerates scientific values or launches a model.
+        self.retained = None
+        if (self.root / "retained").exists():
+            from .retention import retained_record
+            self.retained = retained_record(self.root)
+            if self.retained:
+                self.config = copy.deepcopy(self.retained["config"])
+                self.state = copy.deepcopy(self.retained["state"])
+                self.platform_status = copy.deepcopy(self.retained.get("platform_status", {}))
+
+    def _path(self, relative):
+        return contained(self.root, relative)
+
+    def _json(self, relative):
+        path = self._path(relative)
+        if not path.exists():
+            return {}
+        try:
+            data = json.loads(path.read_text())
+            if not isinstance(data, dict):
+                raise ValueError("JSON object expected")
+            if relative == "run_state.json" and (not isinstance(data.get("phases", {}), dict) or not isinstance(data.get("warnings", []), list)
+                                                    or not isinstance(data.get("execution", {}), dict)):
+                raise ValueError("상태 필드 형식 오류")
+            if relative == "run_state.json":
+                if (any(not isinstance(value, dict) for value in data.get("phases", {}).values())
+                        or ("state" in data.get("execution", {}) and not isinstance(data["execution"]["state"], str))):
+                    raise ValueError("단계·실행 상태 필드 형식 오류")
+            if relative == "platform_status.json" and (not isinstance(data.get("state"), str)
+                    or data["state"] not in {"cancelled", "interrupted", "failed", "partial_failure", "budget_exhausted", "complete"}
+                    or isinstance(data.get("updated"), bool) or not isinstance(data.get("updated"), (int, float)) or not math.isfinite(data["updated"])):
+                raise ValueError("플랫폼 상태 필드 형식 오류")
+            return data
+        except (ValueError, OSError) as exc:
+            self.issues.append(f"{relative}: 읽을 수 없는 JSON ({type(exc).__name__})")
+            return {}
+
+    def _yaml(self, relative):
+        path = self._path(relative)
+        if not path.exists():
+            return {}
+        try:
+            data = yaml.safe_load(path.read_text())
+            if not isinstance(data, dict):
+                raise ValueError("YAML object expected")
+            if any(key in data and not isinstance(data[key], dict) for key in ("run", "target", "screen", "structure", "mature", "score", "rank", "specificity", "complex", "input_review")):
+                raise ValueError("설정 필드 형식 오류")
+            for section, fields in {"screen": ("comparison", "cascade", "restraint", "colabfold"),
+                                    "structure": ("msa",), "score": ("boltz2",),
+                                    "mature": ("cdr",)}.items():
+                if any(key in data.get(section, {}) and not isinstance(data[section][key], dict) for key in fields):
+                    raise ValueError("세부 설정 필드 형식 오류")
+            return data
+        except (ValueError, yaml.YAMLError, OSError) as exc:
+            self.issues.append(f"{relative}: 읽을 수 없는 설정 ({type(exc).__name__})")
+            return {}
+
+    def _csv(self, relative):
+        path = self._path(relative)
+        if not path.exists():
+            return []
+        try:
+            with path.open(encoding="utf-8-sig", newline="") as handle:
+                reader = csv.DictReader(handle, strict=True)
+                columns = reader.fieldnames
+                if not columns or any(not key for key in columns) or len(set(columns)) != len(columns):
+                    raise ValueError("중복·누락 CSV 헤더")
+                rows = []
+                for row in reader:
+                    if None in row or any(value is None for value in row.values()):
+                        raise ValueError("CSV 열 개수 불일치")
+                    rows.append({key: _cell(value, key) for key, value in row.items()})
+            return rows
+        except (ValueError, csv.Error, UnicodeError, OSError) as exc:
+            self.issues.append(f"{relative}: 읽을 수 없는 CSV ({exc})")
+            return []
+
+    @staticmethod
+    def _identifier(row, index):
+        return str(row.get("candidate_id") or row.get("design_id") or row.get("variant_id") or row.get("label") or f"row-{index + 1}")
+
+    def all_rows(self):
+        if self.retained:
+            return [_geometry_metadata(row) for row in copy.deepcopy(self.retained["candidates"]["rows"])]
+        if self.config.get("run", {}).get("mode") == "complex":
+            recorded = self._json("complex_results.json")
+            rows = recorded.get("rows", [])
+            if not isinstance(rows, list) or any(not isinstance(r, dict) or not r.get("candidate_id") for r in rows):
+                self.issues.append("복합체 모델 목록이 손상되었습니다.")
+                return []
+            settings = recorded.get("settings", self.config.get("complex", {}))
+            if not isinstance(settings, dict):
+                settings = {}
+            for row in rows:
+                # General-complex receipts record these conditions at run level.
+                # Retain explicit per-model values and keep absent receipts null.
+                row.setdefault("msa", settings.get("msa"))
+                row.setdefault("restraint", settings.get("restraints"))
+                pairs = row.get("pair_metrics")
+                if isinstance(pairs, list) and len(pairs) == 1 and isinstance(pairs[0], dict):
+                    # A two-chain complex has one unambiguous interface. Show
+                    # its recorded metrics without combining multiple pairs.
+                    for metric in ("interface_plddt", "interface_pae"):
+                        if metric not in row and metric in pairs[0]:
+                            row[metric] = pairs[0][metric]
+                            row.setdefault("metric_scopes", {})[metric] = {
+                                "source": "recorded_pair_metrics",
+                                "chains": [pairs[0].get("chain_a"), pairs[0].get("chain_b")]}
+                _geometry_metadata(row)
+                row["metric_provenance"] = metric_provenance(row)
+                row.setdefault("structure_available", False)
+                if row["structure_available"]:
+                    try:
+                        if not row.get("structure_file") or not self._path(row["structure_file"]).is_file():
+                            raise FileNotFoundError
+                    except (ValueError, OSError):
+                        row["structure_available"] = False
+                        issue = f"{row['candidate_id']}: 저장된 구조가 누락되었습니다."
+                        if issue not in self.issues:self.issues.append(issue)
+            return rows
+        # Begin with all generated sequences; add evaluated metrics without dropping unscored rows.
+        records, order = {}, []
+        sources = [path for path in TABLES[1:] if self._path(path).exists()]
+        comparison = self.config.get("screen", {}).get("comparison", {}).get("enabled") is True
+        # Comparison IDs represent independent observations of the same source
+        # sequence. Source-stage parent CSVs are provenance, not extra models.
+        if comparison:
+            sources = []
+        if not sources and not self._path(TABLES[0]).exists():
+            self.issues.append("후보 CSV를 찾지 못했습니다. 분석이 완료됐는지 확인하세요.")
+        for relative in sources + [TABLES[0]]:
+            for index, row in enumerate(self._csv(relative)):
+                identifier = self._identifier(row, index)
+                if identifier not in records:
+                    records[identifier] = {}
+                    order.append(identifier)
+                records[identifier].update(row)
+                if relative == TABLES[0]:
+                    records[identifier]["evaluated"] = row.get("final_evaluated", True) is True
+                    if row.get("cif_path") and not row.get("structure_stage"):
+                        records[identifier]["structure_stage"] = "final_prediction"
+        selected = {self._identifier(row, i) for i, row in enumerate(self._csv("05_final/selected_candidates.csv"))}
+        result = []
+        for identifier in order:
+            row = records[identifier]
+            row["candidate_id"] = identifier
+            if row.get("error") and row.get("pred_dir"):
+                try:
+                    from ..screen import prediction_failure_reason
+                    reason = prediction_failure_reason(self.artifact_path(row["pred_dir"]))
+                    if reason:
+                        row["original_error"] = row["error"]
+                        row["error"] = reason
+                except (ValueError, OSError):
+                    pass
+            row["evaluated"] = row.get("evaluated", False)
+            if comparison and row["evaluated"] and row.get("cif_path"):
+                predictor = row.get("predictor_engine") or row.get("engine")
+                if predictor:
+                    # Independent final predictor structures cannot retain the
+                    # generation/refold stage inherited from the source CSV.
+                    if row.get("structure_stage") and row["structure_stage"] != predictor:
+                        row.setdefault("input_structure_stage", row["structure_stage"])
+                    row.update(self._observation_stage({**row, "structure_stage": predictor}))
+            row["selected"] = identifier in selected
+            row["exclusion_reasons"] = [reason for reason in str(row.get("exclusion_reason") or "").split(";") if reason]
+            if not row["evaluated"] and row.get("design_screening_reason"):
+                row["exclusion_reasons"].append(row["design_screening_reason"])
+            if not row["evaluated"]:
+                row["exclusion_reasons"] = list(dict.fromkeys(row["exclusion_reasons"] + ["not_scored"]))
+                row["final_eligible"] = None
+                for key in GEOMETRY_METADATA:
+                    if key in row:
+                        row[key] = None
+            if "final_evaluated" in row:
+                # Final metrics belong exclusively to the Boltz cohort. A
+                # legacy/imported row cannot turn CF metrics into final values
+                # merely by having a representative first-stage structure.
+                if not row["evaluated"]:
+                    for key in METRICS + ADDITIONAL_METRICS + ("rank", "final_rank", "composite_score"):
+                        row[key] = None
+                row["first_stage_evaluated"] = bool(
+                    not row.get("colabfold_error") and any(
+                        row.get("colabfold_" + metric) is not None for metric in METRICS))
+            row["missing_metrics"] = [metric for metric in METRICS if row.get(metric) is None]
+            for metric in METRICS:
+                row.setdefault(metric, None)
+            row["quality_eligible"] = self._quality_eligible(row)
+            row["quality_eligibility_source"] = (
+                "hotspot_only_exclusion_removed" if row["quality_eligible"] is True and row.get("final_eligible") is False
+                else "recorded" if row["quality_eligible"] is not None else "not_assessed")
+            row.update(self._assessment_details(row))
+            _geometry_metadata(row)
+            row["metric_provenance"] = metric_provenance(row)
+            if row.get("cif_path"):
+                try:
+                    path = self.artifact_path(row["cif_path"])
+                    row["structure_available"] = path.is_file()
+                except (OSError, ValueError):
+                    row["structure_available"] = False
+                if not row["structure_available"]:
+                    self.issues.append(f"{identifier}: 구조 파일을 찾지 못했습니다.")
+            else:
+                row["structure_available"] = False
+            result.append(row)
+        return self._attach_pose_assessment(result)
+
+    def _attach_pose_assessment(self, rows):
+        """Read persisted assessments only when bound to this exact scored table.
+
+        Loading an old report never computes geometry or silently refreshes a
+        candidate's policy. The digest and model identities must both match.
+        """
+        relative = "03_score/pose_assessment.json"
+        if not self._path(relative).exists():
+            return rows
+        recorded = self._json(relative)
+        table = self._path(TABLES[0])
+        expected = recorded.get("source_csv_sha256")
+        annotations = recorded.get("models")
+        identifiers = [self._identifier(row, index) for index, row in enumerate(self._csv(TABLES[0]))]
+        valid = (type(recorded.get("schema_version")) is int and recorded["schema_version"] in {1, 2} and isinstance(expected, str)
+                 and table.is_file() and expected == sha256(table)
+                 and isinstance(annotations, list) and all(isinstance(item, dict) for item in annotations))
+        if valid:
+            model_ids = [item.get("model_id") for item in annotations]
+            valid = (len(set(identifiers)) == len(identifiers) and len(model_ids) == len(identifiers)
+                     and all(isinstance(identifier, str) and identifier for identifier in model_ids)
+                     and len(set(model_ids)) == len(model_ids) and set(model_ids) == set(identifiers))
+        if not valid:
+            issue = "자세 평가 기록의 점수표 해시·모델 대응이 일치하지 않아 추가 기록을 적용하지 않았습니다."
+            if issue not in self.issues:
+                self.issues.append(issue)
+            return rows
+        by_id = {item["model_id"]: item for item in annotations}
+        for row in rows:
+            annotation = by_id.get(row["candidate_id"], {})
+            row.update({key: copy.deepcopy(annotation[key]) for key in POSE_ANNOTATIONS if key in annotation})
+        return rows
+
+    def _quality_eligible(self, row):
+        """Remove only a documented hotspot exclusion, without rescoring archives."""
+        recorded = row.get("final_eligible")
+        if not row["evaluated"] or not isinstance(recorded, bool):
+            return None
+        if recorded is True or self.config.get("specificity", {}).get("enabled"):
+            return recorded
+        if set(row["exclusion_reasons"]) != {"hotspot"} or row.get("error") or row["candidate_id"] == "WT":
+            return False
+        checks = [row.get(key) for key in ("pass_ipsae", "pass_iptm", "pass_plddt", "pass_clash", "dev_cdr_evaluated")]
+        if any(value is False for value in checks):
+            return False
+        if any(value is not True for value in checks):
+            return None
+        severe = row.get("dev_severe")
+        maximum = self.config.get("rank", {}).get("max_dev_severe")
+        if any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) for v in (severe, maximum)):
+            return None
+        return severe <= maximum
+
+    def _assessment_details(self, row):
+        """Explain recorded assessments without rescoring read-only results."""
+        thresholds = self.config.get("score", {}).get("thresholds", {})
+        rank = self.config.get("rank", {})
+        checks = []
+        for metric, threshold_key, flag, operator in (
+                ("ipsae", "ipsae", "pass_ipsae", ">="),
+                ("iptm", "iptm", "pass_iptm", ">="),
+                ("interface_plddt", "plddt_interface", "pass_plddt", ">="),
+                ("hotspot_contact_frac", "hotspot_contact_frac", "pass_hotspot", ">="),
+                ("n_clashes", "max_clashes", "pass_clash", "<="),
+                ("dev_severe", "max_dev_severe", None, "<=")):
+            source = rank if metric == "dev_severe" else thresholds
+            recorded = isinstance(source, dict) and threshold_key in source
+            checks.append({"metric": metric, "value": row.get(metric), "operator": operator,
+                           "threshold": source[threshold_key] if recorded else None,
+                           "passed": row.get(flag) if flag else None,
+                           "threshold_source": "run_config" if recorded else "not_recorded"})
+        cdr = self.config.get("mature", {}).get("cdr", {})
+        if not isinstance(cdr, dict):
+            cdr = {}
+        mature_state = self.state.get("phases", {}).get("mature", {})
+        if not isinstance(mature_state, dict):
+            mature_state = {}
+        def reasons(key):
+            return [value for value in str(row.get(key) or "").split(";") if value]
+        return {"threshold_checks": checks,
+                "cdr_details": {"evaluated": row.get("dev_cdr_evaluated"),
+                                "missing_regions": reasons("dev_cdr_missing_regions"),
+                                "configured_source": cdr.get("source"), "scheme": cdr.get("scheme"),
+                                "configured_ranges": cdr.get("regions"),
+                                "recorded_ranges": mature_state.get("cdr_ranges"),
+                                "mutation": {key: row[key] for key in ("region", "position", "wt", "mut", "wt_aa", "mut_aa", "mutation") if key in row}},
+                "developability_details": {"warnings": reasons("dev_warnings"),
+                                            "unevaluated": reasons("dev_unevaluated"),
+                                            "severe_count": row.get("dev_severe"),
+                                            "unevaluated_count": row.get("dev_severe_unevaluated"),
+                                            "flags": {key: value for key, value in row.items()
+                                                      if key.startswith("dev_") and isinstance(value, bool)}}}
+
+    def candidates(self, *, search="", sort="composite_score", descending=True, eligible=None,
+                   eligibility_basis="recorded", hotspot_min=None, engine_filter="all", offset=0, limit=100):
+        if eligibility_basis not in ("recorded", "quality"):
+            raise ValueError("적격 판정 기준은 recorded/quality 중 하나여야 합니다.")
+        hotspot_min = _hotspot_minimum(hotspot_min)
+        rows = self.all_rows()
+        total = len(rows)
+        if engine_filter != "all":
+            rows = [row for row in rows if (row.get("predictor_engine") or row.get("engine")
+                    or self.config.get("screen", {}).get("engine")) == engine_filter]
+        if search:
+            needle = search.lower()
+            rows = [row for row in rows if needle in " ".join(
+                str(value) for key in SEARCH_FIELDS
+                for value in (row[key] if isinstance(row.get(key), list) else [row.get(key)])
+                if value is not None).lower()]
+        if eligible is not None:
+            column = "quality_eligible" if eligibility_basis == "quality" else "final_eligible"
+            rows = [row for row in rows if row.get(column) is eligible]
+        if hotspot_min is not None:
+            rows = [row for row in rows if (fraction := hotspot_filter_fraction(row)) is not None
+                    and fraction >= hotspot_min]
+        if sort:
+            present = [row for row in rows if row.get(sort) is not None]
+            missing = [row for row in rows if row.get(sort) is None]
+            present.sort(key=lambda row: (isinstance(row[sort], str), row[sort] if isinstance(row[sort], (int, float, str)) else str(row[sort])), reverse=descending)
+            rows = present + missing
+        columns = list(dict.fromkeys(key for row in rows for key in row))
+        return {"total": total, "filtered_total": len(rows), "rows": rows[max(0, offset):max(0, offset) + limit] if limit is not None else rows,
+                "columns": columns, "issues": list(dict.fromkeys(self.issues)), "metric_help": METRIC_HELP}
+
+    def summary(self, *, delivery_artifact=False):
+        if self.retained:
+            summary = copy.deepcopy(self.retained["summary"])
+            summary.update(retention="minimal", full_execution_available=False,
+                           capabilities=self.retained.get("capabilities", {}))
+            return summary
+        rows = self.all_rows()
+        from ..publication import publication_issue, tables_available
+        final = self.state.get("phases", {}).get("final", {})
+        source_delivery_status = final.get("delivery_status")
+        if delivery_artifact and source_delivery_status == "pending":
+            # The exported artifact is built now. Its source run is still
+            # awaiting storage; this exception never authorizes retention.
+            final = {k: v for k, v in final.items() if k != "delivery_status"}
+        issue = publication_issue(final)
+        if final.get("table_sha256") is not None and not tables_available(self.root, final):
+            issue = "최신 계산 표의 해시가 일치하지 않습니다."
+        issues = list(dict.fromkeys([*self.issues, *([issue] if issue else [])]))
+        if self.config.get("run", {}).get("mode") == "complex":
+            failures = sum(bool(r.get("error")) for r in rows)
+            execution = self.state.get("execution", {}).get("state", "incomplete")
+            status = "partial_failure" if (failures or issues) and execution == "complete" else execution
+            return {"id": self.root.name, "mode": "complex", "name": self.config.get("run", {}).get("name", self.root.name),
+                    "total": len(rows), "scored_total": sum(bool(r.get("evaluated")) for r in rows), "failed_candidates": failures, "issues": issues,
+                    "mock": False, "status": status, "complete": status == "complete", "readonly": True,
+                    "config": self.config, "state": self.state, "conditions": self.config.get("complex", {}),
+                    "source_delivery_status": source_delivery_status, "delivery_artifact": delivery_artifact}
+
+        run = self.config.get("run", {})
+        warnings = self.state.get("warnings", [])
+        execution_state = self.state.get("execution", {}).get("state")
+        execution_started = self.state.get("execution", {}).get("started")
+        status_applies = bool(self.platform_status) and (execution_started is None or
+                            (isinstance(execution_started, (int, float)) and not isinstance(execution_started, bool)
+                             and self.platform_status["updated"] >= execution_started))
+        authoritative_status = self.platform_status.get("state") if status_applies else execution_state
+        cascade = self._json("03_score/cascade_summary.json") if self._path("03_score/cascade_summary.json").exists() else None
+        recorded_cascade = self.state.get("phases", {}).get("cascade", {})
+        if cascade is None and recorded_cascade:
+            cascade = recorded_cascade
+        comparison = self._json("02_comparison/comparison_status.json") if self.config.get("screen", {}).get("comparison", {}).get("enabled") else {}
+        stage_failure = bool((cascade or {}).get("status") == "partial_failure"
+                             or recorded_cascade.get("status") == "partial_failure"
+                             or comparison.get("status") == "partial_failure")
+        failures = sum(bool(row.get("error") or row.get("prediction_error")
+                            or row.get("prediction_status") == "failed") for row in rows)
+        finalized = "final" in self.state.get("phases", {})
+        successful_execution = authoritative_status in {None, "complete"}
+        status = authoritative_status or ("complete" if finalized else "incomplete")
+        if finalized and successful_execution and (failures or issues or stage_failure):
+            status = "partial_failure"
+        return {"id": self.root.name, "name": run.get("name", self.root.name), "path": str(self.root),
+                "mode": run.get("mode"), "mock": bool(run.get("mock")), "total": len(rows),
+                "scored_total": sum(row["evaluated"] for row in rows),
+                "eligible_total": sum(row.get("final_eligible") is True for row in rows),
+                "quality_eligible_total": sum(row.get("quality_eligible") is True for row in rows),
+                "selected_total": sum(row["selected"] for row in rows),
+                "failed_candidates": failures,
+                "zero_eligible": not any(row.get("final_eligible") is True for row in rows),
+                "complete": finalized and successful_execution and not failures and not issues and not stage_failure, "status": status,
+                "execution_state": execution_state, "warnings": warnings,
+                "platform_status": {**self.platform_status, "applies": status_applies} if self.platform_status else None,
+                "issues": issues, "config": self.config, "state": self.state,
+                "source_delivery_status": source_delivery_status, "delivery_artifact": delivery_artifact,
+                "ranking_policy": self._json("03_score/ranking_policy.json") if self._path("03_score/ranking_policy.json").is_file() else None,
+                "conditions": {"seed": run.get("seed"), "engine": self.config.get("screen", {}).get("engine"),
+                               "cascade": cascade,
+                               "comparison": self.config.get("screen", {}).get("comparison", {}),
+                               "comparison_progress": comparison,
+                               "msa": self.config.get("structure", {}).get("msa", {}),
+                               "restraint": self.config.get("screen", {}).get("restraint", {}),
+                               "target": self.config.get("target", {})}, "readonly": True}
+
+    def observations(self, candidate_id=None):
+        if self.retained:
+            rows = [_geometry_metadata(row) for row in copy.deepcopy(self.retained["observations"]["rows"])]
+            return {"rows": [r for r in rows if candidate_id is None or r["candidate_id"] == candidate_id],
+                    "issues": self.issues}
+        if self.config.get("run", {}).get("mode") == "complex":
+            return {"rows": [{**r, "observation_id": "complex:"+r["candidate_id"]} for r in self.all_rows() if candidate_id is None or r["candidate_id"] == candidate_id], "issues": self.issues}
+        from .. import score_complex
+        from ..config import cfg_seed
+        rows = []
+        candidates = {row["candidate_id"]: row for row in self.all_rows()}
+        scored = {identifier: row for identifier, row in candidates.items() if row["evaluated"]}
+        from ..utils.predictions import current_manifests
+        paths = sorted(current_manifests(self.root, self.issues.append))
+        if not paths and self._has_archive_manifest():
+            issue = "현재 예측 목록이 없고 보존 기록만 있습니다. 아래 관측은 점수표에서 읽었으며 예측 목록의 모델 수·실행 조건을 복원하지 않습니다."
+            if issue not in self.issues:
+                self.issues.append(issue)
+        for path in paths:
+            # Saved attempts remain downloadable audit evidence, but must not
+            # duplicate active models or turn a recovered run into a failure.
+            # Inspect only descendants: the run's own ancestors may have any name.
+            if {".history", ".compact", "source_snapshot"}.intersection(path.relative_to(self.root).parts[:-1]):
+                continue
+            if "batches" in path.parts and any(parent.joinpath("compact_manifest.json").exists() for parent in path.parents if parent.is_relative_to(self.root)):
+                continue
+            for index, row in enumerate(self._csv(str(path.relative_to(self.root)))):
+                row["candidate_id"] = self._identifier(row, index)
+                row["observation_id"] = str(path.relative_to(self.root)) + ":" + str(index)
+                recorded_seed = self.config.get("run", {}).get("seed")
+                if row.get("engine") in {"boltz", "boltz2"} and (recorded_seed is not None or self.config.get("score", {}).get("boltz2", {}).get("seed") is not None):
+                    recorded_seed = cfg_seed(self.config, "score.boltz2.seed")
+                row.setdefault("seed_source", "manifest" if "seed" in row else "config")
+                row["seed"] = row.get("seed", recorded_seed)
+                # Stage manifests describe actual engine conditions. In
+                # particular CF's single-sequence/no-restraint settings must
+                # not be replaced by the final engine's configuration.
+                row.setdefault("msa", row.get("msa_used", self.config.get("structure", {}).get("msa", {}).get("backend")))
+                row.setdefault("restraint", self.config.get("screen", {}).get("restraint", {}).get("enabled"))
+                row["source_table"] = str(path.relative_to(self.root))
+                candidate = candidates.get(row["candidate_id"], {})
+                if candidate.get("input_structure_stage"):
+                    row.setdefault("input_structure_stage", candidate["input_structure_stage"])
+                stage = self._observation_stage(row, row["source_table"])
+                row.update(stage)
+                # Prediction manifests do not establish geometry for a model.
+                # Restore receipts only from a score matching its structure.
+                for key in GEOMETRY_METADATA:
+                    row[key] = None
+                if row.get("structure_pruned"):
+                    candidate = candidates.get(row["candidate_id"], {})
+                    for metric in METRICS + ADDITIONAL_METRICS:
+                        row[metric] = candidate.get("colabfold_" + metric)
+                    row.update(structure_available=False, scored=True, score_stage="colabfold")
+                    rows.append(row)
+                    continue
+                structures = []
+                try:
+                    directory = self.artifact_path(row.get("pred_dir"))
+                    if directory.is_dir():
+                        structures = sorted(directory.glob("pred.model_idx_*.cif")) or sorted(directory.glob("*_model_*.cif")) or sorted(directory.glob("*.cif")) or sorted(directory.glob("*.pdb"))
+                    elif directory.is_file():
+                        structures = [directory]
+                except (ValueError, OSError) as exc:
+                    self.issues.append(f"{row['candidate_id']}: 관측 구조를 읽지 못했습니다 ({exc})")
+                for sample, structure_path in enumerate(structures or [None]):
+                    observation = dict(row)
+                    if sample:
+                        observation["observation_id"] += ":model:" + structure_path.name
+                    observation["model_index"] = sample
+                    if structure_path:
+                        observation["cif_path"] = str(structure_path.relative_to(self.root))
+                        try:
+                            prediction = self._prediction_for_path(structure_path)
+                            confidence = score_complex.load_confidence(prediction)
+                            if not isinstance(confidence, dict):
+                                raise ValueError("신뢰도 데이터는 JSON 객체여야 합니다.")
+                            observation.update(native(confidence))
+                            observation.update(self._model_identity(confidence, row.get("seed")))
+                        except (ValueError, OSError, KeyError) as exc:
+                            self.issues.append(f"{observation['observation_id']}: 신뢰도 파일 손상 ({exc})")
+                    candidate = candidates.get(row["candidate_id"])
+                    # First-stage metrics describe only its representative
+                    # model; additional models retain their own confidence.
+                    first_path = candidate.get("colabfold_cif_path") if candidate else None
+                    if candidate and structure_path and first_path:
+                        try:
+                            if self.artifact_path(first_path) == structure_path.resolve():
+                                for metric in METRICS + ADDITIONAL_METRICS:
+                                    if metric in GEOMETRY_METADATA or candidate.get("colabfold_" + metric) is not None:
+                                        observation[metric] = candidate.get("colabfold_" + metric)
+                                observation["scored"] = True
+                                observation["score_stage"] = "colabfold"
+                        except (ValueError, OSError):
+                            pass
+                    if candidate and observation["stage"] == "first" and candidate.get("colabfold_error"):
+                        observation.setdefault("error", candidate["colabfold_error"])
+                    final = scored.get(row["candidate_id"])
+                    if final and structure_path and final.get("cif_path"):
+                        try:
+                            if self.artifact_path(final["cif_path"]) == structure_path.resolve():
+                                for metric in METRICS + ADDITIONAL_METRICS + ("composite_score",):
+                                    if metric in GEOMETRY_METADATA or final.get(metric) is not None:
+                                        observation[metric] = final.get(metric)
+                                observation["scored"] = True
+                                observation["score_stage"] = "boltz2" if observation["stage"] == "final" else observation["structure_stage"]
+                        except (ValueError, OSError):
+                            pass
+                    rows.append(observation)
+        # Normal runs may only have scored rows; preserve each score's own condition.
+        if not rows:
+            for row in candidates.values():
+                if not row["evaluated"] and not row.get("structure_available"):
+                    continue
+                observation = {**row, "observation_id": "scored:" + row["candidate_id"]}
+                observation.update(source_table="03_score/scored_candidates.csv",
+                                   observation_source="scored_table_only", prediction_manifest_status="not_recorded")
+                observation.update(self._observation_stage(row))
+                observation.update(self._row_conditions(row))
+                if observation["stage"] == "first":
+                    for metric in METRICS + ADDITIONAL_METRICS:
+                        observation[metric] = row.get("colabfold_" + metric)
+                if row.get("cif_path"):
+                    try:
+                        confidence = score_complex.load_confidence(self._prediction_for_path(self.artifact_path(row["cif_path"])))
+                        if isinstance(confidence, dict):
+                            observation.update(self._model_identity(confidence, observation.get("seed")))
+                    except (ValueError, OSError, KeyError) as exc:
+                        self.issues.append(f"{observation['observation_id']}: 신뢰도 파일 손상 ({exc})")
+                rows.append(observation)
+        if candidate_id:
+            rows = [row for row in rows if row["candidate_id"] == candidate_id]
+        for row in rows:
+            _geometry_metadata(row)
+            row["metric_provenance"] = metric_provenance(row)
+        return {"rows": rows, "issues": list(dict.fromkeys(self.issues))}
+
+    def _has_archive_manifest(self):
+        """Detect ambiguous archive-only records without reading their contents."""
+        from ..utils.predictions import ARCHIVE_DIRECTORIES
+        for directory, children, files in os.walk(self.root, followlinks=False):
+            parent = Path(directory)
+            children[:] = [name for name in children if not (parent / name).is_symlink()]
+            if "predictions.csv" in files and any(part in ARCHIVE_DIRECTORIES for part in parent.relative_to(self.root).parts):
+                if not (parent / "predictions.csv").is_symlink():
+                    return True
+        return False
+
+    def _observation_stage(self, row, source_table=""):
+        cascade = bool(self.config.get("screen", {}).get("cascade", {}).get("enabled")
+                       or self.state.get("phases", {}).get("cascade"))
+        engine = row.get("engine")
+        structure_stage = row.get("structure_stage")
+        if self.config.get("screen", {}).get("comparison", {}).get("enabled") is True or row.get("comparison") is True:
+            predictor = row.get("predictor_engine") or engine or structure_stage or "unknown"
+            name = {"colabfold": "ColabFold", "boltz2": "Boltz-2", "boltz": "Boltz-2",
+                    "chai1": "Chai-1", "opendde": "OpenDDE Preview"}.get(predictor, str(predictor))
+            stage = {"stage": "prediction", "structure_stage": predictor,
+                     "stage_label": name + " 독립 예측"}
+            if row.get("input_structure_stage"):
+                stage["input_structure_stage"] = row["input_structure_stage"]
+            return stage
+        if engine == "colabfold" or structure_stage == "colabfold" or cascade and source_table.startswith(("02_screen/", "02b_mature_complex/")):
+            return {"stage": "first", "structure_stage": "colabfold", "stage_label": "ColabFold 1차"}
+        if cascade and (engine in {"boltz", "boltz2"} or source_table.startswith("02c_boltz2/") or structure_stage == "boltz2"):
+            return {"stage": "final", "structure_stage": "boltz2", "stage_label": "Boltz-2 최종"}
+        return {"stage": "prediction", "structure_stage": structure_stage or engine or "unknown", "stage_label": str(engine or "예측")}
+
+    def _row_conditions(self, row):
+        from ..config import cfg_seed
+        prefix = "colabfold_" if self._observation_stage(row)["stage"] == "first" else "boltz_"
+        engine = row.get("engine")
+        seed = cfg_seed(self.config, "score.boltz2.seed") if engine in {"boltz", "boltz2"} else self.config.get("run", {}).get("seed")
+        return {"seed": row.get("seed", row.get(prefix + "seed", seed)),
+                "msa": row.get("msa", row.get(prefix + "msa", self.config.get("structure", {}).get("msa", {}).get("backend"))),
+                "restraint": row.get("restraint", row.get(prefix + "restraint", self.config.get("screen", {}).get("restraint", {}).get("enabled")))}
+
+    @staticmethod
+    def _model_identity(confidence, base_seed):
+        raw_model = str(confidence.get("raw_model") or "")
+        seed_match = re.search(r"_seed_(\d+)(?:\.pdb)?$", raw_model)
+        model_match = re.search(r"_model_(\d+)_seed_", raw_model)
+        result = {}
+        if seed_match:
+            result.update(base_seed=base_seed, seed=int(seed_match.group(1)), seed_source="raw_model")
+        if model_match:
+            result["engine_model_id"] = int(model_match.group(1))
+        return result
+
+    def _prediction_for_path(self, path):
+        from ..score_complex import PredictionFiles
+        path = contained(self.root, path, exists=True)
+        if path.name.startswith("pred.model_idx_"):
+            idx = path.stem.split("_")[-1]
+            pae = path.parent / f"scores_extra_idx_{idx}.npz"
+            if not pae.is_file():
+                pae = path.parent / "scores_extra.npz" if idx == "0" else None
+            prediction = PredictionFiles(path, scores_npz=path.parent / f"scores.model_idx_{idx}.npz",
+                                         pae_npz=pae, source="chai1")
+        elif path.suffix.lower() == ".cif" or path.name.startswith("colabfold_model_"):
+            prediction = PredictionFiles(path, confidence_json=path.parent / f"confidence_{path.stem}.json",
+                                         pae_npz=path.parent / f"pae_{path.stem}.npz",
+                                         source="opendde" if path.name.startswith("opendde_model_") else "colabfold" if path.name.startswith("colabfold_model_") else "boltz2")
+        else:
+            prediction = PredictionFiles(path)
+        for associated in (prediction.confidence_json, prediction.scores_npz, prediction.pae_npz):
+            if associated:
+                contained(self.root, associated)
+        return prediction
+
+    def artifact_path(self, value):
+        resolved = resolve_run_artifact(self.root, value)
+        if resolved is None:
+            raise FileNotFoundError("구조 경로가 없습니다.")
+        return contained(self.root, resolved)
+
+    def structure(self, candidate_id, observation_id=None):
+        if self.retained:
+            from .retention import retained_structure
+            return retained_structure(self.root, candidate_id, observation_id)
+        if self.config.get("run", {}).get("mode") == "complex":
+            row = next((r for r in self.all_rows() if r["candidate_id"] == candidate_id), None)
+            if row is None or not row.get("structure_file"):
+                raise FileNotFoundError("이 모델의 구조가 없습니다.")
+            data = self._json(row["structure_file"])
+            if not data or not data.get("content"):
+                raise ValueError("저장된 복합체 구조가 손상되었습니다.")
+            return {**data, "candidate_id": candidate_id, "observation_id": observation_id}
+        return self._nanobody_structure(candidate_id, observation_id)
+
+    def _nanobody_structure(self, candidate_id, observation_id=None):
+        from .structure_review import closest_atoms, cysteine_geometry, cdr_annotations, reference_overlay
+        from .. import score_complex
+        from ..utils import pdb_io
+        rows = self.all_rows()
+        row = next((row for row in rows if row["candidate_id"] == candidate_id), None)
+        if row is None:
+            raise KeyError("후보가 없습니다.")
+        if observation_id:
+            observation = next((obs for obs in self.observations(candidate_id)["rows"] if obs["observation_id"] == observation_id), None)
+            if observation is None:
+                raise KeyError("관측이 없습니다.")
+            row = {**row, **observation}
+            # A failed/missing first-stage observation must not borrow the
+            # candidate's successful final representative structure.
+            row["cif_path"] = None
+            if observation.get("cif_path"):
+                row["cif_path"] = str(self.artifact_path(observation["cif_path"]))
+            elif observation.get("pred_dir"):
+                directory = self.artifact_path(observation["pred_dir"])
+                row["cif_path"] = str(score_complex.find_prediction_files(directory).cif)
+        path = self.artifact_path(row.get("cif_path"))
+        if not path.is_file():
+            raise FileNotFoundError("이 후보의 구조 파일이 없습니다.")
+        structure = pdb_io.load_structure(path)
+        labels, index_map = score_complex.build_index_map(structure)
+        chains = []
+        model = next(structure.get_models())
+        target_chain, binder_chain = str(row.get("target_chain") or "A"), str(row.get("binder_chain") or "B")
+        for chain in model:
+            chains.append({"id": chain.id, "role": "target" if chain.id == target_chain else "binder" if chain.id == binder_chain else "context",
+                           "residues": [{"label": pdb_io.residue_label(res, chain.id), "number": res.id[1], "icode": res.id[2].strip(), "name": res.resname,
+                                         "ca": pdb_io.ca_coord(res).tolist() if pdb_io.ca_coord(res) is not None else None,
+                                         "atom_ids": {atom.name: atom.get_serial_number() for atom in res.get_atoms()}}
+                                        for res in pdb_io.iter_residues(chain)]})
+        contacts, clashes = [], []
+        binder = pdb_io.get_chain(structure, binder_chain)
+        contact_cutoff = float(self.config.get("score", {}).get("contact_cutoff", 5.0))
+        clash_cutoff = float(self.config.get("score", {}).get("clash_cutoff", 2.0))
+        for chain in model:
+            if chain.id == binder_chain:
+                continue
+            for pair in pdb_io.contact_pairs(chain, binder, cutoff=max(contact_cutoff, clash_cutoff), atom_mode="heavy"):
+                item = {"a": pair["a"], "b": pair["b"], "distance": float(pair["dist"]), "kind": "target" if chain.id == target_chain else "context"}
+                if item["distance"] <= contact_cutoff:
+                    contacts.append(item)
+                if item["distance"] < clash_cutoff:
+                    clashes.append({**item, **closest_atoms(pair), "cutoff": clash_cutoff,
+                                    "distance_below_cutoff": clash_cutoff - item["distance"]})
+        target_state = dict(self.state.get("phases", {}).get("target", {}))
+        hotspots = []
+        if target_state:
+            try:
+                from ..cli import _prediction_hotspot_labels
+                if target_state.get("structure"):
+                    target_state["structure"] = str(self.artifact_path(target_state["structure"]))
+                hotspots = _prediction_hotspot_labels(path, target_chain, target_state)
+            except (ValueError, OSError, KeyError) as exc:
+                self.issues.append(f"hotspot 번호 대응 미평가: {exc}")
+        if not hotspots and not target_state:
+            requested = self.config.get("target", {}).get("hotspots", [])
+            if isinstance(requested, list):
+                try:
+                    hotspots = score_complex.resolve_hotspot_labels(requested, target_chain, index_map)
+                except (ValueError, TypeError) as exc:
+                    self.issues.append(f"hotspot 번호 대응 미평가: {exc}")
+        pae = None
+        try:
+            prediction = self._prediction_for_path(path)
+            matrix = score_complex.load_pae(prediction)
+            if matrix is not None:
+                score_complex.validate_pae(matrix, len(labels))
+                pae = {"values": matrix.tolist(), "labels": labels, "unit": "Å"}
+        except (ValueError, OSError, KeyError) as exc:
+            self.issues.append(f"PAE 미평가 또는 손상: {exc}")
+        conditions = self._row_conditions(row)
+        try:
+            confidence = score_complex.load_confidence(self._prediction_for_path(path))
+            if isinstance(confidence, dict):
+                conditions.update(self._model_identity(confidence, conditions.get("seed")))
+        except (ValueError, OSError, KeyError):
+            # The observation reader separately reports corrupt confidence;
+            # keep the structure and its independently validated PAE usable.
+            pass
+        mapping = self.residue_mapping()
+        return native({"candidate_id": candidate_id, "observation_id": observation_id, "content": path.read_text(),
+                       "engine": row.get("engine"), **self._observation_stage(row), **conditions,
+                       "format": "pdb" if path.suffix.lower() == ".pdb" else "cif", "chains": chains,
+                       "target_chain": target_chain, "binder_chain": binder_chain, "hotspots": hotspots,
+                       "contacts": contacts, "clashes": clashes, "pae": pae,
+                       "residue_mapping": mapping, "cdr": cdr_annotations(self, row, binder),
+                       "cysteines": cysteine_geometry(binder), "reference": reference_overlay(self, pdb_io.get_chain(structure, target_chain), mapping),
+                       "target_region": self.config.get("input_review", {}).get("target_region"),
+                       "issues": list(dict.fromkeys(self.issues))})
+
+    def residue_mapping(self):
+        for relative in ("01_target/residue_mapping.csv", "residue_mapping.csv", "01_target/target_mapping.csv"):
+            if self._path(relative).exists():
+                return self._csv(relative)
+        return []
+
+    def artifacts(self):
+        result = []
+        for path in sorted(self.root.rglob("*")):
+            if path.is_file():
+                try:
+                    contained(self.root, path)
+                except ValueError:
+                    continue
+                relative = str(path.relative_to(self.root))
+                if path.name.startswith(".run.lock"):
+                    continue
+                result.append({"path": relative, "size": path.stat().st_size, "type": path.suffix.lower().lstrip(".")})
+        return {"artifacts": result, "provenance": self.provenance()}
+
+    def provenance(self):
+        authoritative = []
+        for relative in ("run_config.yaml", "run_state.json", "complex_results.json", "03_score/scored_candidates.csv",
+                         "05_final/selected_candidates.csv", "03_score/ranking_policy.json", "retained/manifest.json"):
+            path = self._path(relative)
+            if path.is_file():
+                path = self.artifact_path(relative)
+                authoritative.append({"path": relative, "size": path.stat().st_size, "sha256": sha256(path)})
+        return {"source_artifacts": authoritative,
+            "ranking_policy": self._json("03_score/ranking_policy.json") if self._path("03_score/ranking_policy.json").is_file() else None,
+            "scope": "saved authoritative result files; raw predictions listed separately"}
+
+    def export_to_file(self, format: str, filters: dict | None = None):
+        """Spool a full archive for HTTP delivery; caller removes the temp file.
+
+        The legacy bytes interface is retained for programmatic callers. The
+        public full-archive API uses this method so raw multi-GB ZIP bytes never
+        accumulate in a BytesIO or Response body.
+        """
+        if format != "zip":
+            raise ValueError("파일 스트리밍은 전체 원본 ZIP에 사용합니다.")
+        descriptor, name = tempfile.mkstemp(prefix="nanocofold-export-", suffix=".zip")
+        os.close(descriptor)
+        path = Path(name)
+        try:
+            _, media_type, filename = self.export(format, filters, destination=path)
+            return path, media_type, filename
+        except BaseException:
+            path.unlink(missing_ok=True)
+            raise
+
+    def export(self, format: str, filters: dict | None = None, *, destination: Path | None = None):
+        allowed = _exploration({} if filters is None else filters)
+        query = {key: value for key, value in allowed.items() if key in {"search", "sort", "descending", "eligible", "eligibility_basis", "hotspot_min", "engine_filter"}}
+        eligibility = allowed.get("eligibility")
+        if eligibility in {"all", "missing"}:
+            query.pop("eligible", None)
+        elif eligibility in {"true", "false"}:
+            query["eligible"] = eligibility == "true"
+        table = self.candidates(**query, limit=None)
+        if eligibility == "missing":
+            column = "quality_eligible" if allowed.get("eligibility_basis") == "quality" else "final_eligible"
+            table["rows"] = [row for row in table["rows"] if row.get(column) is None]
+            table["filtered_total"] = len(table["rows"])
+        # Export the entire candidate set and preserve exploration criteria independently.
+        all_table = self.candidates(limit=None)
+        rows, columns = all_table["rows"], all_table["columns"]
+        if format == "report_zip":
+            return self._delivery_export(all_table, allowed, table)
+        provenance = {"summary": self.summary(), "filters": allowed, "filtered_ids": [row["candidate_id"] for row in table["rows"]],
+                      **self.provenance()}
+        def csv_bytes():
+            from ..utils.spreadsheet import csv_cell
+            stream = io.StringIO()
+            writer = csv.DictWriter(stream, fieldnames=columns)
+            writer.writeheader()
+            writer.writerows([{key: csv_cell(json.dumps(value, ensure_ascii=False) if isinstance(value, (dict, list)) else value) for key, value in row.items()} for row in rows])
+            return ("\ufeff" + stream.getvalue()).encode()
+        if format == "csv":
+            return csv_bytes(), "text/csv; charset=utf-8", "candidates.csv"
+        if format == "fasta":
+            content = "".join(f">{row['candidate_id']}\n{row['sequence']}\n" for row in rows if row.get("sequence"))
+            if self.config.get("run", {}).get("mode") == "complex":
+                from ..complex import proteins
+                entries = proteins(self.config["complex"]["proteins"])
+                content = "".join(f">{p['id']} {' '.join(p['name'].split())} original_positions={','.join(map(str,p['original_positions']))}\n{p['sequence']}\n" for p in entries)
+            return content.encode(), "text/plain; charset=utf-8", "candidates.fasta"
+        if format == "xlsx":
+            from openpyxl import Workbook
+            book = Workbook()
+            sheet = book.active
+            sheet.title = "All candidates"
+            sheet.append(columns)
+            for row in rows:
+                values = [json.dumps(row.get(key), ensure_ascii=False) if isinstance(row.get(key), (dict, list)) else row.get(key) for key in columns]
+                sheet.append(values)
+                # Preserve exact identifiers while forcing uploaded text to data,
+                # rather than spreadsheet formulas.
+                for cell, value in zip(sheet[sheet.max_row], values):
+                    if isinstance(value, str):
+                        cell.data_type = "s"
+            sheet.freeze_panes = "A2"
+            sheet.auto_filter.ref = sheet.dimensions
+            manifest = book.create_sheet("Provenance")
+            manifest.append(["field", "part", "json"])
+            for key, value in provenance.items():
+                encoded = json.dumps(native(value), ensure_ascii=False)
+                # Excel truncates strings at 32,767 characters. Preserve long
+                # config/artifact manifests in ordered, reconstructable chunks.
+                chunks = [encoded[index:index + 30000] for index in range(0, len(encoded), 30000)] or [""]
+                for index, chunk in enumerate(chunks):
+                    manifest.append([key, f"{index + 1}/{len(chunks)}", chunk])
+            stream = io.BytesIO()
+            from ..utils.spreadsheet import force_text
+            force_text(book)
+            book.save(stream)
+            return stream.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "candidates.xlsx"
+        if format == "html":
+            payload = self._offline_payload(all_table, allowed, provenance)
+            return self._offline_document(payload), "text/html; charset=utf-8", "report_offline.html"
+        if format == "zip":
+            stream = io.BytesIO() if destination is None else destination
+            with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr("candidates.csv", csv_bytes())
+                archive.writestr("manifest.json", json.dumps(native(provenance), ensure_ascii=False, indent=2))
+                archive.writestr("candidates.fasta", self.export("fasta")[0])
+                archive.writestr("report_offline.html", self._offline_document(self._offline_payload(all_table, allowed, provenance)))
+                for artifact in self.artifacts()["artifacts"]:
+                    archive.write(self.artifact_path(artifact["path"]), "run/" + artifact["path"])
+            return stream.getvalue() if destination is None else destination, "application/zip", "result_package.zip"
+        raise ValueError("내보내기 형식은 report_zip/csv/xlsx/fasta/html/zip 중 하나입니다.")
+
+    def _offline_payload(self, all_table, filters, provenance, *, delivery_artifact=False):
+        structures = []
+        for row in all_table["rows"]:
+            if row["structure_available"]:
+                try:
+                    observation = "complex:" + row["candidate_id"] if self.config.get("run", {}).get("mode") == "complex" else None
+                    structures.append(self.structure(row["candidate_id"], observation))
+                except (OSError, ValueError, KeyError) as exc:
+                    self.issues.append(f"{row['candidate_id']}: {exc}")
+        observations = self.observations()
+        for observation in observations["rows"]:
+            if self.config.get("run", {}).get("mode") == "complex" or observation.get("structure_pruned"):
+                continue
+            try:
+                structures.append(self.structure(observation["candidate_id"], observation["observation_id"]))
+            except (OSError, ValueError, KeyError) as exc:
+                self.issues.append(f"{observation['observation_id']}: {exc}")
+        return {"summary": self.summary(delivery_artifact=delivery_artifact), "candidates": all_table, "observations": observations,
+                "structures": structures, "filters": filters, "provenance": provenance}
+
+    @staticmethod
+    def _offline_document(payload, assets=None):
+        from ..report import _resolve_viewer_asset
+        template = Path(__file__).resolve().parents[1] / "templates/platform_offline.html"
+        encoded = json.dumps(native(payload), ensure_ascii=False).replace("<", "\\u003c").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
+        if not template.exists():
+            return _offline_fallback(encoded).encode()
+        document = template.read_text()
+        for token, filename in (("__PLOTLY_JS__", "plotly.min.js"), ("__3DMOL_JS__", "3dmol-min.js"),
+                                ("__MOLSTAR_JS__", "molstar.js"), ("__MOLSTAR_CSS__", "molstar.css")):
+            if assets is None:
+                raw, evidence = _resolve_viewer_asset({}, filename, asset_root=ASSET_ROOT, local_only=True)
+                if not evidence["ok"]:
+                    raise OSError(evidence["blocker"])
+            else:
+                raw = assets[filename]
+            content = raw.decode("utf-8")
+            document = document.replace(token, re.sub(r"</(script|style)", r"<\\/\1", content, flags=re.I))
+        # Inject records last: literal asset placeholders in names/errors must
+        # remain data rather than being replaced by vendor source code.
+        return document.replace("__RESULT_DATA__", encoded, 1).encode()
+
+    def _delivery_export(self, all_table, filters, filtered_table):
+        import hashlib
+        from ..report_delivery import package_report
+        from ..report import _resolve_viewer_asset
+        assets, asset_sources = {}, {}
+        for name in ("molstar.js", "molstar.css", "plotly.min.js", "3dmol-min.js"):
+            content, evidence = _resolve_viewer_asset({}, name, asset_root=ASSET_ROOT, local_only=True)
+            if not evidence["ok"]:
+                raise OSError(evidence["blocker"])
+            assets[name], asset_sources[name] = content, evidence
+        # Only these source receipts are hashed. Large MSA databases, caches,
+        # logs, old archives and intermediate tensors are never traversed here.
+        source_paths = ("run_config.yaml", "run_state.json", "complex_results.json", "models.csv",
+                        *TABLES, "05_final/selected_candidates.csv", "01_target/residue_mapping.csv",
+                        "retained/manifest.json", "retained/record.json")
+        sources = []
+        for relative in source_paths:
+            path = self._path(relative)
+            if path.is_file():
+                path = self.artifact_path(relative)
+                sources.append({"path": relative, "size": path.stat().st_size, "sha256": sha256(path)})
+        provenance = {"summary": self.summary(), "filters": filters,
+                      "filtered_ids": [row["candidate_id"] for row in filtered_table["rows"]],
+                      "source_artifacts": sources, "viewer_asset_sources": asset_sources,
+                      "scope": "report_inputs_and_embedded_structures"}
+        payload = self._offline_payload(all_table, filters, provenance, delivery_artifact=True)
+        # Hash exactly what the collaborator can inspect, including every seed
+        # and PAE. This is not a manifest of the omitted full run directory.
+        embedded = []
+        for structure in payload["structures"]:
+            content = structure["content"].encode()
+            entry = {"candidate_id": structure["candidate_id"], "observation_id": structure.get("observation_id"),
+                     "format": structure["format"], "size": len(content), "sha256": hashlib.sha256(content).hexdigest()}
+            if structure.get("pae"):
+                entry["pae_sha256"] = hashlib.sha256(json.dumps(native(structure["pae"]), ensure_ascii=False, sort_keys=True, allow_nan=False).encode()).hexdigest()
+            embedded.append(entry)
+        provenance["embedded_structures"] = embedded
+        provenance["summary"] = payload["summary"]
+        from ..utils.presentation import portable_metadata
+        # Resolve/embed native files first, then sanitize the presentation copy.
+        # This never rewrites source CSVs, coordinates, PAE or runtime config.
+        payload = portable_metadata(payload, root=self.root)
+        all_table, provenance = payload["candidates"], payload["provenance"]
+        files = {"report.html": self._offline_document(payload, assets)}
+        stream = io.StringIO()
+        writer = csv.DictWriter(stream, fieldnames=all_table["columns"])
+        writer.writeheader()
+        from ..utils.spreadsheet import csv_cell
+        writer.writerows([{key: csv_cell(json.dumps(value, ensure_ascii=False) if isinstance(value, (dict, list)) else value)
+                          for key, value in row.items()} for row in all_table["rows"]])
+        files["candidates.csv"] = ("\ufeff" + stream.getvalue()).encode()
+        if self.config.get("run", {}).get("mode") == "complex":
+            from ..complex import proteins
+            entries = proteins(self.config["complex"]["proteins"])
+            fasta = "".join(f">{p['id']} {' '.join(p['name'].split())} original_positions={','.join(map(str, p['original_positions']))}\n{p['sequence']}\n" for p in entries)
+        else:
+            fasta = "".join(f">{row['candidate_id']}\n{row['sequence']}\n" for row in all_table["rows"] if row.get("sequence"))
+        files["sequences.fasta"] = fasta.encode()
+        retained_note = ("핵심 보관본입니다. 서열·지표·모든 최종 구조를 유지하며, PAE 배열·MSA·중간 파일은 용량 정리로 삭제됐습니다.\n"
+                         "이 상세 자료가 필요하면 별도 새 분석에서 전체 계산을 다시 실행하세요. 원래 미평가와 삭제된 자료는 구분합니다.\n") if self.retained else ""
+        viewer_features = "표 정렬, MolStar 구조 탐색과 선택 예측 구조 저장" if self.retained else "표 정렬, MolStar 구조 탐색, PAE와 선택 예측 구조 저장"
+        files["README.txt"] = ("NanoCoFold 전달용 보고서\n\nZIP을 모두 풀고 report.html을 Chrome, Edge 또는 Firefox에서 여세요.\n"
+            f"인터넷·서버·Python·GPU 설치 없이 {viewer_features}을 사용할 수 있습니다.\n" + retained_note +
+            "브라우저의 WebGL이 필요합니다. 미평가·실패와 전체 모델을 포함하며 화면 필터로 데이터를 삭제하지 않습니다.\n"
+            "MSA, 로그, 가중치, 중간 계산 파일은 포함하지 않습니다. 재실행이나 전체 계산 감사를 위해 전체 원본 ZIP을 별도로 보관하세요.\n"
+            "기존 결과의 presentation 사본입니다. 예측 신뢰도는 결합 확률·KD 또는 실험 검증이 아닙니다.\n"
+            "delivery_manifest.json은 이 패키지의 파일 및 내장 구조/PAE 해시와 출처를 기록합니다.\n").encode()
+        files["README.txt"] += "서버 절대 경로는 상대 경로 또는 [local path]로 표시합니다. 원본 계산 영수증은 별도 전체 원본에 보존합니다.\n".encode()
+        for name in ("3DMOL_LICENSE.txt", "MOLSTAR_LICENSE.txt", "PLOTLY_LICENSE.txt", "vendor_manifest.json"):
+            content, evidence = _resolve_viewer_asset({}, name, asset_root=ASSET_ROOT, local_only=True)
+            if not evidence["ok"]:
+                raise OSError(evidence["blocker"])
+            files["licenses/" + name] = content
+        receipt = {"summary": payload["summary"], "provenance": provenance,
+                   "all_models_included": True, "offline": True,
+                   "retention": "minimal" if self.retained else "full",
+                   "capabilities": payload["summary"].get("capabilities"),
+                   "omitted": ["MSA", "logs", "weights", "intermediate_files"] + (["PAE_arrays_removed_by_retention"] if self.retained else [])}
+        return package_report(files, native(receipt)), "application/zip", "report_delivery.zip"
+
+
+def _offline_fallback(encoded):
+    return '''<!doctype html><html lang="ko"><meta charset="utf-8"><title>NanoCoFold offline</title>
+<style>body{font:16px system-ui;margin:2rem}table{border-collapse:collapse}td,th{padding:.5rem;border:1px solid #ddd}input{padding:.5rem}</style>
+<h1>NanoCoFold 결과</h1><p>예측 점수는 결합 확률이나 KD가 아닙니다. 모든 후보와 출처를 포함합니다.</p>
+<label>검색 <input id="query"></label><p id="count"></p><div style="overflow:auto"><table id="table"></table></div>
+<script id="data" type="application/json">''' + encoded + '''</script><script>
+const data=JSON.parse(document.getElementById('data').textContent),table=document.getElementById('table');
+function searchText(r){return [r.candidate_id,r.sequence,r.exclusion_reason,...(r.exclusion_reasons||[]),r.error].filter(v=>v!==null&&v!==undefined).join(' ').toLowerCase();}
+function render(){const q=document.getElementById('query').value.toLowerCase();const rows=data.candidates.rows.filter(r=>searchText(r).includes(q));
+table.replaceChildren();const head=document.createElement('tr');for(const key of data.candidates.columns){const th=document.createElement('th');th.textContent=key;head.append(th)}table.append(head);
+for(const row of rows){const tr=document.createElement('tr');for(const key of data.candidates.columns){const td=document.createElement('td');td.textContent=row[key]===null?'미평가':typeof row[key]==='object'?JSON.stringify(row[key]):String(row[key]??'');tr.append(td)}table.append(tr)}document.getElementById('count').textContent=rows.length+' / '+data.candidates.total;}
+document.getElementById('query').addEventListener('input',render);render();</script></html>'''

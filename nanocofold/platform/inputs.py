@@ -1,0 +1,475 @@
+from __future__ import annotations
+
+import json
+import csv
+import hashlib
+import re
+import secrets
+import shutil
+import threading
+from pathlib import Path
+
+import yaml
+
+from ..config import _deep_merge, _validate, load_config
+from ..utils.seq import clean_sequence
+from ..wizard import WizardSession
+from .paths import contained, native, sha256
+from .regions import apply_regions
+
+AA = set("ACDEFGHIKLMNPQRSTVWY")
+INPUT_PATHS = ("target.pdb", "target.fasta", "screen.vhh_fasta", "mature.wt_fasta", "mature.wt_structure",
+               "complex.reference_path", "input_review.reference_path", "input_review.reference_structure_path")
+
+
+def parse_fasta(content: str, *, single: bool = False) -> list[tuple[str, str]]:
+    if not isinstance(content, str) or not content.strip():
+        raise ValueError("FASTA 서열을 입력하세요.")
+    if len(content.encode()) > 20 * 1024 * 1024:
+        raise ValueError("FASTA는 20MB 이하여야 합니다.")
+    entries = []
+    name, sequence = None, []
+    for line in content.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith(">"):
+            if name is not None:
+                entries.append((name, "".join(sequence)))
+            name = line[1:].strip().split()[0] if line[1:].strip() else ""
+            sequence = []
+        else:
+            if name is None:
+                name = "sequence"
+            sequence.append(re.sub(r"\s+", "", line))
+    if name is not None:
+        entries.append((name, "".join(sequence)))
+    if not entries or len(entries) > 10000 or (single and len(entries) != 1):
+        raise ValueError("표적·WT는 서열 하나를, 라이브러리는 1–10,000개를 입력하세요.")
+    normalized = []
+    for name, sequence in entries:
+        # Validate original characters before Unicode upper() can expand them
+        # into apparently valid amino acids (e.g. ß -> SS).
+        sequence_clean = clean_sequence(sequence)
+        # The shared CLI cleaner accepts residue-number digits. Platform
+        # FASTA keeps its existing stricter alphabet and never drops them.
+        if not name or not sequence_clean or len(sequence_clean) != len(sequence) or set(sequence_clean) - AA:
+            raise ValueError("서열 이름과 표준 아미노산 20종으로 구성된 서열을 확인하세요.")
+        normalized.append((name, sequence_clean))
+    if len({name for name, _ in entries}) != len(entries):
+        raise ValueError("FASTA 서열 이름은 중복될 수 없습니다.")
+    return normalized
+
+
+def normalized_config(workspace: Path, override: dict | None = None) -> dict:
+    if override is not None and not isinstance(override, dict):
+        raise ValueError("설정은 객체여야 합니다.")
+    workspace_default = workspace / "config/default.yaml"
+    base = load_config(workspace_default if workspace_default.exists() else None)
+    def check_shape(defaults, values, path=""):
+        for key, value in values.items():
+            expected = defaults.get(key)
+            if isinstance(expected, dict):
+                if not isinstance(value, dict):
+                    raise ValueError(f"{path + key} 설정은 객체여야 합니다.")
+                check_shape(expected, value, path + key + ".")
+            elif isinstance(expected, bool) and not isinstance(value, bool):
+                raise ValueError(f"{path + key} 설정은 true/false여야 합니다.")
+    environment_path = workspace / "config/environment.yaml"
+    if environment_path.exists():
+        environment = yaml.safe_load(environment_path.read_text()) or {}
+        if not isinstance(environment, dict):
+            raise ValueError("작업 공간 environment.yaml은 객체여야 합니다.")
+        check_shape(base, environment)
+        base = _deep_merge(base, environment)
+    check_shape(base, override or {})
+    cfg = _deep_merge(base, override or {})
+    _validate(cfg)
+    if cfg.get("specificity", {}).get("enabled"):
+        raise ValueError("현재 플랫폼 작업은 design/screen/mature 분석을 지원합니다.")
+    cfg.setdefault("specificity", {})["enabled"] = False
+    cfg["run"]["outdir"] = str(workspace / "runs")
+    # Runtime inputs always refer to this workspace, independent of the server cwd.
+    for dotted in INPUT_PATHS:
+        section, key = dotted.split(".")
+        value = cfg.get(section, {}).get(key)
+        if value:
+            cfg[section][key] = str(contained(workspace, value, exists=True))
+    for section, key in (("design", "env"), ("screen", "env"), ("screen", "boltz2_env")):
+        if cfg.get(section, {}).get(key) and not Path(cfg[section][key]).is_absolute():
+            cfg[section][key] = str(workspace / cfg[section][key])
+    for section in ("structure", "mature"):
+        for values in cfg.get(section, {}).values():
+            if isinstance(values, dict) and values.get("env") and not Path(values["env"]).is_absolute():
+                values["env"] = str(workspace / values["env"])
+    colabfold = cfg.get("screen", {}).get("colabfold", {})
+    for key in ("env", "data_dir"):
+        value = colabfold.get(key)
+        if value and not Path(value).is_absolute():
+            colabfold[key] = str(workspace / value)
+    opendde = cfg.get("screen", {}).get("opendde", {})
+    for key in ("env", "data_dir"):
+        value = opendde.get(key)
+        if value and not Path(value).is_absolute():
+            opendde[key] = str(workspace / value)
+    for key in ("msa_cache_dir", "msa_dir"):
+        value = colabfold.get(key)
+        if value:
+            colabfold[key] = str(contained(workspace, value))
+    boltzgen = cfg.get("design", {}).get("boltzgen", {})
+    for key in ("env", "cache_dir", "scaffold"):
+        value = boltzgen.get(key)
+        if value and not Path(value).is_absolute():
+            boltzgen[key] = str(workspace / value)
+    value = cfg.get("design", {}).get("framework")
+    if value and not Path(value).is_absolute():
+        cfg["design"]["framework"] = str(workspace / value)
+    msa = cfg.get("structure", {}).get("msa", {})
+    if msa.get("cache_dir"):
+        msa["cache_dir"] = str(contained(workspace, msa["cache_dir"]))
+    return cfg
+
+
+def normalized_fasta_config(workspace: Path, payload: dict) -> dict:
+    """Validate the reviewed mode/hotspots, rather than a stale imported draft."""
+    supplied = payload.get("config")
+    if supplied is not None and not isinstance(supplied, dict):
+        raise ValueError("설정은 객체여야 합니다.")
+    override = _deep_merge({}, supplied or {})
+    # Do not replace malformed sections with valid reviewed fields and conceal
+    # a schema error. Work on a copy, preserving the submitted manifest.
+    for section in ("run", "target"):
+        if section in override and not isinstance(override[section], dict):
+            raise ValueError(f"{section} 설정은 객체여야 합니다.")
+    if "mode" in payload:
+        override.setdefault("run", {})["mode"] = payload["mode"]
+    if "hotspots" in payload:
+        override.setdefault("target", {})["hotspots"] = payload["hotspots"]
+    return normalized_config(workspace, override)
+
+
+class InputManager:
+    def __init__(self, workspace: Path):
+        self.workspace = workspace
+        self.root = workspace / "inputs"
+        self.root.mkdir(parents=True, exist_ok=True)
+        self.wizard = WizardSession(self.root)
+        self.lock = threading.Lock()
+
+    def close(self):
+        self.wizard.close()
+
+    def list(self):
+        return [self.get(path.parent.name) for path in sorted(self.root.glob("*/platform_input.json"))]
+
+    def get(self, identifier: str):
+        if not isinstance(identifier, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", identifier):
+            raise ValueError("잘못된 입력 ID입니다.")
+        path = contained(self.root, identifier, exists=True) / "platform_input.json"
+        return json.loads(path.read_text())
+
+    @staticmethod
+    def _digest(value):
+        return hashlib.sha256(json.dumps(native(value), ensure_ascii=False, sort_keys=True,
+                                        allow_nan=False).encode()).hexdigest()
+
+    def _review_files(self, folder: Path, cfg: dict):
+        files = {}
+        for path in sorted(folder.rglob("*")):
+            if path.is_symlink():
+                raise ValueError("검토한 입력 파일은 심볼릭 링크일 수 없습니다.")
+            if path.is_file() and path.name not in {"config.yaml", "platform_input.json"}:
+                files["input/" + str(path.relative_to(folder))] = sha256(path)
+        # Imported libraries/references can be outside this input folder but
+        # still inside the workspace; bind their exact reviewed bytes too.
+        for dotted in INPUT_PATHS:
+            section, key = dotted.split(".")
+            value = cfg.get(section, {}).get(key)
+            if value:
+                files[dotted] = sha256(contained(self.workspace, value, exists=True))
+        return files
+
+    def reviewed(self, identifier: str):
+        """Load the stored review unchanged; old inputs require a new review."""
+        result = self.get(identifier)
+        folder = contained(self.root, identifier, exists=True)
+        receipt = result.get("review_receipt")
+        error = "검토한 입력과 설정이 달라졌거나 검토 영수증이 없습니다. 입력을 다시 검토하세요."
+        if not isinstance(receipt, dict) or receipt.get("schema_version") != 1:
+            raise ValueError(error)
+        try:
+            unchanged = (receipt.get("config_sha256") == self._digest(result["config"])
+                         and receipt.get("config_file_sha256") == sha256(folder / "config.yaml")
+                         and receipt.get("review_sha256") == self._digest(result["review"])
+                         and receipt.get("files") == self._review_files(folder, result["config"]))
+        except (OSError, KeyError, TypeError, ValueError) as exc:
+            raise ValueError(error) from exc
+        if not unchanged:
+            raise ValueError(error)
+        _validate(result["config"])
+        return result
+
+    def _save(self, folder: Path, cfg: dict, review: dict):
+        cfg = normalized_config(self.workspace, cfg)
+        (folder / "config.yaml").write_text(yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False))
+        result = {"id": folder.name, "input_id": folder.name, "config": cfg, "review": review,
+                  "config_path": str(folder / "config.yaml")}
+        result["review_receipt"] = {"schema_version": 1,
+                                    "config_sha256": self._digest(cfg),
+                                    "config_file_sha256": sha256(folder / "config.yaml"),
+                                    "review_sha256": self._digest(review),
+                                    "files": self._review_files(folder, cfg)}
+        (folder / "platform_input.json").write_text(json.dumps(native(result), ensure_ascii=False, indent=2))
+        return result
+
+    def _sequences(self, folder: Path, cfg: dict, payload: dict):
+        if "mock" in payload and not isinstance(payload["mock"], bool):
+            raise ValueError("mock는 true/false여야 합니다.")
+        mode = payload.get("mode", cfg["run"]["mode"])
+        if mode not in {"design", "screen", "mature"}:
+            raise ValueError("지원하지 않는 분석 모드입니다.")
+        cfg["run"]["mode"] = mode
+        if payload.get("vhh_fasta"):
+            rows = parse_fasta(payload["vhh_fasta"])
+            path = folder / "vhh.fasta"
+            path.write_text("".join(f">{name}\n{seq}\n" for name, seq in rows))
+            cfg["screen"]["vhh_fasta"] = str(path)
+        if payload.get("wt_fasta"):
+            _, seq = parse_fasta(payload["wt_fasta"], single=True)[0]
+            cfg["mature"]["wt_sequence"] = seq
+            cfg["mature"]["wt_fasta"] = None
+        if payload.get("wt_structure"):
+            upload = payload["wt_structure"]
+            if not isinstance(upload, dict):
+                raise ValueError("WT 구조는 filename/content 객체여야 합니다.")
+            filename, content = upload.get("filename", ""), upload.get("content", "")
+            suffix = Path(filename).suffix.lower()
+            if Path(filename).name != filename or suffix not in {".pdb", ".ent", ".cif", ".mmcif"}:
+                raise ValueError("WT 구조는 PDB/mmCIF 파일이어야 합니다.")
+            if not isinstance(content, str) or not content.strip() or len(content.encode()) > 20 * 1024 * 1024:
+                raise ValueError("WT 구조는 비어 있지 않은 20MB 이하 파일이어야 합니다.")
+            from ..structure_input import inspect_structure
+            source = folder / ("wt_source" + suffix)
+            source.write_text(content)
+            info = inspect_structure(source, folder / "wt_normalized", source={"kind": "upload", "filename": filename})
+            if info.get("blockers"):
+                raise ValueError("WT 구조 입력 문제: " + "; ".join(info["blockers"]))
+            cfg["mature"]["wt_structure"] = info["structure_path"]
+            cfg["mature"]["wt_structure_review"] = {"chains": info["chains"], "sha256": sha256(Path(info["structure_path"])),
+                                                       "warnings": info.get("warnings", []), "source": filename}
+            (folder / "wt_structure_review.json").write_text(json.dumps(native(info), ensure_ascii=False, indent=2))
+        if mode == "screen" and not cfg["screen"].get("vhh_fasta") and not cfg["run"].get("mock"):
+            raise ValueError("screen 모드에는 VHH 라이브러리 FASTA가 필요합니다.")
+        if mode == "mature" and not (cfg["mature"].get("wt_sequence") or cfg["mature"].get("wt_fasta")):
+            raise ValueError("mature 모드에는 WT VHH 서열이 필요합니다.")
+
+    def complex(self, payload: dict):
+        from ..complex import proteins, validate_settings
+        mock = payload.get("mock", False)
+        if type(mock) is not bool:
+            raise ValueError("mock는 true/false여야 합니다.")
+        entries = proteins(payload.get("proteins"))
+        settings = validate_settings(payload.get("settings", {}))
+        folder = self.root / secrets.token_hex(16)
+        folder.mkdir()
+        cfg = {"run": {"mode": "complex", "mock": mock}, "target": {"sequence": entries[0]["sequence"], "fasta": None, "pdb": None},
+               "complex": {**settings, "proteins": payload["proteins"], "reference_path": None,
+                           "anchor_chain": payload.get("anchor_chain", "A"), "interest_positions": payload.get("interest_positions", [])}}
+        upload = payload.get("reference")
+        if upload:
+            suffix = Path(upload.get("filename", "")).suffix.lower()
+            if suffix not in {".pdb", ".cif", ".mmcif"} or not isinstance(upload.get("content"), str) or len(upload["content"].encode()) > 20*1024*1024:
+                raise ValueError("비교 구조는 20MB 이하 PDB/mmCIF이어야 합니다.")
+            source = folder / ("reference"+suffix)
+            source.write_text(upload["content"])
+            from ..utils import pdb_io
+            pdb_io.load_structure(source)
+            cfg["complex"]["reference_path"] = str(source)
+        return self._save(folder, cfg, {"mode": "complex", "mock": mock, "proteins": entries, "settings": settings, "source": "researcher_review"})
+
+    def load(self, payload: dict):
+        with self.lock:
+            return self.wizard.load(payload)
+
+    def structure(self, identifier: str) -> str:
+        """Serve the reviewed, normalized chains rather than reparsing the upload."""
+        with self.lock:
+            info = self.wizard.input
+            if not info or identifier != info["input_id"]:
+                raise ValueError("구조 입력이 변경되었습니다. 구조를 다시 불러오세요.")
+            return Path(info["structure_path"]).read_text()
+
+    def analyze(self, payload: dict):
+        with self.lock:
+            return self.wizard.analyze(payload)
+
+    def review(self, payload: dict):
+        with self.lock:
+            if payload.get("preparation") == "sequence_prediction":
+                return self._prediction_review(payload)
+            if payload.get("preparation", "coordinates") != "coordinates":
+                raise ValueError("지원하지 않는 입력 준비 방식입니다.")
+            exported = self.wizard.export(payload)
+            folder = Path(exported["export_dir"])
+            cfg = yaml.safe_load((folder / "config.yaml").read_text())
+            cfg = _deep_merge(cfg, payload.get("config", {}))
+            cfg["run"]["mock"] = bool(payload.get("mock", cfg["run"].get("mock", False)))
+            # Reviewed mapping/hotspots/context come from the verified wizard export.
+            original = yaml.safe_load((folder / "config.yaml").read_text())
+            for key in ("target", "input_review", "truncate"):
+                cfg[key] = original[key]
+            cfg = normalized_config(self.workspace, cfg)
+            self._sequences(folder, cfg, payload)
+            review = json.loads((folder / "input_review.json").read_text())
+            cfg, review = apply_regions(folder, cfg, review, payload)
+            return self._save(folder, cfg, review)
+
+    def _prediction_review(self, payload: dict):
+        from ..protein_input import MAX_PREDICTION_RESIDUES, STANDARD_COMPONENTS, prediction_chain
+
+        selection = self.wizard.selection
+        if not selection or payload.get("selection_id") != selection["result"]["selection_id"]:
+            raise ValueError("선택 내용이 바뀌었습니다. 표적과 서열을 다시 확인하세요.")
+        if payload.get("acknowledge") is not True:
+            raise ValueError("전체 서열·수정 잔기·예측 경로와 경고를 확인하세요.")
+        selected = selection["result"]["retained_chains"]
+        if len(selected) > 25:
+            raise ValueError("후속 예측은 표적·파트너 합계 25개 체인까지 지원합니다.")
+        provided = dict(parse_fasta(payload["prediction_sequences"])) if payload.get("prediction_sequences") else {}
+        if set(provided) - {chain["id"] for chain in selected}:
+            raise ValueError("전체 서열 FASTA 이름은 선택한 체인 ID와 같아야 합니다(예: >A).")
+        chains = [prediction_chain(chain, provided.get(chain["id"])) for chain in selected]
+        if sum(len(chain["sequence"]) for chain in chains) > MAX_PREDICTION_RESIDUES:
+            raise ValueError(f"전체 서열 예측 입력은 합계 {MAX_PREDICTION_RESIDUES}잔기까지 지원합니다.")
+        provider = payload.get("provider", "boltz2")
+        if provider not in {"boltz2", "chai1"}:
+            raise ValueError("전체 서열 구조 예측 엔진은 Boltz-2 또는 Chai-1이어야 합니다.")
+        mock = payload.get("mock", False)
+        if not isinstance(mock, bool):
+            raise ValueError("mock는 true/false여야 합니다.")
+        prediction_hotspots = payload.get("prediction_hotspots", "auto")
+        hotspots = "auto"
+        if prediction_hotspots == "reference":
+            positions = payload.get("hotspots")
+            allowed = chains[0]["observed_to_full"]
+            if (not isinstance(positions, list) or not 1 <= len(positions) <= 12
+                    or any(type(p) is not int or str(p) not in allowed for p in positions)
+                    or len(set(positions)) != len(positions)):
+                raise ValueError("선택한 Hotspot의 원본·전체 서열 대응이 불명확합니다. 예측 구조 자동 hotspot을 사용하거나 대응을 확인하세요.")
+            hotspots = [f"A:seq{allowed[str(p)]}" for p in sorted(positions)]
+        elif prediction_hotspots == "none":
+            if payload.get("hotspots", []) != []:
+                raise ValueError("Hotspot 미지정 실행의 hotspot 목록은 비어 있어야 합니다.")
+            hotspots = []
+        elif prediction_hotspots != "auto":
+            raise ValueError("예측 hotspot은 auto, reference 또는 none을 선택하세요.")
+        identifier = "sequence-" + secrets.token_hex(8)
+        folder = self.root / identifier
+        folder.mkdir()
+        source = Path(self.wizard.input["source_file"])
+        reference = folder / ("source.cif.gz" if source.name.endswith(".cif.gz") else "source" + source.suffix)
+        shutil.copy2(source, reference)
+        reference_structure = folder / "reference.pdb"
+        shutil.copy2(selection["protein"], reference_structure)
+        warnings = list(selection["result"]["warnings"])
+        warnings.extend([
+            "전체 서열로 새 단백질 구조를 예측합니다. 원본 좌표는 참조로만 보존하며 미관측 좌표를 채운 실험 구조로 표시하지 않습니다.",
+            "원본의 수정 잔기·chromophore·당질·리간드·핵산·막 환경은 이 단백질 서열 예측에 재현되지 않습니다.",
+            "Hotspot은 예측 구조에서 다시 계산합니다." if hotspots == "auto" else
+            "Hotspot 미지정: 결합 위치를 제한하지 않고 탐색합니다." if hotspots == [] else
+            "선택한 원본 hotspot을 전체 서열 위치로 대응했습니다. 노출도와 접촉은 예측 구조에서 다시 평가합니다.",
+        ])
+        for original, chain in zip(selected, chains):
+            if len(chain["observed_to_full"]) < len(original["sequence"]):
+                warnings.append(f"체인 {original['original_id']}: 일부 관측 잔기의 전체 서열 위치가 불명확합니다. 원본 번호·hotspot을 임의 대응하지 않았습니다.")
+        for chain in selected:
+            if chain.get("blockers"):
+                warnings.append(f"체인 {chain['original_id']}: 원본 좌표 경로의 문제: " + "; ".join(chain["blockers"]))
+        mapping = []
+        for index, (original, chain) in enumerate(zip(selected, chains)):
+            output_chain = chr(65 + index)
+            inverse = {pos: row for row in original["residues"]
+                       if (pos := chain["observed_to_full"].get(str(row["position"]))) is not None}
+            components = {}
+            for component in chain["sequence_review"].get("polymer_components", []):
+                span = chain["template_spans"].get(component["label_position"])
+                if span:
+                    for position in range(span[0], span[1] + 1):
+                        components.setdefault(position, []).append((component, span))
+            for position, aa in enumerate(chain["sequence"], 1):
+                observed = inverse.get(position)
+                source_components = components.get(position, [])
+                component, span = source_components[0] if len(source_components) == 1 else (None, None)
+                kind = ("composite_component" if span and span[0] != span[1] else
+                        "parent_component" if component and component["component"] not in STANDARD_COMPONENTS else
+                        "standard_residue" if observed else "ambiguous_component" if source_components else
+                        "unmapped_or_unobserved")
+                mapping.append({"protein": chain["name"], "source_chain": chain["original_id"],
+                                "author_chain": chain["author_chain"],
+                                "source_residue": component["original_label"] if component else observed["original_label"] if observed else "",
+                                "source_component": component["component"] if component else "",
+                                "aa": aa, "output_chain": output_chain, "output_position": position,
+                                "source_observed": bool(observed or source_components),
+                                "source_standard_observed": observed is not None,
+                                "source_mapping_kind": kind,
+                                "coordinate_source": "predicted", "sequence_origin": chain["sequence_origin"]})
+        with (folder / "residue_mapping.csv").open("w", newline="", encoding="utf-8-sig") as stream:
+            writer = csv.DictWriter(stream, fieldnames=list(mapping[0]))
+            writer.writeheader()
+            writer.writerows(mapping)
+        cfg = normalized_config(self.workspace, payload.get("config"))
+        cfg["run"].update(name=cfg["run"].get("name", chains[0]["name"]), mock=mock)
+        cfg["target"].update(name=chains[0]["name"], sequence=chains[0]["sequence"], fasta=None,
+                              pdb=None, chain="A", hotspots=hotspots, hotspot_set=None,
+                              aux_chains=[{"name": c["name"], "sequence": c["sequence"]} for c in chains[1:]])
+        cfg["structure"]["provider"] = "mock" if mock else provider
+        cfg["truncate"]["enabled"] = False
+        # Coordinate faults trigger the prediction path; chemical/context
+        # limitations on automatic design remain separately recorded.
+        design_blockers = list(dict.fromkeys(b for c in selected for b in c.get("design_blockers", [])))
+        cfg["input_review"] = {
+            "preparation": "sequence_prediction", "reference_path": str(reference),
+            "reference_sha256": sha256(reference), "reference_structure_path": str(reference_structure),
+            "reference_structure_sha256": sha256(reference_structure),
+            "target_name": chains[0]["name"], "target_sequence": chains[0]["sequence"],
+            "context_names": [c["name"] for c in chains[1:]],
+            "context_sequences": [c["sequence"] for c in chains[1:]],
+            "prediction_hotspots": hotspots, "provider": cfg["structure"]["provider"],
+            "design_blockers": design_blockers,
+        }
+        self._sequences(folder, cfg, payload)
+        manifest = {"schema_version": 2, "preparation": "sequence_prediction", "source": self.wizard.input["source"],
+                    "source_sha256": sha256(reference), "selection_id": selection["result"]["selection_id"],
+                    "chains": chains, "reference_chains": selected,
+                    "removed_chains": selection["result"]["removed_chains"],
+                    "removed_components": self.wizard.input.get("removed", []),
+                    "warnings": list(dict.fromkeys(warnings)), "predictions_executed": False,
+                    "prediction_hotspots": hotspots, "design_blockers": design_blockers,
+                    "reference_structure_sha256": sha256(reference_structure)}
+        (folder / "input_review.json").write_text(json.dumps(native(manifest), ensure_ascii=False, indent=2))
+        (folder / "target.fasta").write_text("".join(f">{chr(65+i)}\n{c['sequence']}\n" for i, c in enumerate(chains)))
+        cfg, manifest = apply_regions(folder, cfg, manifest, payload)
+        return self._save(folder, cfg, manifest)
+
+    def fasta(self, payload: dict):
+        rows = parse_fasta(payload.get("content", ""), single=True)
+        cfg = normalized_fasta_config(self.workspace, payload)
+        identifier = "fasta-" + secrets.token_hex(8)
+        folder = self.root / identifier
+        folder.mkdir()
+        name, sequence = rows[0]
+        cfg["run"].update(name=payload.get("name", name), mock=bool(payload.get("mock", False)))
+        cfg["target"].update(name=payload.get("target_name", name), sequence=sequence, fasta=None,
+                              pdb=None, chain="A", aux_chains=[], hotspots=payload.get("hotspots", "auto"))
+        cfg["structure"]["provider"] = "mock" if cfg["run"]["mock"] else payload.get("provider", "boltz2")
+        if not cfg["run"]["mock"] and cfg["structure"]["provider"] not in {"boltz2", "chai1"}:
+            raise ValueError("서열 입력은 Boltz-2 또는 Chai-1로 표적 구조를 먼저 예측해야 합니다.")
+        cfg["structure"]["msa"]["backend"] = payload.get("msa_backend", "empty")
+        cfg["truncate"]["enabled"] = False
+        (folder / "target.fasta").write_text(f">{name}\n{sequence}\n")
+        self._sequences(folder, cfg, payload)
+        review = {"source": {"kind": "fasta", "sha256": sha256(folder / "target.fasta")},
+                  "target_sequence": sequence, "warnings": ["서열 입력의 구조와 hotspot은 예측됩니다. 실험 구조 확인과 구분하세요."],
+                  "predictions_executed": False}
+        cfg, review = apply_regions(folder, cfg, review, payload)
+        return self._save(folder, cfg, review)

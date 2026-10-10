@@ -1,0 +1,26 @@
+# 넓은 후보 탐색. 점수/품질 경고는 유지하고 연구자가 전체 결과에서 판단한다.
+# 입력과 엔진 환경은 default.yaml 및 environment.yaml에서 상속한다.
+run:
+  analysis_preset: researcher_exploration
+truncate:
+  enabled: false
+design:
+  num_designs: 1000
+  filters:
+    enabled: false
+    top_n_to_score: 1000
+screen:
+  restraint:
+    enabled: false
+  tier2_n: 500
+mature:
+  prefilter:
+    mode: esm2
+    enforce_threshold: false
+    top_n: 500
+rank:
+  require_hotspot: false
+  include_wt_control: true
+  weights:
+    hotspot_contact_frac: 0.0
+  fallback_to_ineligible: false

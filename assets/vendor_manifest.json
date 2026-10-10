@@ -1,0 +1,50 @@
+{
+  "molstar.js": {
+    "version": "5.12.0",
+    "source": "https://registry.npmjs.org/molstar/-/molstar-5.12.0.tgz#package/build/viewer/molstar.js",
+    "sha256": "df4d620beafff4a602c5b495cb600eb0c0633f76102d1cdaa53624f8b75193de",
+    "license": "MIT",
+    "npm_integrity": "sha512-KBwdn8ie42a6kqgp/zhCjBb8fIJdBcBq/AMc17iWdYLtGF4doxmaMe5Rf0cUUwMj7FiH+/1Hp7F2Px6ywQV/rg==",
+    "upstream_sha256": "8b77dcb87d0920edf5e838a865a9b7f346b177875b1ff85f8689c2e6cfc7cfbd",
+    "patches": [
+      "Disable unused h264 MP4 eager initializer and export factory; preserve CSP without unsafe-eval or wasm-unsafe-eval"
+    ]
+  },
+  "molstar.css": {
+    "version": "5.12.0",
+    "source": "https://registry.npmjs.org/molstar/-/molstar-5.12.0.tgz#package/build/viewer/molstar.css",
+    "sha256": "5b68ceb6d3642549b4e9b2c071e58e41b98a5350ae269180587b39da86925d55",
+    "license": "MIT",
+    "npm_integrity": "sha512-KBwdn8ie42a6kqgp/zhCjBb8fIJdBcBq/AMc17iWdYLtGF4doxmaMe5Rf0cUUwMj7FiH+/1Hp7F2Px6ywQV/rg==",
+    "upstream_sha256": "5b68ceb6d3642549b4e9b2c071e58e41b98a5350ae269180587b39da86925d55"
+  },
+  "MOLSTAR_LICENSE.txt": {
+    "version": "5.12.0",
+    "source": "https://registry.npmjs.org/molstar/-/molstar-5.12.0.tgz#package/LICENSE",
+    "sha256": "aa42900c6ea7bfcf22d25a4c369025e01a526c66501fd9193f9a8aecee7a0753",
+    "license": "MIT",
+    "npm_integrity": "sha512-KBwdn8ie42a6kqgp/zhCjBb8fIJdBcBq/AMc17iWdYLtGF4doxmaMe5Rf0cUUwMj7FiH+/1Hp7F2Px6ywQV/rg==",
+    "upstream_sha256": "aa42900c6ea7bfcf22d25a4c369025e01a526c66501fd9193f9a8aecee7a0753"
+  },
+  "plotly.min.js": {
+    "version": "4.1.1",
+    "source": "plotly Python package 7.1.0 package_data/plotly.min.js",
+    "sha256": "3b6e15d45dbb7fca5bd2094291e961ddc5472cd887009e6009a56dab668d721f",
+    "license": "MIT"
+  },
+  "3dmol-min.js": {
+    "source": "preserved NanoCoFold vendored asset; upstream https://3dmol.org",
+    "sha256": "4ab374e1830bccec950b280fd285a430e05e91bd13c9ef0097c611c66de6cb36",
+    "license": "BSD-3-Clause"
+  },
+  "PLOTLY_LICENSE.txt": {
+    "source": "preserved Plotly MIT notice",
+    "sha256": "ba712274f8336a5f0828c8e2bf639ab8a632c623800a35f96c8b0a67b5f2ab40",
+    "license": "MIT"
+  },
+  "3DMOL_LICENSE.txt": {
+    "source": "https://raw.githubusercontent.com/3dmol/3Dmol.js/master/LICENSE",
+    "sha256": "4c6eaaed856f3f28a3b1a98e74f4a8a71618de7d51ea4155c29f6f793bcef861",
+    "license": "BSD-3-Clause; upstream incorporated notices included"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "preset_id": "public_tutorial_v1",
+  "public_queries": {
+    "human_il6": {
+      "sequence": "VPPGEDSKDVAAPHRQPLTSSERIDKQIRYILDGISALRKETCNKSNMCESSKEALAENNLNLPKMAEKDGCFQSGFNEETCLVKIITGLLEFEVYLEYLQNRFESSEEQARAVQMSTKVLIQFLQKKAKNLDAITTPDPTTNASLLTKLQAQNQWLQDMTTHLILRSFKEFLQSSLRALRQM",
+      "sequence_sha256": "49017e62426d5cda55e4902d3e43bb63e3ff781530c280643c840dfacce10b59",
+      "length": 183,
+      "source_url": "https://rest.uniprot.org/uniprotkb/P05231.json",
+      "cdr_ranges": null
+    },
+    "anti_il6_nb": {
+      "sequence": "MAQVQLVESGGGLVQPGGSLRLSCAASGFTFSSYRMYWFRQAPGQGLEAVAAISAGGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCANRAGWGMGDYWGQGTLVTVSKLAAALEHHHHHH",
+      "sequence_sha256": "8a73d4d27c20f0c41aa84cc4e880673a0bb73dc6085a296e5b31f4878f4f8e8e",
+      "length": 132,
+      "source_url": "https://data.rcsb.org/rest/v1/core/polymer_entity/9VQ6/1",
+      "cdr_ranges": null
+    }
+  },
+  "private_generated_queries_allowed": false
+}
