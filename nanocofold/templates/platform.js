@@ -1485,10 +1485,13 @@ async function focusResultChain(role) {
   if (state.structure !== data || state.viewer !== viewer) return;
   $("structure-note").textContent = `${$("select-result-" + role).textContent} · 체인 ${chain.id} · ${chain.residues.length}개 잔기`;
 }
-async function focusStructure(labels, text) {
-  if (!state.viewer) throw Error("MolStar 구조가 준비될 때까지 기다리세요.");
-  await state.viewer.focus(labels);
+async function focusStructure(labels, text, reveal = false) {
+  const viewer = state.viewer, data = state.structure;
+  if (!viewer) throw Error("MolStar 구조가 준비될 때까지 기다리세요.");
+  await viewer.focus(labels);
+  if (state.viewer !== viewer || state.structure !== data) return;
   $("structure-note").textContent = text || `선택 잔기: ${labels.join(" · ")}`;
+  if (reveal) $("structure-view").scrollIntoView({block: "center", behavior: "auto"});
 }
 function focusButton(label, labels, text, measurement) {
   const button = el("button", label, "secondary");
@@ -1629,8 +1632,9 @@ async function renderStructure() {
     );
     $("pae").removeAllListeners?.("plotly_click");
     $("pae").on("plotly_click", event => {
-      const point = event.points[0];
-      focusStructure([point.x, point.y], `PAE ${Number(point.z).toFixed(2)} Å · ${point.x} / ${point.y}`).catch(error => notice(error.message, true));
+      const point = event.points?.[0];
+      if (!point) return;
+      focusStructure([point.x, point.y], `PAE ${Number(point.z).toFixed(2)} Å · ${point.x} / ${point.y}`, true).catch(error => notice(error.message, true));
     });
   }
 }

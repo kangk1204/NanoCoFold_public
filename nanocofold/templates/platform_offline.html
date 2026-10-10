@@ -679,7 +679,7 @@ dd {
               <section class="card">
                 <h2>PAE · 예측 정렬 오차</h2>
                 <div id="pae" class="chart"></div>
-                <p class="muted">PAE 단위는 Å입니다. 셀을 클릭하면 두 잔기를 3D 구조에서 선택합니다.</p>
+                <p class="muted">PAE 단위는 Å입니다. 셀을 클릭하면 두 잔기를 선택·확대하고 3D 뷰어로 바로 이동합니다.</p>
               </section>
               <section class="card">
               <h2>계면 점수 비교</h2>
@@ -2435,10 +2435,13 @@ async function focusResultChain(role) {
   if (state.structure !== data || state.viewer !== viewer) return;
   $("structure-note").textContent = `${$("select-result-" + role).textContent} · 체인 ${chain.id} · ${chain.residues.length}개 잔기`;
 }
-async function focusStructure(labels, text) {
-  if (!state.viewer) throw Error("MolStar 구조가 준비될 때까지 기다리세요.");
-  await state.viewer.focus(labels);
+async function focusStructure(labels, text, reveal = false) {
+  const viewer = state.viewer, data = state.structure;
+  if (!viewer) throw Error("MolStar 구조가 준비될 때까지 기다리세요.");
+  await viewer.focus(labels);
+  if (state.viewer !== viewer || state.structure !== data) return;
   $("structure-note").textContent = text || `선택 잔기: ${labels.join(" · ")}`;
+  if (reveal) $("structure-view").scrollIntoView({block: "center", behavior: "auto"});
 }
 function focusButton(label, labels, text, measurement) {
   const button = el("button", label, "secondary");
@@ -2579,8 +2582,9 @@ async function renderStructure() {
     );
     $("pae").removeAllListeners?.("plotly_click");
     $("pae").on("plotly_click", event => {
-      const point = event.points[0];
-      focusStructure([point.x, point.y], `PAE ${Number(point.z).toFixed(2)} Å · ${point.x} / ${point.y}`).catch(error => notice(error.message, true));
+      const point = event.points?.[0];
+      if (!point) return;
+      focusStructure([point.x, point.y], `PAE ${Number(point.z).toFixed(2)} Å · ${point.x} / ${point.y}`, true).catch(error => notice(error.message, true));
     });
   }
 }

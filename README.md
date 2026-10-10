@@ -3,7 +3,7 @@
 단백질 서열에서 복합체 구조를 예측하고, 나노바디를 설계하거나 후보와 변이를 비교하는 프로그램입니다.
 결과는 표, 3D 구조, PAE와 HTML 보고서로 확인합니다.
 
-**현재 공개 버전: [v0.4.4](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.4)** ·
+**현재 공개 버전: [v0.4.5](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.5)** ·
 [변경 기록](CHANGELOG.md) · [업데이트 방법](docs/UPGRADING.md)
 
 ## 1. 준비할 컴퓨터
@@ -20,9 +20,9 @@ CUDA Toolkit·Conda·Docker도 이 안내의 필수 준비물이 아닙니다. N
 
 ## 2. 내려받고 한 번에 설치
 
-1. [소스 ZIP 받기](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.4/NanoCoFold_public-0.4.4.zip)를 누릅니다.
+1. [소스 ZIP 받기](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.5/NanoCoFold_public-0.4.5.zip)를 누릅니다.
 2. Ubuntu에서 ZIP을 압축 해제합니다.
-3. 압축을 푼 **`NanoCoFold_public-0.4.4` 폴더 안에서** 터미널을 엽니다.
+3. 압축을 푼 **`NanoCoFold_public-0.4.5` 폴더 안에서** 터미널을 엽니다.
    그 폴더에 `README.md`, `install.sh`, `start.sh`가 보이면 맞습니다.
 4. 아래 명령을 실행합니다.
 
@@ -195,6 +195,7 @@ bash run_example.sh screen --review-only --allow-public-msa
 ## 6. 결과 확인·전달
 
 웹의 작업 목록에서 결과를 엽니다. 후보 표에서 행을 누르면 아래 3D 뷰어와 PAE를 확인할 수 있습니다.
+PAE 히트맵의 셀을 클릭하면 두 잔기를 선택·확대하고, 페이지도 MolStar 뷰어로 바로 이동합니다.
 CSV/XLSX 표, FASTA 서열, 원본 좌표와 보고서 ZIP을 저장할 수 있습니다.
 **보고서 ZIP을 압축 해제한 뒤 HTML을 열면**, 별도 설치 없이 결과를 살펴볼 수 있습니다.
 
