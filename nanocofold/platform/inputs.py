@@ -12,7 +12,7 @@ from pathlib import Path
 import yaml
 
 from ..config import _deep_merge, _validate, load_config
-from ..utils.seq import clean_sequence
+from ..utils.seq import clean_sequence, validate_candidate_id
 from ..wizard import WizardSession
 from .paths import contained, native, sha256
 from .regions import apply_regions
@@ -55,6 +55,7 @@ def parse_fasta(content: str, *, single: bool = False) -> list[tuple[str, str]]:
         # FASTA keeps its existing stricter alphabet and never drops them.
         if not name or not sequence_clean or len(sequence_clean) != len(sequence) or set(sequence_clean) - AA:
             raise ValueError("서열 이름과 표준 아미노산 20종으로 구성된 서열을 확인하세요.")
+        validate_candidate_id(name)
         normalized.append((name, sequence_clean))
     if len({name for name, _ in entries}) != len(entries):
         raise ValueError("FASTA 서열 이름은 중복될 수 없습니다.")

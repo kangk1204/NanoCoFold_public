@@ -3,7 +3,7 @@
 단백질 서열에서 복합체 구조를 예측하고, 나노바디를 설계하거나 후보와 변이를 비교하는 프로그램입니다.
 결과는 표, 3D 구조, PAE와 HTML 보고서로 확인합니다.
 
-**현재 공개 버전: [v0.4.6](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.6)** ·
+**현재 공개 버전: [v0.4.7](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.7)** ·
 [변경 기록](CHANGELOG.md) · [업데이트 방법](docs/UPGRADING.md)
 
 ## 1. 준비할 컴퓨터
@@ -20,9 +20,9 @@ CUDA Toolkit·Conda·Docker도 이 안내의 필수 준비물이 아닙니다. N
 
 ## 2. 내려받고 한 번에 설치
 
-1. [소스 ZIP 받기](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.6/NanoCoFold_public-0.4.6.zip)를 누릅니다.
+1. [소스 ZIP 받기](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.7/NanoCoFold_public-0.4.7.zip)를 누릅니다.
 2. Ubuntu에서 ZIP을 압축 해제합니다.
-3. 압축을 푼 **`NanoCoFold_public-0.4.6` 폴더 안에서** 터미널을 엽니다.
+3. 압축을 푼 **`NanoCoFold_public-0.4.7` 폴더 안에서** 터미널을 엽니다.
    그 폴더에 `README.md`, `install.sh`, `start.sh`가 보이면 맞습니다.
 4. 아래 명령을 실행합니다.
 
@@ -96,6 +96,8 @@ FASTQ를 넣지 않습니다. CDR3 조각만으로 전체 VHH를 대체할 수 �
 
 웹 화면에서는 **모드 선택 → 서열/구조 입력 → 조건 설정 → 입력 검토 → 실행** 순서입니다.
 FASTA 파일은 `>이름` 줄 다음에 아미노산 서열을 적는 텍스트 파일입니다.
+이름은 다른 후보와 구분되게 적고 `=`·`+`·`-`·`@`로 시작하지 않게 합니다.
+이 형식은 입력 검토에서 확인합니다.
 [예제 FASTA와 JSON](examples/tutorial/README.md)을 먼저 확인하세요.
 
 ## 5. 공개 예제로 따라 하기

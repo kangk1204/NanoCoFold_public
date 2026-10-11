@@ -371,6 +371,9 @@ def _validate_scalar_shapes(cfg):
                 if value < 0 and path not in signed and not path.startswith("rank.weights."):
                     raise ValueError(f"{path}는 0 이상이어야 합니다.")
     visit(defaults, cfg)
+    preset = cfg_get(cfg, "run.analysis_preset")
+    if preset is not None and not isinstance(preset, str):
+        raise ValueError("run.analysis_preset은 문자열 또는 null이어야 합니다.")
     chain = cfg_get(cfg, "target.chain")
     if chain is not None and (not isinstance(chain, str) or not chain.strip()):
         raise ValueError("target.chain은 체인 이름 문자열이어야 합니다. YAML에서 NO 같은 이름은 따옴표로 감싸세요.")

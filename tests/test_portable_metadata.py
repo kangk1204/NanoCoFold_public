@@ -6,6 +6,7 @@ import hashlib
 import json
 import random
 import struct
+from pathlib import Path
 
 import pytest
 
@@ -118,4 +119,81 @@ def test_cloud_diagnostics_keeps_typed_array_and_custom_path_context():
     original = copy.deepcopy(value)
     result = public_diagnostics(value)
     assert result == {"pae": entry, "path": "[local path]"}
+    assert value == original
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("id1,/home/user/run/model.cif,0.5", "id1,[local path],0.5"),
+    ("<td>/home/user/run/model.cif</td>", "<td>[local path]</td>"),
+    ("path `/home/user/run/model.cif`", "path `[local path]`"),
+    ("x;/home/user/run", "x;[local path]"),
+    ("x|/home/user/run", "x|[local path]"),
+    ("경로는/home/user/run 입니다", "경로는[local path] 입니다"),
+    ("/nfs/lab/user/run/model.cif", "[local path]"),
+    ("error at /gpfs/proj/user/x.py", "error at [local path]"),
+    ("file:///home/user/run/report.html", "[local path]"),
+    ("open file://localhost/home/user/run/report.html failed", "open [local path] failed"),
+    ("x,file:///custom-mount/run/report.html,0.5", "x,[local path],0.5"),
+    ("/home/user/run/model.cif: 파일을 찾을 수 없습니다", "[local path]: 파일을 찾을 수 없습니다"),
+    ("/home/user/run/model.cif failed: missing input", "[local path] failed: missing input"),
+])
+def test_audit103_path_contexts_and_error_prose(text, expected):
+    assert portable_metadata(text) == expected
+    from nanocofold.platform.cloud_agent import public_diagnostics
+    assert public_diagnostics({"message": text}) == {"message": expected}
+
+
+def test_audit103_supplied_root_is_recognized_inside_free_text():
+    # A supplied root is evidence even when its mount is outside the root list.
+    root = Path("/custom-mount/run with spaces")
+    value = f'row,{root}/model.cif,0.5; open "{root}/sub folder/model.cif" failed'
+    assert portable_metadata(value, root=root) == 'row,model.cif,0.5; open "sub folder/model.cif" failed'
+    assert portable_metadata(f"{root}/model.cif: 원인 설명", root=root) == "model.cif: 원인 설명"
+    assert portable_metadata(f"row,{root}/../outside.cif,0.5", root=root) == "row,[local path],0.5"
+    assert portable_metadata("row,/custom-mount/other/file.cif,0.5", root=root) == "row,/custom-mount/other/file.cif,0.5"
+
+
+def test_audit103_explicit_path_fields_preserve_error_prose_and_identify_short_drive_paths():
+    assert portable_metadata({"path": "/custom-mount/input.cif: 파일 없음"}) == {"path": "[local path]: 파일 없음"}
+    assert portable_metadata({"path": "C:/run"}) == {"path": "[local path]"}
+
+
+@pytest.mark.parametrize("text", [
+    '{"a":1.50,"b":[1,2]}',
+    ' { "metric": 1.5000e-1, "negative_zero": -0.0, "label": "구조/체인" }\n',
+    '[1.50, 2e-3, "GET /api/results/abc", "chain A:/B interface"]',
+    '{"content":"REMARK /home/user/source.pdb\\nATOM unchanged\\n","smiles":"/C=C/C"}',
+])
+def test_audit103_unchanged_json_strings_preserve_original_bytes(text):
+    assert portable_metadata(text).encode("utf-8") == text.encode("utf-8")
+
+
+def test_audit103_json_path_is_changed_and_scientific_values_are_preserved():
+    text = '{"message":"id1,/home/user/run/model.cif,0.5","metric":1.50,"labels":["구조/체인", "GET /api/results/abc"]}'
+    assert json.loads(portable_metadata(text)) == {
+        "message": "id1,[local path],0.5", "metric": 1.50,
+        "labels": ["구조/체인", "GET /api/results/abc"],
+    }
+
+
+@pytest.mark.parametrize("text", [
+    "chain A:/B interface", "A:/B", "id1,A:/B,0.5", "GET /api/results/abc", "GET /v1/models",
+    "경로/체인 매핑; 구조/예측", "<td>임계값/예측 품질</td>",
+    "path `N[C@@H](C)/C=C/C(=O)O`", "x|F/C=C/F",
+    "https://example.org/home/user/run", "s3://bucket/nfs/lab/file",
+])
+def test_audit103_new_boundaries_preserve_nonpath_scientific_text(text):
+    assert portable_metadata(text) == text
+
+
+def test_audit103_opaque_and_numeric_metadata_survives_path_changes():
+    _, entry = encoded_pae()
+    value = {"message": "경로는/home/user/run 입니다", "pae": entry,
+             "content": "ATOM exact /home/user/source.pdb\n",
+             "smiles": "/home/C=C/C", "integrity": "sha512-/home/data+/value==",
+             "labels": ["구조/체인", "결합/KD/친화도"],
+             "metrics": [None, .123456789012345, 0, -1, 2 ** 63]}
+    original = copy.deepcopy(value)
+    result = portable_metadata(value)
+    assert result == {**original, "message": "경로는[local path] 입니다"}
     assert value == original
