@@ -48,7 +48,7 @@ nav button[aria-current] {
   color: #143b38;
 }
 main {
-  max-width: 1520px;
+  max-width: 1280px;
   margin: auto;
   padding: 24px;
 }
@@ -75,6 +75,10 @@ p {
   margin-bottom: 18px;
   min-width: 0;
 }
+.workflow-steps { display:flex; flex-wrap:wrap; gap:12px; padding:0; list-style:none; margin:16px 0; }
+.workflow-steps li { flex:1 1 200px; padding:12px 16px; border:1px solid #d7e0e5; border-radius:6px; background:#fff; }
+.next-step { padding:12px 16px; background:#edf5f7; border-left:4px solid #3b82b2; overflow-wrap:anywhere; }
+.quickstart select { flex:1 1 260px; min-width:0; }
 .grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -147,8 +151,11 @@ button:disabled {
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
+textarea:focus-visible,
+a:focus-visible,
+[tabindex="0"]:focus-visible,
 summary:focus-visible {
-  outline: 3px solid #e99b24;
+  outline: 3px solid #85601e;
   outline-offset: 2px;
 }
 .check {
@@ -448,3 +455,30 @@ dd {
 :is(.viewer,#structure-view) .msp-plugin .msp-layout-top{height:160px!important}
 :is(.viewer,#structure-view) .msp-plugin .msp-layout-main{top:160px!important}
 :is(.viewer,#structure-view) .msp-plugin .msp-layout-hide-top .msp-layout-main{top:0!important}
+
+/* Wizard controls; MolStar owns its internal layout and typography. */
+body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea{font-size:18px;min-height:48px}button,summary{min-height:48px}input[type=checkbox],input[type=radio]{width:20px;height:20px}.novice-grid{display:block}.novice-footer{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0}.novice-heading:focus{outline:3px solid #e7a845;outline-offset:5px}#novice-complex-copies{display:grid;gap:12px}#novice-blocker{flex-basis:100%;color:#983832}#view-input [hidden]{display:none!important}
+.msp-plugin input,.msp-plugin select{min-height:initial;font-size:initial}.msp-plugin button{min-height:initial}
+
+#view-input p,#view-input label{font-size:18px}#novice-reviewed-summary{padding:16px;background:#edf7f6;margin:16px 0}#novice-review #review-input{margin-bottom:16px}
+
+#structure-source{overflow-wrap:anywhere;word-break:normal}
+
+:focus-visible{outline-color:#85601e}.novice-heading:focus{outline-color:#85601e}header :focus-visible{outline-color:#eca846}
+
+/* One decision per purpose; same labels as the shipped README. */
+.novice-purpose-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.novice-purpose-choice{display:flex;flex-direction:column;gap:10px;text-align:left;min-height:156px;padding:20px;background:#fff;color:#213744;border:1px solid #768e91}
+.novice-purpose-choice strong{font-size:20px}.novice-purpose-choice span{font-size:17px;font-weight:400}.novice-purpose-choice:hover{background:#edf7f5;border-color:#0f766e}
+.novice-purpose-choice:focus-visible{outline:3px solid #0f766e;outline-offset:3px}
+@media(max-width:650px){.novice-purpose-choices{grid-template-columns:1fr}}
+
+/* A completed input keeps its editable canonical text and one explicit replacement action. */
+.alternative-input-status{padding:12px 16px;margin:12px 0;background:#edf7f5;border:1px solid #b8d3ce;border-radius:8px}.alternative-input-status p{margin:0 0 8px}.alternative-input-status button{margin:4px 8px 0 0}
+
+/* Keep alternative inputs out of flex layouts when explicitly hidden. */
+#structure-file-option[hidden],#structure-pdb-option[hidden],.alternative-input-status[hidden]{display:none!important}
+.workflow-steps li[aria-current="step"]{background:#dcefeb;border:2px solid #275f58;font-weight:700}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:0.01ms!important;transition-duration:0.01ms!important}}
+
+.novice-grid fieldset label.check{margin-right:12px;margin-bottom:12px}

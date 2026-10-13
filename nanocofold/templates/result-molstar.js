@@ -37,7 +37,7 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
         if (location) onPick(location);
       });
       await result.display({sequence: false, residues: false});
-      result.fit();
+      await result.fit();
       result.observeResize(host);
       return result;
     } catch (error) { result.dispose(); throw error; }
@@ -48,6 +48,7 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     this.activeLayers = {target: true, binder: true, context: true};
     this.displayOptions = {sequence: false, residues: false};
     this.residuesCreated = false;
+    this.cameraFocusLabels = null;
   }
   async load(content, format, label) {
     const plugin = this.viewer.plugin;
@@ -139,8 +140,9 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
       const plugin = this.viewer.plugin, loci = this.loci(labels);
       plugin.managers.interactivity.lociSelects.deselectAll();
       plugin.managers.interactivity.lociSelects.select({loci});
-      plugin.managers.camera.focusLoci(loci);
-      this.selectedLabels = labels;
+      plugin.managers.camera.focusLoci(loci, window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? {durationMs:0} : undefined);
+      this.selectedLabels = [...labels];
+      this.cameraFocusLabels = [...labels];
     });
   }
   distance(a, b, atomA = "CA", atomB = "CA") {
@@ -167,7 +169,12 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
       ? this.data.residue_mapping?.find(r => r.output_chain === chain && Number(r.output_position) === index + 1) : null;
     return {label, chain, number, icode, mapping};
   }
-  fit() { if (!this.disposed) this.viewer.plugin.managers.camera.reset(); }
+  fit() {
+    return this.enqueue(() => {
+      this.cameraFocusLabels = null;
+      this.viewer.plugin.managers.camera.reset(undefined, 0);
+    });
+  }
   observeResize(host) {
     if (typeof ResizeObserver === "undefined") return;
     this.resizeObserver = new ResizeObserver(() => {
@@ -186,8 +193,8 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
           return;
         }
         const camera = this.viewer.plugin.managers.camera;
-        if (this.selectedLabels?.length)
-          camera.focusLoci(this.loci(this.selectedLabels), {durationMs: 0});
+        if (this.cameraFocusLabels?.length)
+          camera.focusLoci(this.loci(this.cameraFocusLabels), {durationMs: 0});
         else camera.reset(undefined, 0);
       };
       this.resizeFrame = requestAnimationFrame(fitWhenReady);

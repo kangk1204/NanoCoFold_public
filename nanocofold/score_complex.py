@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import hashlib
 import math
+import re
 import shutil
 import subprocess
 import sys
@@ -24,13 +25,26 @@ class PredictionFiles:
     confidence_json: Path | None = None
     pae_npz: Path | None = None
     source: str = "generic"
+    sample_index: int | None = None
+    retained_sample_count: int = 1
+    sample_selection: str = "explicit_structure_file"
 
 
 def find_prediction_files(path: str | Path, name: str | None = None, *, model_index: int | None = None) -> PredictionFiles:
     """Chai-1 / Boltz-2 / 일반 cif 출력에서 구조·점수 파일을 찾는다."""
     path = Path(path)
+    if model_index is not None:
+        if isinstance(model_index, (bool, np.bool_)) or not isinstance(model_index, (int, np.integer)) or model_index < 0:
+            raise ValueError("모델 번호는 0 이상의 정수여야 합니다.")
+        model_index = int(model_index)
     if path.is_file() and path.suffix.lower() in {".cif", ".pdb"}:
-        return PredictionFiles(path, source="generic")
+        match = re.search(r"(?:pred\.model_idx_|_model_)(\d+)$", path.stem)
+        sample_index = int(match.group(1)) if match else None
+        if model_index is not None and sample_index != model_index:
+            raise ValueError("요청한 모델 번호와 구조 파일의 모델 번호가 일치하지 않거나 확인할 수 없습니다. "
+                             "해당 모델 파일을 지정하거나 모델 번호 설정을 제거하세요.")
+        return PredictionFiles(path, source="generic", sample_index=sample_index,
+                               sample_selection="explicit_model_index" if model_index is not None else "explicit_structure_file")
     if not path.is_dir():
         raise FileNotFoundError(path)
 
@@ -39,11 +53,14 @@ def find_prediction_files(path: str | Path, name: str | None = None, *, model_in
         cif_candidates = sorted(path.glob("*.pdb"))
     if not cif_candidates:
         raise FileNotFoundError(f"cif/pdb 파일을 찾을 수 없습니다: {path}")
+    retained_sample_count = len(cif_candidates)
     if model_index is not None:
         cif_candidates = [p for p in cif_candidates if p.stem.endswith(f"_model_{model_index}") or p.stem == f"pred.model_idx_{model_index}"]
         if not cif_candidates:
             raise FileNotFoundError(f"model {model_index} 출력이 없습니다: {path}")
     cif = cif_candidates[0]
+    sample_index = int(cif.stem.rsplit("_", 1)[-1]) if cif.stem.rsplit("_", 1)[-1].isdigit() else None
+    sample_selection = "explicit_model_index" if model_index is not None else "first_retained_model"
 
     if cif.name.startswith("pred.model_idx_"):
         idx = cif.stem.split("_")[-1]
@@ -55,7 +72,8 @@ def find_prediction_files(path: str | Path, name: str | None = None, *, model_in
             cif,
             scores_npz=npz if npz.exists() else None,
             pae_npz=extra if extra.exists() else None,
-            source="chai1",
+            source="chai1", sample_index=sample_index, retained_sample_count=retained_sample_count,
+            sample_selection=sample_selection,
         )
 
     confidence = path / f"confidence_{cif.stem}.json"
@@ -65,6 +83,7 @@ def find_prediction_files(path: str | Path, name: str | None = None, *, model_in
         confidence_json=confidence if confidence.exists() else None,
         pae_npz=pae if pae.exists() else None,
         source="opendde" if cif.name.startswith("opendde_model_") else "colabfold" if cif.name.startswith("colabfold_model_") else "boltz2",
+        sample_index=sample_index, retained_sample_count=retained_sample_count, sample_selection=sample_selection,
     )
 
 
@@ -247,6 +266,11 @@ def ipsae_d0dom_from_pae(
 
 
 def interface_pae(pae: np.ndarray, index_map: dict[str, int], contacts: list[dict], cutoff: float = 10.0) -> float:
+    """Mean bidirectional PAE over geometric contacts, including high-PAE pairs.
+
+    ``cutoff`` is retained for legacy call compatibility and is not a PAE filter.
+    Removing high PAE pairs here would conceal low-confidence interfaces.
+    """
     values: list[float] = []
     for contact in contacts:
         i = index_map.get(contact["a"])
@@ -282,19 +306,24 @@ def interface_pae_summary(pae, index_map, contacts) -> dict:
 
 def pdockq2_from_structure(structure, target_chain, binder_chain, plddt, pae, index_map,
                           cutoff=8.0) -> dict:
-    """Zhu et al. 2023 author-code CA8/contact-weighted per-chain pDockQ2.
+    """Zhu et al. 2023 CA8/contact-weighted formula for the selected chain pair.
 
     https://gitlab.com/ElofssonLab/afm-benchmark/-/blob/main/src/pdockq2.py
     ``plddt`` must contain CA-atom confidence (not the residue atom mean).
     Each directional score uses that chain's contact-pair-weighted pLDDT
     (0..100) and mean(1/(1+(directional PAE/10Å)^2)). The conservative
-    two-chain summary is the minimum, without refitting or clipping.
+    pair summary is our conservative minimum, without refitting or clipping.
+    The author script aggregates each chain against all contacting partners;
+    this selected-pair result excludes auxiliary chains. It is not the
+    CB/unique-interface variant in the pinned ipSAE auxiliary implementation.
     Calibration is AlphaFold-Multimer; other engines are exploratory.
     Missing confidence or absent interface is unassessed, not a zero score.
     """
     result = {"pdockq2": float("nan"), "pdockq2_target": float("nan"),
               "pdockq2_binder": float("nan"), "pdockq2_n_contacts": 0,
               "pdockq2_method": PDOCKQ2_METHOD,
+              "pdockq2_scope": "selected_target_binder_pair",
+              "pdockq2_summary": "minimum_of_directional_pair_scores; NanoCoFold summary",
               "pdockq2_status": "missing_pae" if pae is None else "no_interface"}
     residues = [list(pdb_io.iter_residues(pdb_io.get_chain(structure, c)))
                 for c in (target_chain, binder_chain)]
@@ -440,7 +469,7 @@ def _normalize_hotspot_requests(hotspots, target_chain: str) -> list[str]:
         if not text:
             continue
         labels.append(text if ":" in text else f"{target_chain}:{text}")
-    return labels
+    return list(dict.fromkeys(labels))
 
 
 def resolve_hotspot_labels(hotspots, target_chain: str, index_map: dict[str, int]) -> list[str]:
@@ -454,6 +483,96 @@ def resolve_hotspot_labels(hotspots, target_chain: str, index_map: dict[str, int
         else:
             labels.append(f"{target_chain}:{text}")
     return [label for label in labels if label in index_map]
+
+
+def _finite_confidence(value) -> float:
+    if isinstance(value, (bool, np.bool_)) or value is None:
+        return float("nan")
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return float("nan")
+    return numeric if np.isfinite(numeric) and 0 <= numeric <= 1 else float("nan")
+
+
+def target_binder_iptm(confidence: dict, target_chain: str, binder_chain: str,
+                       chain_ids: list[str], *, source: str = "generic") -> tuple[float, str, str | None]:
+    """Use pair confidence only with the engine's established chain-axis mapping."""
+    values = None
+    pair_source = "unavailable"
+    matrix = confidence.get("pair_chains_iptm")
+    if isinstance(matrix, dict):
+        forward, reverse = matrix.get(target_chain), matrix.get(binder_chain)
+        if isinstance(forward, dict) and isinstance(reverse, dict):
+            values = forward.get(binder_chain), reverse.get(target_chain)
+            pair_source = "pair_chains_iptm_chain_labels_directional_minimum"
+        elif source == "boltz2" and chain_ids == [chr(65 + i) for i in range(len(chain_ids))]:
+            # Boltz confidence JSON uses zero-based asym indices; the adapter
+            # validates output chain/sequence order against this canonical input.
+            a, b = str(chain_ids.index(target_chain)), str(chain_ids.index(binder_chain))
+            forward, reverse = matrix.get(a), matrix.get(b)
+            if isinstance(forward, dict) and isinstance(reverse, dict):
+                values = forward.get(b), reverse.get(a)
+                pair_source = "boltz2_zero_based_asym_pair_directional_minimum"
+    axis = confidence.get("chain_axis")
+    ids = axis.get("chain_ids") if isinstance(axis, dict) else axis
+    if values is None and isinstance(ids, list) and all(isinstance(i, str) for i in ids):
+        if len(ids) == len(chain_ids) and len(set(ids)) == len(ids) and set(ids) == set(chain_ids):
+            key = "per_chain_pair_iptm" if isinstance(axis, dict) else "chain_pair_iptm"
+            if isinstance(axis, dict) or (source == "opendde" and confidence.get("engine") == "opendde"):
+                try:
+                    pairs = np.asarray(confidence.get(key), dtype=float)
+                    if pairs.ndim == 3 and pairs.shape[0] == 1:
+                        pairs = pairs[0]
+                    if pairs.shape == (len(ids), len(ids)):
+                        a, b = ids.index(target_chain), ids.index(binder_chain)
+                        values = pairs[a, b], pairs[b, a]
+                        pair_source = ("chai1_native_axis_pair_directional_minimum" if isinstance(axis, dict)
+                                       else "opendde_verified_axis_pair_directional_minimum")
+                except (ValueError, TypeError):
+                    pass
+    if values is not None:
+        forward, reverse = map(_finite_confidence, values)
+        if np.isfinite(forward) and np.isfinite(reverse):
+            return min(forward, reverse), pair_source, None
+    if len(chain_ids) == 2 and set(chain_ids) == {target_chain, binder_chain}:
+        value = _finite_confidence(confidence.get("iptm", confidence.get("protein_iptm")))
+        return value, "native_global_iptm_two_chain_complex", None if np.isfinite(value) else "native ipTM 미제공 또는 유효하지 않음"
+    return float("nan"), "unavailable", "다중 체인의 표적–결합자 쌍 ipTM 또는 검증된 native 체인 축이 제공되지 않았습니다."
+
+
+def iptm_availability_warnings(cfg: dict, *, target_chain_count: int | None = None) -> list[str]:
+    """Explain a known native-output limitation before VHH inference, without changing gates."""
+    if cfg_get(cfg, "run.mode") == "complex":
+        return []
+    if target_chain_count is None:
+        auxiliary = cfg_get(cfg, "target.aux_chains", []) or []
+        target_chain_count = 1 + len(auxiliary) if isinstance(auxiliary, list) else None
+    if type(target_chain_count) is not int or target_chain_count < 2:
+        return []
+    engines = [str(cfg_get(cfg, "screen.engine", "colabfold")).lower()]
+    if cfg_get(cfg, "screen.comparison.enabled", False):
+        engines = [str(engine).lower() for engine in (cfg_get(cfg, "screen.comparison.engines", []) or [])]
+    if cfg_get(cfg, "screen.cascade.enabled", False):
+        engines.append(str(cfg_get(cfg, "screen.cascade.first_engine", "colabfold")).lower())
+    if "colabfold" not in engines:
+        return []
+    return ["ColabFold의 3체인 이상 예측은 native 표적–VHH 쌍 ipTM을 제공하지 않습니다. "
+            "ipTM을 미평가로 기록하고 ipTM 게이트 및 기록 적격을 통과시키지 않습니다. "
+            "전체 복합체 ipTM(complex_iptm)을 쌍 값으로 대체하지 않습니다. "
+            "쌍 지표를 제공하는 엔진의 독립 결과와 함께 확인하세요."]
+
+
+def iptm_missing_warnings(rows: list[dict]) -> list[str]:
+    """Surface saved unavailable reasons, including report regeneration of older runs."""
+    reasons: dict[str, int] = {}
+    for row in rows:
+        reason = row.get("iptm_unavailable_reason")
+        if isinstance(reason, str) and reason.strip() and not np.isfinite(_finite_confidence(row.get("iptm"))):
+            reasons[reason] = reasons.get(reason, 0) + 1
+    return [f"표적–VHH 쌍 ipTM 미평가 {count}개 모델: {reason} "
+            "전체 복합체 ipTM은 이 게이트의 대체값이 아닙니다."
+            for reason, count in reasons.items()]
 
 
 def score_complex(
@@ -535,6 +654,10 @@ def score_complex(
     if pae is not None:
         validate_pae(pae, len(labels))
     confidence = load_confidence(pred)
+    pair_iptm, pair_iptm_source, pair_iptm_reason = target_binder_iptm(
+        confidence, target_chain, binder_chain,
+        [chain.id for chain in next(structure.get_models()) if any(pdb_io.iter_residues(chain))],
+        source=pred.source)
 
     hotspot_labels = resolve_hotspot_labels(hotspots, target_chain, index_map)
     hotspot_min_dist: dict[str, float] = {}
@@ -580,8 +703,27 @@ def score_complex(
         "n_context_clashes": context_clashes,
         "interface_plddt": interface_plddt,
         "binder_plddt": float(np.mean([plddt[l] for l in plddt if l.startswith(binder_chain + ":")])) if plddt else float("nan"),
-        "iptm": float(confidence.get("iptm", confidence.get("protein_iptm", float("nan")))),
-        "ptm": float(confidence.get("ptm", float("nan"))),
+        "iptm": pair_iptm,
+        "iptm_source": pair_iptm_source,
+        "iptm_unavailable_reason": pair_iptm_reason,
+        "iptm_scope": "selected_target_binder_pair",
+        "iptm_chain_a": target_chain,
+        "iptm_chain_b": binder_chain,
+        "iptm_aggregation": ("native_global_two_chain_equivalent" if pair_iptm_source == "native_global_iptm_two_chain_complex"
+                             else "minimum_native_directional_pair" if pair_iptm_reason is None else "not_assessed"),
+        "ipsae_scope": "selected_chain_pair",
+        "ipsae_chain_a": target_chain,
+        "ipsae_chain_b": binder_chain,
+        "ipsae_aggregation": "max_of_directional_pair_ipsae",
+        "complex_iptm": _finite_confidence(confidence.get("iptm", confidence.get("protein_iptm"))),
+        "ptm": _finite_confidence(confidence.get("ptm")),
+        "prediction_sample_index": pred.sample_index,
+        "prediction_retained_sample_count": pred.retained_sample_count,
+        "prediction_sample_selection": pred.sample_selection,
+        "prediction_sample_note": (f"예측 샘플 {pred.retained_sample_count}개가 보존되어 있으며 이 행은 "
+                                   f"{'샘플 ' + str(pred.sample_index) if pred.sample_index is not None else '선택한 구조'}만 "
+                                   "채점합니다. 다른 샘플은 이 행의 평가에 포함하지 않았습니다."
+                                   if pred.retained_sample_count > 1 else None),
         "confidence_summary_precision": "unrounded_float64",
         "hotspot_contact_frac": hotspot_contact_frac,
         "n_hotspots": len(hotspot_min_dist),

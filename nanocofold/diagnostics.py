@@ -17,6 +17,7 @@ from io import StringIO
 from pathlib import Path
 from typing import Any
 
+from . import __version__
 from .config import PROJECT_ROOT, cfg_get, resolve_path
 from .startup_limits import READINESS_TIMEOUT_SECONDS
 
@@ -75,7 +76,7 @@ def doctor(cfg: dict, smoke: bool = False) -> dict:
         checks.append(_check("smoke", bool(smoke_report.get("ok")), True, smoke_report.get("stage", "smoke"), smoke_report))
 
     ok = all(check.get("ok") for check in checks if check.get("required", False))
-    return _jsonable({"ok": ok, "checks": checks, "engines": engines, "evidence": evidence})
+    return _jsonable({"application_version": __version__, "ok": ok, "checks": checks, "engines": engines, "evidence": evidence})
 
 
 def runtime_provenance(cfg: dict) -> dict:
@@ -112,7 +113,9 @@ def runtime_provenance(cfg: dict) -> dict:
 
 def _mode_engines(cfg: dict, mode: str) -> list[str]:
     if mode == "complex":
-        return [str(cfg_get(cfg, "complex.engine", "boltz2"))]
+        from .complex import validate_settings
+        options = validate_settings(cfg_get(cfg, "complex", {}))
+        return options.get("comparison_engines", [options.get("engine", "boltz2")])
     engines: list[str] = []
 
     provider = str(cfg_get(cfg, "structure.provider", "none")).lower()
@@ -321,7 +324,7 @@ def _colabfold_msa_check(cfg):
                     "endpoint": "https://api.colabfold.com", "explicit_sequence_upload_authorized": True,
                     "search_deferred": True,
                     "note": "Preflight performs no network request. Exact target/generated queries are validated and uploaded before prediction."}
-        if cfg_get(cfg, "screen.comparison.enabled", False) and cfg_get(cfg, "screen.colabfold.msa_source") == "local_mmseqs2":
+        if (cfg_get(cfg, "screen.comparison.enabled", False) or cfg_get(cfg, "complex.comparison_engines")) and cfg_get(cfg, "screen.colabfold.msa_source") == "local_mmseqs2":
             from .colabfold_msa_local import SSHTransport, DEFAULT_MIN_FREE_BYTES
             readiness = SSHTransport().call("probe", threads=8, min_free_bytes=DEFAULT_MIN_FREE_BYTES)
             status = readiness.get("status")

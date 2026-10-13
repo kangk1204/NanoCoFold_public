@@ -51,22 +51,26 @@ def test_cpu_workflow_preserves_mock_boundaries_and_delivers_report(tmp_path, mo
     expected_code = 1 if mode == 'complex' else 0
     assert result.returncode == expected_code, result.stderr[-6000:] + result.stdout[-3000:]
     if mode == 'complex':
-        assert '일반 복합체는 합성 좌표를 생성하지 않습니다' in result.stdout
+        assert '일반 복합체는 합성 좌표를 생성하지 않습니다' in result.stdout + result.stderr
     roots = list((tmp_path / 'runs').glob('*/run_state.json'))
     assert len(roots) == 1
     run = roots[0].parent
     state = json.loads(roots[0].read_text())
     assert state['execution']['state'] == ('failed' if mode == 'complex' else 'complete')
     if mode == 'complex':
-        rows = json.loads(next(run.rglob('complex_results.json')).read_text())['rows']
-        assert rows and all(row['evaluated'] is False for row in rows)
-        assert not list(run.rglob('model.pdb'))
+        assert not list(run.rglob('complex_results.json'))
+        assert not list(run.rglob('*.pdb')) and not list(run.rglob('*.cif'))
     summary = ResultReader(run).summary()
     # General complexes reject simulation, so they contain no mock model.
     assert summary['mock'] is (mode != 'complex')
     assert summary['complete'] is (mode != 'complex')
     assert summary['mode'] == mode
     archives = list(run.rglob('report_delivery.zip'))
+    if mode == 'complex':
+        # Unsupported mock computation records a failure; it cannot publish a
+        # completed native ledger or a delivery archive implying model results.
+        assert not archives
+        return
     assert len(archives) == 1
     with zipfile.ZipFile(archives[0]) as archive:
         assert archive.testzip() is None

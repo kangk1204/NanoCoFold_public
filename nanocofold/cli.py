@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import contextvars
 import json
 import math
 import subprocess
 import sys
 from pathlib import Path
+from . import __version__
 
 from .console_progress import ConsoleProgress, batch_detail, elapsed_text
 
@@ -23,12 +26,49 @@ from .state import RunState
 from .utils import msa as msa_utils, pdb_io, seq as seq_utils, shell
 from .utils.misc import format_seconds
 
+_PLATFORM_COMPUTATION_ORIGIN = contextvars.ContextVar("nanocofold_platform_computation_origin", default=None)
+
+
+@contextlib.contextmanager
+def new_platform_computation(job: dict):
+    """Bind a registered fresh worker without exposing a user-settable CLI/version option."""
+    origin = None
+    if (job.get("kind") == "analysis" and job.get("resume") is False and job.get("history") == []
+            and not job.get("reused_result_id") and not job.get("reused")
+            and isinstance(job.get("id"), str) and job["id"] and job.get("run_dir")):
+        root = Path(job["run_dir"]).resolve()
+        if root.name == job["id"]:
+            origin = {"kind": "fresh_platform_job", "job_id": job["id"], "run_dir": root}
+    token = _PLATFORM_COMPUTATION_ORIGIN.set(origin)
+    try:
+        yield
+    finally:
+        _PLATFORM_COMPUTATION_ORIGIN.reset(token)
+
+
+def _fresh_computation_origin(run_dir: Path, state: RunState, args, new: bool, had_config: bool) -> dict | None:
+    """An input-only directory is fresh only with an explicit new-worker identity."""
+    if (not new or getattr(args, "command", None) not in {"run", "complex", "design", "screen", "mature", "prepare"}
+            or getattr(args, "_existing_run_requested", bool(getattr(args, "run_dir", None)))
+            or state.path.exists()):
+        return None
+    for path in run_dir.iterdir():
+        if path.is_symlink() or path.name not in {"run_config.yaml", ".run.lock"} or not path.is_file():
+            return None
+    origin = _PLATFORM_COMPUTATION_ORIGIN.get()
+    if origin and origin["run_dir"] == run_dir.resolve():
+        return {"kind": origin["kind"], "job_id": origin["job_id"]}
+    if not had_config:
+        return {"kind": "new_cli_computation"}
+    return None
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="nanocofold",
         description="타깃+핫스팟 조건 나노바디 설계/스크리닝/성숙 파이프라인 (상업용 라이선스 전용)",
     )
+    parser.add_argument("--version", action="version", version=f"NanoCoFold {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_init = sub.add_parser("init", help="연구자용 작업 공간과 CPU 데모 준비")
@@ -268,6 +308,7 @@ def _execute_command(args) -> int:
     from .state import RunLock
     cfg = _load(args)
     directory = getattr(args, "run_dir", None)
+    args._existing_run_requested = bool(directory)
     if directory:
         run_dir = resolve_path(cfg, directory)
     else:
@@ -468,10 +509,22 @@ def _open_run(cfg: dict, args, new: bool = True) -> tuple[Path, RunState]:
     else:
         run_dir = resolve_run_dir(cfg, run_id=run_id)
         state = RunState(run_dir)
-    if new and not (run_dir / "run_config.yaml").exists():
+    had_config = (run_dir / "run_config.yaml").exists()
+    origin = _fresh_computation_origin(run_dir, state, args, new, had_config)
+    if new and not had_config:
         dump_resolved(cfg, run_dir / "run_config.yaml")
         state.data["run_id"] = run_dir.name
         state.data["mode"] = cfg["run"]["mode"]
+        if origin:
+            state.data["application_version"] = __version__
+            state.data["application_version_source"] = origin
+        state.save()
+    elif origin:
+        # A registered new platform job may have prepared its config before CLI
+        # ownership began. Existing states, archives and explicit resumes never
+        # qualify, so this does not relabel previously computed predictions.
+        state.data.update(run_id=run_dir.name, mode=cfg["run"]["mode"], application_version=__version__,
+                          application_version_source=origin)
         state.save()
     return run_dir, state
 
@@ -733,7 +786,7 @@ def _predictions_columns(frame: pd.DataFrame, id_column: str) -> pd.DataFrame:
     if id_column not in frame.columns:
         frame = frame.copy()
         frame[id_column] = pd.Series(dtype="object")
-    keep = [id_column] + [c for c in ("pred_dir", "engine", "target_chain", "binder_chain") if c in frame.columns]
+    keep = [id_column] + [c for c in ("pred_dir", "engine", "target_chain", "binder_chain", "model_index") if c in frame.columns]
     return frame[keep].copy()
 
 
@@ -752,7 +805,13 @@ def _score_candidates(cfg: dict, pred_frame: pd.DataFrame, target: dict, id_colu
             continue
         try:
             if pred_dir.is_dir() or pred_dir.is_file():
-                pred = scorer.find_prediction_files(pred_dir)
+                raw_model_index = row.get("model_index")
+                model_index = None
+                if raw_model_index is not None and not pd.isna(raw_model_index):
+                    if isinstance(raw_model_index, bool) or float(raw_model_index) != int(raw_model_index) or int(raw_model_index) < 0:
+                        raise ValueError("모델 번호는 0 이상의 정수여야 합니다.")
+                    model_index = int(raw_model_index)
+                pred = scorer.find_prediction_files(pred_dir, model_index=model_index)
             else:
                 matches = sorted(pred_dir.parent.glob(f"{candidate_id}*.pdb")) if pred_dir.parent.exists() else []
                 if not matches:
@@ -1005,6 +1064,7 @@ def _finalize(
         "tables_committed": False, "exports_status": "not_started", "report_status": "blocked",
         "delivery_status": "blocked", "report": None, "synthesis": None, "handoff_gate": None})
     metrics = _score_candidates(cfg, candidates, target, id_column)
+    state.add_warnings(scorer.iptm_missing_warnings(metrics.to_dict("records")))
     merged = candidates.merge(metrics, on=id_column, how="left", suffixes=("", "_score"))
     merged = merged.loc[:, ~merged.columns.duplicated()]
     if "error_score" in merged.columns:
@@ -1164,7 +1224,7 @@ def _finalize(
     if n_eligible == 0:
         state.add_warnings(
             "final_eligible 후보가 0종입니다. "
-            + ("rank.fallback_to_ineligible=true 로 부적격 후보를 포함합니다." if fallback
+            + ("rank.fallback_to_ineligible=true는 종합점수가 있는 부적격 후보만 포함하며 미평가 보류 후보에는 적용되지 않습니다." if fallback
                else "합성 목록은 비어 있습니다. 임계값/예측 품질을 점검하세요.")
         )
     from . import engine_comparison
@@ -1181,9 +1241,14 @@ def _finalize(
             pre_ranked=True,
         )
         scored_sorted = ranked.reset_index(drop=True)
+    state.add_warnings(rank_select.ranking_warnings(scored_sorted, cfg))
     for frame in (scored_sorted, selected):
         if "cif_path" in frame.columns:
             frame["cif_path"] = frame["cif_path"].map(lambda value: _portable_run_artifact(run_dir, value))
+    # Commit the configuration that actually produced these tables even when
+    # a later derived export fails. Report-only recovery must never replace it.
+    dump_resolved(cfg, run_dir / "run_config.yaml")
+    state.data["scoring_version"] = __version__
     write_csv(score_dir / "scored_candidates.csv", scored_sorted, root=run_dir)
     write_csv(final_dir / "selected_candidates.csv", selected, root=run_dir)
     pose_receipt["source_csv_sha256"] = provenance.file_digest(score_dir / "scored_candidates.csv")
@@ -1194,10 +1259,22 @@ def _finalize(
                     "tables_committed": True, "exports_status": "pending", "report_status": "pending",
                     "report": None, "synthesis": None, "n_selected": int(len(selected)),
                     "previous_publication": previous_publication, "table_sha256": table_hashes(run_dir)}
+    final_record["ranking_policy_status"] = "pending"
     state.set_phase("final", final_record)
     try:
+        applied_ranking_policy = rank_select.ranking_policy(cfg, frame=scored_sorted)
+        write_json(score_dir / "ranking_policy.json", applied_ranking_policy, root=run_dir)
+        final_record["ranking_policy_status"] = "complete"
+        state.set_phase("final", final_record)
+        if applied_ranking_policy["cross_engine_scores_combined"]:
+            state.add_warnings("일부 후보만 Boltz-2로 재평가하는 기존 경로에서 여러 엔진의 관측을 함께 정규화했습니다. "
+                               "이 순위는 엔진 간 독립 비교가 아닙니다. 독립 비교는 screen.comparison.enabled=true로 실행하세요.")
         exports = _final_exports(cfg, run_dir, state, scored_sorted, selected, id_column, sequence_column)
     except Exception as exc:
+        if final_record["ranking_policy_status"] == "pending":
+            final_record["ranking_policy_status"] = "failed"
+            state.add_warnings("순위 정책 영수증을 저장하지 못했습니다. 계산 CSV와 설정은 보존했으며, "
+                               "이전 ranking_policy.json이 남아 있어도 새 표의 정책으로 확정하지 않습니다.")
         final_record.update(exports_status="failed", exports_error=f"{type(exc).__name__}: {exc}")
         state.set_phase("final", final_record)
         raise
@@ -1249,12 +1326,7 @@ def _finalize(
 def _final_exports(cfg, run_dir, state, scored_sorted, selected, id_column="design_id", sequence_column="sequence"):
     """Recover derived exports from committed tables, without scoring or inference."""
     from . import engine_comparison
-    score_dir, final_dir = run_dir / "03_score", run_dir / "05_final"
-    applied_ranking_policy = rank_select.ranking_policy(cfg, frame=scored_sorted)
-    if applied_ranking_policy["cross_engine_scores_combined"]:
-        state.add_warnings("일부 후보만 Boltz-2로 재평가하는 기존 경로에서 여러 엔진의 관측을 함께 정규화했습니다. "
-                           "이 순위는 엔진 간 독립 비교가 아닙니다. 독립 비교는 screen.comparison.enabled=true로 실행하세요.")
-    write_json(score_dir / "ranking_policy.json", applied_ranking_policy, root=run_dir)
+    final_dir = run_dir / "05_final"
 
     if engine_comparison.enabled(cfg):
         synthesis = engine_comparison.write_synthesis_by_engine(selected, cfg, final_dir, sequence_column)
@@ -1278,9 +1350,8 @@ def _final_exports(cfg, run_dir, state, scored_sorted, selected, id_column="desi
             )
 
     # 발주 목록을 만드는 모든 경로에서 handoff 게이트를 평가한다(수동 명령에만 의존하지 않음).
-    # 게이트는 저장된 run_config.yaml 을 읽으므로, 이번에 실제로 사용한 설정을 먼저 반영한다
-    # (score 재실행의 --set 오버라이드가 무시되어 거짓 통과/실패가 나오지 않도록).
-    dump_resolved(cfg, run_dir / "run_config.yaml")
+    # The computation commits run_config.yaml with the score tables. Derived
+    # export recovery reads that receipt and cannot introduce report-time gates.
     gate = handoff.validate_handoff(run_dir)
     gate_summary = {"ok": bool(gate.get("ok")), "n_errors": len(gate.get("errors", [])),
                     "n_warnings": len(gate.get("warnings", []))}
@@ -1445,7 +1516,7 @@ def _tier2_and_finalize(
         predictions = pd.concat([predictions, boltz_predictions], ignore_index=True)
         predictions = predictions.drop_duplicates(subset=[id_column], keep="last")
 
-    final_candidates = candidates.drop(columns=[c for c in ("pred_dir", "engine", "target_chain", "binder_chain") if c in candidates.columns])
+    final_candidates = candidates.drop(columns=[c for c in ("pred_dir", "engine", "target_chain", "binder_chain", "model_index") if c in candidates.columns])
     final_candidates = final_candidates.merge(
         _predictions_columns(predictions, id_column),
         on=id_column,
@@ -1825,6 +1896,16 @@ def cmd_report(args) -> int:
         return cmd_score(args)
     cfg = _load(args)
     run_dir, state = _open_run(cfg, args, new=False)
+    saved_config = run_dir / "run_config.yaml"
+    if saved_config.is_file():
+        from .config import read_config_yaml
+        saved_cfg = read_config_yaml(saved_config.read_text(encoding="utf-8"))
+        if not isinstance(saved_cfg, dict) or not saved_cfg:
+            raise ValueError("계산 당시 run_config.yaml이 손상되었습니다. 원본 설정을 복구하세요.")
+        report_options = cfg.get("report", {})
+        cfg.clear()
+        cfg.update(saved_cfg)
+        cfg["report"] = report_options
     execution = state.data.get("report_source_execution")
     if execution is None:
         current = state.data.get("execution", {})
@@ -1858,7 +1939,17 @@ def cmd_report(args) -> int:
     if ("tables_committed" in final or "table_sha256" in final) and not tables_available(run_dir, final):
         raise ValueError("최신 계산 표가 확정되지 않았거나 해시가 다릅니다. 이전 표로 보고서를 재발행하지 않았습니다.")
     if final.get("exports_status") in {"pending", "failed"}:
-        exports = _final_exports(cfg, run_dir, state, scored, selected)
+        from .config import read_config_yaml
+        saved_path = run_dir / "run_config.yaml"
+        if not saved_path.is_file():
+            raise ValueError("내보내기 복구에는 계산 당시 run_config.yaml이 필요합니다. 보고서 설정으로 게이트 기준을 추정하지 않습니다.")
+        export_cfg = read_config_yaml(saved_path.read_text(encoding="utf-8"))
+        if not isinstance(export_cfg, dict) or not export_cfg:
+            raise ValueError("계산 당시 run_config.yaml이 손상되었습니다. 원본 설정을 복구한 뒤 내보내기를 다시 생성하세요.")
+        # Renderer/PyMOL options may be changed to recover an export, while all
+        # scientific, ranking, synthesis and handoff settings stay recorded.
+        export_cfg["report"] = cfg.get("report", {})
+        exports = _final_exports(export_cfg, run_dir, state, scored, selected)
         final.update(exports_status="complete", synthesis=exports["synthesis"], handoff_gate=exports["handoff_gate"])
         final.pop("exports_error", None)
         state.set_phase("final", final)
@@ -1877,10 +1968,13 @@ def cmd_report(args) -> int:
         "synthesis": final.get("synthesis"),
     }
     policy_path = run_dir / "03_score" / "ranking_policy.json"
-    if not policy_path.exists():
+    failed_policy = final.get("ranking_policy_status") in {"pending", "failed"}
+    if not policy_path.exists() or failed_policy:
         # A report command does not rerank. Current defaults cannot recover a
         # missing historical normalization/selection policy from old CSVs.
         policy_path.parent.mkdir(parents=True, exist_ok=True)
+        if failed_policy and policy_path.exists():
+            provenance.archive_existing([policy_path], policy_path.parent)
         write_json(policy_path, {
             "schema_version": 1, "method": "historical_policy_not_recorded",
             "recorded_by": "report_regeneration_without_reranking",
@@ -1889,6 +1983,11 @@ def cmd_report(args) -> int:
             "historical_normalization_scope": "unknown",
             "calibrated_binding_probability": False,
         }, root=run_dir)
+        state.add_warnings("적용 순위 정책은 미기록입니다. 현재 기본값으로 과거 정책을 추정하거나 "
+                           "점수·선별을 다시 계산하지 않았습니다. 이전 정책 파일이 있으면 history에 보존합니다.")
+        final["ranking_policy_status"] = "not_recorded"
+        state.set_phase("final", final)
+        context["warnings"] = state.warnings
     final_record = dict(state.get_phase("final"))
     final_record.update(report_status="pending", report=None)
     final_record.pop("report_error", None)

@@ -50,6 +50,7 @@ def parse_hotspot_spec(spec, default_chain: str = "A") -> list[dict]:
 
 
 def hotspot_spec_labels(entries: list[dict]) -> list[str]:
+    """Render labels only; this compatibility helper does not resolve pdb/seq axes."""
     return [f"{entry['chain']}:{entry['number']}" for entry in entries]
 
 
@@ -155,7 +156,9 @@ def auto_hotspot_sets(
         surface = working.nlargest(min(6, len(working)), "relative_sasa").copy()
 
     surface["hydrophobicity_norm"] = surface["kyte_doolittle"].apply(lambda v: (v + 4.5) / 9.0)
-    conservation = surface["conservation"].fillna(surface["conservation"].mean() if surface["conservation"].notna().any() else 0.5)
+    conservation_fill = float(surface["conservation"].mean()) if surface["conservation"].notna().any() else 0.5
+    conservation_missing = int(surface["conservation"].isna().sum())
+    conservation = surface["conservation"].fillna(conservation_fill)
     surface["conservation_norm"] = conservation.clip(0, 1)
     surface["score"] = (
         exposure_weight * surface["relative_sasa"].clip(0, 1)
@@ -168,7 +171,7 @@ def auto_hotspot_sets(
     coords = pdb_io.chain_coords_by_label(chain)
 
     # 반경 기반 patch 클러스터링: 상위 점수 잔기를 seed로 주변 표면 잔기를 묶는다.
-    candidates = list(surface.sort_values("score", ascending=False)["label"])
+    candidates = list(surface.sort_values("score", ascending=False, kind="stable")["label"])
     clusters: list[list[str]] = []
     for seed in candidates:
         if seed not in coords:
@@ -189,7 +192,7 @@ def auto_hotspot_sets(
         available = [label for label in cluster if label not in used]
         if not available:
             continue
-        cluster_scores = info.loc[available, "score"].sort_values(ascending=False)
+        cluster_scores = info.loc[available, "score"].sort_values(ascending=False, kind="stable")
         min_res, max_res = int(residues_range[0]), int(residues_range[1])
         selected = list(cluster_scores.index[: min(max_res, len(cluster_scores))])
         if len(selected) < min_res:
@@ -207,6 +210,21 @@ def auto_hotspot_sets(
         cluster_score = float(cluster_scores.head(len(selected)).mean()) * cluster_penalty * glycan_penalty
         used.update(selected)
         scored.append({
+            "method": "uncalibrated_surface_patch_heuristic_v1",
+            "calibrated_binding_probability": False,
+            "heuristic_parameters": {"exposure_weight": exposure_weight, "hydrophobicity_weight": hydro_weight,
+                                     "conservation_weight": cons_weight, "min_relative_sasa": min_rel_sasa,
+                                     "selected_sasa_multiplier": 1.2, "patch_radius": patch_radius,
+                                     "cluster_size_penalty_start": 10, "cluster_size_penalty_per_residue": 0.05,
+                                     "glycan_distance_angstrom": 8.0, "near_glycan_multiplier": 0.5,
+                                     "conservation_imputation": "surface_population_observed_mean_or_0.5_if_all_missing",
+                                     "conservation_imputation_value": conservation_fill,
+                                     "conservation_imputed_surface_residues": conservation_missing,
+                                     "conservation_population_size": len(surface),
+                                     "residue_tie_break": "stable_recorded_input_residue_order",
+                                     "set_tie_break": "stable_patch_seed_order_after_recorded_score_rounding"},
+            "cluster_size_penalty": cluster_penalty,
+            "cluster_size_penalty_scope": "all patch cluster members; mean score uses selected residues",
             "residues": selected,
             "residues_seq": [int(seq_lookup[label]) for label in selected],
             "score": round(cluster_score, 3),
@@ -266,7 +284,8 @@ def validate_hotspots(
     hydrophobic_count = sum(1 for rec in records if rec.get("kyte_doolittle", 0) and rec["kyte_doolittle"] > 0)
     if len(records) >= 3 and hydrophobic_count < 3:
         warnings.append(
-            f"소수성 잔기가 {hydrophobic_count}개뿐입니다. RFantibody는 소수성 패치(≥3)가 있는 에피토프에서 성공률이 높습니다."
+            f"소수성 잔기가 {hydrophobic_count}개입니다. 자동 핫스팟의 소수성 패치 기준(≥3)은 "
+            "탐색용 휴리스틱이며, 실제 결합이나 설계 성공을 보장하지 않습니다."
         )
     return {"records": records, "warnings": warnings, "hydrophobic_count": hydrophobic_count}
 

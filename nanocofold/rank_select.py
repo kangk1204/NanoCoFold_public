@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from difflib import SequenceMatcher
 
 import numpy as np
 import pandas as pd
@@ -28,9 +27,21 @@ def guess_cdr3(sequence: str, fallback_length: int = 15) -> str:
 
 
 def cdr3_identity(a: str, b: str) -> float:
+    """Symmetric global edit similarity; insertions/deletions count as differences.
+
+    This normalized Levenshtein score is not a calibrated biological distance.
+    """
     if not a or not b:
         return 0.0
-    return SequenceMatcher(None, a, b).ratio()
+    if a == b:
+        return 1.0
+    previous = list(range(len(b) + 1))
+    for i, aa in enumerate(a, 1):
+        current = [i]
+        for j, bb in enumerate(b, 1):
+            current.append(min(current[-1] + 1, previous[j] + 1, previous[j - 1] + (aa != bb)))
+        previous = current
+    return 1.0 - previous[-1] / max(len(a), len(b))
 
 
 def cluster_cdr3(frame: pd.DataFrame, identity: float = 0.85, sequence_column: str = "sequence", cdr_ranges: dict | None = None) -> pd.Series:
@@ -54,16 +65,14 @@ def cluster_cdr3(frame: pd.DataFrame, identity: float = 0.85, sequence_column: s
     clusters: list[str] = []
     representatives: list[str] = []
     cached: dict[str, str] = {}
-    for cdr3 in sequences:
+    for cdr3 in sorted(set(sequences)):
         if cdr3 in cached:
             clusters.append(cached[cdr3])
             continue
         assigned = None
         for index, representative in enumerate(representatives):
-            matcher = SequenceMatcher(None, cdr3, representative)
-            # These are rigorous upper bounds on ratio, not approximations.
-            if (matcher.real_quick_ratio() >= identity and matcher.quick_ratio() >= identity
-                    and matcher.ratio() >= identity):
+            if (min(len(cdr3), len(representative)) / max(1, len(cdr3), len(representative)) >= identity
+                    and cdr3_identity(cdr3, representative) >= identity):
                 assigned = f"cluster_{index + 1:02d}"
                 break
         if assigned is None:
@@ -71,7 +80,7 @@ def cluster_cdr3(frame: pd.DataFrame, identity: float = 0.85, sequence_column: s
             assigned = f"cluster_{len(representatives):02d}"
         clusters.append(assigned)
         cached[cdr3] = assigned
-    return pd.Series(clusters, index=frame.index, name="cluster_id")
+    return pd.Series([cached[s] for s in sequences], index=frame.index, name="cluster_id")
 
 
 def _zscore(series: pd.Series, higher_is_better: bool = True) -> pd.Series:
@@ -93,6 +102,10 @@ def _zscore(series: pd.Series, higher_is_better: bool = True) -> pd.Series:
 
 def composite_score(frame: pd.DataFrame, cfg: dict) -> pd.Series:
     weights = cfg_get(cfg, "rank.weights", {}) or {}
+    original_index = frame.index
+    if weights.get("dev_flags", 0) and "dev_cdr_evaluated" in frame:
+        assessed = frame["dev_cdr_evaluated"].map(lambda value: isinstance(value, (bool, np.bool_)) and bool(value))
+        frame = frame.loc[assessed]
     score = pd.Series(0.0, index=frame.index)
     total = 0.0
     scale = max((abs(float(weight)) for metric, weight in weights.items()
@@ -111,7 +124,9 @@ def composite_score(frame: pd.DataFrame, cfg: dict) -> pd.Series:
         total += magnitude
     if total > 0:
         score = score / total
-    return score.round(4)
+    # Missing CDR-dependent liabilities cannot earn a favorable risk score.
+    # Preserve partial flag counts but hold the combined ranking until assessed.
+    return score.round(4).reindex(original_index)
 
 
 def ranking_policy(cfg: dict, frame: pd.DataFrame | None = None) -> dict:
@@ -127,9 +142,12 @@ def ranking_policy(cfg: dict, frame: pd.DataFrame | None = None) -> dict:
         "method": "mixed_engine_batch_weighted_zscore_legacy" if mixed else "within_engine_batch_weighted_zscore_v1",
         "recorded_prediction_engines": engines,
         "weights": weights,
+        "applied_weights": {k:v for k,v in weights.items() if frame is None or k in frame},
+        "ignored_weights": {k:v for k,v in weights.items() if frame is not None and k not in frame},
+        "cdr3_similarity": "normalized_levenshtein_v2; canonical-sequence-order greedy representatives",
         "normalization": "batch z-score; missing finite values filled with batch median; fewer than two values or constant columns contribute zero",
-        "normalization_population": ("recorded mixed prediction-engine input, including controls; legacy partial-rescore path"
-                                     if mixed else "recorded ranking input in the same prediction engine, including controls"),
+        "normalization_population": ("recorded mixed prediction-engine input, including controls; rows with unassessed CDR liabilities excluded when developability is weighted; legacy partial-rescore path"
+                                     if mixed else "recorded ranking input in the same prediction engine, including controls; rows with unassessed CDR liabilities excluded when developability is weighted"),
         "failed_row_handling": "failed/interrupted prediction rows are preserved with unavailable scores/ranks, excluded before normalization and never selected even under fallback",
         "selection": "filter recorded eligibility and controls, then apply diversity limits without renormalizing",
         "cross_engine_scores_combined": mixed,
@@ -138,8 +156,32 @@ def ranking_policy(cfg: dict, frame: pd.DataFrame | None = None) -> dict:
         "sequence_priors": {key: weight for key, weight in weights.items() if key in {"esm_score", "antifold"}},
         "sequence_prior_interpretation": "sequence/folding plausibility only; no measured affinity labels or binding calibration",
         "developability_gate": "dev_severe: five severe risk flags",
-        "developability_weight": "dev_flags: all evaluated True risk flags; not the severe-only count",
+        "developability_weight": "dev_flags: all evaluated True risk flags; incomplete CDR assessment holds composite_score/rank and selection",
+        "fallback_scope": "recorded ineligible rows with available composite scores only; failed predictions and unassessed weighted CDR liabilities stay held",
     }
+
+
+def ranking_warnings(frame: pd.DataFrame, cfg: dict) -> list[str]:
+    """Explain held rankings while preserving conservative selection and all saved values."""
+    if frame.empty or "composite_score" not in frame:
+        return []
+    held = frame["composite_score"].isna() & ~_failed_prediction_rows(frame)
+    if not held.any():
+        return []
+    cdr_held = (held & frame["dev_cdr_evaluated"].map(
+        lambda value: not (isinstance(value, (bool, np.bool_)) and bool(value)))
+        if "dev_cdr_evaluated" in frame and cfg_get(cfg, "rank.weights.dev_flags", 0)
+        else pd.Series(False, index=frame.index))
+    message = f"종합점수·기록 순위 보류 {int(held.sum())}/{len(frame)}개 모델. "
+    if cdr_held.any():
+        message += (f"이 중 {int(cdr_held.sum())}개는 CDR 개발가능성이 미평가입니다. "
+                    "ANARCI 환경 또는 서열에 맞는 CDR 범위를 확인하세요. ")
+    else:
+        message += "저장된 종합점수가 없어 순위·선별을 추정하지 않습니다. "
+    if cfg_get(cfg, "rank.fallback_to_ineligible", False):
+        message += ("fallback_to_ineligible=true는 종합점수가 있는 부적격 후보에만 적용됩니다. "
+                    "실패 예측이나 가중 CDR 미평가로 보류된 후보는 포함하지 않습니다.")
+    return [message.strip()]
 
 
 def rank_candidates(frame: pd.DataFrame, cfg: dict, cdr_ranges: dict | None = None, sequence_column: str = "sequence") -> pd.DataFrame:
@@ -153,10 +195,15 @@ def rank_candidates(frame: pd.DataFrame, cfg: dict, cdr_ranges: dict | None = No
         )
     failed = _failed_prediction_rows(ranked)
     ranked["composite_score"] = composite_score(ranked.loc[~failed], cfg).reindex(ranked.index)
-    ranked = ranked.sort_values("composite_score", ascending=False, kind="stable").reset_index(drop=True)
+    identifier = next((k for k in ("design_id", "variant_id") if k in ranked), None)
+    columns = ["composite_score"] + ([identifier] if identifier else [])
+    ranked = ranked.sort_values(columns, ascending=[False] + ([True] if identifier else []), kind="stable").reset_index(drop=True)
     ranked["rank"] = ranked.index + 1
     failed = _failed_prediction_rows(ranked)
-    ranked["rank"] = ranked["rank"].astype("Int64").mask(failed)
+    ranked["rank"] = ranked["rank"].astype("Int64").mask(failed | ranked["composite_score"].isna())
+    ranked["ranking_status"] = np.where(ranked["rank"].notna(), "ranked", "held")
+    ranked["ranking_unavailable_reason"] = np.where(failed, "prediction_failed",
+        np.where(ranked["composite_score"].isna(), "weighted_cdr_assessment_unavailable", None))
     return ranked
 
 
@@ -189,8 +236,14 @@ def select_final(
             ranked = ranked.reset_index(drop=True)
     else:
         ranked = rank_candidates(frame, cfg, cdr_ranges, sequence_column)
-    ranked = ranked.loc[~_failed_prediction_rows(ranked)].copy()
     fallback = bool(cfg_get(cfg, "rank.fallback_to_ineligible", False)) if allow_fallback is None else allow_fallback
+    available = ~_failed_prediction_rows(ranked) & ranked["composite_score"].notna()
+    if fallback and not ranked.empty and not available.any():
+        messages = ranking_warnings(ranked, cfg)
+        _warnings.warn(messages[0] if messages else
+            "fallback_to_ineligible=true여도 실패 예측·종합점수 미평가 후보는 선별하지 않습니다.",
+            RuntimeWarning, stacklevel=2)
+    ranked = ranked.loc[available].copy()
     if eligible_column in ranked.columns:
         filtered = ranked[ranked[eligible_column].fillna(False)]
         if filtered.empty and not fallback:

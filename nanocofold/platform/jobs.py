@@ -171,7 +171,7 @@ class JobStore:
             connection.close()
 
     def list(self, *, states=None, limit=None, before=None, before_id=None, cleanup=False) -> list[dict]:
-        from .eta import terminal_eta
+        from .eta import terminal_eta, refresh_complex_job
         clauses, values = [], []
         if states is not None:
             if not states:
@@ -194,15 +194,15 @@ class JobStore:
             query += " LIMIT ?"
             values.append(limit)
         with self.connect() as connection:
-            return [terminal_eta(json.loads(row["payload"])) for row in connection.execute(query, values)]
+            return [terminal_eta(refresh_complex_job(json.loads(row["payload"]))) for row in connection.execute(query, values)]
 
     def get(self, identifier: str) -> dict:
         with self.connect() as connection:
             row = connection.execute("SELECT payload FROM jobs WHERE id=?", (identifier,)).fetchone()
         if row is None:
             raise KeyError("작업이 없습니다.")
-        from .eta import terminal_eta
-        return terminal_eta(json.loads(row["payload"]))
+        from .eta import terminal_eta, refresh_complex_job
+        return terminal_eta(refresh_complex_job(json.loads(row["payload"])))
 
     def submitted(self, identifier: str):
         with self.connect() as connection:
@@ -321,7 +321,6 @@ class JobManager:
     def _create(self, payload: dict, *, kind: str = "analysis", identifier=None, submission_hash=None) -> dict:
         identifier = identifier or uuid.uuid4().hex
         folder = self.store.root / "jobs" / identifier
-        folder.mkdir(parents=True, exist_ok=True)
         cfg = normalized_config(self.workspace, payload.get("config"))
         if payload.get("mode"):
             if payload["mode"] not in {"complex", "design", "screen", "mature"}:
@@ -352,6 +351,7 @@ class JobManager:
         if budget is not None and (isinstance(budget, bool) or not isinstance(budget, (int, float)) or not 0 < budget <= 604800):
             raise ValueError("실행 시간 한도는 0초 초과, 7일 이하여야 합니다.")
         run_dir = self.workspace / "runs" / identifier if kind == "analysis" else None
+        folder.mkdir(parents=True, exist_ok=True)
         manifest = []
         # Store independent input snapshots; never read a changed upload midway through inference.
         for dotted in INPUT_PATHS:
@@ -727,8 +727,10 @@ class JobManager:
                 return {"phase": "resume_validation", "progress": {"completed": None, "total": len(stages)}, "eta": eta}
             completed = set(completed_phases) if execution.get("state") == "running" else set(phases)
             if job["mode"] == "complex":
-                prediction = phases.get("prediction", {})
-                return {"phase": "prediction" if "final" not in completed else "complete", "progress": {"completed": prediction.get("completed_models", 0) if "prediction" in completed else 0, "total": prediction.get("total_models")}, "eta": eta}
+                from .eta import complex_model_observations
+                observation = complex_model_observations(job, state=state)
+                return {"phase": "prediction" if "final" not in completed else "complete",
+                        "progress": observation["progress"], "eta": eta}
             if state.get("current_phase") is not None and not isinstance(state["current_phase"], str):
                 raise ValueError("현재 단계 이름은 문자열이어야 합니다.")
             phase = state.get("current_phase") or next((name for name in stages if name not in completed), "complete")

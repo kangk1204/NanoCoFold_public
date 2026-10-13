@@ -207,6 +207,10 @@ def _prepare_target_impl(
     chain_id = str(cfg_get(cfg, "target.chain", "A"))
     provider = "mock" if mock else str(cfg_get(cfg, "structure.provider", "none")).lower()
     warnings: list[str] = []
+    mapping_qc: dict = {}
+    ambiguity_hint = seq_utils.nucleotide_ambiguity_hint(sequence)
+    if ambiguity_hint:
+        warnings.append(ambiguity_hint)
     aux_chains = _parse_aux_chains(cfg)
     if aux_chains:
         warnings.append(
@@ -220,7 +224,7 @@ def _prepare_target_impl(
         for provided_chain in next(provided_structure.get_models()):
             pdb_io.validate_polymer_residues(provided_chain)
         # Reject incompatible native inputs before MSA requests or inference.
-        _structure_index_maps(provided_pdb, chain_id, sequence)
+        _structure_index_maps(provided_pdb, chain_id, sequence, warnings=warnings, mapping_qc=mapping_qc)
     sequence_only = provider in {"none", "sequence"} and not (provided_pdb and provided_pdb.exists())
 
     if verified_raw is None:
@@ -281,7 +285,8 @@ def _prepare_target_impl(
 
     experimental = provided_pdb is not None
     confidence_metric = "bfactor" if experimental else "plddt"
-    label_to_seq, seq_to_label, seq_positions_map = _structure_index_maps(raw_structure, chain_id, sequence)
+    label_to_seq, seq_to_label, seq_positions_map = _structure_index_maps(
+        raw_structure, chain_id, sequence, warnings=warnings, mapping_qc=mapping_qc)
     table = hotspots_mod.hotspot_table(
         raw_structure,
         chain_id,
@@ -347,6 +352,7 @@ def _prepare_target_impl(
     hotspot_confidence = [confidence.get(label, float("nan")) for label in pdb_labels]
     qc = {
         "sequence_length": len(sequence),
+        "sequence_structure_mapping": mapping_qc,
         "chain_id": chain_id,
         "provider": provider,
         "confidence_metric": confidence_metric,
@@ -407,6 +413,7 @@ def _structure_index_maps(
     structure_path: str | Path,
     chain_id: str,
     input_sequence: str | None = None,
+    *, warnings: list[str] | None = None, mapping_qc: dict | None = None,
 ) -> tuple[dict[str, int], dict[int, str], list[int]]:
     """구조 잔기(PDB 번호) → 입력 서열 위치 매핑.
 
@@ -423,9 +430,16 @@ def _structure_index_maps(
     if input_sequence is not None:
         input_sequence = seq_utils.clean_sequence(input_sequence)
 
+    if mapping_qc is not None:
+        mapping_qc["coverage_definition"] = "input positions aligned to observed standard protein residues; atom completeness is assessed separately"
     label_to_seq: dict[str, int] = {}
     seq_to_label: dict[int, str] = {}
     if input_sequence is None or seq_utils.clean_sequence(input_sequence) == structure_sequence:
+        if mapping_qc is not None:
+            mapping_qc.update(identity=1.0, structure_coverage=1.0, input_coverage=1.0,
+                              mapped_residues=len(labels), partial_input_coverage=False,
+                              input_coordinate_coverage=1.0, unmapped_input_residues=0,
+                              unmapped_input_ranges=[])
         for index, label in enumerate(labels, start=1):
             label_to_seq[label] = index
             seq_to_label[index] = label
@@ -445,8 +459,22 @@ def _structure_index_maps(
                for offset in range(s_end - s_start)]
     identity = sum(structure_sequence[i] == input_sequence[j] for i, j in aligned) / max(1, len(aligned))
     coverage = len(aligned) / max(1, len(structure_sequence))
+    input_coverage = len(aligned) / max(1, len(input_sequence))
+    if mapping_qc is not None:
+        mapping_qc.update(identity=identity, structure_coverage=coverage, input_coverage=input_coverage,
+                          mapped_residues=len(aligned), partial_input_coverage=input_coverage < 1.0,
+                          input_coordinate_coverage=input_coverage,
+                          unmapped_input_residues=len(input_sequence) - len(aligned),
+                          unmapped_input_ranges=_position_ranges(
+                              sorted(set(range(1, len(input_sequence) + 1)) - {j + 1 for _, j in aligned})))
     if identity < 0.9 or coverage < 0.8:
         raise ValueError(f"구조와 입력 서열의 동일성이 부족합니다 (identity={identity:.3f}, 구조 coverage={coverage:.3f}; 최소 0.9/0.8).")
+    if input_coverage < 1.0 and warnings is not None:
+        message = (f"입력 서열의 {input_coverage:.1%}만 제공 구조에 대응합니다 "
+                   f"({len(aligned)}/{len(input_sequence)}잔기). 나머지 {len(input_sequence) - len(aligned)}잔기는 "
+                   "제공 좌표로 평가하지 못합니다. 결손·부분 구조를 확인하세요. 전체 입력 서열은 보존합니다.")
+        if message not in warnings:
+            warnings.append(message)
     seq_positions: list[int] = [0] * len(labels)
     for (s_start, s_end), (q_start, q_end) in zip(alignment.aligned[0], alignment.aligned[1]):
         for offset in range(s_end - s_start):
@@ -460,6 +488,17 @@ def _structure_index_maps(
             "제공 구조와 target.sequence 를 정렬하지 못했습니다. 서열/체인을 확인하세요."
         )
     return label_to_seq, seq_to_label, seq_positions
+
+
+def _position_ranges(positions: list[int]) -> list[list[int]]:
+    """Compact inclusive 1-based ranges for retained mapping diagnostics."""
+    ranges: list[list[int]] = []
+    for position in positions:
+        if ranges and position == ranges[-1][1] + 1:
+            ranges[-1][1] = position
+        else:
+            ranges.append([position, position])
+    return ranges
 
 
 def _validate_target_chain(structure_path: str | Path, chain_id: str, from_provider: bool) -> tuple[str, list[str]]:
@@ -488,6 +527,9 @@ def _resolve_explicit_hotspots(
         chain = entry["chain"]
         kind = entry["kind"]
         number = int(entry["number"])
+        if kind is None and not warnings:
+            warnings.append("접두사 없는 핫스팟 번호는 제공 구조의 PDB 잔기 번호로 해석했습니다. "
+                            "번호 체계를 고정하려면 pdbN 또는 seqN으로 입력하세요.")
         if chain != chain_id:
             raise ValueError(f"핫스팟 체인 '{chain}' 이 타깃 체인 '{chain_id}' 과 다릅니다.")
         if kind == "seq":
@@ -535,6 +577,9 @@ def _prepare_sequence_only(
             "target.pdb / structure.provider(boltz2|chai1)를 설정하세요."
         )
     seq_positions: list[int] = []
+    if any(entry["kind"] is None for entry in explicit_entries):
+        warnings.append("구조가 없어 접두사 없는 핫스팟 번호는 1-based 서열 위치로 해석했습니다. "
+                        "번호 체계를 고정하려면 seqN으로 입력하세요.")
     for entry in explicit_entries:
         chain = entry["chain"]
         kind = entry["kind"]

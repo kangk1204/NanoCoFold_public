@@ -274,9 +274,18 @@ def _validate(cfg: dict) -> None:
     library = cfg_get(cfg, "mature.library", {})
     if not isinstance(library, dict):
         raise ValueError("mature.library는 설정 객체여야 합니다.")
+    limit = library.get("max_variants")
+    if limit is not None and (type(limit) is not int or not 1 <= limit <= 100000):
+        raise ValueError("mature.library.max_variants는 null 또는 1–100000 정수입니다.")
     strategy = library.get("strategy", "dms")
     if not isinstance(strategy, str) or strategy not in {"dms", "random"}:
         raise ValueError("mature.library.strategy는 dms/random 중 하나여야 합니다.")
+    if mode == "mature" and strategy == "dms" and "size" in library:
+        warnings.warn(
+            "mature.library.strategy=dms에서는 mature.library.size를 사용하지 않습니다. "
+            "실제 변이 생성 상한은 mature.library.max_variants로 설정하세요(WT는 별도 포함).",
+            UserWarning, stacklevel=2,
+        )
     if strategy == "random":
         size = library.get("size", 10000)
         minimum, maximum = library.get("min_mutations", 1), library.get("max_mutations", 5)
@@ -329,6 +338,10 @@ def _validate(cfg: dict) -> None:
     identity = cascade.get("diversity_identity", .85)
     if isinstance(identity, bool) or not isinstance(identity, (int, float)) or not 0 < identity <= 1:
         raise ValueError("screen.cascade.diversity_identity 는 0 초과 1 이하의 숫자여야 합니다.")
+    cdr_identity = cfg_get(cfg, "rank.cdr3.cluster_identity", .85)
+    if (isinstance(cdr_identity, bool) or not isinstance(cdr_identity, (int, float))
+            or not math.isfinite(cdr_identity) or not 0 < cdr_identity <= 1):
+        raise ValueError("rank.cdr3.cluster_identity는 0 초과 1 이하의 유한한 숫자여야 합니다.")
     seed = cascade.get("audit_seed")
     if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed < 2**32):
         raise ValueError("screen.cascade.audit_seed 는 null 또는 0–4294967295 사이의 정수여야 합니다.")
@@ -371,6 +384,66 @@ def _validate_scalar_shapes(cfg):
                 if value < 0 and path not in signed and not path.startswith("rank.weights."):
                     raise ValueError(f"{path}는 0 이상이어야 합니다.")
     visit(defaults, cfg)
+    # Reject model budgets before an adapter can truncate a float with int()
+    # or request an unbounded allocation. Zero is allowed only where it has an
+    # explicit meaning (rescore disabled, no diversity/audit, no exclusions).
+    counts = {
+        "structure.boltz2.diffusion_samples": (1, 16),
+        "score.boltz2_diffusion_samples": (1, 16),
+        "structure.chai1.num_diffn_samples": (1, 16),
+        "screen.num_diffn_samples": (1, 16),
+        "structure.boltz2.recycling_steps": (1, 100),
+        "score.boltz2_recycling_steps": (1, 100),
+        "structure.chai1.num_trunk_recycles": (1, 100),
+        "screen.num_trunk_recycles": (1, 100),
+        "structure.chai1.num_diffn_timesteps": (1, 10000),
+        "screen.num_diffn_timesteps": (1, 10000),
+        "score.boltz2_num_subsampled_msa": (1, 100000),
+        "design.chunk_size": (1, 10000),
+        "design.mpnn.seqs_per_struct": (1, 1000),
+        "design.rf2.num_recycles": (1, 100),
+        "design.filters.top_n_to_score": (1, 100000),
+        "screen.tier2_n": (1, 100000),
+        "screen.boltz2_rescore_top": (0, 100000),
+        "mature.prefilter.top_n": (1, 100000),
+        "rank.final_n": (1, 100000),
+        "rank.diversity_pool": (1, 100000),
+        "rank.cdr3.per_cluster": (1, 100000),
+        "truncate.min_segment": (1, 100000),
+        "hotspots.auto.num_sets": (1, 1000),
+        "hotspots.auto.exclude_terminal": (0, 10000),
+        "structure.msa.threads": (1, 1024),
+        "structure.msa.max_seqs": (1, 100000),
+        "report.top_n_table": (1, 100000),
+        "developability.hydrophobic_window": (1, 10000),
+    }
+    for path, (low, high) in counts.items():
+        value = cfg_get(cfg, path)
+        if value is not None and (type(value) is not int or not low <= value <= high):
+            raise ValueError(f"{path}는 {low}–{high} 범위의 정수여야 합니다.")
+    for path in ("truncate.radius", "hotspots.auto.patch_radius", "design.mpnn.temperature"):
+        value = cfg_get(cfg, path)
+        if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float))
+                                  or not math.isfinite(value) or value <= 0):
+            raise ValueError(f"{path}는 0보다 큰 유한한 숫자여야 합니다.")
+    prefilter = cfg_get(cfg, "mature.prefilter", {})
+    mode = prefilter.get("threshold_mode", "absolute")
+    if not isinstance(mode, str) or mode not in {"absolute", "percentile"}:
+        raise ValueError("mature.prefilter.threshold_mode는 absolute/percentile 중 하나여야 합니다.")
+    percentile = prefilter.get("percentile", 50)
+    if (isinstance(percentile, bool) or not isinstance(percentile, (int, float))
+            or not math.isfinite(percentile) or not 0 < percentile <= 100):
+        raise ValueError("mature.prefilter.percentile은 0 초과 100 이하의 숫자여야 합니다.")
+    limit = cfg_get(cfg, "screen.cascade.final_count")
+    if limit is not None and (type(limit) is not int or not 1 <= limit <= 10000):
+        raise ValueError("screen.cascade.final_count는 null 또는 1–10000 정수여야 합니다.")
+    for path in ("mature.antifold.model_path", "mature.antifold.sha256", "mature.antifold.antigen_chain",
+                 "mature.antifold.nanobody_chain", "screen.chai1.msa_directory",
+                 "screen.colabfold.database_manifest", "screen.colabfold.msa_manifest_sha256",
+                 "structure.msa.database_manifest"):
+        value = cfg_get(cfg, path)
+        if value is not None and (not isinstance(value, str) or not value.strip()):
+            raise ValueError(f"{path}는 경로·식별자 문자열 또는 null이어야 합니다.")
     preset = cfg_get(cfg, "run.analysis_preset")
     if preset is not None and not isinstance(preset, str):
         raise ValueError("run.analysis_preset은 문자열 또는 null이어야 합니다.")
@@ -401,7 +474,7 @@ def _validate_scalar_shapes(cfg):
                 raise ValueError(f"expression.{key}는 대문자 아미노산 서열이어야 합니다.")
     # Warn about typo-shaped keys in fixed scientific sections. Dynamic metric
     # weights, CDR names, complex entities and campaign definitions stay open.
-    dynamic = {"rank.weights", "mature.cdr.regions", "complex", "specificity"}
+    dynamic = {"rank.weights", "mature.cdr.regions", "mature.wt_structure_review", "complex", "specificity"}
     def unknown(default, current, prefix=""):
         if prefix in dynamic or prefix.endswith(".env_vars") or not isinstance(current, dict):
             return

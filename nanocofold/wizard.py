@@ -410,7 +410,9 @@ def create_server(output_dir: Path, port: int = 8765) -> ThreadingHTTPServer:
                 result = routes[self.path](payload)
                 self._send(200, json_bytes(result))
             except (ValueError, OSError) as exc:
-                self._send(400, json_bytes({"error": str(exc)}))
+                from .platform.errors import public_error
+                print(f"[wizard] {type(exc).__name__}: {exc}", file=sys.stderr)
+                self._send(400, json_bytes({"error": public_error(exc)}))
             except Exception as exc:  # keep a malformed parser response from crashing the local service
                 print(f"[wizard] {type(exc).__name__}: {exc}", file=sys.stderr)
                 self._send(500, json_bytes({"error": "구조 처리에 실패했습니다. 올바른 단일 모델 PDB/mmCIF로 다시 시도하세요. 자세한 내용은 터미널에 표시됩니다."}))

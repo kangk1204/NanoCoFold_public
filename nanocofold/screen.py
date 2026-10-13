@@ -167,7 +167,7 @@ def predict_complexes(
     if not bool(cfg_get(cfg, "screen.restraint.enabled", True)):
         hotspot_positions = []
     target_msa = target_info.get("target_msa") or "empty"
-    seed = int(cfg_get(cfg, "run.seed", 42))
+    seed = cfg_seed(cfg, "run.seed")
     records: list[dict] = []
     run_root = work_dir.parent.resolve()
 
@@ -481,7 +481,7 @@ def _predict_chai1(
         "--num-trunk-recycles", str(int(cfg_get(cfg, "screen.num_trunk_recycles", 1))),
         "--num-diffn-timesteps", str(int(cfg_get(cfg, "screen.num_diffn_timesteps", 50))),
         "--num-diffn-samples", str(int(cfg_get(cfg, "screen.num_diffn_samples", 1))),
-        "--seed", str(int(cfg_get(cfg, "run.seed", 42))),
+        "--seed", str(cfg_seed(cfg, "run.seed")),
     ]
     if restraint_path is not None:
         argv.extend(["--constraint-path", str(restraint_path)])

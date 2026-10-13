@@ -98,6 +98,9 @@ def validate_candidate_id(candidate_id: str) -> str:
     if any(ord(ch) < 32 or ord(ch) == 127 for ch in str(candidate_id)):
         raise ValueError("후보 ID에 제어 문자를 사용할 수 없습니다.")
     text = str(candidate_id).strip()
+    # Leave room for engine/seed prefixes and filenames on common filesystems.
+    if len(text.encode("utf-8")) > 120:
+        raise ValueError("후보 ID는 UTF-8 기준 120바이트 이하여야 합니다. 짧은 이름으로 바꿔 입력하세요.")
     if not text or text in (".", ".."):
         raise ValueError(f"후보 ID가 유효하지 않습니다: {candidate_id!r}")
     if text.startswith(("=", "+", "-", "@")):
@@ -121,6 +124,8 @@ def clean_sequence(seq: str, strict: bool = True) -> str:
     # Unicode uppercase expansion can turn invalid letters into valid residues.
     if strict and any(not ch.isascii() and not ch.isspace() for ch in seq):
         raise ValueError("서열은 ASCII 표준 아미노산 문자로 입력하세요.")
+    if strict and any(ch.isdigit() for ch in seq):
+        raise ValueError("서열에 잔기 번호나 숫자를 넣을 수 없습니다. 표준 아미노산 문자만 입력하세요.")
     if not strict:
         seq = "".join(ch for ch in seq if ch.isascii())
     stripped = re.sub(r"[\s\d]", "", seq.upper())
@@ -131,6 +136,16 @@ def clean_sequence(seq: str, strict: bool = True) -> str:
             "(표준 20개 아미노산만 허용; 좌표가 조용히 어긋나는 것을 방지)"
         )
     return re.sub(r"[^ACDEFGHIKLMNPQRSTVWY]", "", stripped)
+
+
+def nucleotide_ambiguity_hint(sequence: str) -> str | None:
+    """Non-destructive heuristic: A/C/G/T are also valid amino-acid letters."""
+    compact = "".join(sequence.split()).upper()
+    if len(compact) >= 30 and set(compact) <= set("ACGTN") and sum(compact.count(ch) for ch in "ACGT") / len(compact) >= 0.8:
+        return ("서열이 A/C/G/T와 일부 N 문자로 이루어져 DNA 서열일 가능성이 있습니다. "
+                "단백질 아미노산 서열인지 확인하세요. 이 문자들은 아미노산으로도 유효하므로 "
+                "서열을 삭제하거나 임의 번역하지 않았습니다.")
+    return None
 
 
 def molecular_weight(seq: str) -> float:

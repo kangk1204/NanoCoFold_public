@@ -12,6 +12,94 @@ from pathlib import Path
 import yaml
 
 
+def complex_model_observations(job, *, state=None):
+    """Read recorded model attempts; terminal failures count as attempted models.
+
+    Actual run-state totals outrank a config plan. Missing/corrupt counters are
+    not manufactured into completion, and returned observations never rewrite
+    the queue payload, state, configuration or result table.
+    """
+    root = Path(job["run_dir"])
+    settings, rows, rows_recorded = {}, [], False
+    try:
+        config = yaml.safe_load(Path(job["config_path"]).read_text()) if job.get("config_path") else {}
+        if isinstance(config, dict) and isinstance(config.get("complex"), dict):
+            settings = config["complex"]
+    except (OSError, ValueError, yaml.YAMLError):
+        pass
+    if state is None:
+        path = root / "run_state.json"
+        state = json.loads(path.read_text()) if path.is_file() else {}
+    if not isinstance(state, dict) or not isinstance(state.get("phases", {}), dict):
+        raise ValueError("Invalid complex run state")
+    prediction = state.get("phases", {}).get("prediction", {})
+    if not isinstance(prediction, dict):
+        raise ValueError("Invalid complex prediction state")
+    result_path = root / "complex_results.json"
+    if result_path.is_file():
+        payload = json.loads(result_path.read_text())
+        if not isinstance(payload, dict) or not isinstance(payload.get("rows"), list):
+            raise ValueError("Invalid complex result observations")
+        rows, rows_recorded = payload["rows"], True
+        if any(not isinstance(row, dict) or type(row.get("evaluated")) is not bool for row in rows):
+            raise ValueError("Invalid complex model outcome")
+        if not settings and isinstance(payload.get("settings"), dict):
+            settings = payload["settings"]
+    comparison = settings.get("comparison_engines")
+    if comparison is not None:
+        if (not isinstance(comparison, list) or not comparison or any(not isinstance(e, str) or not e for e in comparison)
+                or len(set(comparison)) != len(comparison)):
+            raise ValueError("Invalid comparison engine plan")
+        engines = list(comparison)
+    else:
+        engines = [settings.get("engine", "boltz2")] if settings else []
+    total = prediction.get("total_models")
+    total_source = "recorded_run_state" if "total_models" in prediction else "configured_plan"
+    if total is not None and (type(total) is not int or total < 0):
+        raise ValueError("Invalid recorded model total")
+    if "total_models" not in prediction and settings:
+        seeds, models = settings.get("seeds", [42, 123, 2026]), settings.get("models_per_seed", 1)
+        if (not isinstance(seeds, list) or not seeds or any(type(seed) is not int for seed in seeds)
+                or len(set(seeds)) != len(seeds) or type(models) is not int or models < 1):
+            raise ValueError("Invalid complex model plan")
+        total = len(engines) * len(seeds) * models
+    completed = len(rows) if rows_recorded else prediction.get("completed_models", 0)
+    if completed is not None and (type(completed) is not int or completed < 0):
+        raise ValueError("Invalid recorded completed model count")
+    progress = {"completed": completed, "total": total}
+    if rows_recorded:
+        progress.update(succeeded=sum(row["evaluated"] for row in rows),
+                        failed=sum(not row["evaluated"] for row in rows))
+    elif "failed_models" in prediction:
+        failed = prediction["failed_models"]
+        if type(failed) is not int or failed < 0 or completed is None or failed > completed:
+            raise ValueError("Invalid recorded failed model count")
+        progress.update(succeeded=completed - failed, failed=failed)
+    inconsistent = total is not None and completed is not None and completed > total
+    if inconsistent:
+        # Keep all observed successful and failed rows; an invalid denominator
+        # must not clamp the model outcomes down to a stale planned count.
+        progress["total"] = None
+    return {"progress": progress, "rows": rows, "settings": settings, "engines": engines,
+            "total_source": total_source, "count_status": "inconsistent" if inconsistent else "recorded"}
+
+
+def refresh_complex_job(job):
+    """Reconcile API reads with actual observations, preserving stored records."""
+    if job.get("kind") != "analysis" or job.get("mode") != "complex" or not job.get("run_dir"):
+        return job
+    try:
+        observation = complex_model_observations(job)
+        job["progress"] = observation["progress"]
+        job["eta"] = RuntimeEstimator().estimate(job)
+    except (OSError, ValueError, TypeError, KeyError, AttributeError, OverflowError):
+        job["progress"] = {"completed": None, "total": None}
+        base = job.get("eta") if isinstance(job.get("eta"), dict) else {}
+        job["eta"] = {**base, "completed": None, "total": None, "status": "unavailable",
+                      "remaining_seconds": None, "lower_seconds": None, "upper_seconds": None}
+    return job
+
+
 class RuntimeEstimator:
     def __init__(self):
         self.cache = {}
@@ -37,6 +125,11 @@ class RuntimeEstimator:
                   "upper_seconds": None, "completed": 0, "total": None, "sample_count": 0,
                   "basis": "within_run_successful_tool_logs", "includes_postprocessing": False,
                   "note": "표적 준비·후보 생성·후처리·대기 시간은 포함하지 않습니다."}
+        if job.get("mode") == "complex" and job.get("kind") == "analysis" and job.get("run_dir"):
+            try:
+                return self._complex(job, result, now)
+            except (OSError, ValueError, TypeError, KeyError, AttributeError, OverflowError):
+                return {**result, "completed": None, "total": None, "status": "unavailable"}
         if job.get("state") == "complete":
             return {**result, "remaining_seconds": 0, "lower_seconds": 0, "upper_seconds": 0, "status": "complete"}
         if job.get("state") != "running" or job.get("kind") != "analysis" or job.get("mock"):
@@ -46,19 +139,6 @@ class RuntimeEstimator:
             comparison_path = root / "02_comparison/comparison_status.json"
             if comparison_path.is_file():
                 return self._comparison(json.loads(comparison_path.read_text()), result, now)
-            if job.get("mode") == "complex":
-                cfg = yaml.safe_load(Path(job["config_path"]).read_text())
-                settings = cfg.get("complex", {})
-                total = len(settings.get("seeds", [42,123,2026])) * settings.get("models_per_seed", 1)
-                values = json.loads((root/"complex_results.json").read_text()).get("rows", []) if (root/"complex_results.json").exists() else []
-                durations = [r["elapsed_seconds"] for r in values if r.get("evaluated") and r.get("elapsed_seconds")]
-                result.update(total=total, completed=len(values), sample_count=len(durations), engine=settings.get("engine", "boltz2"))
-                if not durations:
-                    return {**result, "status": "awaiting_first_sample"}
-                rate = statistics.median(durations); remaining = max(0,total-len(values))
-                return {**result, "status": "estimated", "remaining_seconds": round(rate*remaining),
-                        "lower_seconds": round(rate*.7*remaining), "upper_seconds": round(rate*1.3*remaining),
-                        "seconds_per_candidate": round(rate,2), "range_kind": "heuristic_budget_range_not_confidence_interval"}
             plan = None
             plans = [p for p in root.glob("02*/prediction_plan.json") if not p.parent.is_symlink() and not p.is_symlink()]
             if plans:
@@ -171,6 +251,56 @@ class RuntimeEstimator:
             return {**result, "status": "unavailable"}
 
     @staticmethod
+    def _complex(job, base, now):
+        observation = complex_model_observations(job)
+        progress, rows, engines = observation["progress"], observation["rows"], observation["engines"]
+        result = {**base, **progress, "count_source": observation["total_source"],
+                  "count_status": observation["count_status"], "engines": engines,
+                  "basis": "within_run_successful_same_engine_observations"}
+        total, completed = progress["total"], progress["completed"]
+        durations = [row["elapsed_seconds"] for row in rows if row["evaluated"] and _valid_duration(row.get("elapsed_seconds"))]
+        result["sample_count"] = len(durations)
+        if len(engines) == 1:
+            result["engine"] = engines[0]
+        if observation["count_status"] != "recorded" or total is None or completed is None:
+            return {**result, "status": "unavailable"}
+        if job.get("state") not in {"running", "complete"} or job.get("mock"):
+            return {**result, "status": job.get("state", "unavailable")}
+        if completed == total:
+            return {**result, "status": "complete", "remaining_seconds": 0, "lower_seconds": 0, "upper_seconds": 0}
+        if not engines or total % len(engines):
+            return {**result, "status": "unavailable"}
+        per_engine = total // len(engines)
+        groups = {engine: [] for engine in engines}
+        for row in rows:
+            engine = row.get("engine", engines[0] if len(engines) == 1 else None)
+            if engine not in groups:
+                return {**result, "status": "unavailable"}
+            groups[engine].append(row)
+        if any(len(group) > per_engine for group in groups.values()):
+            return {**result, "status": "unavailable"}
+        active = next((engine for engine in engines if len(groups[engine]) < per_engine), None)
+        pending, seconds = [], 0.
+        for engine in engines:
+            remaining = per_engine - len(groups[engine])
+            samples = [row["elapsed_seconds"] for row in groups[engine] if row["evaluated"] and _valid_duration(row.get("elapsed_seconds"))][-10:]
+            if remaining and not samples:
+                pending.append(engine)
+            elif remaining:
+                seconds += statistics.median(samples) * remaining
+        result.update(engine=active, unestimated_engines=pending)
+        if pending:
+            return {**result, "status": "awaiting_engine_samples" if len(engines) > 1 else "awaiting_first_sample"}
+        if not all(math.isfinite(value) for value in (seconds, seconds * .7, seconds * 1.3)):
+            return {**result, "status": "unavailable"}
+        if len(engines) == 1 and durations:
+            result["seconds_per_candidate"] = round(statistics.median(durations[-10:]), 2)
+        return {**result, "status": "estimated", "remaining_seconds": round(seconds),
+                "lower_seconds": round(seconds * .7), "upper_seconds": round(seconds * 1.3),
+                "estimated_finish": (time.time() if now is None else now) + seconds,
+                "range_kind": "heuristic_budget_range_not_confidence_interval"}
+
+    @staticmethod
     def _comparison(snapshot, base, now):
         engines, rows = snapshot["engines"], snapshot["rows"]
         per_engine = snapshot["input_candidates"]
@@ -217,9 +347,12 @@ class RuntimeEstimator:
 def terminal_eta(job):
     """Do not display a stale running estimate after cancellation or completion."""
     if isinstance(job.get("eta"), dict) and job.get("state") != "running":
-        value = 0 if job.get("state") == "complete" else None
+        unknown_complex_counts = (job.get("mode") == "complex" and job.get("kind") == "analysis"
+                                  and job["eta"].get("status") == "unavailable" and job["eta"].get("total") is None)
+        value = 0 if job.get("state") == "complete" and not unknown_complex_counts else None
         job["eta"] = {**job["eta"], "remaining_seconds": value, "lower_seconds": value,
-                      "upper_seconds": value, "status": job.get("state")}
+                      "upper_seconds": value,
+                      "status": "unavailable" if unknown_complex_counts else job.get("state")}
     return job
 
 

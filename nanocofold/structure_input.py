@@ -150,6 +150,7 @@ def inspect_structure(path: Path, output_dir: Path, source: dict | None = None, 
         chains: list[dict[str, Any]] = []
         protein_index = 0
         any_context = False
+        nucleic_context = []
 
         # 단백질 체인 ID를 파일 순서와 무관하게 먼저 확보한다(context 체인이 ID를 먼저 차지해
         # 같은 ID 가 두 번 배정되어 조회가 실패하는 것을 방지).
@@ -161,6 +162,7 @@ def inspect_structure(path: Path, output_dir: Path, source: dict | None = None, 
             standard_residues = [res for res in original_chain if _is_standard_protein_residue(res)]
             nonstandard_polymer = [res for res in original_chain if _is_nonstandard_polymer_residue(res)]
             context_residues = [res for res in original_chain if _is_context_residue(res)]
+            nucleic_context.extend((original_chain.id, res.resname) for res in context_residues if _is_nucleic_residue(res))
             hetatm_standard = [res for res in original_chain
                                if res.id[0] != " " and res.resname in STANDARD_AA3]
             water_residues = [res for res in original_chain if _is_water_residue(res)]
@@ -181,6 +183,10 @@ def inspect_structure(path: Path, output_dir: Path, source: dict | None = None, 
                         "원본의 TER/HETATM 표기 또는 번호를 확인하세요.",
                     ))
             if not standard_residues:
+                if hetatm_standard:
+                    raise ValueError(
+                        f"체인 {original_chain.id}: 모든 표준 단백질 잔기가 HETATM으로 기록되었습니다. "
+                        "단백질 체인 입력을 확인해 ATOM/TER 표기를 수정한 별도 사본을 준비하세요. 원본 좌표는 변경하지 않았습니다.")
                 if context_residues:
                     context_chain_id = _context_chain_id(original_chain.id, used_context_ids, warnings)
                     if context_chain_id is not None:
@@ -225,6 +231,12 @@ def inspect_structure(path: Path, output_dir: Path, source: dict | None = None, 
 
         if not chains:
             raise ValueError("표준 단백질 체인을 찾지 못했습니다. PDB/mmCIF 파일과 assembly 선택을 확인하세요.")
+        if nucleic_context:
+            message = ("핵산 context를 context.pdb에 원본 좌표로 보존했습니다. 핵산을 제외한 단백질만으로 "
+                       "de novo 설계하지 말고 핵산의 계면·가림 효과를 먼저 검토하세요.")
+            warnings.append(message)
+            for chain in chains:
+                chain["design_blockers"].append(message)
 
         structure_path = output_dir / "structure.pdb"
         _validate_pdb_export_bounds(normalized, "structure.pdb")
@@ -700,12 +712,17 @@ def _is_standard_protein_residue(residue: Residue) -> bool:
 def _is_nonstandard_polymer_residue(residue: Residue) -> bool:
     from Bio.PDB.Polypeptide import is_aa
     from .utils.pdb_io import has_peptide_backbone
-    return (residue.resname not in STANDARD_AA3 and residue.resname not in WATER_NAMES
+    return (not _is_nucleic_residue(residue) and residue.resname not in STANDARD_AA3 and residue.resname not in WATER_NAMES
             and (residue.id[0] == " " or is_aa(residue, standard=False) or has_peptide_backbone(residue)))
 
 
 def _is_context_residue(residue: Residue) -> bool:
-    return residue.id[0] != " " and residue.resname not in WATER_NAMES and not _is_nonstandard_polymer_residue(residue)
+    return (_is_nucleic_residue(residue) or residue.id[0] != " ") and residue.resname not in WATER_NAMES and not _is_nonstandard_polymer_residue(residue)
+
+
+def _is_nucleic_residue(residue: Residue) -> bool:
+    from Bio.PDB.Polypeptide import is_nucleic
+    return is_nucleic(residue, standard=False) or residue.resname.strip().upper() in {"A", "C", "G", "U", "I", "DA", "DC", "DG", "DT", "DI", "ADE", "CYT", "GUA", "THY", "URA"}
 
 
 def _is_water_residue(residue: Residue) -> bool:

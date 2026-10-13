@@ -46,6 +46,10 @@ def gate_summary(gate):
         values = gate.get(name)
         if isinstance(values, list):
             return len(values)
-        value = gate.get("n_" + name, 0)
-        return value if type(value) is int and value >= 0 else 0
-    return {"ok": gate["ok"], "n_errors": count("errors"), "n_warnings": count("warnings")}
+        value = gate.get("n_" + name)
+        return value if type(value) is int and value >= 0 else None
+    errors, warnings = count("errors"), count("warnings")
+    inconsistent = gate["ok"] is False and errors == 0
+    return {"ok": gate["ok"], "n_errors": errors, "n_warnings": warnings,
+            "diagnostic": ("미통과 사유가 기록되지 않았습니다. 원본 게이트 기록을 확인하세요." if inconsistent else
+                           "오류·경고 개수 기록이 불완전합니다. 원본 게이트 기록을 확인하세요." if errors is None or warnings is None else None)}

@@ -48,6 +48,13 @@ def truncate_target(
             keep_residues.append(res)
 
     segments = _split_segments(keep_residues)
+    backtracks = sum(int(right.id[1]) < int(left.id[1])
+                     for left, right in zip(keep_residues, keep_residues[1:]))
+    boundary_hint = (
+        f"author 잔기 번호가 역행한 경계 {backtracks}곳을 별도 조각으로 분할했습니다. "
+        "현재 번호 정책은 역행 경계를 연결하지 않습니다. 원본 서열·구조의 잔기 번호와 체인 순서를 확인하세요."
+        if backtracks else "radius를 키우거나 min_segment를 줄이세요."
+    )
     kept: list = []
     for segment in segments:
         if len(segment) >= min_segment:
@@ -58,12 +65,12 @@ def truncate_target(
     if not kept:
         raise ValueError(
             f"truncation 결과 잔기가 0개입니다 (radius={radius}, min_segment={min_segment}). "
-            "radius를 키우거나 min_segment를 줄이세요."
+            + boundary_hint
         )
     if missing_hotspots:
         raise ValueError(
             f"truncation 후 지정 핫스팟이 사라졌습니다: {missing_hotspots}. "
-            "radius를 키우거나 min_segment를 줄이세요 (빈 구조 저장 방지)."
+            + boundary_hint + " (빈 구조 저장 방지)."
         )
 
     new_structure = Structure.Structure("target_prepared")
@@ -122,7 +129,7 @@ def _split_segments(residues: list, max_gap: int = 2) -> list[list]:
     previous_number: int | None = None
     for res in residues:
         number = int(res.id[1])
-        if previous_number is not None and number - previous_number > max_gap:
+        if previous_number is not None and (number < previous_number or number - previous_number > max_gap):
             segments.append(current)
             current = []
         current.append(res)

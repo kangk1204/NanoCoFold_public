@@ -107,7 +107,7 @@ def _valid_outputs(output: Path, chains: dict, expected_models: int) -> bool:
 
 
 def predict(cfg, work_dir, target, candidates, *, mock=False, dry_run=False,
-            id_column="design_id", sequence_column="sequence"):
+            id_column="design_id", sequence_column="sequence", chain_records=None):
     from .screen import complex_chain_records, _predictions_manifest_frame
     from .diagnostics import _engine_extra_env
     from .input_review import validate_reviewed_input
@@ -140,7 +140,15 @@ def predict(cfg, work_dir, target, candidates, *, mock=False, dry_run=False,
     # Validate the complete submission before changing any saved output/cache.
     for _, row in candidates.iterrows():
         identifier = seq.validate_candidate_id(str(row[id_column]))
-        chains, auxiliary, binder = complex_chain_records(target, str(row[sequence_column]))
+        if chain_records is None:
+            chains, auxiliary, binder = complex_chain_records(target, str(row[sequence_column]))
+        else:
+            from .complex import proteins
+            validated = proteins([{"sequence": value} for value in chain_records.values()])
+            chains = {p["id"]: p["sequence"] for p in validated}
+            if list(chains.items()) != list(chain_records.items()):
+                raise ValueError("ColabFold 일반 복합체 체인 순서·서열 불일치")
+            auxiliary, binder = [], next(reversed(chains))
         if sum(map(len, chains.values())) > 2000 or len(chains) > 25:
             raise ValueError("ColabFold 복합체 상한은 2,000잔기·25체인입니다.")
         query_msa = msa_collection.for_query(identifier, row, chains, binder, cfg) if msa_collection else None
@@ -235,6 +243,8 @@ def predict(cfg, work_dir, target, candidates, *, mock=False, dry_run=False,
                                                    "error": records[identifier]["error"]})
                     continue
                 try:
+                    if chain_records is not None and (result is None or result.returncode != 0):
+                        raise ValueError("ColabFold 일반 복합체 명령이 정상 종료하지 않았습니다. 원본 출력과 로그를 확인하세요.")
                     count = _normalize(raw, identifier, directory / "colabfold_out", chains)
                     if count != expected_models:
                         raise ValueError(f"ColabFold 모델 수 불일치: {count}/{expected_models}")

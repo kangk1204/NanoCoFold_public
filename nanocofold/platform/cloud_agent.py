@@ -21,6 +21,7 @@ from .. import __version__
 from .inputs import InputManager, normalized_config
 from .jobs import JobManager, TERMINAL
 from .paths import contained, sha256
+from .errors import public_error, public_log
 
 AGENT_VERSION=4
 
@@ -143,20 +144,25 @@ class Agent:
     def capabilities():
         from ..engine_comparison import AVAILABLE_ENGINES
         return {'comparison_public_api':True,'review_bound_diagnostics':True,
-                'comparison_engine_selection':True,'comparison_predictors':list(AVAILABLE_ENGINES)}
+                'comparison_engine_selection':True,'comparison_predictors':list(AVAILABLE_ENGINES),
+                'complex_comparison':True,'complex_comparison_schema':1,'complex_comparison_predictors':list(AVAILABLE_ENGINES)}
     def installation_identity(self):
         from ..provenance import application_identity
         return {'agent_id':self.agent_id,'agent_version':AGENT_VERSION,'package_version':__version__,
                 'cloud_agent_sha256':sha256(Path(__file__)), 'application_sha256':application_identity()}
     def bounded_settings(self,mode,settings,engine=None):
         self.workflow(mode,settings)
-        values={**settings,'engine':settings.get('engine',engine or 'boltz2')}
+        values=dict(settings)
+        if 'comparison_engines' not in values or mode!='complex':
+            values['engine']=settings.get('engine',engine or 'boltz2')
+        elif engine is not None:
+            raise ValueError('복합체 비교 요청에는 단일 engine 필드를 함께 보내지 마세요.')
         if mode!='complex':return self.settings(mode,values)
-        if 'comparison_engines' in values:
-            raise ValueError('comparison_engines는 독립 VHH 엔진 비교에서만 지정하세요.')
         from ..complex import validate_settings
-        allowed={k:values[k] for k in ('engine','seeds','recycles','diffusion_steps','models_per_seed','msa','restraints') if k in values}
-        return {'run':{'mode':mode},'complex':validate_settings(allowed)}
+        from ..complex_comparison import configure
+        allowed={k:values[k] for k in ('engine','comparison_engines','seeds','recycles','diffusion_steps','models_per_seed','msa','msa_source','allow_public_msa_server','restraints') if k in values}
+        validated=validate_settings(allowed)
+        return configure({'run':{'mode':mode},'complex':validated},validated)
     def input_fingerprints(self,folder):
         files={}
         for path in sorted(folder.rglob('*')):
@@ -425,6 +431,10 @@ class Agent:
             antifold=p.get('antifold',False)
             if type(antifold) is not bool:raise ValueError('antifold는 true/false입니다.')
             cfg['mature']={'prefilter':{'top_n':count,'enforce_threshold':False},'antifold':{'enabled':antifold}}
+            if 'max_variants' in p:
+                limit=p['max_variants']
+                if type(limit) is not int or not 1<=limit<=100000:raise ValueError('준비 변이 수는 1–100000 정수입니다.')
+                cfg['mature']['library']={'strategy':'dms','max_variants':limit}
         if cascade:
             values={}
             for key,default,lo,hi in (('top_n',20,1,2000),('diversity_n',0,0,2000),('audit_n',0 if design_cascade else 2,0,2000),
@@ -545,7 +555,9 @@ class Agent:
         for op in queue['operations']:
             if op.get('agent_id','legacy')!=self.agent_id:continue
             try: result=self.operation(op)
-            except Exception as exc:result={'state':'failed','response':{'error':f'{type(exc).__name__}: {exc}'}}
+            except Exception as exc:
+                print(f'[operation] {type(exc).__name__}: {exc}',flush=True)
+                result={'state':'failed','response':{'error':public_error(exc)}}
             self.client.request('agent/operations',{'id':op['id'],**result})
         # Include terminal remote jobs not yet acknowledged/uploaded by the cloud.
         ids={j['id']:j for j in queue['jobs'] if j.get('agent_id','legacy')==self.agent_id}
@@ -576,12 +588,15 @@ class Agent:
                     with self.manager.store.connect() as db:db.execute('UPDATE cloud_sync SET action_id=?,result_synced=0 WHERE id=?',(action_id,identifier))
                 logs=self.manager.logs(job['id'],max(0,Path(job['log_path']).stat().st_size-64000) if Path(job['log_path']).exists() else 0)
                 public={k:v for k,v in job.items() if k not in ('config_path','run_dir','log_path','gpu_lock','descendants','last_descendants')};public.update(logs=logs['text'],agent_id=self.agent_id)
+                public['logs']=public_log(public['logs'])
+                if public.get('error'):public['error']=public_error(ValueError(public['error']))
+                public=public_diagnostics(public)
                 self.client.request('agent/status',{'id':identifier,'status':public,'action_id':action_id})
                 if job['state'] in TERMINAL and job.get('run_dir') and Path(job['run_dir']).exists() and (not existing or not existing['result_synced']):self.schedule_result(identifier,job)
                 self.sync_errors.pop(identifier,None)
             except Exception as exc:
                 # Preserve remote state on transport errors; never restart inference.
-                if not existing:self.client.request('agent/status',{'id':identifier,'status':{'id':None,'state':'failed','agent_id':self.agent_id,'error':f'{type(exc).__name__}: {exc}'}})
+                if not existing:self.client.request('agent/status',{'id':identifier,'status':{'id':None,'state':'failed','agent_id':self.agent_id,'error':public_error(exc)}})
                 else:
                     self.sync_errors[identifier]=f'{type(exc).__name__}: {exc}'
                     print(f'[sync] {identifier}: {type(exc).__name__}: {exc}',flush=True)
@@ -589,7 +604,7 @@ class Agent:
     def heartbeat(self):
         self.client.request('agent/heartbeat',{'host':os.uname().nodename,'agent_id':self.agent_id,'version':AGENT_VERSION,
             'capabilities':self.capabilities(),'installation_identity':self.installation_identity(),
-            'diagnostics':self.diagnostics,'sync_errors':{**self.sync_errors,**self.export_errors},'queue_jobs':len(self.manager.store.list())})
+            'diagnostics':public_diagnostics(self.diagnostics),'sync_errors':{k:public_error(ValueError(v)) for k,v in {**self.sync_errors,**self.export_errors}.items()},'queue_jobs':len(self.manager.store.list())})
     def heartbeat_loop(self):
         # File transfer and model diagnostics must not look like a disconnected server.
         while not self.heartbeat_stop.is_set():

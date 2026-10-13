@@ -124,13 +124,14 @@ def execute(workspace: Path, identifier: str) -> int:
                 code = main(["setup", "--workspace", str(workspace), "--profile", job["profile"], "--yes"])
             else:
                 # cli.main owns the shared preflight and run lock for both entrypoints.
-                from ..cli import main
+                from ..cli import main, new_platform_computation
                 args = ["run", "-c", job["config_path"], "--mode", job["mode"]]
                 if job.get("resume"):
                     args += ["--run-dir", job["run_dir"]]
                 else:
                     args += ["--run-id", Path(job["run_dir"]).name]
-                code = main(args)
+                with new_platform_computation(job):
+                    code = main(args)
                 import shutil
                 run_root = Path(job["run_dir"])
                 if run_root.exists():
@@ -155,10 +156,9 @@ def execute(workspace: Path, identifier: str) -> int:
                 extra["result_id"] = Path(job["run_dir"]).name
         if code == 0:
             state = "complete"
-            total = 4 if job["kind"] == "analysis" and job["mode"] == "design" else 3 if job["kind"] == "analysis" else 1
-            if job["kind"] == "analysis" and job["mode"] == "complex":
-                total = len(cfg["complex"]["seeds"]) * cfg["complex"]["models_per_seed"]
-            extra["progress"] = {"completed": total, "total": total}
+            if not (job["kind"] == "analysis" and job["mode"] == "complex"):
+                total = 4 if job["kind"] == "analysis" and job["mode"] == "design" else 3 if job["kind"] == "analysis" else 1
+                extra["progress"] = {"completed": total, "total": total}
             if job["kind"] == "analysis":
                 from .results import ResultReader
                 reader = ResultReader(Path(job["run_dir"]))
@@ -186,6 +186,11 @@ def execute(workspace: Path, identifier: str) -> int:
         state = "budget_exhausted" if current.get("budget_exceeded") else "cancelled"
     previous_elapsed = job.get("history", [])[-1].get("elapsed_seconds", 0) if job.get("history") else 0
     elapsed = previous_elapsed + time.time() - started
+    if job["kind"] == "analysis" and job["mode"] == "complex":
+        from .eta import refresh_complex_job
+        observed = refresh_complex_job({**job, "state": state})
+        extra["progress"] = observed["progress"]
+        extra["eta"] = observed["eta"]
     terminal = store.update(identifier, state=state, phase=state, error=error, exit_code=code, finished=time.time(),
                             elapsed_seconds=elapsed, can_resume=job["kind"] == "analysis" and state != "complete", **extra)
     from .jobs import write_platform_status

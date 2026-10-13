@@ -12,6 +12,7 @@ import numpy as np
 from Bio.PDB import PDBIO, Superimposer
 
 from ..utils import pdb_io
+from ..utils.seq import AA1
 from .paths import contained, sha256
 
 
@@ -39,14 +40,47 @@ def _numbered_cdr_ranges(entry, sequence):
     if not isinstance(entry, dict) or entry.get("error") or entry.get("scheme_supported") is False:
         return {}
     positions = entry.get("imgt_positions")
-    if (not isinstance(positions, list) or len(positions) != len(sequence)
+    if (not isinstance(positions, list) or not positions
             or any(not isinstance(p, dict) or type(p.get("index")) is not int
-                   or not isinstance(p.get("aa"), str) for p in positions)
-            or [p["index"] for p in positions] != list(range(1, len(sequence) + 1))
-            or "".join(p["aa"] for p in positions) != sequence):
+                   or not 1 <= p["index"] <= len(sequence)
+                   or not isinstance(p.get("aa"), str) or len(p["aa"]) != 1
+                   or p["aa"] not in AA1 or p["aa"] != sequence[p["index"] - 1] for p in positions)):
+        return {}
+    # ANARCI numbers the antibody domain, excluding expression tags. Its
+    # recorded bounds and indexes are already full-sequence 1-based positions.
+    # Older receipts without either bound can prove only full-length coverage.
+    if "domain_start" not in entry and "domain_end" not in entry:
+        start, end = 1, len(sequence)
+    else:
+        start, end = entry.get("domain_start"), entry.get("domain_end")
+        if (type(start) is not int or type(end) is not int
+                or not 1 <= start <= end <= len(sequence)):
+            return {}
+    if [p["index"] for p in positions] != list(range(start, end + 1)):
+        return {}
+    domain = "".join(p["aa"] for p in positions)
+    if sequence.find(domain) != start - 1 or sequence.find(domain, start) >= 0:
         return {}
     ranges = entry.get("cdr_ranges")
-    return ranges if isinstance(ranges, dict) else {}
+    names = ("CDR1", "CDR2", "CDR3")
+    if not isinstance(ranges, dict) or not all(name in ranges for name in names):
+        return {}
+    previous = start - 1
+    for name in names:
+        bounds = ranges[name]
+        if (not isinstance(bounds, (list, tuple)) or len(bounds) != 2
+                or any(type(value) is not int for value in bounds)
+                or not start <= bounds[0] <= bounds[1] <= end or bounds[0] <= previous):
+            return {}
+        previous = bounds[1]
+    if any("imgt" in position for position in positions):
+        if any(type(position.get("imgt")) is not int or position["imgt"] < 1 for position in positions):
+            return {}
+        for name, (lo, hi) in {"CDR1": (27, 38), "CDR2": (56, 65), "CDR3": (105, 117)}.items():
+            mapped = [position["index"] for position in positions if lo <= position["imgt"] <= hi]
+            if not mapped or list(ranges[name]) != [min(mapped), max(mapped)]:
+                return {}
+    return {name: ranges[name] for name in names}
 
 
 def _saved_cdr_ranges(reader, row, sequence):

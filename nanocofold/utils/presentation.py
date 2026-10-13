@@ -20,6 +20,7 @@ _PATH_TAIL = r'''[^\s"'<>()[\]{};,`|:]*'''
 _URL = re.compile(r'''((?:https?|ftp|s3|gs)://[^\s"'<>]+)''')
 _BASE64 = re.compile(r'[A-Za-z0-9+/]{64,}={0,2}')
 _INTEGRITY = re.compile(r'sha(?:256|384|512)-[A-Za-z0-9+/=]+')
+_GPU_UUID = re.compile(r'\b(?:GPU|MIG)-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b', re.I)
 _OPAQUE_FIELDS = frozenset({'content', 'smiles', 'canonical_smiles', 'isomeric_smiles',
                             'integrity', 'sha256', 'sha384', 'sha512'})
 _PATH_FIELDS = frozenset({'path', 'paths', 'root', 'source_root', 'workspace', 'cwd',
@@ -79,11 +80,17 @@ def _portable(value, root, patterns, field=''):
             result = _portable(parsed, root, patterns)
             return value if result == parsed else json.dumps(result, ensure_ascii=False)
     # Opaque data also appears in older/untyped metadata. Do not decode or
-    # rewrite it; a host-root or an explicit path field still identifies paths.
+    # rewrite it. Explicit path fields still identify paths; ambiguous untyped
+    # base64-shaped strings are preserved to protect native scientific data.
     if _INTEGRITY.fullmatch(value):
         return value
-    if not _path_field(field) and not _HOST_START.match(value) and _BASE64.fullmatch(value):
+    if not _path_field(field) and _BASE64.fullmatch(value):
         return value
+    # UUID-based device selection identifies the private host hardware. Keep
+    # numerical CUDA ordinals and ordinary UUIDs, and only mask metadata copies;
+    # opaque coordinates, hashes, encoded scientific data and internal runtime
+    # receipts above remain exact.
+    value = _GPU_UUID.sub('[GPU UUID]', value)
     url_parts = _URL.split(value)
     if len(url_parts) > 1:
         return ''.join(part if index % 2 else _portable(part, root, patterns, field)
@@ -107,6 +114,7 @@ def portable_metadata(value, *, root: Path | None = None):
     Explicit pathname fields and known host roots are made relative to ``root``
     or withheld. Free text uses token boundaries, never arbitrary slash matches.
     Native ``content``, encoded arrays, SMILES and integrity fields are opaque.
+    Host GPU UUIDs are withheld; numerical device ordinals remain recorded.
     Raw archives and internal runtime records do not use this presentation copy.
     """
     return _portable(value, root, _path_patterns(root))

@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .config import cfg_get, resolve_path
+from .config import cfg_get, cfg_seed, resolve_path
 from .utils import seq as seq_utils, shell
 
 SCRIPTS_DIR = Path(__file__).resolve().parent / "scripts"
@@ -146,7 +146,7 @@ def run_esm_sequence_scores(
     frame.to_csv(input_csv, index=False)
 
     if mock or dry_run:
-        rng = np.random.default_rng(int(cfg_get(cfg, "run.seed", 42)) + 7)
+        rng = np.random.default_rng(cfg_seed(cfg, "run.seed") + 7)
         frame["esm_mean_logprob"] = rng.normal(-1.0, 0.15, len(frame)).round(4)
         frame["esm_delta"] = (frame["esm_mean_logprob"] - frame["esm_mean_logprob"].max()).round(4)
         return frame

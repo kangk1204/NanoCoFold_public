@@ -16,6 +16,22 @@ from .utils import pdb_io, seq
 
 STATES = ("cleaved", "full")
 METRICS = ("ipsae", "iptm", "interface_plddt", "interface_pae", "hotspot_contact_frac", "n_clashes")
+REQUIRED_METRICS = ("ipsae", "iptm", "hotspot_contact_frac", "n_clashes")
+
+
+def observation_metrics_complete(record: dict) -> bool:
+    """Undefined interface values are valid only for an observed zero-contact pose."""
+    def finite(value):
+        try:
+            return value is not None and not isinstance(value, bool) and math.isfinite(float(value))
+        except (TypeError, ValueError, OverflowError):
+            return False
+    if not all(finite(record.get(key)) for key in REQUIRED_METRICS):
+        return False
+    if all(finite(record.get(key)) for key in ("interface_plddt", "interface_pae")):
+        return True
+    contacts = record.get("n_contacts")
+    return finite(contacts) and float(contacts) == 0
 
 
 def _position(value, name: str) -> int:
@@ -177,9 +193,7 @@ def aggregate(candidates: pd.DataFrame, records: pd.DataFrame, cfg: dict, seeds:
                                      ("evidence_type", "mock" if cfg_get(cfg, "run.mock") else "real")):
             if key not in subset or not subset[key].eq(expected_value).all():
                 complete = False
-        for metric in METRICS:
-            if metric not in subset or not pd.to_numeric(subset[metric], errors="coerce").map(math.isfinite).all():
-                complete = False
+        complete = complete and all(observation_metrics_complete(r) for r in subset.to_dict("records"))
         row.update(specificity_complete=bool(complete), comparison_status="insufficient",
                    terminal_modeling_status="unassessed" if cfg_get(cfg, "specificity.epitope_mode", "both") != "exposed" else "not_applicable",
                    evidence_type="mock" if cfg_get(cfg, "run.mock", False) else "real", review_status="pending")

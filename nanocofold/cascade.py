@@ -21,6 +21,7 @@ from .utils.atomic import check_output, write_csv, write_json
 from .config import cfg_get, dump_resolved, resolve_run_artifact, resolve_path
 from .rank_select import cdr3_identity, guess_cdr3
 from .utils.shell import ExecutionCancelled, ToolError
+from .score_complex import iptm_missing_warnings
 
 SCHEMA_VERSION = 1
 FINAL_METRICS = ("ipsae", "iptm", "interface_plddt", "interface_pae")
@@ -703,6 +704,7 @@ def run(cfg, run_dir, state, target, candidates, cdr_ranges, *, predict, score, 
         predictions = _predict(cfg, run_dir, stage, target, candidates, "colabfold", predict, state, id_column, sequence_column)
         metrics = score(cfg, _merge_predictions(candidates, predictions, id_column), target, id_column)
     first = _stage_table(candidates, predictions, metrics, "colabfold_", id_column)
+    state.add_warnings(iptm_missing_warnings(metrics.to_dict("records")))
     write_csv(score_dir / "colabfold_scores.csv", _portable(run_dir, first), root=run_dir)
     selection = select_candidates(candidates, metrics, cfg, id_column, sequence_column, cdr_ranges)
     write_csv(score_dir / "cascade_selection.csv", selection, root=run_dir)
@@ -750,6 +752,7 @@ def reanalyze(cfg, run_dir, state, target, cdr_ranges, *, score, finalize):
     else:
         metrics = score(cfg, _merge_predictions(candidates, predictions, "design_id"), target, "design_id")
     first = _stage_table(candidates, predictions, metrics, "colabfold_", "design_id")
+    state.add_warnings(iptm_missing_warnings(metrics.to_dict("records")))
     write_csv(score_dir / "colabfold_scores.csv", _portable(run_dir, first), root=run_dir)
     boltz = _read_manifest(run_dir, run_dir / "02c_boltz2", "design_id")
     return _publish(cfg, run_dir, state, target, candidates, first, selection, boltz,

@@ -11,14 +11,14 @@
       --panel: #fffdf9;
       --line: #ddd2c3;
       --text: #21302d;
-      --muted: #66736f;
+      --muted: #52625b;
       --teal: #0f766e;
       --teal-dark: #115e59;
       --amber: #a35f00;
       --red: #a33a32;
       --hot: #f97316;
       --gray: #87908c;
-      --focus: #0ea5a4;
+      --focus: #0f766e;
     }
     * { box-sizing: border-box; }
     body {
@@ -52,7 +52,7 @@
     textarea, input[type="text"] {
       width: 100%;
       min-height: 42px;
-      border: 1px solid var(--line);
+      border: 1px solid #718477;
       border-radius: 8px;
       padding: 9px 10px;
       background: #fff;
@@ -194,7 +194,7 @@
       <div class="actions">
         <button id="loadFile" class="secondary">로컬 구조 불러오기</button>
       </div>
-      <p id="loadStatus" class="status" aria-live="polite"></p>
+      <p id="loadStatus" class="status"></p>
       <div id="sourceInfo"></div>
       <div id="warnings"></div>
     </section>
@@ -217,7 +217,7 @@
         <button id="analyze" disabled>Hotspot 후보 계산</button>
         <span id="selectionHint" class="note">표적을 선택하면 계산할 수 있습니다.</span>
       </div>
-      <p id="analyzeStatus" class="status" aria-live="polite"></p>
+      <p id="analyzeStatus" class="status"></p>
     </section>
 
     <section class="panel" aria-labelledby="step3">
@@ -235,12 +235,13 @@
           <label for="manualOriginal">원본 번호로 추가 선택</label>
           <input id="manualOriginal" type="text" placeholder="원본 번호/라벨 예: 52, 53A">
           <div class="actions">
-            <button id="addManual" class="secondary" disabled>원본 번호 적용</button>
+            <button id="addManual" class="secondary" aria-describedby="manualPrerequisite" disabled>원본 번호 적용</button>
           </div>
+          <p id="manualPrerequisite" class="note">표적을 선택하고 표면 분석을 완료하면 원본 번호를 적용할 수 있습니다.</p>
           <div id="residueList" class="list"></div>
         </div>
       </div>
-      <p id="hotspotStatus" class="status" aria-live="polite"></p>
+      <p id="hotspotStatus" class="status"></p>
     </section>
 
     <section class="panel" aria-labelledby="step4">
@@ -255,7 +256,7 @@
       <div class="actions">
         <button id="export" disabled>설정 저장하기</button>
       </div>
-      <p id="exportStatus" class="status" aria-live="polite"></p>
+      <p id="exportStatus" class="status"></p>
       <div id="exportResult" hidden>
         <h3>저장 결과</h3>
         <p id="exportDir"></p>
@@ -303,15 +304,31 @@
     if (msg) announce(msg);
   }
   async function api(path, body) {
-    const res = await fetch(path, {
-      method: "POST",
-      headers: {"Content-Type": "application/json", "X-Wizard-Token": TOKEN},
-      body: JSON.stringify(body)
-    });
-    let data = {};
-    try { data = await res.json(); } catch (_) {}
-    if (!res.ok) throw new Error(data.error || "요청을 처리하지 못했습니다.");
-    return data;
+    const controls = path === "/api/load" ? [el.loadPdb, el.loadFile] : path === "/api/analyze" ? [el.analyze] : [el.export];
+    const previous = controls.map(node => node.disabled);
+    controls.forEach(node => { node.disabled = true; node.setAttribute("aria-busy", "true"); });
+    try {
+      const res = await fetch(path, {
+        method: "POST",
+        headers: {"Content-Type": "application/json", "X-Wizard-Token": TOKEN},
+        body: JSON.stringify(body)
+      });
+      let data = {};
+      try { data = await res.json(); } catch (_) {}
+      if (!res.ok) throw new Error(data.error || "요청을 처리하지 못했습니다. 입력과 연결 상태를 확인하세요.");
+      return data;
+    } finally {
+      controls.forEach((node, index) => { node.disabled = previous[index]; node.removeAttribute("aria-busy"); });
+    }
+  }
+  function markExportStale() {
+    state.staleExport = true;
+    const saved = $("exportResult").dataset.snapshot === "saved";
+    $("exportResult").hidden = !saved;
+    if (saved && state.staleExport) {
+      $("commands").hidden = true;
+      setStatus("exportStatus", "입력이나 선택이 바뀌었습니다. 아래 폴더는 이전 입력의 저장본입니다. 한계를 다시 확인한 뒤 현재 입력을 새로 내보내세요.", "warning");
+    }
   }
   function invalidate(level) {
     if (level <= 1) {
@@ -335,12 +352,11 @@
       clear($("residueList")); el.addManual.disabled = true;
     }
     state.exportGen++;
-    state.staleExport = true;
+    markExportStale();
     state.exportBusy = false;
     el.ack.checked = false;
     el.export.disabled = true;
-    $("exportResult").hidden = true;
-    setStatus("exportStatus", "", "");
+    if (!$("exportResult").dataset.snapshot) setStatus("exportStatus", "", "");
   }
   function chainLabel(c) {
     return `${c.id} (원본 ${c.original_id || "-"}, author ${c.author_chain || "-"})`;
@@ -424,13 +440,14 @@
     const caption = document.createElement("caption"); caption.textContent = "불러온 체인: 이름, 생물종, 관찰된 원본 번호 범위";
     table.append(caption);
     const head = document.createElement("tr");
-    ["계산 체인", "원본/author", "이름", "생물종", "길이", "관찰 범위"].forEach((h) => head.append(text("th", h)));
-    table.append(head);
+    ["계산 체인", "원본/author", "이름", "생물종", "길이", "관찰 범위"].forEach((h) => { const th = text("th", h); th.scope = "col"; head.append(th); });
+    const thead = document.createElement("thead"); thead.append(head); table.append(thead);
+    const tbody = document.createElement("tbody"); table.append(tbody);
     for (const c of data.chains || []) {
       const tr = document.createElement("tr");
       [c.id, `${c.original_id || "-"} / ${c.author_chain || "-"}`, c.name || "이름 미상", c.organism || "생물종 미상", c.length, observedRange(c)]
         .forEach((v) => tr.append(text("td", v)));
-      table.append(tr);
+      tbody.append(tr);
     }
     wrap.append(table); tableHost.append(wrap);
     renderChainControls();
@@ -471,7 +488,7 @@
   function updateContext(changed) {
     state.context = Array.from($("contextChoices").querySelectorAll("input:checked")).map((x) => x.value);
     if (changed) invalidate(2);
-    state.staleExport = true; $("exportResult").hidden = true; el.export.disabled = true; el.ack.checked = false;
+    markExportStale(); el.export.disabled = true; el.ack.checked = false;
   }
   async function loadFromPdb() {
     invalidate(1);
@@ -508,7 +525,7 @@
       const data = await api("/api/analyze", {input_id: state.input.input_id, target: state.target, context: state.context});
       if (gen !== state.analyzeGen) return;
       state.selection = data; state.residues = data.residues || []; state.pdb = data.pdb || "";
-      state.hotspots.clear(); state.staleExport = true; el.addManual.disabled = false;
+      state.hotspots.clear(); markExportStale(); el.addManual.disabled = false;
       renderAnalysis(data); setStatus("analyzeStatus", "분석 결과가 준비되었습니다.", "ok");
     } catch (e) { if (gen === state.analyzeGen) setStatus("analyzeStatus", e.message, "error"); }
   }
@@ -634,9 +651,9 @@
   }
   function markHotspotsChanged() {
     state.exportGen++;
-    state.staleExport = true; $("exportResult").hidden = true; el.ack.checked = false;
+    markExportStale(); el.ack.checked = false;
     updateResidueChecks(); renderReview(state.selection); updateViewerHotspots();
-    const issues = exportIssues().filter((x) => !x.includes("한계 확인란"));
+    const issues = exportIssues();
     setStatus("hotspotStatus", issues.length ? issues.join(" ") : `선택된 hotspot ${state.hotspots.size}개`, issues.length ? "warning" : "ok");
     updateExportButton();
   }
@@ -714,6 +731,8 @@
   }
   function renderExport(data) {
     $("exportResult").hidden = false;
+    $("exportResult").dataset.snapshot = "saved";
+    $("commands").hidden = false;
     $("exportDir").textContent = `폴더: ${data.export_dir || "-"}`;
     $("configPath").textContent = `설정: ${data.config_path || "-"}`;
     $("fingerprint").textContent = `스냅샷 fingerprint: ${data.fingerprint || "-"}`;
@@ -724,6 +743,7 @@
     renderMessages(host, "주의", data.warnings, "warning");
   }
   el.loadPdb.addEventListener("click", loadFromPdb);
+  el.pdbId.addEventListener("keydown", event => { if (event.key === "Enter" && !el.loadPdb.disabled) { event.preventDefault(); loadFromPdb(); } });
   el.loadFile.addEventListener("click", loadFromFile);
   el.analyze.addEventListener("click", analyze);
   el.addManual.addEventListener("click", addManual);

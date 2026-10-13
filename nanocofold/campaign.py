@@ -4,7 +4,6 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-import math
 import subprocess
 import time
 from contextlib import contextmanager
@@ -17,6 +16,9 @@ from .config import PROJECT_ROOT, cfg_get, dump_resolved, resolve_path
 from .utils import msa, seq, shell
 from .utils.misc import to_native
 from .utils.atomic import write_json, write_csv
+from . import __version__
+
+INITIAL_POOL_CDR3_IDENTITY = .85
 
 
 def _hash(path: Path) -> str:
@@ -78,7 +80,8 @@ def _run_lock(run_dir: Path):
 def provenance(cfg: dict, definition: dict) -> dict:
     """Content identity includes dirty source, input files, environments and declared weights."""
     source = Path(__file__).parent
-    result = {"source_sha256": _key({str(p.relative_to(source)): _hash(p) for p in sorted(source.rglob("*.py"))}),
+    result = {"application_version": __version__,
+              "source_sha256": _key({str(p.relative_to(source)): _hash(p) for p in sorted(source.rglob("*.py"))}),
               "inputs": {}, "environments": {}, "weights": {}}
     try:
         result["git_head"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=PROJECT_ROOT, text=True).strip()
@@ -218,8 +221,8 @@ def _prediction(cfg: dict, root: Path, directory: Path, target: dict, candidate:
         metric = _score_candidates(job_cfg, predictions, target).iloc[0].to_dict()
         if metric.get("error"):
             raise ValueError(metric["error"])
-        if not all(math.isfinite(float(metric.get(m, float("nan")))) for m in specificity.METRICS):
-            raise ValueError("필수 계면 점수가 누락되었거나 유한하지 않습니다.")
+        if not specificity.observation_metrics_complete(metric):
+            raise ValueError("필수 예측 신뢰도·기하 지표가 누락됐습니다. 계면 미정의는 실제 접촉 0이 기록된 경우에만 허용합니다.")
         record.update(metric)
         from .utils import pdb_io
         structure = pdb_io.load_structure(record["cif_path"])
@@ -302,7 +305,7 @@ def _initial_pool(frame: pd.DataFrame, n: int) -> pd.DataFrame:
     representatives = []
     deferred = []
     for index, row in ordered.iterrows():
-        if any(rank_select.cdr3_identity(row.cdr3, r) >= .85 for r in representatives):
+        if any(rank_select.cdr3_identity(row.cdr3, r) >= INITIAL_POOL_CDR3_IDENTITY for r in representatives):
             deferred.append(index)
         else:
             chosen.append(index)
@@ -339,7 +342,7 @@ def write_outputs(cfg: dict, root: Path, definition: dict, candidates: pd.DataFr
     for directory in ("03_score", "05_final", "06_specificity"):
         (root / directory).mkdir(parents=True, exist_ok=True)
     # Commit authoritative observations before any derived export can fail.
-    status = {"status": run_status, "n_candidates": len(candidates), "n_selected": len(selected),
+    status = {"status": run_status, "reporting_version": __version__, "n_candidates": len(candidates), "n_selected": len(selected),
               "n_failed_jobs": sum(r.get("status") == "failed" for r in records),
               "n_interrupted_jobs": sum(r.get("status") == "interrupted" for r in records),
               "biological_validation": "not_performed", "outputs_status": "pending",
@@ -357,6 +360,10 @@ def write_outputs(cfg: dict, root: Path, definition: dict, candidates: pd.DataFr
         "sort_ascending": [False, False, True, True], "primary_n": 16,
         "normalization": "none; no composite z-score used",
         "selection": "eligible primary rows then farthest CDR3 identity additions",
+        "initial_pool_policy": {"cdr3_identity": INITIAL_POOL_CDR3_IDENTITY,
+            "cdr3_similarity": "normalized_levenshtein_v2",
+            "ordering": "dev_severe then design_id; optional esm_llr descending stable ties",
+            "selection": "one representative per threshold cluster, then deferred rows up to initial cap"},
         "cross_engine_scores_combined": False, "calibrated_binding_probability": False,
         "affinity_improvement_established": False,
     })

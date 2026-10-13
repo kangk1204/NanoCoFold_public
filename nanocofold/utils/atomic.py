@@ -71,7 +71,13 @@ def write_json(path: Path, payload, **kwargs) -> None:
     write_bytes(path, content.encode("utf-8"), **kwargs)
 
 
-def write_csv(path: Path, frame, **kwargs) -> None:
+def write_csv(path: Path, frame, *, encoding="utf-8", **kwargs) -> None:
+    from .spreadsheet import csv_cell
+    from pandas.api.types import is_string_dtype
+    safe = frame.copy()
+    for column in safe.columns:
+        if safe[column].dtype == object or is_string_dtype(safe[column].dtype):
+            safe[column] = safe[column].map(csv_cell)
     # pandas streams into a binary handle; avoid materializing large CSV strings.
     with atomic_writer(path, **kwargs) as handle:
-        frame.to_csv(handle, index=False)
+        safe.to_csv(handle, index=False, encoding=encoding)

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
 
 from .config import cfg_get
 from .handoff_validation import validate_handoff as validate_handoff
@@ -41,8 +42,12 @@ def write_synthesis_sheet(selected: pd.DataFrame, cfg: dict, out_dir: Path, sequ
         sequence = str(row.get(sequence_column, ""))
         construct = seq_utils.suggest_construct(sequence, signal, tag, host, optimize, organism)
         notes = []
-        if row.get("dev_severe", 0):
-            notes.append(f"개발가능성 경고 {row.get('dev_warnings', '')}")
+        severe = pd.to_numeric(row.get("dev_severe"), errors="coerce")
+        if pd.isna(severe) or not np.isfinite(severe):
+            notes.append("개발가능성 심한 위험 수 미평가")
+        elif severe > 0:
+            text = row.get("dev_warnings")
+            notes.append("개발가능성 경고" + (f" {text}" if isinstance(text, str) and text else " · 상세 사유 미기록"))
         if pd.notna(row.get("n_clashes", float("nan"))) and float(row.get("n_clashes", 0)) > 0:
             notes.append("계면 clash 존재")
         rows.append({
@@ -50,7 +55,7 @@ def write_synthesis_sheet(selected: pd.DataFrame, cfg: dict, out_dir: Path, sequ
             "plate_id": row.get("plate_id", "plate_01"),
             "plate_position": row.get("plate_position"),
             "design_id": row.get("design_id", row.get("variant_id")),
-            "final_eligible": bool(row.get("final_eligible", False)),
+            "final_eligible": bool(row.get("final_eligible")) if isinstance(row.get("final_eligible"), (bool, np.bool_)) else None,
             "exclusion_reason": row.get("exclusion_reason", ""),
             "variant_id": row.get("variant_id"),
             "cluster_id": row.get("cluster_id"),
@@ -85,16 +90,16 @@ def write_synthesis_sheet(selected: pd.DataFrame, cfg: dict, out_dir: Path, sequ
             "construct_dna": construct if optimize else "",
             "dna_status": row.get("dna_status", dna_status),
             "notes": "; ".join(notes),
-            **{column: row.get(column) for column in metadata_columns},
+            **{column: row.get(column) for column in metadata_columns if column not in SYNTHESIS_COLUMNS},
         })
 
     sheet = pd.DataFrame(rows)
     if sheet.empty:
-        sheet = pd.DataFrame(columns=SYNTHESIS_COLUMNS + list(metadata_columns))
+        sheet = pd.DataFrame(columns=list(dict.fromkeys(SYNTHESIS_COLUMNS + list(metadata_columns))))
     else:
-        sheet = sheet[[column for column in SYNTHESIS_COLUMNS + list(metadata_columns) if column in sheet.columns]]
+        sheet = sheet[[column for column in dict.fromkeys(SYNTHESIS_COLUMNS + list(metadata_columns)) if column in sheet.columns]]
     csv_path = out_dir / "synthesis_plate_list.csv"
-    write_csv(csv_path, sheet.map(csv_cell), root=out_dir)
+    write_csv(csv_path, sheet.map(csv_cell), root=out_dir, encoding="utf-8-sig")
 
     xlsx_path = out_dir / "synthesis_plate_list.xlsx"
     try:
@@ -129,14 +134,24 @@ def write_pymol_session_script(
         "bg_color white",
         "hide everything",
     ]
-    for name, path, binder_chain in top_structures:
+    used_names = set()
+    for index, (candidate_id, path, binder_chain) in enumerate(top_structures):
         import re
-        if not re.fullmatch(r"[A-Za-z0-9_.:-]+", str(name)):
-            raise ValueError("PyMOL 객체 이름은 영문·숫자·밑줄만 지원합니다.")
+        import hashlib
+        # Keep the original scientific identifier in the mapping. PyMOL's
+        # command namespace has a narrower grammar than accepted FASTA IDs.
+        name = str(candidate_id)
+        if not re.fullmatch(r"[A-Za-z0-9_]+", name) or name in used_names:
+            digest = hashlib.sha256(str(candidate_id).encode("utf-8")).hexdigest()[:12]
+            name = f"ncf_{index + 1}_{digest}"
+            while name in used_names:
+                name += "_x"
+        used_names.add(name)
         if any(character in str(path) for character in "\n\r;\x00"):
             raise ValueError("PyMOL 구조 경로에 명령 구분 문자를 사용할 수 없습니다.")
         import json
         lines.extend([
+            "# candidate_id_map: " + json.dumps({"object": name, "candidate_id": str(candidate_id)}, ensure_ascii=False),
             f"load {json.dumps(str(path))}, {name}",
             f"show cartoon, {name}",
             f"color grey80, {name} and chain {target_chain}",

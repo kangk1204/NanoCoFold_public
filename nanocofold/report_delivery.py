@@ -19,8 +19,12 @@ def package_report(files: dict[str, bytes], receipt: dict) -> bytes:
         if not isinstance(content, bytes):
             raise TypeError(f"Report member must be bytes: {name}")
     from .utils.presentation import portable_metadata
+    from . import __version__
+    compute_version = receipt.get("summary", {}).get("state", {}).get("application_version")
     manifest = {
         "schema_version": 1, "kind": "presentation_only", "source_readonly": True,
+        "rendering_version": __version__, "compute_version": compute_version,
+        "compute_version_source": "saved run_state.application_version" if compute_version else "not_recorded",
         "receipt": portable_metadata(receipt),
         "files": [{"path": name, "size": len(content), "sha256": hashlib.sha256(content).hexdigest()}
                   for name, content in sorted(files.items())],

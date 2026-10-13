@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.background import BackgroundTask
 
-from ..config import ASSET_ROOT, _deep_merge, exploration_config
+from ..config import ASSET_ROOT, _deep_merge, exploration_config, read_config_yaml
 from .inputs import InputManager, normalized_config
 from .jobs import JobManager
 from .paths import contained, native
@@ -103,15 +103,26 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
 
     @app.exception_handler(ValueError)
     async def value_error(_request, exc):
-        return JSONResponse({"error": str(exc)}, status_code=400)
+        from .errors import public_error
+        import logging
+        logging.getLogger(__name__).warning("input error: %s", exc)
+        return JSONResponse({"error": public_error(exc)}, status_code=400)
 
     @app.exception_handler(FileNotFoundError)
     async def missing(_request, exc):
-        return JSONResponse({"error": str(exc)}, status_code=404)
+        return JSONResponse({"error": "요청한 입력 또는 결과 파일을 찾지 못했습니다. 작업 목록에서 항목을 다시 선택하세요."}, status_code=404)
 
     @app.exception_handler(KeyError)
     async def unknown(_request, exc):
-        return JSONResponse({"error": str(exc)}, status_code=404)
+        return JSONResponse({"error": "저장된 항목을 찾지 못했습니다. 입력을 다시 검토하거나 작업 목록을 새로 확인하세요."}, status_code=404)
+
+    import yaml
+
+    @app.exception_handler(yaml.YAMLError)
+    async def yaml_error(_request, exc):
+        import logging
+        logging.getLogger(__name__).warning("YAML input error: %s", exc)
+        return JSONResponse({"error": "YAML 설정 구문을 읽지 못했습니다. 들여쓰기·키와 값 형식을 확인하세요."}, status_code=400)
 
     async def body(request):
         if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
@@ -131,11 +142,47 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
             raise ValueError("JSON 객체가 필요합니다.")
         if "config" in payload and not isinstance(payload["config"], dict):
             raise ValueError("config는 JSON 객체여야 합니다.")
+        for key in ("provider", "mode", "msa_backend", "preparation", "input_id", "selection_id", "config_path", "name", "target_name"):
+            if key in payload and payload[key] is not None and not isinstance(payload[key], str):
+                raise ValueError(f"{key} 입력은 문자열이어야 합니다.")
+        for key in ("settings", "reference", "wt_structure"):
+            if key in payload and payload[key] is not None and not isinstance(payload[key], dict):
+                raise ValueError(f"{key} 입력은 JSON 객체여야 합니다.")
+        if "mock" in payload and type(payload["mock"]) is not bool:
+            raise ValueError("mock는 true/false여야 합니다.")
         return payload
 
     @app.post("/api/inputs/complex")
     async def complex_input(request: Request):
         return await asyncio.to_thread(inputs.complex, await body(request))
+
+    @app.get("/api/starter-presets")
+    async def starter_presets():
+        return json.loads((Path(__file__).parents[1] / "_data/starter-presets.json").read_text())
+
+    @app.get("/api/capabilities")
+    async def capabilities():
+        from .cloud_agent import Agent
+        return Agent.capabilities()
+
+    @app.get("/api/draft")
+    async def draft_read():
+        path = workspace / "platform_draft_v1.json"
+        if path.is_symlink():
+            raise ValueError("초안 파일은 심볼릭 링크일 수 없습니다.")
+        return json.loads(path.read_text()) if path.exists() else {"version": 1, "fields": {}}
+
+    @app.post("/api/draft")
+    async def draft_save(request: Request):
+        from ..utils.atomic import write_json
+        value = await body(request)
+        if value.get("version") != 1 or not isinstance(value.get("fields"), dict):
+            raise ValueError("초안 버전 또는 입력 형식 오류")
+        path = workspace / "platform_draft_v1.json"
+        if path.is_symlink():
+            raise ValueError("초안 파일은 심볼릭 링크일 수 없습니다.")
+        await asyncio.to_thread(write_json, path, value)
+        return {"saved": True, "version": 1}
 
     @app.get("/api/batches")
     def batch_list():
@@ -164,9 +211,8 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
             reviewed = inputs.reviewed(payload["input_id"])
             cfg = _deep_merge(reviewed["config"], cfg)
         if payload.get("config_path"):
-            import yaml
             path = contained(workspace, payload["config_path"], exists=True)
-            config = yaml.safe_load(path.read_text())
+            config = read_config_yaml(path.read_text())
             if not isinstance(config, dict):
                 raise ValueError("설정 파일은 YAML 객체여야 합니다.")
             cfg = _deep_merge(config, cfg)
@@ -255,12 +301,17 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
 
     @app.get("/api/session")
     def session():
-        return {"workspace": str(workspace), "modes": ["design", "screen", "mature"], "poll_interval_ms": 2000,
+        return {"workspace": str(workspace), "modes": ["complex", "design", "screen", "mature"], "poll_interval_ms": 2000,
                 "presets": {"researcher_exploration": exploration_config(), "standard": {}}}
 
     @app.get("/api/inputs")
     def input_list():
         return native({"inputs": inputs.list()})
+
+    @app.get("/api/tutorials/{mode}")
+    def public_tutorial(mode: str):
+        from .tutorials import load_public_example
+        return load_public_example(mode)
 
     @app.post("/api/configs/parse")
     async def parse_config(request: Request):
@@ -270,7 +321,7 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         if not isinstance(content, str):
             raise ValueError("YAML 설정 내용을 입력하세요.")
         try:
-            cfg = yaml.safe_load(content)
+            cfg = read_config_yaml(content)
         except yaml.YAMLError as exc:
             raise ValueError("YAML 설정을 읽지 못했습니다.") from exc
         if not isinstance(cfg, dict):
@@ -323,7 +374,9 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
 
     @app.get("/api/jobs/{identifier}/logs")
     def job_logs(identifier: str, offset: int = 0):
-        return manager.logs(identifier, offset)
+        from .errors import public_log
+        result = manager.logs(identifier, offset)
+        return {**result, "text": public_log(result["text"])}
 
     @app.post("/api/jobs/{identifier}/cancel")
     def job_cancel(identifier: str):

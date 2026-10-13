@@ -7,7 +7,7 @@
 - 인터넷과 `sudo` 권한. 설치 도중 시스템 패키지 설치를 위해 Ubuntu 계정 암호를 요청할 수 있습니다.
 - 권장 여유 공간: **SSD 150 GiB 이상**, **RAM 32 GiB 이상**, **GPU 메모리 16 GiB 이상**. 표적·서열 길이·MSA 크기에 따라 더 필요합니다. 이 수치는 모든 입력이 성공한다는 보장이 아닙니다.
 
-Python, pip, NumPy, pandas, matplotlib, PyTorch, JAX, HMMER는 미리 설치하지 않아도 됩니다. Conda, Docker, CUDA Toolkit, Node.js도 이 설치 경로의 선행 조건이 아닙니다. 공개 MSA API를 쓰는 예제에는 대형 로컬 MSA 데이터베이스가 필요하지 않습니다.
+Python, pip, NumPy, pandas, matplotlib, PyTorch, JAX, HMMER는 미리 설치하지 않아도 됩니다. Conda, Docker, CUDA Toolkit, Node.js도 이 설치 경로의 선행 조건이 아닙니다. 공용 MSA API를 쓰는 예제에는 대형 로컬 MSA 데이터베이스가 필요하지 않습니다.
 
 ## 한 명령으로 설치
 
@@ -80,4 +80,4 @@ v0.4.2 이하에서는 `nvidia-smi`가 표준 출력에 쓴 오류가 가려져 
 
 설치기는 Ubuntu·CPU 아키텍처·glibc·드라이버·필수 도구를 확인합니다. Ubuntu 버전 번호만으로 설치를 거부하지 않지만, 모든 GPU 기종·Ubuntu 조합의 새 설치와 추론을 인증한다는 뜻은 아닙니다. 릴리스의 검증 기록에서 CPU 설치 검사, 모의 설치 회귀 검사, 실제 GPU 추론 확인을 구분해 확인하세요.
 
-외부 엔진 코드·모델·공개 MSA 서비스에는 각각의 별도 조건이 적용됩니다. [외부 도구 안내](../LICENSE_MANIFEST.md)를 확인하세요. 설치는 가중치·패키지를 내려받지만 입력 서열을 MSA 서버에 보내거나 분석 작업을 제출하지 않습니다.
+외부 엔진 코드·모델·공용 MSA 서비스에는 각각의 별도 조건이 적용됩니다. [외부 도구 안내](../LICENSE_MANIFEST.md)를 확인하세요. 설치는 가중치·패키지를 내려받지만 입력 서열을 MSA 서버에 보내거나 분석 작업을 제출하지 않습니다.

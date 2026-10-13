@@ -27,11 +27,14 @@ structure:
   provider: boltz2         # boltz2 | chai1 | none | mock
   boltz2:
     env: envs/boltz2
+    env_vars: {}
+    seed: null             # null이면 run.seed 사용
     extra_args: ["--no_kernels"]   # cu128/sm_120에서 cuequivariance 미지원 시 필수
     recycling_steps: 3
     diffusion_samples: 1
   chai1:
     env: envs/chai1
+    env_vars: {}
     extra_args: []
     seed: null            # null이면 run.seed를 사용; 결정론적 CUDA 래퍼
     num_trunk_recycles: 3
@@ -44,6 +47,7 @@ structure:
     cache_dir: data/msa_cache
     mmseqs_binary: tools/mmseqs/bin/mmseqs  # backend: mmseqs
     db: null               # MMseqs DB 경로 (예: data/msa_db/uniref50_db)
+    database_manifest: null # 사전 검증한 로컬 MSA 데이터베이스 영수증
     threads: 8
     sensitivity: 5.7       # 4.0 빠름 / 7.5 민감 (검색 시간에 큰 영향)
     max_seqs: 300          # 프리필터 최대 히트 수
@@ -66,6 +70,7 @@ hotspots:
     patch_radius: 12.0     # Å, 패치 클러스터 반경
     exclude_terminal: 3    # 양끝 잔기 제외 수 (말단 아티팩트 방지)
     min_relative_sasa: 0.25
+    exclude_positions: []  # 자동 제안에서 제외할 1-based 서열 위치
 
 design:
   engine: rfantibody
@@ -127,6 +132,8 @@ screen:
     continue_on_error: true  # 실패도 엔진별 행으로 보존, 취소/시간 한도는 전파
   colabfold:
     env: envs/colabfold
+    env_vars: {}
+    extra_args: []
     data_dir: models/colabfold
     num_recycles: 1
     num_models: 1
@@ -138,6 +145,11 @@ screen:
     msa_cache_dir: msa/monomer_cache  # approved public/local monomer cache, never implicit network
     msa_source: cache        # cache | local_mmseqs2 | public_mmseqs2(preset only) | public_api(explicit upload consent)
     msa_max_sequences: 2048  # query + unique homologs per chain, bounded 2..10000
+    cf_public_preset: null  # 등록된 로컬 공개 MSA 검색 프리셋
+    database_manifest: null
+    msa_manifest_sha256: null # 검토·재개에 사용하는 MSA 영수증 해시
+  chai1:
+    msa_directory: null
   engine: chai1
   env: envs/chai1
   boltz2_env: envs/boltz2
@@ -165,6 +177,9 @@ screen:
     diversity_identity: 0.85
     audit_n: 2             # 상위/다양성 밖 후보를 Boltz-2로 평가하여 탈락 편향 탐색
     audit_seed: null       # null이면 run.seed; 재현 가능한 hash 순서로 선택
+    final_count: null      # 명시하면 WT/대조군 포함 최종 평가 예산
+    calibrate_wt: false
+    prune_unselected: false
 
 mature:
   wt_sequence: ""          # 야생형 VHH 서열
@@ -172,6 +187,7 @@ mature:
   wt_structure: null       # WT 복합체/VHH 구조 (AntiFold 입력)
   library:
     strategy: dms          # dms(단일 변이 전수) | random(CDR 다중 변이 표본)
+    max_variants: null     # 새 작은 시작 설정만 명시적으로 DMS 표본 수를 제한
     size: 10000            # random: WT 1개를 포함한 총 고유 서열 수
     min_mutations: 1
     max_mutations: 5
@@ -195,10 +211,16 @@ mature:
     top_n: 200
   esm:
     env: envs/esm
+    env_vars: {}
     model: esm2_t33_650M_UR50D
   antifold:
     enabled: true
     env: envs/esm
+    env_vars: {}
+    model_path: null
+    sha256: null
+    antigen_chain: null
+    nanobody_chain: null
 
 score:
   contact_cutoff: 5.0      # 계면 접촉 (Å, 중원자)
@@ -218,6 +240,7 @@ score:
     use_official: true     # 공식 스크립트가 있으면 결과를 우선 사용
     dist_cutoff: 10.0      # 공식 출력 파일명·거리 보조 컬럼용; ipSAE의 PAE mask에는 무영향
   boltz2_recycling_steps: 3
+  boltz2_diffusion_samples: 1 # 모든 요청 샘플을 보존; 평가 경로는 샘플별 기록
   boltz2:
     seed: null             # null이면 run.seed 사용
   boltz2_num_subsampled_msa: 512
@@ -289,6 +312,7 @@ expression:
   signal_peptide: "MKYLLPTAAAGLLLLAAQPAMA"   # pelB
   tag: "GGGSGGGSHHHHHH"                        # C-terminal linker-His6
   codon_optimize: true
+  codon_optimized_confirmed: false
   organism_codons: ecoli
   vector: null             # 발주 전 명시
   order_format: dna        # dna | aa

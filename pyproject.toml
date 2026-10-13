@@ -1,6 +1,6 @@
 [project]
 name = "nanocofold"
-version = "0.4.7"
+version = "0.4.8rc1"
 description = "Protein complex prediction and nanobody design, screening, and variant evaluation"
 requires-python = ">=3.12"
 dependencies = [
@@ -68,6 +68,7 @@ packages = ["nanocofold"]
 "examples/tutorial/manifest.json" = "nanocofold/_data/examples/tutorial/manifest.json"
 "examples/tutorial/sources.json" = "nanocofold/_data/examples/tutorial/sources.json"
 "examples/tutorial/README.md" = "nanocofold/_data/examples/tutorial/README.md"
+"docs/browser_quickstart.md" = "nanocofold/_data/docs/browser_quickstart.md"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,434 @@
+{
+  "schema_version": 1,
+  "id": "small-four-v1",
+  "steps": [
+    "분석 목적",
+    "입력 준비",
+    "실행 조건",
+    "검토·실행"
+  ],
+  "seed": 42,
+  "engines": [
+    "colabfold",
+    "boltz2",
+    "chai1",
+    "opendde"
+  ],
+  "models_per_engine": 1,
+  "msa_source": "public_api",
+  "allow_public_msa_server": false,
+  "modes": {
+    "complex": {
+      "cloud_settings": {
+        "workflow": "direct",
+        "comparison_engines": [
+          "colabfold",
+          "boltz2",
+          "chai1",
+          "opendde"
+        ],
+        "seed": 42,
+        "seeds": "42",
+        "recycles": 3,
+        "diffusion_steps": 200,
+        "models_per_seed": 1,
+        "count": 1,
+        "backbone_engine": "both",
+        "backbone_count": 1,
+        "antifold": false,
+        "cf_recycles": 3,
+        "cf_models": 1,
+        "cf_seeds": 1,
+        "msa_source": "public_api",
+        "allow_public_msa_server": false,
+        "mutation_strategy": "dms",
+        "max_variants": 3
+      },
+      "native_override": {
+        "run": {
+          "mode": "complex",
+          "seed": 42
+        },
+        "truncate": {
+          "enabled": false
+        },
+        "screen": {
+          "engine": "boltz2",
+          "comparison": {
+            "enabled": true,
+            "engines": [
+              "colabfold",
+              "boltz2",
+              "chai1",
+              "opendde"
+            ],
+            "continue_on_error": true
+          },
+          "cascade": {
+            "enabled": false
+          },
+          "restraint": {
+            "enabled": false
+          },
+          "allow_public_msa_server": false,
+          "colabfold": {
+            "msa_mode": "precomputed",
+            "msa_source": "public_api",
+            "num_models": 1,
+            "num_seeds": 1,
+            "num_recycles": 3
+          },
+          "opendde": {
+            "enabled": true
+          },
+          "num_trunk_recycles": 3,
+          "num_diffn_timesteps": 200,
+          "num_diffn_samples": 1,
+          "boltz2_rescore_top": 0
+        },
+        "design": {
+          "engine": "both",
+          "num_designs": 1,
+          "filters": {
+            "enabled": false,
+            "top_n_to_score": 2
+          },
+          "mpnn": {
+            "seqs_per_struct": 1
+          },
+          "refinement": {
+            "enabled": false
+          }
+        },
+        "rank": {
+          "final_n": 8,
+          "require_hotspot": false
+        },
+        "mature": {
+          "antifold": {
+            "enabled": false
+          },
+          "library": {
+            "strategy": "dms",
+            "max_variants": 3
+          },
+          "prefilter": {
+            "top_n": 2,
+            "enforce_threshold": false
+          }
+        }
+      },
+      "maximum_models": 4,
+      "model_count_basis": "maximum planned; actual generation/selection separately recorded"
+    },
+    "design": {
+      "cloud_settings": {
+        "workflow": "design_engine_comparison",
+        "comparison_engines": [
+          "colabfold",
+          "boltz2",
+          "chai1",
+          "opendde"
+        ],
+        "seed": 42,
+        "seeds": "42",
+        "recycles": 3,
+        "diffusion_steps": 200,
+        "models_per_seed": 1,
+        "count": 1,
+        "backbone_engine": "both",
+        "backbone_count": 1,
+        "antifold": false,
+        "cf_recycles": 3,
+        "cf_models": 1,
+        "cf_seeds": 1,
+        "msa_source": "public_api",
+        "allow_public_msa_server": false,
+        "mutation_strategy": "dms",
+        "max_variants": 3
+      },
+      "native_override": {
+        "run": {
+          "mode": "design",
+          "seed": 42
+        },
+        "truncate": {
+          "enabled": false
+        },
+        "screen": {
+          "engine": "boltz2",
+          "comparison": {
+            "enabled": true,
+            "engines": [
+              "colabfold",
+              "boltz2",
+              "chai1",
+              "opendde"
+            ],
+            "continue_on_error": true
+          },
+          "cascade": {
+            "enabled": false
+          },
+          "restraint": {
+            "enabled": false
+          },
+          "allow_public_msa_server": false,
+          "colabfold": {
+            "msa_mode": "precomputed",
+            "msa_source": "public_api",
+            "num_models": 1,
+            "num_seeds": 1,
+            "num_recycles": 3
+          },
+          "opendde": {
+            "enabled": true
+          },
+          "num_trunk_recycles": 3,
+          "num_diffn_timesteps": 200,
+          "num_diffn_samples": 1,
+          "boltz2_rescore_top": 0
+        },
+        "design": {
+          "engine": "both",
+          "num_designs": 1,
+          "filters": {
+            "enabled": false,
+            "top_n_to_score": 2
+          },
+          "mpnn": {
+            "seqs_per_struct": 1
+          },
+          "refinement": {
+            "enabled": false
+          }
+        },
+        "rank": {
+          "final_n": 8,
+          "require_hotspot": false
+        },
+        "mature": {
+          "antifold": {
+            "enabled": false
+          },
+          "library": {
+            "strategy": "dms",
+            "max_variants": 3
+          },
+          "prefilter": {
+            "top_n": 2,
+            "enforce_threshold": false
+          }
+        }
+      },
+      "maximum_models": 8,
+      "model_count_basis": "maximum planned; actual generation/selection separately recorded"
+    },
+    "screen": {
+      "cloud_settings": {
+        "workflow": "engine_comparison",
+        "comparison_engines": [
+          "colabfold",
+          "boltz2",
+          "chai1",
+          "opendde"
+        ],
+        "seed": 42,
+        "seeds": "42",
+        "recycles": 3,
+        "diffusion_steps": 200,
+        "models_per_seed": 1,
+        "count": 1,
+        "backbone_engine": "both",
+        "backbone_count": 1,
+        "antifold": false,
+        "cf_recycles": 3,
+        "cf_models": 1,
+        "cf_seeds": 1,
+        "msa_source": "public_api",
+        "allow_public_msa_server": false,
+        "mutation_strategy": "dms",
+        "max_variants": 3
+      },
+      "native_override": {
+        "run": {
+          "mode": "screen",
+          "seed": 42
+        },
+        "truncate": {
+          "enabled": false
+        },
+        "screen": {
+          "engine": "boltz2",
+          "comparison": {
+            "enabled": true,
+            "engines": [
+              "colabfold",
+              "boltz2",
+              "chai1",
+              "opendde"
+            ],
+            "continue_on_error": true
+          },
+          "cascade": {
+            "enabled": false
+          },
+          "restraint": {
+            "enabled": false
+          },
+          "allow_public_msa_server": false,
+          "colabfold": {
+            "msa_mode": "precomputed",
+            "msa_source": "public_api",
+            "num_models": 1,
+            "num_seeds": 1,
+            "num_recycles": 3
+          },
+          "opendde": {
+            "enabled": true
+          },
+          "num_trunk_recycles": 3,
+          "num_diffn_timesteps": 200,
+          "num_diffn_samples": 1,
+          "boltz2_rescore_top": 0
+        },
+        "design": {
+          "engine": "both",
+          "num_designs": 1,
+          "filters": {
+            "enabled": false,
+            "top_n_to_score": 2
+          },
+          "mpnn": {
+            "seqs_per_struct": 1
+          },
+          "refinement": {
+            "enabled": false
+          }
+        },
+        "rank": {
+          "final_n": 8,
+          "require_hotspot": false
+        },
+        "mature": {
+          "antifold": {
+            "enabled": false
+          },
+          "library": {
+            "strategy": "dms",
+            "max_variants": 3
+          },
+          "prefilter": {
+            "top_n": 2,
+            "enforce_threshold": false
+          }
+        }
+      },
+      "maximum_models": null,
+      "model_count_basis": "all submitted candidates × selected engines"
+    },
+    "mature": {
+      "cloud_settings": {
+        "workflow": "engine_comparison",
+        "comparison_engines": [
+          "colabfold",
+          "boltz2",
+          "chai1",
+          "opendde"
+        ],
+        "seed": 42,
+        "seeds": "42",
+        "recycles": 3,
+        "diffusion_steps": 200,
+        "models_per_seed": 1,
+        "count": 2,
+        "backbone_engine": "both",
+        "backbone_count": 1,
+        "antifold": false,
+        "cf_recycles": 3,
+        "cf_models": 1,
+        "cf_seeds": 1,
+        "msa_source": "public_api",
+        "allow_public_msa_server": false,
+        "mutation_strategy": "dms",
+        "max_variants": 3
+      },
+      "native_override": {
+        "run": {
+          "mode": "mature",
+          "seed": 42
+        },
+        "truncate": {
+          "enabled": false
+        },
+        "screen": {
+          "engine": "boltz2",
+          "comparison": {
+            "enabled": true,
+            "engines": [
+              "colabfold",
+              "boltz2",
+              "chai1",
+              "opendde"
+            ],
+            "continue_on_error": true
+          },
+          "cascade": {
+            "enabled": false
+          },
+          "restraint": {
+            "enabled": false
+          },
+          "allow_public_msa_server": false,
+          "colabfold": {
+            "msa_mode": "precomputed",
+            "msa_source": "public_api",
+            "num_models": 1,
+            "num_seeds": 1,
+            "num_recycles": 3
+          },
+          "opendde": {
+            "enabled": true
+          },
+          "num_trunk_recycles": 3,
+          "num_diffn_timesteps": 200,
+          "num_diffn_samples": 1,
+          "boltz2_rescore_top": 0
+        },
+        "design": {
+          "engine": "both",
+          "num_designs": 1,
+          "filters": {
+            "enabled": false,
+            "top_n_to_score": 2
+          },
+          "mpnn": {
+            "seqs_per_struct": 1
+          },
+          "refinement": {
+            "enabled": false
+          }
+        },
+        "rank": {
+          "final_n": 12,
+          "require_hotspot": false
+        },
+        "mature": {
+          "antifold": {
+            "enabled": false
+          },
+          "library": {
+            "strategy": "dms",
+            "max_variants": 3
+          },
+          "prefilter": {
+            "top_n": 2,
+            "enforce_threshold": false
+          }
+        }
+      },
+      "maximum_models": 12,
+      "model_count_basis": "maximum planned; actual generation/selection separately recorded"
+    }
+  }
+}

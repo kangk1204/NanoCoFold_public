@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import itertools
 from pathlib import Path
+from uuid import uuid4
 
 import numpy as np
 import pandas as pd
@@ -363,7 +364,18 @@ def generate_library(wt_sequence: str, cdr_ranges: dict, cfg: dict) -> pd.DataFr
                    protect_wt_cys=bool(cfg_get(cfg, "mature.exclude.wt_cys", True)))
     strategy = cfg_get(cfg, "mature.library.strategy", "dms")
     if strategy == "dms":
-        return generate_dms_library(wt_sequence, cdr_ranges, **options)
+        frame = generate_dms_library(wt_sequence, cdr_ranges, **options)
+        limit = cfg_get(cfg, "mature.library.max_variants")
+        if limit is not None:
+            if type(limit) is not int or not 1 <= limit <= 100000:
+                raise ValueError("mature.library.max_variants는 1–100000 정수입니다.")
+            total = len(frame) - 1
+            variants = frame[frame.variant_id != "WT"].sample(n=min(limit, total), random_state=cfg_seed(cfg, "run.seed"))
+            frame = pd.concat([frame[frame.variant_id == "WT"], variants], ignore_index=True)
+            frame.attrs["library_generation"] = {"strategy": "dms_bounded_sample", "maximum_variants": limit,
+                "available_dms_variants": total, "prepared_variants": len(variants), "includes_wt": True,
+                "selection_seed": cfg_seed(cfg, "run.seed"), "sampling": "without replacement"}
+        return frame
     if strategy != "random":
         raise ValueError("mature.library.strategy는 dms/random 중 하나여야 합니다.")
     if cfg_get(cfg, "mature.prefilter.mode", "esm2") != "none":
@@ -384,6 +396,23 @@ def run_prefilter(
     dry_run: bool = False,
 ) -> tuple[pd.DataFrame, dict]:
     """ESM-2 ΔLLR (+ 선택적 AntiFold) 프리필터."""
+    # Programmatic callers can mutate configs after loading. Validate these
+    # knobs before launching a native model as well as at the central gate.
+    threshold = cfg_get(cfg, "mature.prefilter.threshold", -2.0)
+    threshold_mode = cfg_get(cfg, "mature.prefilter.threshold_mode", "absolute")
+    percentile = cfg_get(cfg, "mature.prefilter.percentile", 50.0)
+    top_n = cfg_get(cfg, "mature.prefilter.top_n", 200)
+    if not isinstance(threshold_mode, str) or threshold_mode not in {"absolute", "percentile"}:
+        raise ValueError("mature.prefilter.threshold_mode는 absolute/percentile 중 하나여야 합니다.")
+    if (isinstance(percentile, bool) or not isinstance(percentile, (int, float))
+            or not np.isfinite(percentile) or not 0 < percentile <= 100):
+        raise ValueError("mature.prefilter.percentile은 0 초과 100 이하이어야 합니다.")
+    if (isinstance(threshold, bool) or not isinstance(threshold, (int, float)) or not np.isfinite(threshold)):
+        raise ValueError("mature.prefilter.threshold는 유한한 숫자여야 합니다.")
+    if type(top_n) is not int or not 1 <= top_n <= 100000:
+        raise ValueError("mature.prefilter.top_n은 1–100000 정수여야 합니다.")
+    if type(cfg_get(cfg, "mature.prefilter.enforce_threshold", True)) is not bool:
+        raise ValueError("mature.prefilter.enforce_threshold는 true/false여야 합니다.")
     phase_dir.mkdir(parents=True, exist_ok=True)
     mode = "mock" if mock else str(cfg_get(cfg, "mature.prefilter.mode", "esm2"))
     info: dict = {"mode": mode, "warnings": []}
@@ -400,7 +429,7 @@ def run_prefilter(
 
     frame = library.copy()
     if mode == "mock" or dry_run:
-        rng = np.random.default_rng(int(cfg_get(cfg, "run.seed", 42)))
+        rng = np.random.default_rng(cfg_seed(cfg, "run.seed"))
         frame["esm_llr"] = rng.normal(0.0, 1.2, len(frame)).round(3)
         frame.loc[frame["variant_id"] == "WT", "esm_llr"] = 0.0
         frame["antifold"] = rng.normal(0.0, 0.8, len(frame)).round(3)
@@ -442,11 +471,6 @@ def run_prefilter(
     else:
         raise ValueError(f"지원하지 않는 prefilter mode: {mode}")
 
-    threshold = float(cfg_get(cfg, "mature.prefilter.threshold", -2.0))
-    threshold_mode = str(cfg_get(cfg, "mature.prefilter.threshold_mode", "absolute"))
-    percentile = float(cfg_get(cfg, "mature.prefilter.percentile", 50.0))
-    top_n = int(cfg_get(cfg, "mature.prefilter.top_n", 200))
-
     if threshold_mode == "percentile":
         values = pd.to_numeric(frame.loc[frame["variant_id"] != "WT", "esm_llr"], errors="coerce").dropna()
         cutoff = float(np.nanpercentile(values, max(0.0, 100.0 - percentile))) if len(values) else threshold
@@ -457,7 +481,7 @@ def run_prefilter(
     threshold_applied = mode != "none" and bool(cfg_get(cfg, "mature.prefilter.enforce_threshold", True))
     passed = frame[frame["pass_llr"]].copy() if threshold_applied else frame.copy()
     if mode != "none":
-        passed = passed.sort_values("esm_llr", ascending=False).head(top_n)
+        passed = passed.sort_values("esm_llr", ascending=False, kind="stable").head(top_n)
     if bool(cfg_get(cfg, "rank.include_wt_control", False)):
         wt_rows = frame[frame["variant_id"] == "WT"]
         if not wt_rows.empty and "WT" not in set(passed["variant_id"]):
@@ -476,6 +500,8 @@ def run_prefilter(
         "threshold_applied": threshold_applied,
         "evaluation_limit_applied": mode != "none",
         "prior_state": "not_evaluated" if mode == "none" else "evaluated",
+        "ranking_tie_break": "stable_recorded_library_row_order",
+        "top_n_policy": "descending_ESM_LLR_then_recorded_library_row_order; WT may be restored separately",
         "percentile": percentile if threshold_mode == "percentile" else None,
     })
     if mode != "none" and not threshold_applied:
@@ -521,7 +547,10 @@ def _run_antifold(
     model_path = antifold_model_path(cfg, env)
     if not dry_run and (model_path is None or not model_path.is_file()):
         raise shell.ToolError("AntiFold 로컬 가중치가 없습니다. nanocofold setup --profile mature 실행 후 재시도하세요.")
-    out_dir = phase_dir / "antifold"
+    # Preserve prior attempts but require this invocation to produce its own
+    # result. A leftover CSV must never stand in for a missing new output.
+    out_dir = phase_dir / "antifold" / ("attempt-" + uuid4().hex)
+    out_dir.mkdir(parents=True, exist_ok=False)
     argv = [
         str(shell.env_python(env)) if not dry_run else "python",
         str(Path(__file__).resolve().parent / "scripts" / "antifold_local.py"),
@@ -665,6 +694,9 @@ def _parse_antifold_output(
     csv_candidates = sorted(Path(out_dir).glob("*.csv"))
     if not csv_candidates:
         warnings.append("AntiFold 출력 CSV를 찾지 못했습니다 (로그 확인).")
+        return None
+    if len(csv_candidates) != 1:
+        warnings.append("AntiFold 출력 CSV가 여러 개라 현재 결과를 확정할 수 없습니다. 별도 출력 폴더로 다시 실행하세요.")
         return None
     frame = pd.read_csv(csv_candidates[0])
     aa_columns = [aa for aa in AMINO_ACIDS if aa in frame.columns]

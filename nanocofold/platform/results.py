@@ -34,8 +34,13 @@ SEARCH_FIELDS = ("candidate_id", "sequence", "exclusion_reason", "exclusion_reas
 TABLES = ("03_score/scored_candidates.csv", "02_screen/candidates.csv", "02_design/design_candidates.csv",
           "02_mature/esm2_scored_library.csv", "02_mature/prefiltered_candidates.csv", "02_design/all_generated_candidates.csv")
 METRIC_HELP = {
-    "ipsae": "계면의 PAE 기반 구조 일관성 점수입니다. 알려진 결합 위치와의 일치·결합 확률·KD를 평가하지 않습니다.",
-    "iptm": "예측 복합체의 상대 배치 신뢰도 점수입니다. 알려진 결합 위치 일치나 실제 결합을 확정하지 않습니다.",
+    "ipsae": "PAE 기반 구조 일관성 점수입니다. VHH 모드는 선택한 표적–VHH 계면이며, 일반 복합체 요약은 ipsae_scope·ipsae_pair에 기록된 체인 쌍을 확인하세요. 결합 확률·KD가 아닙니다.",
+    "iptm": "VHH 모드에서는 선택한 표적–VHH 쌍 신뢰도입니다. 일반 복합체 모델 요약의 전역 ipTM과 구분하고 iptm_source·iptm_scope를 확인하세요. 실제 결합·KD가 아닙니다.",
+    "complex_iptm": "native 전체 복합체 ipTM입니다. 3체인 이상에서 표적–VHH 쌍 ipTM을 대체하거나 쌍 게이트를 통과시키지 않습니다.",
+    "iptm_source": "기록된 쌍 ipTM의 native 출처·체인 축 대응·방향별 요약법입니다. unavailable은 미평가를 뜻합니다.",
+    "ipsae_scope": "ipSAE 요약에 실제 사용된 체인 쌍·집계 범위입니다. 기록되지 않은 다중 체인 요약은 전체 복합체 점수로 해석하지 않습니다.",
+    "ipsae_pair": "요약 ipSAE가 나타내는 체인 쌍입니다. 다른 쌍은 pair_metrics에서 각각 확인합니다.",
+    "iptm_unavailable_reason": "표적–VHH 쌍 ipTM 미평가의 기록 사유입니다. 미평가를 0 또는 통과로 바꾸지 않습니다.",
     "interface_plddt": "계면 잔기의 예측 구조 신뢰도입니다. 실험 구조의 B-factor와 구분하세요.",
     "hotspot_contact_frac": "평가 가능한 hotspot 중 접촉 거리 조건을 만족한 비율입니다.",
     "n_clashes": "고정 거리 기준 이내의 무거운 원자쌍 수입니다. 표적·보존 파트너와 VHH 사이를 합산합니다. 잔기 수나 원소별 반데르발스 충돌 판정이 아닙니다.",
@@ -267,6 +272,7 @@ class ResultReader:
             if not isinstance(settings, dict):
                 settings = {}
             for row in rows:
+                row["model_record"] = True
                 # General-complex receipts record these conditions at run level.
                 # Retain explicit per-model values and keep absent receipts null.
                 row.setdefault("msa", settings.get("msa"))
@@ -311,6 +317,7 @@ class ResultReader:
                     order.append(identifier)
                 records[identifier].update(row)
                 if relative == TABLES[0]:
+                    records[identifier]["model_record"] = True
                     records[identifier]["evaluated"] = row.get("final_evaluated", True) is True
                     if row.get("cif_path") and not row.get("structure_stage"):
                         records[identifier]["structure_stage"] = "final_prediction"
@@ -318,6 +325,7 @@ class ResultReader:
         result = []
         for identifier in order:
             row = records[identifier]
+            row.setdefault("model_record", False)
             row["candidate_id"] = identifier
             if row.get("error") and row.get("pred_dir"):
                 try:
@@ -342,7 +350,16 @@ class ResultReader:
             if not row["evaluated"] and row.get("design_screening_reason"):
                 row["exclusion_reasons"].append(row["design_screening_reason"])
             if not row["evaluated"]:
-                row["exclusion_reasons"] = list(dict.fromkeys(row["exclusion_reasons"] + ["not_scored"]))
+                if not row.get("model_record") and self.config.get("run", {}).get("mode") == "mature":
+                    prior = self.state.get("phases", {}).get("mature", {})
+                    if identifier == "WT" and self.config.get("rank", {}).get("include_wt_control") is False:
+                        row["exclusion_reasons"].append("wt_control_not_in_model_pool")
+                    elif prior.get("evaluated") is True:
+                        prior_reason = ("sequence_prior_prefilter_unmet" if row.get("pass_llr") is False else
+                                        "sequence_prior_top_n_not_selected" if row.get("pass_llr") is True else
+                                        "sequence_prior_prefilter_unassessed")
+                        row["exclusion_reasons"].append(prior_reason)
+                row["exclusion_reasons"] = list(dict.fromkeys(row["exclusion_reasons"] + ["not_scored" if row.get("model_record") else "prefilter_not_selected"]))
                 row["final_eligible"] = None
                 for key in GEOMETRY_METADATA:
                     if key in row:
@@ -437,7 +454,8 @@ class ResultReader:
         """Explain recorded assessments without rescoring read-only results."""
         thresholds = self.config.get("score", {}).get("thresholds", {})
         rank = self.config.get("rank", {})
-        checks = []
+        recorded_checks = row.get("threshold_checks")
+        checks = copy.deepcopy(recorded_checks) if isinstance(recorded_checks, list) else []
         for metric, threshold_key, flag, operator in (
                 ("ipsae", "ipsae", "pass_ipsae", ">="),
                 ("iptm", "iptm", "pass_iptm", ">="),
@@ -447,6 +465,8 @@ class ResultReader:
                 ("dev_severe", "max_dev_severe", None, "<=")):
             source = rank if metric == "dev_severe" else thresholds
             recorded = isinstance(source, dict) and threshold_key in source
+            if isinstance(recorded_checks, list):
+                continue
             checks.append({"metric": metric, "value": row.get(metric), "operator": operator,
                            "threshold": source[threshold_key] if recorded else None,
                            "passed": row.get(flag) if flag else None,
@@ -510,7 +530,13 @@ class ResultReader:
             summary.update(retention="minimal", full_execution_available=False,
                            capabilities=self.retained.get("capabilities", {}))
             return summary
+        recorded_engines = self.engine_provenance()
         rows = self.all_rows()
+        population = {"candidate_record_total": len(rows),
+                      "model_record_total": sum(row.get("model_record") is True for row in rows),
+                      "scored_record_total": sum(row.get("model_record") is True for row in rows),
+                      "preprediction_record_total": sum(row.get("model_record") is False for row in rows),
+                      "population_scope": "Candidate records include prepared/generated/prefiltered sequences. Model records are the authoritative final score/complex ledger, including failed/incomplete attempts; evaluated models are counted separately."}
         from ..publication import publication_issue, tables_available
         final = self.state.get("phases", {}).get("final", {})
         source_delivery_status = final.get("delivery_status")
@@ -526,11 +552,18 @@ class ResultReader:
             failures = sum(bool(r.get("error")) for r in rows)
             execution = self.state.get("execution", {}).get("state", "incomplete")
             status = "partial_failure" if (failures or issues) and execution == "complete" else execution
-            return {"id": self.root.name, "mode": "complex", "name": self.config.get("run", {}).get("name", self.root.name),
+            expected = self.state.get("phases", {}).get("prediction", {}).get("total_models")
+            if type(expected) is not int or expected < 0:
+                expected = final.get("total_models")
+            if type(expected) is not int or expected < 0:
+                expected = None
+            return {**population, "id": self.root.name, "mode": "complex", "name": self.config.get("run", {}).get("name", self.root.name),
                     "total": len(rows), "scored_total": sum(bool(r.get("evaluated")) for r in rows), "failed_candidates": failures, "issues": issues,
                     "mock": False, "status": status, "complete": status == "complete", "readonly": True,
                     "config": self.config, "state": self.state, "conditions": self.config.get("complex", {}),
-                    "source_delivery_status": source_delivery_status, "delivery_artifact": delivery_artifact}
+                    "source_delivery_status": source_delivery_status, "delivery_artifact": delivery_artifact,
+                    "expected_total": expected,
+                    "engine_provenance": recorded_engines}
 
         run = self.config.get("run", {})
         warnings = self.state.get("warnings", [])
@@ -555,7 +588,7 @@ class ResultReader:
         status = authoritative_status or ("complete" if finalized else "incomplete")
         if finalized and successful_execution and (failures or issues or stage_failure):
             status = "partial_failure"
-        return {"id": self.root.name, "name": run.get("name", self.root.name), "path": str(self.root),
+        return {**population, "id": self.root.name, "name": run.get("name", self.root.name), "path": str(self.root),
                 "mode": run.get("mode"), "mock": bool(run.get("mock")), "total": len(rows),
                 "scored_total": sum(row["evaluated"] for row in rows),
                 "eligible_total": sum(row.get("final_eligible") is True for row in rows),
@@ -568,6 +601,8 @@ class ResultReader:
                 "platform_status": {**self.platform_status, "applies": status_applies} if self.platform_status else None,
                 "issues": issues, "config": self.config, "state": self.state,
                 "source_delivery_status": source_delivery_status, "delivery_artifact": delivery_artifact,
+                "expected_total": comparison.get("expected_rows"),
+                "engine_provenance": recorded_engines,
                 "ranking_policy": self._json("03_score/ranking_policy.json") if self._path("03_score/ranking_policy.json").is_file() else None,
                 "conditions": {"seed": run.get("seed"), "engine": self.config.get("screen", {}).get("engine"),
                                "cascade": cascade,
@@ -925,14 +960,52 @@ class ResultReader:
     def provenance(self):
         authoritative = []
         for relative in ("run_config.yaml", "run_state.json", "complex_results.json", "03_score/scored_candidates.csv",
-                         "05_final/selected_candidates.csv", "03_score/ranking_policy.json", "retained/manifest.json"):
+                         "05_final/selected_candidates.csv", "03_score/ranking_policy.json", "retained/manifest.json",
+                         "02_comparison/comparison_identity.json", "02_comparison/comparison_status.json", "preflight.json"):
             path = self._path(relative)
             if path.is_file():
                 path = self.artifact_path(relative)
                 authoritative.append({"path": relative, "size": path.stat().st_size, "sha256": sha256(path)})
         return {"source_artifacts": authoritative,
+            "engine_provenance": self.engine_provenance(),
             "ranking_policy": self._json("03_score/ranking_policy.json") if self._path("03_score/ranking_policy.json").is_file() else None,
             "scope": "saved authoritative result files; raw predictions listed separately"}
+
+    def engine_provenance(self):
+        """Expose saved versions and runtime fingerprints without a live probe."""
+        identity = self._json("02_comparison/comparison_identity.json")
+        runtime = identity.get("runtime", {}) if isinstance(identity, dict) else {}
+        preflight = self._json("preflight.json")
+        registered = preflight.get("engines", {}) if isinstance(preflight, dict) else {}
+        if not isinstance(runtime, dict):
+            runtime = {}
+        if not isinstance(registered, dict):
+            registered = {}
+        engines = list(dict.fromkeys([*runtime, *registered]))
+        records = []
+        for engine in engines:
+            saved = registered.get(engine, {})
+            saved = saved if isinstance(saved, dict) else {}
+            probe = saved.get("env_probe", {})
+            probe = probe if isinstance(probe, dict) else {}
+            versions = probe.get("imports", {})
+            versions = versions if isinstance(versions, dict) else {}
+            versions = {name: value.get("version") for name, value in versions.items()
+                        if isinstance(value, dict) and isinstance(value.get("version"), str)}
+            native_runtime = runtime.get(engine)
+            native_runtime = copy.deepcopy(native_runtime) if isinstance(native_runtime, dict) else None
+            if native_runtime and isinstance(native_runtime.get("source"), dict):
+                # Paths as JSON object keys cannot be redacted without losing
+                # colliding external files. Preserve every digest in path rows
+                # so the portable presentation copy can sanitize each value.
+                native_runtime["source_files"] = [{"path": path, "sha256": digest}
+                                                  for path, digest in native_runtime.pop("source").items()]
+            records.append({"engine": engine, "versions": versions,
+                            "runtime": native_runtime,
+                            "weights": saved.get("weights"), "installation_identity": saved.get("installation_identity"),
+                            "version_source": "preflight.json" if versions else "not_recorded",
+                            "runtime_source": "02_comparison/comparison_identity.json" if native_runtime else "not_recorded"})
+        return records
 
     def export_to_file(self, format: str, filters: dict | None = None):
         """Spool a full archive for HTTP delivery; caller removes the temp file.
@@ -971,8 +1044,12 @@ class ResultReader:
         rows, columns = all_table["rows"], all_table["columns"]
         if format == "report_zip":
             return self._delivery_export(all_table, allowed, table)
+        from ..utils.presentation import portable_metadata
+        all_table = portable_metadata(all_table, root=self.root)
+        rows = all_table["rows"]
         provenance = {"summary": self.summary(), "filters": allowed, "filtered_ids": [row["candidate_id"] for row in table["rows"]],
                       **self.provenance()}
+        provenance = portable_metadata(provenance, root=self.root)
         def csv_bytes():
             from ..utils.spreadsheet import csv_cell
             stream = io.StringIO()
@@ -1051,8 +1128,9 @@ class ResultReader:
                 structures.append(self.structure(observation["candidate_id"], observation["observation_id"]))
             except (OSError, ValueError, KeyError) as exc:
                 self.issues.append(f"{observation['observation_id']}: {exc}")
-        return {"summary": self.summary(delivery_artifact=delivery_artifact), "candidates": all_table, "observations": observations,
-                "structures": structures, "filters": filters, "provenance": provenance}
+        from ..utils.presentation import portable_metadata
+        return portable_metadata({"summary": self.summary(delivery_artifact=delivery_artifact), "candidates": all_table, "observations": observations,
+                                  "structures": structures, "filters": filters, "provenance": provenance}, root=self.root)
 
     @staticmethod
     def _offline_document(payload, assets=None):
@@ -1090,7 +1168,8 @@ class ResultReader:
         # logs, old archives and intermediate tensors are never traversed here.
         source_paths = ("run_config.yaml", "run_state.json", "complex_results.json", "models.csv",
                         *TABLES, "05_final/selected_candidates.csv", "01_target/residue_mapping.csv",
-                        "retained/manifest.json", "retained/record.json")
+                        "retained/manifest.json", "retained/record.json", "preflight.json",
+                        "02_comparison/comparison_identity.json", "02_comparison/comparison_status.json")
         sources = []
         for relative in source_paths:
             path = self._path(relative)
@@ -1100,6 +1179,7 @@ class ResultReader:
         provenance = {"summary": self.summary(), "filters": filters,
                       "filtered_ids": [row["candidate_id"] for row in filtered_table["rows"]],
                       "source_artifacts": sources, "viewer_asset_sources": asset_sources,
+                      "engine_provenance": self.engine_provenance(),
                       "scope": "report_inputs_and_embedded_structures"}
         payload = self._offline_payload(all_table, filters, provenance, delivery_artifact=True)
         # Hash exactly what the collaborator can inspect, including every seed
@@ -1114,6 +1194,7 @@ class ResultReader:
             embedded.append(entry)
         provenance["embedded_structures"] = embedded
         provenance["summary"] = payload["summary"]
+        payload["provenance"] = provenance
         from ..utils.presentation import portable_metadata
         # Resolve/embed native files first, then sanitize the presentation copy.
         # This never rewrites source CSVs, coordinates, PAE or runtime config.
