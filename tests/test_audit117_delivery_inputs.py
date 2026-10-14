@@ -25,8 +25,8 @@ def test_allowed_candidate_id_exports_to_safe_pymol_object(tmp_path, identifier)
     mapping = json.loads(next(line.split(': ', 1)[1] for line in text.splitlines() if line.startswith('# candidate_id_map: ')))
     assert mapping['candidate_id'] == identifier
     assert re.fullmatch('[A-Za-z0-9_]+', mapping['object'])
-    assert text.count('load ') == 1
-    assert f", {mapping['object']}" in text
+    assert text.count('cmd.load(') == 1
+    assert repr(mapping['object']) in text
 
 
 def test_pymol_mapped_names_and_synthesis_bom(tmp_path):

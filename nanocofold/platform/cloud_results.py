@@ -11,7 +11,7 @@ from .paths import native, sha256
 
 def write(path,value):
     path.parent.mkdir(parents=True,exist_ok=True)
-    path.write_text(json.dumps(native(value),ensure_ascii=False,allow_nan=False))
+    path.write_bytes(json.dumps(native(value),ensure_ascii=False,allow_nan=False).encode('utf-8'))
 
 
 def build_bundle(run_root, destination, snapshot_root=None):
@@ -107,5 +107,5 @@ def store_structure(data,destination,prefix):
         pae.update(size=n,tiles=tiles)
     name=prefix+'/structure.json';write(destination/name,data)
     structure_name=prefix+'/model.'+('pdb' if data['format']=='pdb' else 'cif')
-    (destination/structure_name).write_text(data['content'])
+    (destination/structure_name).write_bytes(data['content'].encode('utf-8'))
     return {'file':name,'model_file':structure_name}

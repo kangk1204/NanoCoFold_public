@@ -113,6 +113,8 @@ def predict(cfg, work_dir, target, candidates, *, mock=False, dry_run=False,
     from .input_review import validate_reviewed_input
     validate_reviewed_input(cfg)
     work_dir = Path(work_dir)
+    identifiers = seq.validate_candidate_ids(candidates[id_column].astype(str))
+    aliases = seq.candidate_id_aliases(identifiers)
     work_dir.mkdir(parents=True, exist_ok=True)
     if candidates[id_column].astype(str).duplicated().any():
         raise ValueError("ColabFold 후보 ID는 중복될 수 없습니다.")
@@ -132,9 +134,8 @@ def predict(cfg, work_dir, target, candidates, *, mock=False, dry_run=False,
     expected_models = options["num_models"] * options["num_seeds"]
     identity = {} if mock or dry_run else provenance.runtime_identity(cfg, "colabfold", env=env, env_vars=extra)
     marker_name = "colabfold_complete.json"
-    identifiers = [seq.validate_candidate_id(str(v)) for v in candidates[id_column]]
     attempt = uuid.uuid4().hex
-    plan = {"attempt_id": attempt, "engine": "colabfold", "candidate_ids": identifiers}
+    plan = {"attempt_id": attempt, "engine": "colabfold", "candidate_ids": identifiers, "id_aliases": aliases}
     progress = {"attempt_id": attempt, "completed": []}
     prepared = []
     # Validate the complete submission before changing any saved output/cache.
@@ -168,6 +169,7 @@ def predict(cfg, work_dir, target, candidates, *, mock=False, dry_run=False,
                   "target_chain": "A", "binder_chain": binder, "seed": seed, "msa": "mock" if mock else options["msa_mode"],
                   "restraint": False, "num_recycles": options["num_recycles"], "num_models": expected_models,
                   "aux_chains": ";".join(f"{name}:{letter}" for name, letter in auxiliary)}
+        record["native_job_id"] = aliases[identifier]
         records[identifier] = record
         if query_msa:
             record["msa_sha256"] = query_msa.identity["query_a3m_sha256"]
@@ -177,6 +179,9 @@ def predict(cfg, work_dir, target, candidates, *, mock=False, dry_run=False,
         except (OSError, ValueError):
             marker = {}
         if not mock and not dry_run and marker.get("fingerprint") == fingerprint and marker.get("status") == "complete" and provenance.outputs_match(output, marker.get("outputs")) and _valid_outputs(output, chains, expected_models):
+            # A legacy completion may predate job aliases. The new plan's alias
+            # must not be presented as the filename used by an earlier call.
+            record["native_job_id"] = marker.get("native_job_id")
             progress["completed"].append(identifier)
         else:
             if not dry_run:
@@ -204,13 +209,16 @@ def predict(cfg, work_dir, target, candidates, *, mock=False, dry_run=False,
         query = batch / "queries.csv"
         query_rows = []
         for identifier, chains, fingerprint, query_msa in chunk:
-            item = {"id": identifier, "sequence": ":".join(chains.values())}
+            item = {"id": aliases[identifier], "sequence": ":".join(chains.values())}
             if query_msa:
-                path = query_msa.write(batch / "a3ms" / (identifier + ".a3m"))
+                path = query_msa.write(batch / "a3ms" / (aliases[identifier] + ".a3m"))
                 item["a3mpath"] = str(path.resolve())
                 _save(work_dir / identifier / "colabfold_msa.json", query_msa.identity)
             query_rows.append(item)
         pd.DataFrame(query_rows).to_csv(query, index=False)
+        _save(batch / "query_id_aliases.json", {"schema_version": 1,
+            "original_to_alias": {identifier: aliases[identifier] for identifier, *_ in chunk},
+            "alias_to_original": {aliases[identifier]: identifier for identifier, *_ in chunk}})
         raw = batch / "raw"
         argv = [str(shell.env_executable(env, "colabfold_batch", dry_run=dry_run)), str(query), str(raw),
                 "--model-type", "alphafold2_multimer_v3", "--msa-mode", "mmseqs2_uniref_env" if options["msa_mode"] == "precomputed" else "single_sequence", "--data", str(data),
@@ -233,7 +241,7 @@ def predict(cfg, work_dir, target, candidates, *, mock=False, dry_run=False,
         if not dry_run:
             for identifier, chains, fingerprint, query_msa in chunk:
                 directory = work_dir / identifier
-                done = raw / (identifier + ".done.txt")
+                done = raw / (aliases[identifier] + ".done.txt")
                 if interrupted is not None and (not done.is_file() or done.is_symlink()):
                     # Upstream v1.6.3 writes this candidate-local marker only
                     # after saving all models, scores and plots. Parseable raw
@@ -245,10 +253,11 @@ def predict(cfg, work_dir, target, candidates, *, mock=False, dry_run=False,
                 try:
                     if chain_records is not None and (result is None or result.returncode != 0):
                         raise ValueError("ColabFold 일반 복합체 명령이 정상 종료하지 않았습니다. 원본 출력과 로그를 확인하세요.")
-                    count = _normalize(raw, identifier, directory / "colabfold_out", chains)
+                    count = _normalize(raw, aliases[identifier], directory / "colabfold_out", chains)
                     if count != expected_models:
                         raise ValueError(f"ColabFold 모델 수 불일치: {count}/{expected_models}")
                     marker = {"status": "complete", "fingerprint": fingerprint,
+                              "original_id": identifier, "native_job_id": aliases[identifier],
                               "outputs": provenance.output_manifest(directory / "colabfold_out"), "model_count": count,
                               "msa": query_msa.identity if query_msa else None}
                     if done.is_file() and not done.is_symlink():

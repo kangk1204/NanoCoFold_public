@@ -207,6 +207,9 @@ def _report_presentation(scored: pd.DataFrame | None, selected: pd.DataFrame | N
     for row in rows:
         explicit = "final_evaluated" if "final_evaluated" in row else "evaluated" if "evaluated" in row else None
         assessed = _recorded_bool(row.get(explicit)) if explicit else not bool(row.get("error") or row.get("prediction_error"))
+        if any(bool(error.strip()) if isinstance(error, str) else bool(error)
+               for error in (row.get("error"), row.get("prediction_error"))):
+            assessed = False  # Presentation only: a recorded failure cannot be a completed evaluation.
         is_model = "model_record" not in row or _recorded_bool(row.get("model_record")) is True
         if is_model:
             evaluated.append(assessed)
@@ -273,7 +276,6 @@ def metric_scope_records(rows: list[dict], mode: str) -> list[dict]:
     for saved in rows:
         row = dict(saved)
         if mode == "complex":
-            row.setdefault("iptm_scope", "whole_complex")
             if not row.get("ipsae_scope"):
                 pairs = row.get("pair_metrics")
                 first = pairs[0] if isinstance(pairs, list) and pairs and isinstance(pairs[0], dict) else None

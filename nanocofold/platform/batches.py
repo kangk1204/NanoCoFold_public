@@ -12,6 +12,7 @@ from pathlib import Path
 
 from .inputs import INPUT_PATHS, parse_fasta, normalized_config, normalized_fasta_config, _deep_merge
 from .jobs import TERMINAL
+from .errors import public_error
 from .paths import contained, sha256
 
 MAX_BATCH = 200
@@ -143,7 +144,7 @@ class BatchManager:
                     if payload["mode"] == "complex" else normalized_fasta_config(self.inputs.workspace, row["input"]))
                    for row in rows]
         # Consent covers this exact manifest, never an earlier single-analysis draft.
-        requires_api = any(cfg.get("screen", {}).get("allow_public_msa_server") or row["input"].get("msa_backend") == "mmseqs2_api" or cfg.get("structure", {}).get("msa", {}).get("backend") == "mmseqs2_api" for row, cfg in zip(rows, configs))
+        requires_api = any(cfg.get("screen", {}).get("allow_public_msa_server") or cfg.get("complex", {}).get("allow_public_msa_server") for cfg in configs)
         if requires_api and payload.get("api_consent") is not True:
             raise ValueError("이 배치의 표적과 후보 서열을 외부 MSA 서비스로 보내는 데 동의하세요.")
         batch = {"id": uuid.uuid4().hex, "name": str(payload.get("name", "배치 분석"))[:120], "mode": payload["mode"], "created": time.time(), "manifest_sha256": digest(payload), "rows": [], "predictions_executed": False}
@@ -178,7 +179,7 @@ class BatchManager:
                     prepared = self.inputs.fasta(value)
                 entry.update(input_id=prepared["input_id"], input_sha256=digest(prepared), input_files=self._files(prepared["config"]), config_file_sha256=sha256(Path(prepared["config_path"])), review=prepared["review"], job_id=None)
             except (ValueError, TypeError) as exc:
-                entry["error"] = str(exc)
+                entry["error"] = public_error(exc)
             batch["rows"].append(entry)
         batch["review_sha256"] = digest(batch)
         self._save(batch)
@@ -229,7 +230,7 @@ class BatchManager:
                     job = self.jobs.create({"config": prepared[row["id"]]["config"], "mode": batch["mode"], "name": f"{batch['name']} · {row['id']}"[:120], "submission_id": f"batch-{identifier}-{number:03d}", "budget_seconds": budget})
                     row.update(job_id=job["id"], submission_error=None)
                 except (ValueError, OSError) as exc:
-                    row["submission_error"] = str(exc)
+                    row["submission_error"] = public_error(exc)
                 self._save(batch)
             return self.get(identifier)
 

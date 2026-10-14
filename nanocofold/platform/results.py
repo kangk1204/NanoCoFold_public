@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import copy
+import hashlib
 import io
 import json
 import math
@@ -34,12 +35,13 @@ SEARCH_FIELDS = ("candidate_id", "sequence", "exclusion_reason", "exclusion_reas
 TABLES = ("03_score/scored_candidates.csv", "02_screen/candidates.csv", "02_design/design_candidates.csv",
           "02_mature/esm2_scored_library.csv", "02_mature/prefiltered_candidates.csv", "02_design/all_generated_candidates.csv")
 METRIC_HELP = {
-    "ipsae": "PAE 기반 구조 일관성 점수입니다. VHH 모드는 선택한 표적–VHH 계면이며, 일반 복합체 요약은 ipsae_scope·ipsae_pair에 기록된 체인 쌍을 확인하세요. 결합 확률·KD가 아닙니다.",
+    "ipsae": "PAE 기반 구조 일관성 점수입니다. VHH 모드는 선택한 표적–VHH 계면이며, 일반 복합체 요약은 ipsae_scope·ipsae_chain_a·ipsae_chain_b에 기록된 체인 쌍을 확인하세요. 결합 확률·KD가 아닙니다.",
     "iptm": "VHH 모드에서는 선택한 표적–VHH 쌍 신뢰도입니다. 일반 복합체 모델 요약의 전역 ipTM과 구분하고 iptm_source·iptm_scope를 확인하세요. 실제 결합·KD가 아닙니다.",
     "complex_iptm": "native 전체 복합체 ipTM입니다. 3체인 이상에서 표적–VHH 쌍 ipTM을 대체하거나 쌍 게이트를 통과시키지 않습니다.",
     "iptm_source": "기록된 쌍 ipTM의 native 출처·체인 축 대응·방향별 요약법입니다. unavailable은 미평가를 뜻합니다.",
     "ipsae_scope": "ipSAE 요약에 실제 사용된 체인 쌍·집계 범위입니다. 기록되지 않은 다중 체인 요약은 전체 복합체 점수로 해석하지 않습니다.",
-    "ipsae_pair": "요약 ipSAE가 나타내는 체인 쌍입니다. 다른 쌍은 pair_metrics에서 각각 확인합니다.",
+    "ipsae_chain_a": "요약 ipSAE의 첫 체인입니다. 다른 체인 쌍은 pair_metrics에서 확인합니다.",
+    "ipsae_chain_b": "요약 ipSAE의 둘째 체인입니다. 다른 체인 쌍은 pair_metrics에서 확인합니다.",
     "iptm_unavailable_reason": "표적–VHH 쌍 ipTM 미평가의 기록 사유입니다. 미평가를 0 또는 통과로 바꾸지 않습니다.",
     "interface_plddt": "계면 잔기의 예측 구조 신뢰도입니다. 실험 구조의 B-factor와 구분하세요.",
     "hotspot_contact_frac": "평가 가능한 hotspot 중 접촉 거리 조건을 만족한 비율입니다.",
@@ -705,6 +707,9 @@ class ResultReader:
                                         observation[metric] = candidate.get("colabfold_" + metric)
                                 observation["scored"] = True
                                 observation["score_stage"] = "colabfold"
+                                for key in ("iptm_scope", "iptm_source"):
+                                    if "colabfold_" + key in candidate:
+                                        observation[key] = candidate["colabfold_" + key]
                         except (ValueError, OSError):
                             pass
                     if candidate and observation["stage"] == "first" and candidate.get("colabfold_error"):
@@ -718,6 +723,9 @@ class ResultReader:
                                         observation[metric] = final.get(metric)
                                 observation["scored"] = True
                                 observation["score_stage"] = "boltz2" if observation["stage"] == "final" else observation["structure_stage"]
+                                for key in ("iptm_scope", "iptm_source"):
+                                    if key in final:
+                                        observation[key] = final[key]
                         except (ValueError, OSError):
                             pass
                     rows.append(observation)
@@ -831,16 +839,147 @@ class ResultReader:
     def structure(self, candidate_id, observation_id=None):
         if self.retained:
             from .retention import retained_structure
-            return retained_structure(self.root, candidate_id, observation_id)
+            return self._coordinate_contract(retained_structure(self.root, candidate_id, observation_id))
         if self.config.get("run", {}).get("mode") == "complex":
             row = next((r for r in self.all_rows() if r["candidate_id"] == candidate_id), None)
             if row is None or not row.get("structure_file"):
                 raise FileNotFoundError("이 모델의 구조가 없습니다.")
             data = self._json(row["structure_file"])
-            if not data or not data.get("content"):
+            if not data or not isinstance(data.get("content"), str) or not data["content"]:
                 raise ValueError("저장된 복합체 구조가 손상되었습니다.")
-            return {**data, "candidate_id": candidate_id, "observation_id": observation_id}
+            return self._coordinate_contract({**data, "candidate_id": candidate_id, "observation_id": observation_id}, row=row)
         return self._nanobody_structure(candidate_id, observation_id)
+
+    def _native_coordinate_receipt(self, path, digest, row):
+        """Match this exact file to a saved native completion output hash.
+
+        A file name, score-table reference, or parseable coordinate is not a
+        native-origin receipt. Search only the selected file's owned ancestors.
+        """
+        if self.config.get("run", {}).get("mock") or row.get("engine") == "mock":
+            return {"status": "unavailable", "reason": "mock_coordinates"}
+        markers = (("boltz_complete.json", "boltz_out"),
+                   ("colabfold_complete.json", "colabfold_out"),
+                   ("prediction_complete.json", "chai_out"),
+                   ("prediction_complete.json", "opendde_out"))
+        mismatch = False
+        for parent in path.parents:
+            if not parent.is_relative_to(self.root):
+                break
+            for name, output in markers:
+                marker = parent / name
+                if not marker.is_file():
+                    continue
+                relative = str(marker.relative_to(self.root))
+                try:
+                    receipt = self._json(relative)
+                    directory = self._path(str((parent / output).relative_to(self.root)))
+                except (ValueError, OSError):
+                    # A stale/external receipt cannot hide usable local display
+                    # coordinates or establish their native origin.
+                    continue
+                outputs = receipt.get("outputs")
+                if receipt.get("status") != "complete" or not isinstance(outputs, dict):
+                    continue
+                if not path.is_relative_to(directory):
+                    continue
+                expected = outputs.get(str(path.relative_to(directory)))
+                if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
+                    continue
+                if expected != digest:
+                    mismatch = True
+                    continue
+                return {"status": "verified", "basis": "native_completion_output_sha256",
+                        "receipt_path": relative, "receipt_sha256": sha256(marker)}
+        return {"status": "hash_mismatch" if mismatch else "unavailable",
+                "reason": "native_coordinate_hash_mismatch" if mismatch else "native_origin_not_recorded"}
+
+    def _coordinate_contract(self, payload, *, path=None, row=None):
+        """Normalize provenance without changing display coordinates or axes.
+
+        UTF-8 bytes are preserved (including CRLF). Embedded raw coordinates
+        need their own recorded SHA; legacy display content never establishes
+        native origin merely because it resembles an engine output.
+        """
+        data = dict(payload)
+        source = data.get("coordinate_source")
+        source = source if isinstance(source, dict) else {}
+        row = row or {}
+        content = data.get("content", "")
+        display_sha = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        raw, raw_path, raw_format = None, None, None
+        verification = {"status": "unavailable", "reason": "native_origin_not_recorded"}
+        expected = source.get("raw_sha256")
+        if isinstance(expected, str) and re.fullmatch(r"[0-9a-f]{64}", expected):
+            # A saved complex/retained payload explicitly records native bytes.
+            embedded = data.get("raw_content")
+            raw = embedded.encode("utf-8") if isinstance(embedded, str) else None
+            try:
+                if source.get("raw_path"):
+                    original = self.artifact_path(source["raw_path"])
+                    raw_path = str(original.relative_to(self.root))
+                    if original.is_file():
+                        original_bytes = original.read_bytes()
+                        if raw is not None and raw != original_bytes:
+                            raise ValueError("embedded_raw_mismatch")
+                        raw = original_bytes
+                        raw_format = original.suffix.lower().lstrip(".")
+                artifacts = row.get("artifacts", {})
+                if isinstance(artifacts, dict) and raw_path in artifacts and artifacts[raw_path] != expected:
+                    raise ValueError("recorded_raw_hash_conflict")
+                if raw is None:
+                    verification["reason"] = "recorded_native_coordinates_missing"
+                elif hashlib.sha256(raw).hexdigest() != expected:
+                    raise ValueError("recorded_raw_hash_mismatch")
+                else:
+                    verification = {"status": "verified", "basis": "stored_coordinate_source_sha256"}
+                    if raw_path and (self.root / raw_path).is_file():
+                        verification["basis"] = "stored_coordinate_source_and_file_sha256"
+                    if row.get("structure_file"):
+                        verification["receipt_path"] = row["structure_file"]
+                        verification["receipt_sha256"] = sha256(self.artifact_path(row["structure_file"]))
+                    elif data.get("content_file"):
+                        verification["receipt_path"] = data["content_file"]
+            except (ValueError, TypeError, OSError):
+                verification = {"status": "hash_mismatch", "reason": "recorded_native_coordinates_unverified"}
+        elif path is not None:
+            raw = path.read_bytes()
+            expected = hashlib.sha256(raw).hexdigest()
+            verification = self._native_coordinate_receipt(path, expected, row)
+            raw_path, raw_format = str(path.relative_to(self.root)), path.suffix.lower().lstrip(".")
+        verified = verification["status"] == "verified"
+        if verified:
+            try:
+                raw_content = raw.decode("utf-8")
+            except UnicodeError:
+                verified = False
+                verification = {"status": "unavailable", "reason": "native_coordinates_not_utf8"}
+        transforms = []
+        relation = "unverified_legacy"
+        transform = "native origin not verified"
+        if verified:
+            relation = "native_identical" if raw_content == content else "transformed_display"
+            transform = "none" if relation == "native_identical" else "display differs from verified native bytes; transform not recorded"
+            if relation == "transformed_display":
+                if source.get("display_transform"):
+                    transform = source["display_transform"]
+                    transforms.append("recorded_display_transform")
+                # A VHH reference is a separate overlay. Only the complex
+                # writer's successful reference receipt records an applied fit.
+                if self.config.get("run", {}).get("mode") == "complex":
+                    transforms.append("coordinate_serialization_and_numbering_mapping")
+                    aligned = isinstance(data.get("reference"), dict) and data["reference"].get("available") is True
+                    if aligned:
+                        transforms.append("recorded_reference_alignment")
+                    transform = "coordinate serialization and recorded numbering mapping" + ("; recorded reference alignment" if aligned else "")
+            raw_format = raw_format or data.get("raw_format")
+        data.update(raw_content=raw_content if verified else None, raw_format=raw_format if verified else None,
+                    coordinate_source={"schema_version": 2, "raw_preserved": verified,
+                        "raw_path": raw_path, "raw_sha256": expected if verified else None,
+                        "display_sha256": display_sha, "display_relation": relation,
+                        "display_transform": transform, "display_transforms": transforms,
+                        "verification": verification})
+        return data
 
     def _nanobody_structure(self, candidate_id, observation_id=None):
         from .structure_review import closest_atoms, cysteine_geometry, cdr_annotations, reference_overlay
@@ -927,7 +1066,7 @@ class ResultReader:
             # keep the structure and its independently validated PAE usable.
             pass
         mapping = self.residue_mapping()
-        return native({"candidate_id": candidate_id, "observation_id": observation_id, "content": path.read_text(),
+        payload = native({"candidate_id": candidate_id, "observation_id": observation_id, "content": path.read_text(),
                        "engine": row.get("engine"), **self._observation_stage(row), **conditions,
                        "format": "pdb" if path.suffix.lower() == ".pdb" else "cif", "chains": chains,
                        "target_chain": target_chain, "binder_chain": binder_chain, "hotspots": hotspots,
@@ -936,6 +1075,7 @@ class ResultReader:
                        "cysteines": cysteine_geometry(binder), "reference": reference_overlay(self, pdb_io.get_chain(structure, target_chain), mapping),
                        "target_region": self.config.get("input_review", {}).get("target_region"),
                        "issues": list(dict.fromkeys(self.issues))})
+        return self._coordinate_contract(payload, path=path, row=row)
 
     def residue_mapping(self):
         for relative in ("01_target/residue_mapping.csv", "residue_mapping.csv", "01_target/target_mapping.csv"):

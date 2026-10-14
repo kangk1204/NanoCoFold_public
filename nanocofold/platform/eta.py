@@ -7,12 +7,52 @@ import math
 import re
 import statistics
 import time
+import threading
+from collections import OrderedDict
+from copy import deepcopy
 from pathlib import Path
 
 import yaml
 
 
-def complex_model_observations(job, *, state=None):
+def _file_identity(path):
+    try:
+        stat = Path(path).stat()
+        return stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns
+    except OSError:
+        return None
+
+
+class MetadataReadCache:
+    """Bound parsed metadata to file identity; never use it as queue control state."""
+    def __init__(self, limit=2048):
+        self.limit = limit
+        self.entries = OrderedDict()
+        self._lock = threading.RLock()
+
+    def read(self, path, *, yaml_format=False):
+        with self._lock:
+            return self._read(path, yaml_format=yaml_format)
+
+    def _read(self, path, *, yaml_format=False):
+        path = Path(path)
+        key = (str(path), yaml_format)
+        identity = _file_identity(path)
+        saved = self.entries.get(key)
+        if saved is not None and saved[0] == identity:
+            self.entries.move_to_end(key)
+            return saved[1]
+        self.entries.pop(key, None)
+        # Cache only successful parses, including explicit null/empty records.
+        text = path.read_text()
+        value = yaml.safe_load(text) if yaml_format else json.loads(text)
+        self.entries[key] = (identity, value)
+        while len(self.entries) > self.limit:
+            self.entries.popitem(last=False)
+        return value
+
+
+def complex_model_observations(job, *, state=None, metadata_cache=None):
     """Read recorded model attempts; terminal failures count as attempted models.
 
     Actual run-state totals outrank a config plan. Missing/corrupt counters are
@@ -22,14 +62,15 @@ def complex_model_observations(job, *, state=None):
     root = Path(job["run_dir"])
     settings, rows, rows_recorded = {}, [], False
     try:
-        config = yaml.safe_load(Path(job["config_path"]).read_text()) if job.get("config_path") else {}
+        config = (metadata_cache.read(job["config_path"], yaml_format=True) if metadata_cache is not None
+                  else yaml.safe_load(Path(job["config_path"]).read_text())) if job.get("config_path") else {}
         if isinstance(config, dict) and isinstance(config.get("complex"), dict):
             settings = config["complex"]
     except (OSError, ValueError, yaml.YAMLError):
         pass
     if state is None:
         path = root / "run_state.json"
-        state = json.loads(path.read_text()) if path.is_file() else {}
+        state = (metadata_cache.read(path) if metadata_cache is not None else json.loads(path.read_text())) if path.is_file() else {}
     if not isinstance(state, dict) or not isinstance(state.get("phases", {}), dict):
         raise ValueError("Invalid complex run state")
     prediction = state.get("phases", {}).get("prediction", {})
@@ -37,7 +78,7 @@ def complex_model_observations(job, *, state=None):
         raise ValueError("Invalid complex prediction state")
     result_path = root / "complex_results.json"
     if result_path.is_file():
-        payload = json.loads(result_path.read_text())
+        payload = metadata_cache.read(result_path) if metadata_cache is not None else json.loads(result_path.read_text())
         if not isinstance(payload, dict) or not isinstance(payload.get("rows"), list):
             raise ValueError("Invalid complex result observations")
         rows, rows_recorded = payload["rows"], True
@@ -84,14 +125,15 @@ def complex_model_observations(job, *, state=None):
             "total_source": total_source, "count_status": "inconsistent" if inconsistent else "recorded"}
 
 
-def refresh_complex_job(job):
+def refresh_complex_job(job, *, estimator=None):
     """Reconcile API reads with actual observations, preserving stored records."""
     if job.get("kind") != "analysis" or job.get("mode") != "complex" or not job.get("run_dir"):
         return job
     try:
-        observation = complex_model_observations(job)
+        estimator = estimator if estimator is not None else RuntimeEstimator()
+        observation = complex_model_observations(job, metadata_cache=estimator.metadata_cache)
         job["progress"] = observation["progress"]
-        job["eta"] = RuntimeEstimator().estimate(job)
+        job["eta"] = estimator.estimate(job, complex_observation=observation)
     except (OSError, ValueError, TypeError, KeyError, AttributeError, OverflowError):
         job["progress"] = {"completed": None, "total": None}
         base = job.get("eta") if isinstance(job.get("eta"), dict) else {}
@@ -103,6 +145,7 @@ def refresh_complex_job(job):
 class RuntimeEstimator:
     def __init__(self):
         self.cache = {}
+        self.metadata_cache = MetadataReadCache()
 
     def _seconds(self, path):
         try:
@@ -120,14 +163,15 @@ class RuntimeEstimator:
         except (OSError, ValueError):
             return None
 
-    def estimate(self, job, *, now=None):
+    def estimate(self, job, *, now=None, complex_observation=None):
         result = {"scope": "complex_prediction", "remaining_seconds": None, "lower_seconds": None,
                   "upper_seconds": None, "completed": 0, "total": None, "sample_count": 0,
                   "basis": "within_run_successful_tool_logs", "includes_postprocessing": False,
                   "note": "표적 준비·후보 생성·후처리·대기 시간은 포함하지 않습니다."}
         if job.get("mode") == "complex" and job.get("kind") == "analysis" and job.get("run_dir"):
             try:
-                return self._complex(job, result, now)
+                return self._complex(job, result, now, observation=complex_observation,
+                                     metadata_cache=self.metadata_cache)
             except (OSError, ValueError, TypeError, KeyError, AttributeError, OverflowError):
                 return {**result, "completed": None, "total": None, "status": "unavailable"}
         if job.get("state") == "complete":
@@ -251,8 +295,8 @@ class RuntimeEstimator:
             return {**result, "status": "unavailable"}
 
     @staticmethod
-    def _complex(job, base, now):
-        observation = complex_model_observations(job)
+    def _complex(job, base, now, *, observation=None, metadata_cache=None):
+        observation = observation if observation is not None else complex_model_observations(job, metadata_cache=metadata_cache)
         progress, rows, engines = observation["progress"], observation["rows"], observation["engines"]
         result = {**base, **progress, "count_source": observation["total_source"],
                   "count_status": observation["count_status"], "engines": engines,
@@ -354,6 +398,46 @@ def terminal_eta(job):
                       "upper_seconds": value,
                       "status": "unavailable" if unknown_complex_counts else job.get("state")}
     return job
+
+
+class ComplexJobReadCache:
+    """Reconcile once, then reuse terminal observations while all sources match.
+
+    Queue payloads remain immutable. A changed payload, file timestamp, inode,
+    size, creation/deletion or lifecycle state forces fresh reconciliation.
+    Running ETA is recomputed from cached parses so finish times stay current.
+    """
+    def __init__(self, limit=512):
+        self.limit = limit
+        self.entries = OrderedDict()
+        self._lock = threading.RLock()
+        self.estimator = RuntimeEstimator()
+
+    def read(self, job, *, record_key, terminal_states):
+        with self._lock:
+            return self._read(job, record_key=record_key, terminal_states=terminal_states)
+
+    def _read(self, job, *, record_key, terminal_states):
+        if job.get("kind") != "analysis" or job.get("mode") != "complex" or not job.get("run_dir"):
+            return terminal_eta(job)
+        root = Path(job["run_dir"])
+        paths = [root / "run_state.json", root / "complex_results.json"]
+        if job.get("config_path"):
+            paths.append(Path(job["config_path"]))
+        signature = (record_key, tuple(_file_identity(path) for path in paths))
+        key = (job.get("id"), str(root))
+        saved = self.entries.get(key)
+        if job.get("state") in terminal_states and saved is not None and saved[0] == signature:
+            self.entries.move_to_end(key)
+            job.update(deepcopy(saved[1]))
+            return terminal_eta(job)
+        self.entries.pop(key, None)
+        refreshed = terminal_eta(refresh_complex_job(job, estimator=self.estimator))
+        if job.get("state") in terminal_states:
+            self.entries[key] = (signature, deepcopy({name: refreshed[name] for name in ("progress", "eta") if name in refreshed}))
+            while len(self.entries) > self.limit:
+                self.entries.popitem(last=False)
+        return refreshed
 
 
 def _valid_duration(value):

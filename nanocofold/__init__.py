@@ -1,3 +1,3 @@
 """NanoCoFold: target + hotspot conditioned nanobody design pipeline."""
 
-__version__ = "0.4.8rc1"
+__version__ = "0.4.8rc2"

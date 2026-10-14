@@ -41,6 +41,11 @@ def supplied_server(tmp_path_factory):
     launch_environment = dict(os.environ)
     if os.environ.get("NANOCOFOLD_SUPPLIED_INSTALLED") == "1":
         launch_environment.pop("PYTHONPATH", None)
+    else:
+        # Source acceptance must run this checkout in the actual CLI child,
+        # even when the development environment has an older wheel installed.
+        inherited = launch_environment.get("PYTHONPATH", "")
+        launch_environment["PYTHONPATH"] = str(ROOT) + (os.pathsep + inherited if inherited else "")
     process = subprocess.Popen([sys.executable, "-m", "nanocofold", "serve", "--workspace", str(workspace),
         "--port", str(port), "--no-browser"], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=launch_environment, cwd=workspace)
     url = f"http://127.0.0.1:{port}/"

@@ -1,6 +1,6 @@
 [project]
 name = "nanocofold"
-version = "0.4.8rc1"
+version = "0.4.8rc2"
 description = "Protein complex prediction and nanobody design, screening, and variant evaluation"
 requires-python = ">=3.12"
 dependencies = [

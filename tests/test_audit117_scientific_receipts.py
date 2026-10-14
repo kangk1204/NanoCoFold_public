@@ -314,7 +314,7 @@ def test_legacy_complex_ipsae_scope_follows_saved_first_pair_without_aggregation
     assert display["ipsae"] == .9 and display["iptm"] == .86
     assert [display["ipsae_chain_a"], display["ipsae_chain_b"]] == chains[:2]
     assert display["ipsae_scope_source"] == "legacy_first_recorded_pair"
-    assert display["iptm_scope"] == "whole_complex"
+    assert "iptm_scope" not in display  # Legacy mode alone cannot establish metric scope.
     assert "ipsae_scope" not in row
 
 

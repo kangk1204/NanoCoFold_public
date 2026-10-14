@@ -14,7 +14,7 @@ from functools import wraps
 import yaml
 
 from ..config import _deep_merge, _validate, cfg_get, cfg_set, load_config, read_config_yaml
-from ..utils.seq import clean_sequence, validate_candidate_id, validate_candidate_ids
+from ..utils.seq import clean_sequence, validate_candidate_id, validate_candidate_ids, validate_fasta_controls
 from ..wizard import WizardSession
 from .paths import contained, native, sha256
 from .regions import apply_regions
@@ -45,6 +45,7 @@ def parse_fasta(content: str, *, single: bool = False) -> list[tuple[str, str]]:
     if len(content.encode()) > 20 * 1024 * 1024:
         raise ValueError("FASTA는 20MB 이하여야 합니다.")
     content = content.lstrip("\ufeff")
+    validate_fasta_controls(content)
     nonempty = [line.strip() for line in content.splitlines() if line.strip()]
     if any(line.startswith(">") for line in nonempty) and not nonempty[0].startswith(">"):
         raise ValueError("FASTA 첫 서열 앞에 >ID 헤더가 필요합니다. 제목 없는 붙여넣기와 FASTA를 섞지 마세요.")

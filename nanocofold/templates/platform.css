@@ -127,7 +127,7 @@ textarea {
   font-family: ui-monospace, monospace;
   font-size: 0.85rem;
 }
-button {
+button:where(:not(.modebar-btn)) {
   padding: 9px 14px;
   background: #17695f;
   color: #fff;
@@ -137,10 +137,10 @@ button {
   font: inherit;
   font-size: 0.9rem;
 }
-button:hover {
+button:where(:not(.modebar-btn)):hover {
   filter: brightness(0.94);
 }
-button:disabled {
+button:where(:not(.modebar-btn)):disabled {
   opacity: 0.5;
   cursor: wait;
 }
@@ -377,9 +377,9 @@ dd {
 #view-results :is(h1,h2,h3){line-height:1.6;overflow-wrap:anywhere}
 #view-results h1{font-size:32px}#view-results :is(h2,h3){font-size:24px}
 #view-results .card{border-radius:4px;border-color:var(--line);padding:24px}
-#view-results :is(button,input,select):not(.msp-plugin *){min-height:64px;font-size:16px;border-radius:4px}
+#view-results :is(button,input,select):not(.msp-plugin *):where(:not(.modebar-btn)){min-height:64px;font-size:16px;border-radius:4px}
 /* Keep primary defaults weaker than secondary, table and sort-header styles. */
-#view-results button:where(:not(.msp-plugin *)){background:#333;border-color:#333;color:#fff}
+#view-results button:where(:not(.msp-plugin *)):where(:not(.modebar-btn)){background:#333;border-color:#333;color:#fff}
 #view-results .danger{background:#9e312c;color:white}#view-results .danger:disabled{background:#c6c6c6}
 #view-results :is(.secondary,td button){color:#222;border-color:#aaa;background:#fff}
 #view-results input[type=checkbox]:not(.msp-plugin *){min-height:0;accent-color:#444}
@@ -457,7 +457,7 @@ dd {
 :is(.viewer,#structure-view) .msp-plugin .msp-layout-hide-top .msp-layout-main{top:0!important}
 
 /* Wizard controls; MolStar owns its internal layout and typography. */
-body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea{font-size:18px;min-height:48px}button,summary{min-height:48px}input[type=checkbox],input[type=radio]{width:20px;height:20px}.novice-grid{display:block}.novice-footer{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0}.novice-heading:focus{outline:3px solid #e7a845;outline-offset:5px}#novice-complex-copies{display:grid;gap:12px}#novice-blocker{flex-basis:100%;color:#983832}#view-input [hidden]{display:none!important}
+body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea{font-size:18px;min-height:48px}button:where(:not(.modebar-btn)),summary{min-height:48px}input[type=checkbox],input[type=radio]{width:20px;height:20px}.novice-grid{display:block}.novice-footer{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0}.novice-heading:focus{outline:3px solid #e7a845;outline-offset:5px}#novice-complex-copies{display:grid;gap:12px}#novice-blocker{flex-basis:100%;color:#983832}#view-input [hidden]{display:none!important}
 .msp-plugin input,.msp-plugin select{min-height:initial;font-size:initial}.msp-plugin button{min-height:initial}
 
 #view-input p,#view-input label{font-size:18px}#novice-reviewed-summary{padding:16px;background:#edf7f6;margin:16px 0}#novice-review #review-input{margin-bottom:16px}
@@ -482,3 +482,13 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:0.01ms!important;transition-duration:0.01ms!important}}
 
 .novice-grid fieldset label.check{margin-right:12px;margin-bottom:12px}
+
+/* Plotly tools retain their own compact controls instead of product form-button styles. */
+#view-results .js-plotly-plot .modebar { display:flex; max-width:100%; overflow-x:auto; align-items:center; }
+#view-results .js-plotly-plot .modebar-group { float:none; display:flex; flex:0 0 auto; padding:2px; background:rgba(255,255,255,.96); }
+#view-results .js-plotly-plot .modebar-btn { display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px; min-height:32px; margin:0; padding:6px; border:0; border-radius:3px; background:transparent; color:#344f60; font-size:14px; font-weight:normal; line-height:1; filter:none; cursor:pointer; }
+#view-results .js-plotly-plot .modebar-btn svg { display:block; top:0; width:16px; height:16px; }
+#view-results .js-plotly-plot .modebar-btn path { fill:#344f60!important; }
+#view-results .js-plotly-plot .modebar-btn:hover { background:#edf5f7; filter:none; }
+#view-results .js-plotly-plot .modebar-btn.active path { fill:#17695f!important; }
+#view-results .js-plotly-plot .modebar-btn:focus-visible { outline:3px solid #85601e; outline-offset:-3px; background:#edf5f7; }

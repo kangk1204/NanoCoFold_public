@@ -147,12 +147,18 @@ def write_pymol_session_script(
             while name in used_names:
                 name += "_x"
         used_names.add(name)
-        if any(character in str(path) for character in "\n\r;\x00"):
-            raise ValueError("PyMOL 구조 경로에 명령 구분 문자를 사용할 수 없습니다.")
+        if any(character in str(path) for character in "\n\r\x00"):
+            raise ValueError("PyMOL 구조 경로에 줄바꿈·NUL 문자를 사용할 수 없습니다.")
         import json
         lines.extend([
             "# candidate_id_map: " + json.dumps({"object": name, "candidate_id": str(candidate_id)}, ensure_ascii=False),
-            f"load {json.dumps(str(path))}, {name}",
+            "python",
+            "from pymol import cmd",
+            # A Python string literal reaches cmd.load intact. PyMOL's PML
+            # argument parser neither unescapes JSON Unicode nor safely treats
+            # semicolons in arbitrary filenames as part of a load argument.
+            f"cmd.load({str(path)!r}, {name!r})",
+            "python end",
             f"show cartoon, {name}",
             f"color grey80, {name} and chain {target_chain}",
             f"color skyblue, {name} and chain {binder_chain}",

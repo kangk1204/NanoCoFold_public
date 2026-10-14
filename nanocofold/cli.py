@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import contextlib
 import contextvars
 import json
@@ -19,7 +20,7 @@ from . import design_rfantibody, developability, handoff, mature, provenance, ra
 from . import score_complex as scorer
 from .config import (
     PROJECT_ROOT, cfg_get, dump_resolved, load_config, resolve_path, resolve_run_artifact,
-    resolve_run_dir,
+    resolve_run_dir, read_config_yaml,
 )
 from .utils.atomic import write_csv, write_json
 from .state import RunState
@@ -486,7 +487,7 @@ def _open_run(cfg: dict, args, new: bool = True) -> tuple[Path, RunState]:
             effective = _load_saved(saved)
             if getattr(args, "config", None):
                 # 부분 config는 "명시된 키만" 덮어쓴다(H10).
-                partial = _yaml.safe_load(Path(args.config).read_text(encoding="utf-8")) or {}
+                partial = read_config_yaml(Path(args.config).read_text(encoding="utf-8")) or {}
                 effective = _deep_merge(effective, partial)
                 partial_target = (partial or {}).get("target", {}) or {}
                 if partial_target.get("fasta") and not partial_target.get("sequence"):
@@ -699,6 +700,10 @@ def _target_cache_valid(
 
 
 def _target_phase(cfg: dict, run_dir: Path, state: RunState, mock: bool, dry_run: bool) -> dict:
+    for warning in scorer.iptm_availability_warnings(cfg):
+        print("[안내] " + warning, file=sys.stderr)
+        if not dry_run:
+            state.add_warnings(warning)
     if not dry_run: state.begin_phase("target")
     cached = state.get_phase("target")
     fingerprint = _target_fingerprint(cfg, run_dir, mock)
@@ -1902,7 +1907,22 @@ def cmd_report(args) -> int:
         saved_cfg = read_config_yaml(saved_config.read_text(encoding="utf-8"))
         if not isinstance(saved_cfg, dict) or not saved_cfg:
             raise ValueError("계산 당시 run_config.yaml이 손상되었습니다. 원본 설정을 복구하세요.")
-        report_options = cfg.get("report", {})
+        from .config import _deep_merge, _set_dotted
+        report_options = copy.deepcopy(saved_cfg.get("report", cfg.get("report", {})))
+        if getattr(args, "config", None):
+            requested_config = read_config_yaml(Path(args.config).read_text(encoding="utf-8")) or {}
+            report_options = _deep_merge(report_options, requested_config.get("report", {}))
+        ignored = []
+        for override in getattr(args, "set", []) or []:
+            key, raw = override.split("=", 1)
+            if key.strip().startswith("report."):
+                options = {"report": report_options}
+                _set_dotted(options, key.strip(), read_config_yaml(raw.strip()))
+                report_options = options["report"]
+            else:
+                ignored.append(key.strip())
+        if ignored:
+            print("[안내] 보고서 재생성은 계산 당시 설정을 유지합니다. 적용하지 않은 --set 항목: " + ", ".join(ignored), file=sys.stderr)
         cfg.clear()
         cfg.update(saved_cfg)
         cfg["report"] = report_options
@@ -2124,13 +2144,11 @@ def _write_dry_run_notice(run_dir: Path, state: RunState) -> None:
 
 
 def _is_specificity_resume(args) -> bool:
-    import yaml
-
     directory = getattr(args, "run_dir", None)
     if not directory:
         return False
     saved = Path(directory) / "run_config.yaml"
-    return saved.exists() and bool(cfg_get(yaml.safe_load(saved.read_text()), "specificity.enabled", False))
+    return saved.exists() and bool(cfg_get(read_config_yaml(saved.read_text()), "specificity.enabled", False))
 
 
 def cmd_specificity(args) -> int:
@@ -2146,7 +2164,7 @@ def cmd_specificity(args) -> int:
             raise FileNotFoundError(f"재개할 run_config.yaml 이 없습니다: {saved}")
         cfg = load_config(saved)
         if getattr(args, "config", None):
-            cfg = _deep_merge(cfg, yaml.safe_load(Path(args.config).read_text()) or {})
+            cfg = _deep_merge(cfg, read_config_yaml(Path(args.config).read_text()) or {})
         for value in getattr(args, "set", []):
             key, raw = value.split("=", 1)
             _set_dotted(cfg, key, yaml.safe_load(raw))

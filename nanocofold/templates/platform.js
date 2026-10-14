@@ -1,8 +1,26 @@
 /* Shared browser/offline explorer. Data is displayed with textContent, not HTML injection. */
 "use strict";
 const $ = (id) => document.getElementById(id);
-const metricCaptions = Object.freeze({ptm:"pTM",pdockq:"pDockQ",pdockq2:"pDockQ2 (최소)",interface_pae_ab:"PAE 행 표적·열 VHH (Å)",interface_pae_ba:"PAE 행 VHH·열 표적 (Å)",interface_pae_median:"계면 PAE 중앙값 (Å)",interface_pae_p90:"계면 PAE 90백분위 (Å)",target_plddt:"표적 pLDDT",binder_plddt:"VHH pLDDT",complex_plddt:"전체 복합체 pLDDT",n_hotspots_requested:"지정 결합 부위 잔기 수",n_hotspots_contacted:"접촉한 지정 잔기 수",n_target_clashes:"표적–VHH 충돌 원자쌍",n_context_clashes:"파트너–VHH 충돌 원자쌍",candidate_id:"후보",ipsae:"ipSAE",iptm:"표적–VHH ipTM",interface_plddt:"계면 pLDDT",interface_pae:"계면 PAE (Å)",hotspot_contact_frac:"결합 부위 접촉률",seed:"Seed",model:"모델",error:"평가 오류",chain_a:"체인 1",chain_b:"체인 2",iptm_a_to_b:"체인 1→2 ipTM",iptm_b_to_a:"체인 2→1 ipTM",a:"잔기 1",b:"잔기 2",distance:"거리 (Å)",kind:"구분",pdockq2_target:"pDockQ2 표적 방향",pdockq2_binder:"pDockQ2 VHH 방향",dev_flags:"전체 평가 위험 수",dev_severe:"심한 위험 수 (5종)",n_hbonds:"N/O 근접 원자쌍",n_salt_bridges:"반대 전하 원자쌍",esm_score:"ESM 서열 prior (친화도 아님)",composite_score:"배치 상대 종합점수",n_clashes:"충돌 원자쌍",site_satisfied:"지정 부위 충족",site_selection_eligible:"지정 부위 포함 적격",pose_consensus_status:"동일 후보 자세 일치",pose_supporting_engines:"자세 일치 엔진 수",pose_quality_supporting_engines:"기록 적격·자세 일치 엔진 수",design_consistency_status:"설계·재예측 일치",design_binder_rmsd_A:"설계·재예측 VHH RMSD (Å)",review_rank:"검토 순위 (동률 허용)",review_rank_scope:"검토 순위 범위",review_priority_reason:"검토 판정 이유",candidate_review_priority:"후보 검토 판정",review_priority:"모델 검토 판정"});
-const metricCaption = key => metricCaptions[key] || key;
+const metricCaptions = Object.freeze({ptm:"pTM",pdockq:"pDockQ",pdockq2:"pDockQ2 (최소)",interface_pae_ab:"PAE 행 표적·열 VHH (Å)",interface_pae_ba:"PAE 행 VHH·열 표적 (Å)",interface_pae_median:"계면 PAE 중앙값 (Å)",interface_pae_p90:"계면 PAE 90백분위 (Å)",target_plddt:"표적 pLDDT",binder_plddt:"VHH pLDDT",complex_plddt:"전체 복합체 pLDDT",n_hotspots_requested:"지정 결합 부위 잔기 수",n_hotspots_contacted:"접촉한 지정 잔기 수",n_target_clashes:"표적–VHH 충돌 원자쌍",n_context_clashes:"파트너–VHH 충돌 원자쌍",candidate_id:"후보",ipsae:"ipSAE",iptm:"ipTM",interface_plddt:"계면 pLDDT",interface_pae:"계면 PAE (Å)",hotspot_contact_frac:"결합 부위 접촉률",seed:"Seed",model:"모델",error:"평가 오류",chain_a:"체인 1",chain_b:"체인 2",iptm_a_to_b:"체인 1→2 ipTM",iptm_b_to_a:"체인 2→1 ipTM",a:"잔기 1",b:"잔기 2",distance:"거리 (Å)",kind:"구분",pdockq2_target:"pDockQ2 표적 방향",pdockq2_binder:"pDockQ2 VHH 방향",dev_flags:"전체 평가 위험 수",dev_severe:"심한 위험 수 (5종)",n_hbonds:"N/O 근접 원자쌍",n_salt_bridges:"반대 전하 원자쌍",esm_score:"ESM 서열 prior (친화도 아님)",composite_score:"배치 상대 종합점수",n_clashes:"충돌 원자쌍",site_satisfied:"지정 부위 충족",site_selection_eligible:"지정 부위 포함 적격",pose_consensus_status:"동일 후보 자세 일치",pose_supporting_engines:"자세 일치 엔진 수",pose_quality_supporting_engines:"기록 적격·자세 일치 엔진 수",design_consistency_status:"설계·재예측 일치",design_binder_rmsd_A:"설계·재예측 VHH RMSD (Å)",review_rank:"검토 순위 (동률 허용)",review_rank_scope:"검토 순위 범위",review_priority_reason:"검토 판정 이유",candidate_review_priority:"후보 검토 판정",review_priority:"모델 검토 판정"});
+function iptmCaption(records) {
+  const rows = Array.isArray(records) ? records : records && typeof records === "object" ? [records] : [];
+  const scopes = new Set(rows.map(row => ["whole_complex", "selected_target_binder_pair"].includes(row?.iptm_scope) ? row.iptm_scope : "unrecorded"));
+  if (scopes.size > 1) return "ipTM · 적용 범위 혼합";
+  if (scopes.has("whole_complex")) return "전체 복합체 ipTM";
+  if (scopes.has("selected_target_binder_pair")) return "표적–VHH ipTM";
+  return "ipTM · 적용 범위 미기록";
+}
+const metricCaption = (key, records) => key === "iptm" ? iptmCaption(records) : metricCaptions[key] || key;
+function refreshMetricCaptions(records) {
+  for (const id of ["sort-metric", "plot-x", "plot-y"])
+    for (const option of $(id).options) {
+      const value = option.value;
+      if (metricCaptions[value]) {
+        option.value = value;
+        option.textContent = metricCaption(value, records);
+      }
+    }
+}
 const decisionCaption = value => typeof value === "boolean" ? value ? "적격" : "부적격" : "미평가";
 const offline = Boolean(window.NANOCOFOLD_OFFLINE);
 const state = {
@@ -86,6 +104,22 @@ const fmt = (value) =>
         ? JSON.stringify(value)
         : String(value);
 /* REPORT_SEMANTICS_START */
+function recordedEvaluationError(row) {
+  for (const error of [row?.error, row?.prediction_error]) {
+    if (typeof error === "string" && error.trim()) return error.trim();
+    if (error && typeof error !== "string") return "평가 오류 · 상세 기록 확인";
+  }
+  return "";
+}
+function evaluationErrorCaption(row) {
+  const error = recordedEvaluationError(row);
+  return error ? error.split(/\r?\n/).find(line => line.trim()).replace(/\s+/g, " ").slice(0, 200)
+    : row?.evaluated === true ? "오류 없음" : "미평가";
+}
+function modelAssessmentCaption(row) {
+  return recordedEvaluationError(row) ? "평가 오류 · 상세 기록 확인" : row?.evaluated === true ? "모델 평가 완료" : "모델 미평가";
+}
+
 function reportSourceIdentity(row) {
   if (typeof row.source_sequence_id === "string" && row.source_sequence_id) return row.source_sequence_id;
   const id = row.candidate_id || row.design_id || row.variant_id || row.label;
@@ -98,7 +132,7 @@ function reportModelCounts(rows, mode, config) {
   const sequences = mode === "complex" ? (config?.complex?.proteins || []).map(r => r.sequence) : rows.map(r => r.sequence);
   const complete = sequences.length > 0 && sequences.every(s => typeof s === "string" && s.trim().length);
   const models = rows.filter(r=>r.model_record!==false);
-  const decisions = models.map(r => r.evaluated === true && typeof r.final_eligible === "boolean" ? r.final_eligible : null);
+  const decisions = models.map(r => r.evaluated === true && !recordedEvaluationError(r) && typeof r.final_eligible === "boolean" ? r.final_eligible : null);
   const sourceIds = rows.map(reportSourceIdentity);
   return {
     unique_sequences: complete ? new Set(sequences).size : (mode !== "complex" && !rows.length ? 0 : null),
@@ -106,10 +140,10 @@ function reportModelCounts(rows, mode, config) {
     model_total: models.length,
     prepared_record_total: rows.length,
     preprediction_record_total: rows.filter(r=>r.model_record===false).length,
-    evaluated_total: models.filter(r => r.evaluated === true).length,
+    evaluated_total: models.filter(r => r.evaluated === true && !recordedEvaluationError(r)).length,
     eligible_total: mode === "complex" ? null : (!rows.length || decisions.some(v => v !== null) ? decisions.filter(v => v === true).length : null),
     eligibility_missing: mode === "complex" ? null : decisions.filter(v => v === null).length,
-    evaluation_missing: models.filter(r => r.evaluated !== true).length,
+    evaluation_missing: models.filter(r => r.evaluated !== true || recordedEvaluationError(r)).length,
   };
 }
 function reportAliases(rows) {
@@ -159,6 +193,11 @@ const phaseLabel = (phase) => ({
   final: "결과·보고서 저장", complete: "완료", resume_validation: "재개 조건 확인",
   colabfold_screen: "ColabFold 예측", boltz_rescore: "Boltz-2 재평가",
 }[phase] || phase || "준비");
+function jobPhaseCaption(job) {
+  if (job.phase === "complete" && job.state === "running") return "결과·보고서 저장 중";
+  if (job.phase === "complete" && job.state === "cancelling") return "종료 정리 중";
+  return phaseLabel(job.phase);
+}
 function el(tag, text, cls) {
   const node = document.createElement(tag);
   if (text !== undefined) node.textContent = text;
@@ -228,7 +267,7 @@ function table(node, rows, columns) {
     body = el("tbody"),
     tr = el("tr");
   target.append(el("caption", node.getAttribute("aria-label") || columns.join(" · ")));
-  columns.forEach((key) => {const th=el("th",metricCaption(key));th.scope="col";tr.append(th);});
+  columns.forEach((key) => {const th=el("th",metricCaption(key, rows));th.scope="col";tr.append(th);});
   head.append(tr);
   rows.forEach((row) => {
     const r = el("tr");
@@ -353,7 +392,7 @@ function inputSettings(forPlan = false) {
     // CPU demonstrations create synthetic data and never acquire an MSA.
     cfg = merge(cfg, {structure:{msa:{backend:"empty"}},screen:{msa_mode:"single",allow_public_msa_server:false,colabfold:{msa_source:"cache"}}});
   }
-  const publicMsa = !simulated && (cfg.complex?.msa_source === "public_api" || cfg.screen?.colabfold?.msa_source === "public_api" || cfg.screen?.msa_mode === "msa" || cfg.structure?.msa?.backend === "mmseqs2_api");
+  const publicMsa = !simulated && (cfg.complex?.msa_source === "public_api" || cfg.screen?.colabfold?.msa_source === "public_api" || cfg.screen?.msa_mode === "msa" || cfg.structure?.msa?.backend === "public_api");
   if (!forPlan && publicMsa && !$("novice-consent").checked) throw Error("가져온 설정도 현재 입력에 대한 외부 MSA 전송 동의를 다시 확인해야 합니다.");
   if (publicMsa) cfg.screen = merge(cfg.screen, {allow_public_msa_server: true});
   for (const id of ["candidate-limit", "design-count"]) {
@@ -646,6 +685,7 @@ function etaText(job) {
   const eta = job.eta;
   if (job.mock || job.state !== "running" || !eta) return "";
   if (eta.status === "awaiting_candidate_pool") return "복합체 예측 시간: 후보 목록이 확정되면 실측을 시작합니다.";
+  if (eta.status === "complete") return `예측 단계 ${eta.completed}/${eta.total} 처리 완료 · 작업은 실행 중이며 결과 저장·후처리는 남아 있을 수 있습니다.`;
   if (eta.status !== "estimated") return "복합체 예측 시간: 첫 실제 완료 후보를 기다리는 중";
   if (eta.remaining_seconds === 0) return `복합체 예측 ${eta.completed}/${eta.total} 완료 · 후처리 시간은 추정에 포함하지 않습니다.`;
   const minutes = seconds => Math.max(1, Math.ceil(seconds / 60));
@@ -791,7 +831,7 @@ function jobProgressCaption(job) {
   return `진행 ${counts}`;
 }
 async function refreshJobs() {
-  if (offline || !$("job-list") || state.pollingJobs) return;
+  if (offline || document.hidden || !$("job-list") || state.pollingJobs) return;
   state.pollingJobs = true;
   try {
     state.jobs = (await api("/api/jobs")).jobs;
@@ -827,7 +867,7 @@ async function refreshJobs() {
       ...state.jobs.map((job) => {
         const button = el(
           "button",
-          `${job.name} · ${job.kind} / ${job.mode}\n${states[job.state] || job.state} · ${phaseLabel(job.phase)} · ${Math.round(job.elapsed_seconds || 0)}초`,
+          `${job.name} · ${job.kind} / ${job.mode}\n${states[job.state] || job.state} · ${jobPhaseCaption(job)} · ${Math.round(job.elapsed_seconds || 0)}초`,
           "job-row" + (job.id === state.job ? " active" : ""),
         );
         button.onclick = () => selectJob(job.id);
@@ -849,7 +889,7 @@ async function refreshJobs() {
       $("job-detail").replaceChildren(
         el(
           "p",
-          `${states[job.state] || job.state} · ${phaseLabel(job.phase)} · ${jobProgressCaption(job)} · ${Math.round(job.elapsed_seconds || 0)}초`,
+          `${states[job.state] || job.state} · ${jobPhaseCaption(job)} · ${jobProgressCaption(job)} · ${Math.round(job.elapsed_seconds || 0)}초`,
         ),
       );
       if (job.reused_result_id) $("job-detail").append(el("p", `저장 결과 연결 · 새 계산 0초 · 원본 ${job.reused_result_id}${job.reuse_kind === "view_only" ? " · 핵심 보관본" : ""}. 원래 계산 시간 ${job.source_elapsed_seconds === null ? "미기록" : Math.round(job.source_elapsed_seconds || 0) + "초"}`));
@@ -1010,6 +1050,7 @@ async function loadResult(id) {
   }
   if (request !== state.resultRequest) return;
   state.result = summary;
+  $("notice").hidden = true;  // A successfully opened result dismisses the prior completion notice.
   state.retentionPlan = null;
   if ($("retention-plan")) $("retention-plan").replaceChildren();
   if ($("retention-confirmation")) $("retention-confirmation").hidden = true;
@@ -1029,11 +1070,12 @@ async function loadResult(id) {
     if (checkbox) checkbox.parentElement.replaceChildren(checkbox, document.createTextNode(caption));
   }
   state.rows = rows.map(row => ({...row, predictor_engine: row.predictor_engine || row.engine || summary.conditions?.engine || "unknown", design_origin: row.design_origin || row.parent_engine || row.source || null}));
+  refreshMetricCaptions(state.rows);
   const savedSort = offline ? window.NANOCOFOLD_OFFLINE.filters?.sort : null;
   if (!savedSort) {
     const defaultSort = defaultResultSort(state.rows, summary.mode);
     const select = $("sort-metric");
-    if (![...select.options].some(option => option.value === defaultSort.sort)) {const option = el("option", metricCaption(defaultSort.sort));option.value = defaultSort.sort;select.append(option);}
+    if (![...select.options].some(option => option.value === defaultSort.sort)) {const option = el("option", metricCaption(defaultSort.sort, state.rows));option.value = defaultSort.sort;select.append(option);}
     select.value = defaultSort.sort;
     $("descending").checked = defaultSort.descending;
   }
@@ -1068,7 +1110,7 @@ async function loadResult(id) {
   const names={colabfold:"ColabFold",boltz2:"Boltz-2",chai1:"Chai-1",opendde:"OpenDDE Preview"};
   for (const engine of [...new Set(state.rows.map(r=>r.predictor_engine))].sort()) {
     const models=state.rows.filter(r=>r.predictor_engine===engine),card=el("div"), engineCounts=reportModelCounts(models, summary.mode, summary.config);
-    card.append(el("b",names[engine]||engine),el("span",`평가 ${engineCounts.evaluated_total}/${engineCounts.model_total} · 오류 ${models.filter(r=>r.error || r.prediction_error).length}${generalComplex?'':` · 기록 적격 ${engineCounts.eligible_total === null ? "미평가" : engineCounts.eligible_total} · 판정 미평가 ${engineCounts.eligibility_missing}`}`));engineSummary.append(card);
+    card.append(el("b",names[engine]||engine),el("span",`평가 ${engineCounts.evaluated_total}/${engineCounts.model_total} · 오류 ${models.filter(r=>recordedEvaluationError(r)).length}${generalComplex?'':` · 기록 적격 ${engineCounts.eligible_total === null ? "미평가" : engineCounts.eligible_total} · 판정 미평가 ${engineCounts.eligibility_missing}`}`));engineSummary.append(card);
   }
   $("result-summary").append(engineSummary,el("p","동일 후보 서열의 엔진별 재예측은 별도 관측입니다. 상대 점수의 정규화 범위는 기록된 ranking_policy를 확인하세요. 기존 부분 재평가 경로는 혼합 배치일 수 있으며, 독립 비교에서는 엔진별로 순위를 매깁니다. 결합 확률·KD로 해석하지 않습니다.","report-interpretation"));
   renderReportReasons(state.rows, summary.mode);
@@ -1181,9 +1223,9 @@ function syncCandidateNavigation() {
   if (row) {
     const eligibility = candidateEligibility(row);
     const basis = $("eligibility-basis").value === "quality" ? "품질 판정 (hotspot 제외)" : "실행 당시 기록 판정";
-    const assessment = !row.evaluated ? "미평가" : state.result.mode === "complex" ? "모델 평가 완료"
+    const assessment = recordedEvaluationError(row) ? modelAssessmentCaption(row) : !row.evaluated ? "미평가" : state.result.mode === "complex" ? modelAssessmentCaption(row)
       : `${basis}: ${eligibility === true ? "적격" : eligibility === false ? "부적격" : "미평가"}`;
-    $("candidate-status").textContent = `${row.predictor_engine || "엔진 미기록"} · ipSAE ${fmt(row.ipsae)} · ipTM ${fmt(row.iptm)} · ${assessment}`;
+    $("candidate-status").textContent = `${row.predictor_engine || "엔진 미기록"} · ipSAE ${fmt(row.ipsae)} · ${metricCaption("iptm", row)} ${fmt(row.iptm)} · ${assessment}`;
   } else $("candidate-status").textContent = "현재 목록에서 후보를 선택하세요.";
 }
 function stepCandidate(offset) {
@@ -1318,7 +1360,8 @@ function renderCandidates() {
   state.filtered = keyed.map(item=>item.row);
   $("candidate-count").textContent =
     `표시 ${state.filtered.length} / 전체 ${state.rows.length} 후보·모델 기록 · 미평가는 0으로 바꾸지 않습니다.`;
-  $("candidate-sort-note").textContent = `정렬 기준: ${metricCaption(f.sort)} · ${f.descending ? "높은 값부터" : "낮은 값부터"} · 미평가 마지막 · ${f.sort === "review_rank" ? "동일 범위의 후보별 검토 순위·동률 허용·1위도 보류 가능" : "탐색 순서이며 통합 순위가 아닙니다"}.`;
+  refreshMetricCaptions(state.filtered);
+  $("candidate-sort-note").textContent = `정렬 기준: ${metricCaption(f.sort, state.filtered)} · ${f.descending ? "높은 값부터" : "낮은 값부터"} · 미평가 마지막 · ${f.sort === "review_rank" ? "동일 범위의 후보별 검토 순위·동률 허용·1위도 보류 가능" : "탐색 순서이며 통합 순위가 아닙니다"}.`;
   const columns = state.result.mode === "complex" ? ["candidate_id", "predictor_engine", "seed", "model", "iptm", "ipsae", "pdockq2", "pdockq2_target", "pdockq2_binder", "interface_pae", "n_clashes", "error"] : [
       "candidate_id",
       "predictor_engine",
@@ -1353,7 +1396,8 @@ function renderCandidates() {
   captions.predictor_engine = "예측 엔진"; captions.design_origin = "생성 엔진";
   captions.n_clashes = "충돌 원자쌍";
   Object.assign(captions, metricCaptions);
-  if (state.result.mode === "complex") {captions.iptm="전체 복합체 ipTM";captions.ipsae="ipSAE · 표시 체인 쌍";}
+  captions.iptm=metricCaption("iptm", state.filtered);
+  if (state.result.mode === "complex") captions.ipsae="ipSAE · 표시 체인 쌍";
   columns.forEach(k => {
     const th = el("th"), button = el("button", (captions[k] || k) + (f.sort === k ? (f.descending ? " ↓" : " ↑") : " ↕"), "sort-header");
     th.setAttribute("aria-sort", f.sort === k ? (f.descending ? "descending" : "ascending") : "none");
@@ -1382,6 +1426,7 @@ function renderCandidates() {
           button.onclick = () => reviewCandidate(row.candidate_id);
           td.append(button);
         } else if(["final_eligible","quality_eligible"].includes(key)) td.textContent=decisionCaption(row[key]);
+        else if(key === "error") td.textContent=evaluationErrorCaption(row);
         else if(key === "selected") td.textContent=typeof row[key]==="boolean"?(row[key]?"선별":"미선별"):"미기록";
         else if(key === "exclusion_reasons") td.textContent=(row[key]||[]).map(reportReasonLabel).join(" · ")||"없음";
         else if(key === "ipsae" && state.result.mode === "complex") td.textContent = fmt(row[key]) + (row.ipsae_chain_a && row.ipsae_chain_b ? ` (${row.ipsae_chain_a}–${row.ipsae_chain_b} 체인쌍)` : " (적용 체인 미기록)");
@@ -1437,7 +1482,7 @@ function renderScatter() {
           ),
         },
         hovertemplate:
-          "%{text}<br>" + x + ": %{x}<br>" + y + ": %{y}<extra></extra>",
+          "%{text}<br>" + metricCaption(x, state.filtered) + ": %{x}<br>" + metricCaption(y, state.filtered) + ": %{y}<extra></extra>",
       },
     ],
     {
@@ -1445,14 +1490,14 @@ function renderScatter() {
       // Reserve space above data points so the Plotly toolbar cannot intercept
       // clicks on high-valued observations in a narrow three-panel layout.
       margin: { t: 50, l: 50, r: 10, b: 65 },
-      xaxis: { automargin: true, title: { text: metricCaption(x), font: { size: 14 }, standoff: 12 } },
-      yaxis: { automargin: true, title: { text: metricCaption(y), font: { size: 14 }, standoff: 8 } },
+      xaxis: { automargin: true, title: { text: metricCaption(x, state.filtered), font: { size: 14 }, standoff: 12 } },
+      yaxis: { automargin: true, title: { text: metricCaption(y, state.filtered), font: { size: 14 }, standoff: 8 } },
       annotations: rows.length
         ? []
         : [{ text: "표시할 평가값이 없습니다", showarrow: false }],
       paper_bgcolor: "#fff",
     },
-    { responsive: true, displaylogo: false },
+    { responsive: true, displaylogo: false, modeBarButtonsToRemove: ["sendChartToCloud", "sendDataToCloud", "editInChartStudio"] },
   );
   node.removeAllListeners?.("plotly_click");
   node.on("plotly_click", (event) =>
@@ -1469,7 +1514,7 @@ async function selectCandidate(id) {
   detail.replaceChildren(
     el(
       "p",
-      state.result.mode === 'complex' ? (row.evaluated ? '모델 평가 완료' : '모델 미평가') : row.evaluated
+      recordedEvaluationError(row) ? modelAssessmentCaption(row) : state.result.mode === 'complex' ? modelAssessmentCaption(row) : row.evaluated
         ? candidateEligibility(row) === true
           ? "선택한 판정 기준 적격"
           : candidateEligibility(row) === false
@@ -1506,15 +1551,15 @@ async function selectCandidate(id) {
     detail.append(el("p", "실행 당시 hotspot 조건만으로 제외됐습니다. 나머지 기록 기준은 통과했으며 원본 판정·선별 목록은 보존됩니다."));
   warnings(detail.appendChild(el("div")), [
     ...(row.exclusion_reasons || []).map((r) => "기록 제외 사유: " + reportReasonLabel(r) + " (" + r + ")"),
-    ...(row.error ? ["후보 평가 오류: " + row.error] : []),
+    ...(recordedEvaluationError(row) ? ["후보 평가 오류: " + recordedEvaluationError(row)] : []),
     ...(row.missing_metrics?.length
-      ? ["미평가 지표: " + row.missing_metrics.map(metricCaption).join(", ")]
+      ? ["미평가 지표: " + row.missing_metrics.map(key => metricCaption(key, row)).join(", ")]
       : []),
   ]);
   const dl = el("dl");
   if (row.structure_stage === "rf2") detail.append(el("p", `RF2 설계 단계 구조 · PAE ${fmt(row.rf2_pae)} Å · pLDDT ${fmt(row.rf2_plddt)} · 설계–RF2 RMSD ${fmt(row.rmsd)} Å. 최종 복합체 재예측 지표와 구분하세요.`, "muted"));
   for (const key of metricKeys) {
-    dl.append(el("dt", metricCaption(key)), el("dd", fmt(row[key])));
+    dl.append(el("dt", metricCaption(key, row)), el("dd", fmt(row[key])));
   }
   detail.append(dl);
   const confidenceScope=el("details");confidenceScope.append(el("summary","ipSAE·ipTM 적용 체인과 출처"));
@@ -1544,7 +1589,7 @@ async function selectCandidate(id) {
     table(
       facts.appendChild(el("div", undefined, "scroll")),
       (Array.isArray(row.threshold_checks)?row.threshold_checks:[]).filter(c=>c&&typeof c==="object"&&!Array.isArray(c)).map((c) => ({
-        지표: metricCaption(c.metric),
+        지표: metricCaption(c.metric, row),
         값: c.value,
         조건: c.operator,
         기준: c.threshold,
@@ -1611,7 +1656,7 @@ function renderDistribution(observations) {
     }
   }
   $("observation-note").textContent =
-    `현재 후보 ${observations.length}개 관측. 조건별 ipTM을 따로 표시하며 서로 다른 조건을 합산하지 않습니다. ` +
+    `현재 후보 ${observations.length}개 관측. 조건별 ${metricCaption("iptm", observations)}을 따로 표시하며 서로 다른 조건을 합산하지 않습니다. ` +
     [...groups.keys()].map((name, i) => `조건 ${i + 1}: ${name}`).join(" · ");
   if (window.Plotly)
     Plotly.react(
@@ -1630,12 +1675,12 @@ function renderDistribution(observations) {
         // keep long MSA names from extending beyond a narrow report viewport.
         xaxis: { tickmode: "array", tickvals: [...groups.keys()],
           ticktext: [...groups.keys()].map((_, i) => `조건 ${i + 1}`) },
-        yaxis: { title: { text: "ipTM" } },
+        yaxis: { title: { text: metricCaption("iptm", observations) } },
         annotations: groups.size
           ? []
           : [{ text: "반복 관측의 ipTM 미평가", showarrow: false }],
       },
-      { responsive: true, displaylogo: false },
+      { responsive: true, displaylogo: false, modeBarButtonsToRemove: ["sendChartToCloud", "sendDataToCloud", "editInChartStudio"] },
     );
 }
 async function loadStructure() {
@@ -1672,7 +1717,7 @@ async function loadStructure() {
         $("pae"),
         [],
         { annotations: [{ text: "구조 / PAE 미평가", showarrow: false }] },
-        { responsive: true, displaylogo: false },
+        { responsive: true, displaylogo: false, modeBarButtonsToRemove: ["sendChartToCloud", "sendDataToCloud", "editInChartStudio"] },
       );
   }
 }
@@ -1701,15 +1746,29 @@ function resultLayers() {
 function resultDisplay() {
   return Object.fromEntries([...document.querySelectorAll("[data-viewer-display]")].map(node => [node.dataset.viewerDisplay, node.checked]));
 }
+function coordinatePresentation(data) {
+  const source = data?.coordinate_source;
+  const verified = source?.schema_version === 2 && source.raw_preserved === true &&
+    source.verification?.status === "verified" && typeof data.raw_content === "string" && data.raw_content.length > 0;
+  if (verified && source.display_relation === "native_identical" && data.content === data.raw_content)
+    return {rawAvailable:true, caption:"검증된 원본 엔진 좌표와 표시 좌표가 동일합니다."};
+  if (verified && source.display_relation === "transformed_display")
+    return {rawAvailable:true, caption:`검증된 원본 엔진 좌표를 별도로 보존합니다. 화면은 변환된 표시 좌표입니다 · ${source.display_transform || "변환 종류 미기록"}`};
+  if (verified)
+    return {rawAvailable:true, caption:"검증된 원본 엔진 좌표를 별도로 보존합니다. 표시 좌표와 원본의 관계는 미확인입니다."};
+  if (source?.verification?.status === "hash_mismatch")
+    return {rawAvailable:false, caption:"저장된 표시 좌표 · 원본 좌표의 해시가 검증 기록과 불일치하여 원본 다운로드를 제공하지 않습니다."};
+  return {rawAvailable:false, caption:"저장된 표시 좌표 · 이 보고서에는 검증된 원본 엔진 좌표가 없습니다. 원본이 없거나 검증 근거가 미기록입니다."};
+}
 function structureDataNote(data) {
   const metrics = [];
-  if (Number.isFinite(data.global_iptm)) metrics.push(`기록 ipTM ${data.global_iptm.toFixed(3)}`);
+  if (Number.isFinite(data.global_iptm)) metrics.push(`전체 복합체 ipTM ${data.global_iptm.toFixed(3)}`);
   if (data.pair_metrics?.length === 1) {
     const pair = data.pair_metrics[0];
     if (Number.isFinite(pair.interface_plddt)) metrics.push(`계면 pLDDT ${pair.interface_plddt.toFixed(1)}`);
     if (Number.isFinite(pair.interface_pae)) metrics.push(`계면 PAE ${pair.interface_pae.toFixed(1)} Å`);
   }
-  return "원본 예측 좌표를 표시합니다. " + (metrics.length ? metrics.join(" · ") + ". " : "") +
+  return coordinatePresentation(data).caption + " " + (metrics.length ? metrics.join(" · ") + ". " : "") +
     "신뢰도 지표와 PAE를 함께 확인하세요. 계산 완료는 구조 품질 통과나 실제 결합 확인을 뜻하지 않습니다.";
 }
 function resultChain(role) {
@@ -1786,8 +1845,8 @@ async function renderStructure() {
     if (request !== state.viewerRequest || state.structure !== data) { viewer.dispose(); return; }
     state.viewer = viewer;
     syncResultChainControls();
-    if ($("structure-source")) $("structure-source").textContent = `현재 모델 ${data.candidate_id} · 체인 ${data.chains.map(c=>c.id).join(", ")} · ${data.coordinate_source?"원본 엔진 좌표 보존 · 표시는 원본 번호 대응 및 선택적 참조 정렬":"저장된 표시 좌표 · 이 보고서에 원본 엔진 파일은 포함되지 않았습니다"}`;
-    if ($("save-native-structure")) $("save-native-structure").disabled = !data.raw_content;
+    if ($("structure-source")) $("structure-source").textContent = `현재 모델 ${data.candidate_id} · 체인 ${data.chains.map(c=>c.id).join(", ")} · ${coordinatePresentation(data).caption}`;
+    if ($("save-native-structure")) $("save-native-structure").disabled = !coordinatePresentation(data).rawAvailable;
     if ($("save-pae")) $("save-pae").disabled = !data.pae;
   } else if (!state.viewer) {
     try { await state.viewerReady; } catch { return; }
@@ -2063,7 +2122,7 @@ function setupExplorer() {
   });
   action("save-native-structure", () => {
     const data=state.structure;
-    if (!data?.raw_content) throw Error("이 보고서에 원본 엔진 파일이 없습니다. 원본 산출물 ZIP을 확인하세요.");
+    if (!coordinatePresentation(data).rawAvailable) throw Error("이 보고서에 검증된 원본 엔진 좌표가 없습니다. 출처·원본 산출물을 확인하세요.");
     saveBlob(new Blob([data.raw_content],{type:"text/plain;charset=utf-8"}),
       `${data.candidate_id.replace(/[^A-Za-z0-9_.-]/g,"_")}_native.${data.raw_format||"cif"}`);
   });
@@ -2243,15 +2302,7 @@ async function startPlatform() {
 
 async function boot() {
   $("candidate-extra-columns").addEventListener("change", renderCandidates);
-  for (const id of ["sort-metric", "plot-x", "plot-y"]) {
-    for (const option of $(id).options) {
-      const value = option.value;
-      if (metricCaptions[value]) {
-        option.value = value;
-        option.textContent = metricCaption(value);
-      }
-    }
-  }
+  refreshMetricCaptions([]);
   setupExplorer();
   if (offline) {
     if ($("result-retention-panel")) $("result-retention-panel").hidden = true;

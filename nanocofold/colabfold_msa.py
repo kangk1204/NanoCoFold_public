@@ -18,6 +18,7 @@ from Bio import Align
 
 from . import provenance as identities
 from .config import cfg_get, resolve_path
+from .utils.seq import candidate_id_aliases
 
 AMINO = set("ACDEFGHIKLMNPQRSTVWY")
 ALIGNED = set("ABCDEFGHIKLMNOPQRSTUVWXYZ-")
@@ -27,6 +28,25 @@ MAX_FILE_BYTES = 64 * 1024 * 1024
 
 def sequence_hash(sequence):
     return hashlib.sha256(sequence.encode()).hexdigest()
+
+
+def prepare_id_aliases(path, candidate_ids):
+    """Freeze an original↔ASCII ID receipt before any sequence acquisition."""
+    aliases = candidate_id_aliases(candidate_ids, preserve_ascii=False)
+    receipt = {"schema_version": 1, "original_to_alias": aliases,
+               "alias_to_original": {alias: original for original, alias in aliases.items()},
+               "scope": "local MSA parent identity; service submits numeric query headers, never these user IDs"}
+    path = Path(path)
+    if path.exists():
+        try:
+            previous = json.loads(path.read_text(encoding="utf-8"))
+        except (ValueError, OSError) as exc:
+            raise ValueError("저장된 MSA 후보 ID 별칭 대응이 손상되었습니다. 새 실행을 사용하세요.") from exc
+        if previous != receipt:
+            raise ValueError("MSA 후보 ID 별칭 대응이 바뀌었습니다. 기존 기록을 보존하고 새 실행을 사용하세요.")
+    else:
+        _atomic_json(path, receipt)
+    return receipt
 
 
 def _query(sequence):
@@ -311,6 +331,7 @@ def project_parent(template: Monomer, parent_sequence, parent_cdrs, template_cdr
 def prepare_manifest(destination, *, static_chains, parents, public_templates, max_sequences=2048):
     """Publish an immutable run-local MSA collection; repeat only identical inputs."""
     destination = Path(destination)
+    parent_aliases = candidate_id_aliases(parents["design_id"], preserve_ascii=False)
     if not isinstance(static_chains, dict) or not static_chains or "A" not in static_chains:
         raise ValueError("MSA static_chains must contain primary target A")
     templates = []
@@ -340,7 +361,7 @@ def prepare_manifest(destination, *, static_chains, parents, public_templates, m
         records["static_chains"][chain] = retain("static_" + chain, alignment, {"source_a3m_sha256": alignment.source_sha256})
     for parent in parents.to_dict("records"):
         identifier, sequence = str(parent["design_id"]), _query(parent["sequence"])
-        if not re.fullmatch(r"[A-Za-z0-9_.-]+", identifier) or identifier in records["parents"]:
+        if identifier not in parent_aliases or identifier in records["parents"]:
             raise ValueError("Invalid/duplicate parent ID in MSA collection")
         ranges = _cdrs(parent.get("cdr_ranges"), len(sequence), required=False)
         inputs["parents"].append({"design_id": identifier, "sequence": sequence, "cdr_ranges": ranges})
@@ -360,18 +381,21 @@ def prepare_manifest(destination, *, static_chains, parents, public_templates, m
         if not valid_choices:
             raise ValueError(f"No valid cached MSA/template for parent {identifier}: " + "; ".join(problems))
         _, entry, projected, projection = min(valid_choices, key=lambda value: value[0])
-        selected = retain("parent_" + sequence_hash(identifier), projected,
+        selected = retain("parent_" + parent_aliases[identifier], projected,
                           {"cdr_ranges": ranges, "public_template_id": entry["id"], "projection": projection})
         records["parents"][identifier] = selected
     if not records["parents"]:
         raise ValueError("MSA collection requires at least one binder parent")
     fingerprint = identities.fingerprint(inputs)
     manifest = {"schema_version": 1, "inputs_fingerprint": fingerprint, "max_sequences": max_sequences,
-                "pairing": "unpaired", **records}
+                "pairing": "unpaired", "id_aliases": parent_aliases, **records}
     manifest_path = destination / "manifest.json"
     if manifest_path.exists():
         existing = json.loads(manifest_path.read_text())
-        if existing != manifest:
+        legacy = {key: value for key, value in manifest.items() if key != "id_aliases"}
+        legacy["parents"] = {key: {**entry, "a3m": "monomers/parent_" + sequence_hash(key) + ".a3m"}
+                             for key, entry in manifest["parents"].items()}
+        if existing != manifest and existing != legacy:
             raise ValueError("MSA collection inputs changed; preserve it and use a new directory")
         Collection(destination, max_sequences=max_sequences)
         return manifest_path
@@ -523,6 +547,9 @@ class Collection:
                 raise ValueError("MSA manifest chain/parent entries must be objects")
             for entry in self.manifest[group].values():
                 self._load(entry)
+        expected_aliases = candidate_id_aliases(self.manifest["parents"], preserve_ascii=False)
+        if "id_aliases" in self.manifest and self.manifest["id_aliases"] != expected_aliases:
+            raise ValueError("MSA 원본 후보 ID와 안전 별칭 대응이 일치하지 않습니다.")
 
     def _path(self, entry):
         if not isinstance(entry, dict) or not isinstance(entry.get("a3m"), str):
@@ -602,6 +629,8 @@ class Collection:
                     "mutation_positions": changed,
                     "chain_lengths": [len(sequence) for sequence in sequences], "chain_cardinality": cardinality,
                     "pairing": "unpaired", "projection": parent.get("projection")}
+        if "id_aliases" in self.manifest:
+            identity["parent_alias"] = self.manifest["id_aliases"][key]
         return _query_descriptor(sequences, cardinality, alignments, identity)
 
 

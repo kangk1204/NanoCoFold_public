@@ -72,11 +72,13 @@ def prepare_msa(cfg, run_dir, state, target, candidates, id_column="design_id", 
     requires explicit consent to upload the target and generated sequences.
     All predictors receive the same frozen, unpaired monomer inputs.
     """
+    seq.candidate_id_aliases(candidates[id_column])
     if cfg_get(cfg, "run.mock", False) or cfg_get(cfg, "run.dry_run", False):
         return copy.deepcopy(cfg), candidates.copy(), {}
-    from .colabfold_msa import cached_monomer, prepare_manifest
+    from .colabfold_msa import cached_monomer, prepare_manifest, prepare_id_aliases
     from .screen import complex_chain_records
     copied, candidates = copy.deepcopy(cfg), candidates.copy()
+    prepare_id_aliases(Path(run_dir) / "01_msa/comparison_id_aliases.json", candidates[id_column])
     cache = resolve_path(cfg, cfg_get(cfg, "screen.colabfold.msa_cache_dir", "msa/monomer_cache"))
     chains, _, binder = complex_chain_records(target, "")
     sequences = {**{"chain::" + letter: sequence for letter, sequence in chains.items() if letter != binder},
@@ -329,8 +331,7 @@ def run(cfg, run_dir, state, target, candidates, cdr_ranges=None, *, predict, fi
         candidates = preserve_generation_structure(candidates)
     if candidates[id_column].astype(str).duplicated().any():
         raise ValueError("Comparison source candidate IDs must be unique")
-    for value in candidates[id_column]:
-        seq.validate_candidate_id(str(value))
+    seq.validate_candidate_ids(candidates[id_column].astype(str))
     cfg, candidates, alignments = prepare_msa(cfg, run_dir, state, target, candidates, id_column, sequence_column)
     root = Path(run_dir) / "02_comparison"
     root.mkdir(parents=True, exist_ok=True)

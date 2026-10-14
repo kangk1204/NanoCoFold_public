@@ -212,6 +212,8 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
             cfg = _deep_merge(reviewed["config"], cfg)
         if payload.get("config_path"):
             path = contained(workspace, payload["config_path"], exists=True)
+            if not path.is_file():
+                raise ValueError("config_path에는 폴더가 아닌 YAML 설정 파일을 지정하세요.")
             config = read_config_yaml(path.read_text())
             if not isinstance(config, dict):
                 raise ValueError("설정 파일은 YAML 객체여야 합니다.")

@@ -21,14 +21,14 @@ _URL = re.compile(r'''((?:https?|ftp|s3|gs)://[^\s"'<>]+)''')
 _BASE64 = re.compile(r'[A-Za-z0-9+/]{64,}={0,2}')
 _INTEGRITY = re.compile(r'sha(?:256|384|512)-[A-Za-z0-9+/=]+')
 _GPU_UUID = re.compile(r'\b(?:GPU|MIG)-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b', re.I)
-_OPAQUE_FIELDS = frozenset({'content', 'smiles', 'canonical_smiles', 'isomeric_smiles',
+_OPAQUE_FIELDS = frozenset({'content', 'raw_content', 'smiles', 'canonical_smiles', 'isomeric_smiles',
                             'integrity', 'sha256', 'sha384', 'sha512'})
 _PATH_FIELDS = frozenset({'path', 'paths', 'root', 'source_root', 'workspace', 'cwd',
                           'env', 'outdir', 'directory', 'destination', 'file', 'filename'})
 
 
 def _path_field(field):
-    return field in _PATH_FIELDS or field.endswith(('_path', '_paths', '_dir', '_dirs', '_root', '_file', '_files'))
+    return field in _PATH_FIELDS or field.endswith(('_path', '_paths', '_dir', '_dirs', '_root', '_file', '_files', '_home'))
 
 
 def _portable_path(value, root):
@@ -56,7 +56,8 @@ def _path_patterns(root):
             # mounts and spaces; it must not match a neighboring root name.
             path_root = '(?:' + re.escape(prefix) + r'(?=/|$)|' + path_root + ')'
     quoted = re.compile(r'''(["'])(''' + path_root + r'''[^\r\n]*?)\1''')
-    token = re.compile(_BOUNDARY + path_root + _PATH_TAIL)
+    continuation = r'''(?:[ \t]+[^\s"\'<>()[\]{};,`|:]+(?=/)''' + _PATH_TAIL + ")*"
+    token = re.compile(_BOUNDARY + path_root + _PATH_TAIL + continuation)
     return quoted, token
 
 

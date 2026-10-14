@@ -548,7 +548,7 @@ def iptm_availability_warnings(cfg: dict, *, target_chain_count: int | None = No
     if target_chain_count is None:
         auxiliary = cfg_get(cfg, "target.aux_chains", []) or []
         target_chain_count = 1 + len(auxiliary) if isinstance(auxiliary, list) else None
-    if type(target_chain_count) is not int or target_chain_count < 2:
+    if isinstance(target_chain_count, (bool, np.bool_)) or not isinstance(target_chain_count, (int, np.integer)) or target_chain_count < 2:
         return []
     engines = [str(cfg_get(cfg, "screen.engine", "colabfold")).lower()]
     if cfg_get(cfg, "screen.comparison.enabled", False):

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import hashlib
+import unicodedata
 from pathlib import Path
 
 from Bio.SeqUtils.IsoelectricPoint import IsoelectricPoint
@@ -57,13 +59,15 @@ def read_fasta(path: str | Path) -> dict[str, str]:
     def finish():
         if name is None:
             return
-        if name.casefold() in folded_ids:
+        if candidate_id_key(name) in folded_ids:
             raise ValueError(f"FASTA에 중복 ID가 있습니다: '{name}' (서로 다른 후보가 덮어써질 수 있음)")
         if not chunks:
             raise ValueError(f"FASTA 서열이 비어 있습니다: '{name}'")
         records[name] = "".join(chunks)
-        folded_ids.add(name.casefold())
-    for raw in Path(path).read_text(encoding="utf-8-sig").splitlines():
+        folded_ids.add(candidate_id_key(name))
+    text = Path(path).read_text(encoding="utf-8-sig")
+    validate_fasta_controls(text)
+    for raw in text.splitlines():
         line = raw.strip()
         if not line:
             continue
@@ -72,7 +76,7 @@ def read_fasta(path: str | Path) -> dict[str, str]:
             tokens = line[1:].split()
             if not tokens:
                 raise ValueError("FASTA 헤더에 ID가 없습니다.")
-            name = tokens[0]
+            name = validate_candidate_id(tokens[0])
             chunks = []
         else:
             if name is None:
@@ -95,7 +99,7 @@ def write_fasta(records: dict[str, str] | list[tuple[str, str]], path: str | Pat
 
 def validate_candidate_id(candidate_id: str) -> str:
     """후보 ID를 파일 경로 성분으로 안전하게 사용할 수 있는지 검증한다(N06)."""
-    if any(ord(ch) < 32 or ord(ch) == 127 for ch in str(candidate_id)):
+    if any(unicodedata.category(ch) in {"Cc", "Cf"} for ch in str(candidate_id)):
         raise ValueError("후보 ID에 제어 문자를 사용할 수 없습니다.")
     text = str(candidate_id).strip()
     # Leave room for engine/seed prefixes and filenames on common filesystems.
@@ -111,12 +115,39 @@ def validate_candidate_id(candidate_id: str) -> str:
 
 
 def validate_candidate_ids(candidate_ids) -> list[str]:
-    """Reject IDs that share a directory on case-insensitive filesystems."""
+    """Reject Unicode/case equivalents while preserving the original spelling."""
     identifiers = [validate_candidate_id(value) for value in candidate_ids]
-    folded = [value.casefold() for value in identifiers]
+    folded = [candidate_id_key(value) for value in identifiers]
     if len(set(folded)) != len(folded):
-        raise ValueError("후보 ID는 대소문자를 무시해도 서로 달라야 합니다.")
+        raise ValueError("후보 ID는 유니코드 정규화·대소문자를 무시해도 서로 달라야 합니다.")
     return identifiers
+
+
+def candidate_id_key(identifier):
+    """Filesystem identity only; never rewrite a scientific identifier."""
+    return unicodedata.normalize("NFKC", identifier).casefold()
+
+
+def validate_fasta_controls(text):
+    """Reject hidden delimiters before splitlines can silently split an ID."""
+    if any(unicodedata.category(ch) in {"Cc", "Cf"} and ch not in "\n\r\t" for ch in text):
+        raise ValueError("FASTA에 숨은 제어·서식 문자를 사용할 수 없습니다. 일반 줄바꿈과 탭만 사용하세요.")
+
+
+def candidate_id_aliases(candidate_ids, *, preserve_ascii=True):
+    """Validate the whole ID set before deriving collision-checked ASCII aliases."""
+    originals = [str(value) for value in candidate_ids]
+    checked = validate_candidate_ids(originals)
+    if checked != originals:
+        raise ValueError("후보 ID 앞뒤의 공백을 제거한 뒤 다시 입력하세요.")
+    aliases = {}
+    for identifier in originals:
+        digest = hashlib.sha256(identifier.encode("utf-8")).hexdigest()
+        aliases[identifier] = (identifier if preserve_ascii and re.fullmatch(r"[A-Za-z0-9_.-]+", identifier)
+                               and not identifier.startswith("ncf_") else "ncf_" + digest)
+    if len({value.casefold() for value in aliases.values()}) != len(aliases):
+        raise ValueError("후보 ID의 안전 별칭이 중복됩니다. 서로 다른 ID를 사용하세요.")
+    return aliases
 
 
 def clean_sequence(seq: str, strict: bool = True) -> str:

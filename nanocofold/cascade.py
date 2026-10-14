@@ -168,6 +168,8 @@ def _validate_msa_lineage(candidates, parents, id_column, sequence_column):
 
 def prepare_msa(cfg, run_dir, state, target, candidates, cdr_ranges=None, id_column="design_id", sequence_column="sequence"):
     """Freeze local parent/static MSAs before calibration or first-stage inference."""
+    from .utils.seq import candidate_id_aliases
+    candidate_id_aliases(candidates[id_column])
     if cfg_get(cfg, "screen.colabfold.msa_mode") != "precomputed":
         return cfg, candidates
     if cfg_get(cfg, "run.mock", False) or cfg_get(cfg, "run.dry_run", False):
@@ -175,15 +177,17 @@ def prepare_msa(cfg, run_dir, state, target, candidates, cdr_ranges=None, id_col
             state.set_phase("colabfold_msa", {"mode": "precomputed", "mock": True, "mock_bypass": True,
                                              "actual_homologs_evaluated": False})
         return cfg, candidates
-    from .colabfold_msa import prepare_manifest
+    from .colabfold_msa import prepare_manifest, prepare_id_aliases
     from . import mature, provenance
     cfg, candidates = copy.deepcopy(cfg), candidates.copy()
+    prepare_id_aliases(Path(run_dir) / "01_msa/colabfold_id_aliases.json", candidates[id_column])
     if hasattr(state, "begin_phase"):
         state.begin_phase("colabfold_msa")
     mode = cfg_get(cfg, "run.mode")
     if mode == "design" and cfg_get(cfg, "design.refinement.enabled", False):
         from .design_refinement import public_msa_templates, public_msa_template_sequences
         parents = pd.read_csv(Path(run_dir) / "02_design/refinement/parents.csv", dtype={"design_id": str})
+        candidate_id_aliases(parents["design_id"])
         public_queries = [source["sequence"] for source in public_msa_template_sequences(cfg).values()]
     elif mode == "mature":
         public_queries = [mature.resolve_wt_sequence(cfg)]

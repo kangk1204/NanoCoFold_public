@@ -240,7 +240,7 @@ def _validate(cfg: dict) -> None:
             raise ValueError(f"{dotted} 은 true/false여야 합니다.")
     design_engine = cfg_get(cfg, "design.engine", "rfantibody")
     if not isinstance(design_engine, str) or design_engine not in {"rfantibody", "boltzgen", "both"}:
-        raise ValueError("design.engine must be rfantibody|boltzgen|both")
+        raise ValueError("design.engine은 rfantibody, boltzgen, both 중 하나를 선택하세요.")
     hotspot_mode = cfg_get(cfg, "design.hotspot_mode", "none")
     if not isinstance(hotspot_mode, str) or hotspot_mode not in {"none", "specified"}:
         raise ValueError("design.hotspot_mode must be none|specified")
@@ -270,7 +270,7 @@ def _validate(cfg: dict) -> None:
         settings(cfg)
     count = cfg_get(cfg, "design.num_designs", 2)
     if type(count) is not int or not 1 <= count <= 10000:
-        raise ValueError("design.num_designs must be integer 1..10000 per engine")
+        raise ValueError("design.num_designs는 엔진당 생성 수로 1–10000 정수를 입력하세요.")
     library = cfg_get(cfg, "mature.library", {})
     if not isinstance(library, dict):
         raise ValueError("mature.library는 설정 객체여야 합니다.")
@@ -280,7 +280,7 @@ def _validate(cfg: dict) -> None:
     strategy = library.get("strategy", "dms")
     if not isinstance(strategy, str) or strategy not in {"dms", "random"}:
         raise ValueError("mature.library.strategy는 dms/random 중 하나여야 합니다.")
-    if mode == "mature" and strategy == "dms" and "size" in library:
+    if mode == "mature" and strategy == "dms" and "size" in library and library["size"] != 10000:
         warnings.warn(
             "mature.library.strategy=dms에서는 mature.library.size를 사용하지 않습니다. "
             "실제 변이 생성 상한은 mature.library.max_variants로 설정하세요(WT는 별도 포함).",

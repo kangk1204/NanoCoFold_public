@@ -136,6 +136,8 @@ def descendants(pid: int) -> list[tuple[int, str | None]]:
 
 class JobStore:
     def __init__(self, workspace: Path):
+        from .eta import ComplexJobReadCache
+        self._complex_read_cache = ComplexJobReadCache()
         self.workspace = Path(workspace).resolve()
         self.root = self.workspace / ".nanocofold"
         self.root.mkdir(parents=True, exist_ok=True)
@@ -171,7 +173,6 @@ class JobStore:
             connection.close()
 
     def list(self, *, states=None, limit=None, before=None, before_id=None, cleanup=False) -> list[dict]:
-        from .eta import terminal_eta, refresh_complex_job
         clauses, values = [], []
         if states is not None:
             if not states:
@@ -194,15 +195,17 @@ class JobStore:
             query += " LIMIT ?"
             values.append(limit)
         with self.connect() as connection:
-            return [terminal_eta(refresh_complex_job(json.loads(row["payload"]))) for row in connection.execute(query, values)]
+            return [self._read_payload(row["payload"]) for row in connection.execute(query, values)]
+
+    def _read_payload(self, payload):
+        return self._complex_read_cache.read(json.loads(payload), record_key=payload, terminal_states=TERMINAL)
 
     def get(self, identifier: str) -> dict:
         with self.connect() as connection:
             row = connection.execute("SELECT payload FROM jobs WHERE id=?", (identifier,)).fetchone()
         if row is None:
             raise KeyError("작업이 없습니다.")
-        from .eta import terminal_eta, refresh_complex_job
-        return terminal_eta(refresh_complex_job(json.loads(row["payload"])))
+        return self._read_payload(row["payload"])
 
     def submitted(self, identifier: str):
         with self.connect() as connection:
@@ -350,6 +353,8 @@ class JobManager:
         budget = payload.get("budget_seconds")
         if budget is not None and (isinstance(budget, bool) or not isinstance(budget, (int, float)) or not 0 < budget <= 604800):
             raise ValueError("실행 시간 한도는 0초 초과, 7일 이하여야 합니다.")
+        if "reuse_results" in payload and type(payload["reuse_results"]) is not bool:
+            raise ValueError("reuse_results는 true/false여야 합니다.")
         run_dir = self.workspace / "runs" / identifier if kind == "analysis" else None
         folder.mkdir(parents=True, exist_ok=True)
         manifest = []
@@ -385,8 +390,6 @@ class JobManager:
                "pid": None, "process_stamp": None, "pgid": None, "started": None, "finished": None,
                "error": None, "can_resume": False, "history": [], "resume": False,
                "profile": payload.get("profile"), "submission_id": payload.get("submission_id"), "submission_hash": submission_hash}
-        if "reuse_results" in payload and type(payload["reuse_results"]) is not bool:
-            raise ValueError("reuse_results는 true/false여야 합니다.")
         if kind == "analysis":
             from .result_catalog import build_identity
             identity = build_identity(self.workspace, cfg, gpu)
@@ -707,7 +710,7 @@ class JobManager:
             return {}
         path = Path(job["run_dir"]) / "run_state.json"
         try:
-            state = json.loads(path.read_text())
+            state = self._runtime_estimator.metadata_cache.read(path)
             if not isinstance(state, dict) or not isinstance(state.get("phases", {}), dict):
                 raise ValueError("진행 상태 형식 오류")
             phases = state.get("phases", {})
@@ -728,7 +731,7 @@ class JobManager:
             completed = set(completed_phases) if execution.get("state") == "running" else set(phases)
             if job["mode"] == "complex":
                 from .eta import complex_model_observations
-                observation = complex_model_observations(job, state=state)
+                observation = complex_model_observations(job, state=state, metadata_cache=self._runtime_estimator.metadata_cache)
                 return {"phase": "prediction" if "final" not in completed else "complete",
                         "progress": observation["progress"], "eta": eta}
             if state.get("current_phase") is not None and not isinstance(state["current_phase"], str):
