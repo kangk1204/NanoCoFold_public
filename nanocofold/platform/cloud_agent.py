@@ -143,9 +143,17 @@ class Agent:
     @staticmethod
     def capabilities():
         from ..engine_comparison import AVAILABLE_ENGINES
+        from ..provenance import fingerprint
+        root = Path(__file__).resolve().parents[1]
+        python_files = {str(path.relative_to(root)): sha256(path)
+                        for path in sorted(root.rglob('*.py'))
+                        if '__pycache__' not in path.parts}
         return {'comparison_public_api':True,'review_bound_diagnostics':True,
                 'comparison_engine_selection':True,'comparison_predictors':list(AVAILABLE_ENGINES),
-                'complex_comparison':True,'complex_comparison_schema':1,'complex_comparison_predictors':list(AVAILABLE_ENGINES)}
+                'complex_comparison':True,'complex_comparison_schema':1,'complex_comparison_predictors':list(AVAILABLE_ENGINES),
+                'package_version':__version__,'application_python_sha256':fingerprint(python_files),
+                'application_python_sha256_algorithm':'sha256(canonical JSON relative Python-path to file-sha256 mapping)',
+                'application_python_files':len(python_files),'cloud_agent_sha256':sha256(Path(__file__))}
     def installation_identity(self):
         from ..provenance import application_identity
         return {'agent_id':self.agent_id,'agent_version':AGENT_VERSION,'package_version':__version__,

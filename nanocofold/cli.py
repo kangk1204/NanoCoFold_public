@@ -303,11 +303,32 @@ def _main(argv: list[str] | None = None) -> int:
     return 0
 
 
+def _normalized_cli_config(cfg: dict, args) -> dict:
+    """One independent effective config for reuse identity and actual execution."""
+    effective = copy.deepcopy(cfg)
+    mode = getattr(args, "mode", None)
+    if getattr(args, "command", None) in {"complex", "design", "screen", "mature"}:
+        mode = args.command
+    if mode:
+        effective.setdefault("run", {})["mode"] = mode
+    if getattr(args, "mock", False):
+        effective.setdefault("run", {})["mock"] = True
+    if getattr(args, "dry_run", False):
+        effective.setdefault("run", {})["dry_run"] = True
+    if getattr(args, "vhh_fasta", None):
+        effective.setdefault("screen", {})["vhh_fasta"] = args.vhh_fasta
+    if getattr(args, "wt_fasta", None):
+        effective.setdefault("mature", {}).update(wt_fasta=args.wt_fasta, wt_sequence="")
+    return effective
+
+
 def _execute_command(args) -> int:
     """Shared readiness, run ownership and durable lifecycle for CLI/HTTP workers."""
     import time
     from .state import RunLock
-    cfg = _load(args)
+    cfg = _normalized_cli_config(_load(args), args)
+    from .config import _validate
+    _validate(cfg)
     directory = getattr(args, "run_dir", None)
     args._existing_run_requested = bool(directory)
     if directory:
@@ -333,11 +354,7 @@ def _execute_command(args) -> int:
             and not _is_dry_run(cfg) and not (run_dir / "run_config.yaml").exists()):
         from .platform.result_catalog import ResultCatalog, build_identity
         catalog = ResultCatalog(args.reuse_workspace)
-        effective = dict(cfg)
-        if getattr(args, "vhh_fasta", None):
-            effective = {**effective, "screen": {**effective["screen"], "vhh_fasta": args.vhh_fasta}}
-        if getattr(args, "wt_fasta", None):
-            effective = {**effective, "mature": {**effective["mature"], "wt_fasta": args.wt_fasta, "wt_sequence": ""}}
+        effective = _normalized_cli_config(cfg, args)
         import os
         # CLI adapters resolve relative inputs/environments against PROJECT_ROOT;
         # the catalog location controls storage, never scientific file resolution.
@@ -351,12 +368,9 @@ def _execute_command(args) -> int:
     with RunLock(run_dir), ConsoleProgress("NanoCoFold " + args.command, run_dir=run_dir):
         args.run_dir = str(run_dir)
         run_dir, state = _open_run(cfg, args)
-        if args.command in {"complex", "design", "screen", "mature"}:
-            cfg["run"]["mode"] = args.command
-        if getattr(args, "vhh_fasta", None):
-            cfg["screen"]["vhh_fasta"] = args.vhh_fasta
-        if getattr(args, "wt_fasta", None):
-            cfg["mature"].update(wt_fasta=args.wt_fasta, wt_sequence="")
+        normalized = _normalized_cli_config(cfg, args)
+        cfg.clear()
+        cfg.update(normalized)
         dry = _is_dry_run(cfg)
         started = time.time()
         previous_execution = dict(state.data.get("execution", {}))
@@ -497,15 +511,13 @@ def _open_run(cfg: dict, args, new: bool = True) -> tuple[Path, RunState]:
                 _set_dotted(effective, key.strip(), _yaml.safe_load(value.strip()))
             from .config import _validate
 
+            effective = _normalized_cli_config(effective, args)
             _validate(effective)  # 병합 후 상호 배타 입력 검증(I07)
             cfg.clear()
             cfg.update(effective)
-        if getattr(args, "mode", None):
-            cfg["run"]["mode"] = args.mode
-        if getattr(args, "mock", False):
-            cfg["run"]["mock"] = True
-        if getattr(args, "dry_run", False):
-            cfg["run"]["dry_run"] = True
+        effective = _normalized_cli_config(cfg, args)
+        cfg.clear()
+        cfg.update(effective)
         state = RunState(run_dir)
     else:
         run_dir = resolve_run_dir(cfg, run_id=run_id)

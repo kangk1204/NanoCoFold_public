@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "smoke_fixture_directory": "examples/tutorial",
+  "mock_framework_sequence": "MAQVQLVESGGGLVQPGGSLRLSCAASGFTFSSYRMYWFRQAPGQGLEAVAAISAGGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCANRAGWGMGDYWGQGTLVTVSKLAAALEHHHHHH",
+  "local_msa_profile": {
+    "name": "operator-local",
+    "enabled": false,
+    "host": null,
+    "hostname": null,
+    "db_root": null,
+    "work_root": null,
+    "executable_roots": [],
+    "databases": {
+      "uniref30_2302_db": "2302",
+      "colabfold_envdb_202108_db": "202108"
+    }
+  }
+}

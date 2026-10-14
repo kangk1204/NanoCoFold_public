@@ -10,14 +10,15 @@ function iptmCaption(records) {
   if (scopes.has("selected_target_binder_pair")) return "표적–VHH ipTM";
   return "ipTM · 적용 범위 미기록";
 }
-const metricCaption = (key, records) => key === "iptm" ? iptmCaption(records) : metricCaptions[key] || key;
-function refreshMetricCaptions(records) {
+const complexMetricCaptions = Object.freeze({interface_pae_ab:"PAE 행 기준 체인·열 파트너 (Å)",interface_pae_ba:"PAE 행 파트너·열 기준 체인 (Å)",target_plddt:"기준 체인 pLDDT",binder_plddt:"파트너 pLDDT",pdockq2_target:"pDockQ2 기준 체인 방향",pdockq2_binder:"pDockQ2 파트너 방향"});
+const metricCaption = (key, records, mode) => key === "iptm" ? iptmCaption(records) : (mode === "complex" ? complexMetricCaptions[key] : null) || metricCaptions[key] || key;
+function refreshMetricCaptions(records, mode) {
   for (const id of ["sort-metric", "plot-x", "plot-y"])
     for (const option of $(id).options) {
       const value = option.value;
       if (metricCaptions[value]) {
         option.value = value;
-        option.textContent = metricCaption(value, records);
+        option.textContent = metricCaption(value, records, mode);
       }
     }
 }
@@ -124,7 +125,7 @@ function reportSourceIdentity(row) {
   if (typeof row.source_sequence_id === "string" && row.source_sequence_id) return row.source_sequence_id;
   const id = row.candidate_id || row.design_id || row.variant_id || row.label;
   if (typeof id !== "string" || !id) return null;
-  for (const engine of [row.predictor_engine, "colabfold", "boltz2", "chai1"])
+  for (const engine of [row.predictor_engine, row.engine, "colabfold", "boltz2", "chai1", "opendde"])
     if (engine && id.startsWith(engine + "__")) return id.slice(engine.length + 2);
   return id;
 }
@@ -1064,13 +1065,14 @@ async function loadResult(id) {
     $("hotspot-filter").checked = false;
   }
   for (const [layer, caption] of Object.entries(generalComplex
-    ? {target:'기준 체인', binder:'파트너 B', context:'다른 파트너', hotspots:'관심 부위'}
+    ? {target:'기준 체인', binder:'파트너 체인', context:'다른 파트너', hotspots:'관심 부위'}
     : {target:'표적', binder:'VHH', context:'파트너', hotspots:'결합 부위(hotspot)'})) {
     const checkbox = document.querySelector(`[data-layer="${layer}"]`);
     if (checkbox) checkbox.parentElement.replaceChildren(checkbox, document.createTextNode(caption));
   }
   state.rows = rows.map(row => ({...row, predictor_engine: row.predictor_engine || row.engine || summary.conditions?.engine || "unknown", design_origin: row.design_origin || row.parent_engine || row.source || null}));
-  refreshMetricCaptions(state.rows);
+  syncResultModeControls();
+  refreshMetricCaptions(state.rows, state.result?.mode);
   const savedSort = offline ? window.NANOCOFOLD_OFFLINE.filters?.sort : null;
   if (!savedSort) {
     const defaultSort = defaultResultSort(state.rows, summary.mode);
@@ -1325,7 +1327,30 @@ function hotspotMatchesMinimum(row,minimum) {
  const fraction=hotspotFilterFraction(row);
  return fraction!==null&&fraction>=minimum;
 }
+function syncResultModeControls() {
+  const complex = state.result?.mode === "complex";
+  for (const node of document.querySelectorAll("[data-vhh-results]")) node.hidden = complex;
+  for (const id of ["eligibility", "eligibility-basis", "hotspot-min"]) {
+    const node = $(id), label = document.querySelector(`label[for="${id}"]`);
+    if (node) node.hidden = complex;
+    if (label) label.hidden = complex;
+  }
+  for (const layer of ["hotspots", "cdr"]) {
+    const node = document.querySelector(`[data-layer="${layer}"]`);
+    if (node) {node.parentElement.hidden = complex;if (complex) node.checked = false;}
+  }
+  if ($("cdr-actions")) $("cdr-actions").hidden = complex;
+  for (const id of ["sort-metric", "plot-x", "plot-y"]) {
+    const select = $(id);
+    for (const option of select?.options || []) {
+      const unavailable = complex && ["composite_score", "dev_flags", "dev_severe", "esm_score", "review_rank", "candidate_review_priority", "site_selection_eligible"].includes(option.value);
+      option.hidden = unavailable;option.disabled = unavailable;
+    }
+    if (select?.selectedOptions[0]?.disabled) select.value = id === "plot-x" ? "iptm" : "ipsae";
+  }
+}
 function renderCandidates() {
+  syncResultModeControls();
   if (!state.result) return;
   const f = filters(),
     status = $("eligibility").value;
@@ -1360,8 +1385,8 @@ function renderCandidates() {
   state.filtered = keyed.map(item=>item.row);
   $("candidate-count").textContent =
     `표시 ${state.filtered.length} / 전체 ${state.rows.length} 후보·모델 기록 · 미평가는 0으로 바꾸지 않습니다.`;
-  refreshMetricCaptions(state.filtered);
-  $("candidate-sort-note").textContent = `정렬 기준: ${metricCaption(f.sort, state.filtered)} · ${f.descending ? "높은 값부터" : "낮은 값부터"} · 미평가 마지막 · ${f.sort === "review_rank" ? "동일 범위의 후보별 검토 순위·동률 허용·1위도 보류 가능" : "탐색 순서이며 통합 순위가 아닙니다"}.`;
+  refreshMetricCaptions(state.filtered, state.result?.mode);
+  $("candidate-sort-note").textContent = `정렬 기준: ${metricCaption(f.sort, state.filtered, state.result?.mode)} · ${f.descending ? "높은 값부터" : "낮은 값부터"} · 미평가 마지막 · ${f.sort === "review_rank" ? "동일 범위의 후보별 검토 순위·동률 허용·1위도 보류 가능" : "탐색 순서이며 통합 순위가 아닙니다"}.`;
   const columns = state.result.mode === "complex" ? ["candidate_id", "predictor_engine", "seed", "model", "iptm", "ipsae", "pdockq2", "pdockq2_target", "pdockq2_binder", "interface_pae", "n_clashes", "error"] : [
       "candidate_id",
       "predictor_engine",
@@ -1396,11 +1421,13 @@ function renderCandidates() {
   captions.predictor_engine = "예측 엔진"; captions.design_origin = "생성 엔진";
   captions.n_clashes = "충돌 원자쌍";
   Object.assign(captions, metricCaptions);
+  if (state.result.mode === "complex") Object.assign(captions, complexMetricCaptions);
   captions.iptm=metricCaption("iptm", state.filtered);
   if (state.result.mode === "complex") captions.ipsae="ipSAE · 표시 체인 쌍";
   columns.forEach(k => {
     const th = el("th"), button = el("button", (captions[k] || k) + (f.sort === k ? (f.descending ? " ↓" : " ↑") : " ↕"), "sort-header");
     th.setAttribute("aria-sort", f.sort === k ? (f.descending ? "descending" : "ascending") : "none");
+    th.dataset.columnKey = k;
     button.type = "button";
     button.onclick = () => {
       const select = $("sort-metric");
@@ -1420,6 +1447,7 @@ function renderCandidates() {
         row.candidate_id === state.candidate?.candidate_id ? "selected" : "";
       columns.forEach((key, i) => {
         const td = el("td");
+        td.dataset.columnKey = key;
         if (i === 0) {
           const button = el("button", state.displayAliases?.[row.candidate_id] || row[key]);
           button.title = row.candidate_id;
@@ -1482,7 +1510,7 @@ function renderScatter() {
           ),
         },
         hovertemplate:
-          "%{text}<br>" + metricCaption(x, state.filtered) + ": %{x}<br>" + metricCaption(y, state.filtered) + ": %{y}<extra></extra>",
+          "%{text}<br>" + metricCaption(x, state.filtered, state.result?.mode) + ": %{x}<br>" + metricCaption(y, state.filtered, state.result?.mode) + ": %{y}<extra></extra>",
       },
     ],
     {
@@ -1490,8 +1518,8 @@ function renderScatter() {
       // Reserve space above data points so the Plotly toolbar cannot intercept
       // clicks on high-valued observations in a narrow three-panel layout.
       margin: { t: 50, l: 50, r: 10, b: 65 },
-      xaxis: { automargin: true, title: { text: metricCaption(x, state.filtered), font: { size: 14 }, standoff: 12 } },
-      yaxis: { automargin: true, title: { text: metricCaption(y, state.filtered), font: { size: 14 }, standoff: 8 } },
+      xaxis: { automargin: true, title: { text: metricCaption(x, state.filtered, state.result?.mode), font: { size: 14 }, standoff: 12 } },
+      yaxis: { automargin: true, title: { text: metricCaption(y, state.filtered, state.result?.mode), font: { size: 14 }, standoff: 8 } },
       annotations: rows.length
         ? []
         : [{ text: "표시할 평가값이 없습니다", showarrow: false }],
@@ -1553,19 +1581,24 @@ async function selectCandidate(id) {
     ...(row.exclusion_reasons || []).map((r) => "기록 제외 사유: " + reportReasonLabel(r) + " (" + r + ")"),
     ...(recordedEvaluationError(row) ? ["후보 평가 오류: " + recordedEvaluationError(row)] : []),
     ...(row.missing_metrics?.length
-      ? ["미평가 지표: " + row.missing_metrics.map(key => metricCaption(key, row)).join(", ")]
+      ? ["미평가 지표: " + row.missing_metrics.map(key => metricCaption(key, row, state.result?.mode)).join(", ")]
       : []),
   ]);
   const dl = el("dl");
   if (row.structure_stage === "rf2") detail.append(el("p", `RF2 설계 단계 구조 · PAE ${fmt(row.rf2_pae)} Å · pLDDT ${fmt(row.rf2_plddt)} · 설계–RF2 RMSD ${fmt(row.rmsd)} Å. 최종 복합체 재예측 지표와 구분하세요.`, "muted"));
   for (const key of metricKeys) {
-    dl.append(el("dt", metricCaption(key, row)), el("dd", fmt(row[key])));
+    const term = el("dt", metricCaption(key, row, state.result.mode));term.dataset.columnKey = key;
+    dl.append(term, el("dd", fmt(row[key])));
   }
   detail.append(dl);
   const confidenceScope=el("details");confidenceScope.append(el("summary","ipSAE·ipTM 적용 체인과 출처"));
   confidenceScope.append(el("p", `ipSAE 적용 체인: ${row.ipsae_chain_a || "미기록"}–${row.ipsae_chain_b || "미기록"} · ${["selected_chain_pair","legacy_first_recorded_pair"].includes(row.ipsae_scope) ? "표시된 체인 쌍" : "범위 미기록·상세 원문 확인"}`));
-  confidenceScope.append(el("p","일반 복합체의 요약 ipSAE는 검토한 체인 순서의 첫 쌍이며 전체 평균·최솟값이 아닙니다. 모든 체인 쌍의 결과는 체인 쌍 상세 표·CSV에서 확인합니다. ipTM 전체 값과 선택 표적–VHH 쌍 값은 구분하며, 범위가 없으면 전체 복합체로 추정하지 않습니다.","muted"));
-  confidenceScope.append(el("pre",JSON.stringify(Object.fromEntries(Object.entries(row).filter(([key])=>/^ipsae_(scope|chain|source)|^iptm_(scope|source|unavailable)/.test(key))),null,2)));detail.append(confidenceScope);
+  confidenceScope.append(el("p","일반 복합체의 요약 ipSAE는 기본적으로 검토한 체인 순서의 첫 쌍이며, 체인쌍을 명시한 실행에서는 해당 쌍입니다. 전체 평균·최솟값과 구분하고 모든 체인 쌍의 결과는 상세 표·CSV에서 확인합니다. ipTM 전체 값과 선택 표적–VHH 쌍 값은 구분하며, 범위가 없으면 전체 복합체로 추정하지 않습니다.","muted"));
+  if (state.result?.mode === "complex") {
+    const selection = row.ipsae_selection === "explicit_primary_pair" ? "명시한 체인쌍" : row.ipsae_selection === "first_pair_in_reviewed_chain_order" ? "검토 순서의 첫 체인쌍" : "선택 기준 미기록";
+    confidenceScope.append(el("p", `요약 쌍 선택: ${selection} · 유한한 기록값의 최솟값 ${fmt(row.min_pair_ipsae)} / 최댓값 ${fmt(row.max_pair_ipsae)} · 평가 쌍 ${fmt(row.pair_ipsae_assessed_count)} / 전체 쌍 ${fmt(row.pair_ipsae_total_count)}. 미평가 체인쌍은 최솟값·최댓값에서 제외됩니다.`));
+  }
+  confidenceScope.append(el("pre",JSON.stringify(Object.fromEntries(Object.entries(row).filter(([key])=>/^ipsae_(scope|chain|source|selection)|^iptm_(scope|source|unavailable)|^(primary_pair|(max|min)_pair_ipsae|pair_ipsae_)/.test(key))),null,2)));detail.append(confidenceScope);
   const methodReceipts = Object.entries(row.metric_provenance || {});
   if (methodReceipts.length) {
     const methods = el("details");

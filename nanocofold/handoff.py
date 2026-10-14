@@ -128,9 +128,25 @@ def write_pymol_session_script(
     out_path: Path,
     target_chain: str = "A",
 ) -> str:
-    """top_structures: [(name, structure_path, binder_chain), ...] — binder 체인은 실제 값 사용."""
+    """Write a script with coordinate paths relative to its own location.
+
+    top_structures: [(name, structure_path, binder_chain), ...]. Moving the
+    complete run folder preserves these relationships; binder chains retain
+    their recorded values.
+    """
+    import os
+
+    out_path = Path(out_path)
     lines = [
         "# NanoCoFold PyMOL 시각화 스크립트 (오픈소스 PyMOL)",
+        "# 좌표 파일은 이 스크립트 위치를 기준으로 불러옵니다. 폴더 구조를 함께 유지하세요.",
+        "python",
+        "from pathlib import Path as _NcfPath",
+        "from pymol import cmd",
+        # PyMOL's native PML parser sets __script__ while executing @/File Open.
+        # Resolving it here preserves moved folders and arbitrary launch CWDs.
+        "_ncf_script_root = _NcfPath(__script__).resolve().parent",
+        "python end",
         "bg_color white",
         "hide everything",
     ]
@@ -149,6 +165,9 @@ def write_pymol_session_script(
         used_names.add(name)
         if any(character in str(path) for character in "\n\r\x00"):
             raise ValueError("PyMOL 구조 경로에 줄바꿈·NUL 문자를 사용할 수 없습니다.")
+        relative_path = Path(os.path.relpath(
+            Path(path).expanduser().resolve(), out_path.resolve().parent,
+        )).as_posix()
         import json
         lines.extend([
             "# candidate_id_map: " + json.dumps({"object": name, "candidate_id": str(candidate_id)}, ensure_ascii=False),
@@ -157,12 +176,12 @@ def write_pymol_session_script(
             # A Python string literal reaches cmd.load intact. PyMOL's PML
             # argument parser neither unescapes JSON Unicode nor safely treats
             # semicolons in arbitrary filenames as part of a load argument.
-            f"cmd.load({str(path)!r}, {name!r})",
+            f"cmd.load(str(_ncf_script_root / {relative_path!r}), {name!r})",
             "python end",
             f"show cartoon, {name}",
             f"color grey80, {name} and chain {target_chain}",
             f"color skyblue, {name} and chain {binder_chain}",
-            f"select interface_{name}, {name} within 5 of chain {target_chain}",
+            f"select interface_{name}, {name} within 5 of ({name} and chain {target_chain})",
             f"show sticks, interface_{name} and chain {binder_chain}",
         ])
     lines.append("zoom all")

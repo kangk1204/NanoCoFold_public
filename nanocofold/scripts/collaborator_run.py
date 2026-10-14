@@ -240,9 +240,11 @@ def prepare_smoke_fixtures(workspace: Path) -> None:
     # doctor uses these public runtime fixtures independently of the user input.
     # init_workspace intentionally does not copy benchmark/reference datasets.
     from nanocofold.diagnostics import _public_smoke_fixtures
+    from nanocofold.runtime_policy import runtime_policy
+    fixture_directory = runtime_policy()["smoke_fixture_directory"]
     for source in _public_smoke_fixtures():
         name = source.name
-        destination = workspace / "examples/tutorial" / name
+        destination = workspace / fixture_directory / name
         if destination.exists():
             if digest(destination.read_bytes()) != digest(source.read_bytes()):
                 raise ValueError(f"기존 smoke fixture가 다릅니다. 덮어쓰지 않았습니다: {destination}")

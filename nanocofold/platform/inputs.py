@@ -378,6 +378,8 @@ class InputManager:
             raise ValueError("mock는 true/false여야 합니다.")
         entries = proteins(payload.get("proteins"))
         settings = validate_settings(payload.get("settings", {}))
+        if settings.get("primary_pair") and not set(settings["primary_pair"]) <= {p["id"] for p in entries}:
+            raise ValueError("primary_pair가 실제 분석 체인에 없습니다.")
         folder = self.root / secrets.token_hex(16)
         folder.mkdir()
         cfg = {"run": {"mode": "complex", "mock": mock}, "target": {"sequence": entries[0]["sequence"], "fasta": None, "pdb": None},

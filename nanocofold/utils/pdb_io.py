@@ -297,7 +297,7 @@ def parse_plddt(structure: Structure, normalize: bool = True) -> dict[str, float
     for label, values in raw.items():
         mean = float(np.mean(values))
         out[label] = mean
-    if normalize and out and max(out.values()) <= 1.5:
+    if normalize and out and max(out.values()) <= 1.0:
         out = {key: value * 100.0 for key, value in out.items()}
     return out
 
@@ -328,7 +328,7 @@ def parse_atom_plddt(structure: Structure, atom_mode: str = "ca",
             atom = metric_confidence_atom(residue, atom_mode)
             if atom is not None:
                 out[residue_label(residue, chain.id)] = float(atom.get_bfactor())
-    if normalize and out and all(np.isfinite(v) for v in out.values()) and max(out.values()) <= 1.5:
+    if normalize and out and all(np.isfinite(v) for v in out.values()) and max(out.values()) <= 1.0:
         out = {key: value * 100.0 for key, value in out.items()}
     return out
 

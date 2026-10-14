@@ -111,29 +111,45 @@ test('explicit consent retains the loaded example summary while invalidating rev
 
 const adapter=readFileSync(new URL('../nanocofold/templates/result-molstar.js',import.meta.url),'utf8');
 function viewerFixture() {
-  const calls=[],frames=[];let resize;
-  const camera={focusLoci:(...args)=>calls.push({focus:args}),reset:(...args)=>calls.push({reset:args})};
+  const calls=[];let resize;
+  const cameraState={position:[0,0,20],target:[0,0,0],up:[0,1,0]};
+  const pose=()=>JSON.parse(JSON.stringify(cameraState));
+  const camera={
+    focusLoci:(...args)=>{calls.push({focus:args});cameraState.position=[0,0,10];},
+    reset:(...args)=>{calls.push({reset:args});cameraState.position=[0,0,20];},
+  };
   const context={window:{},molstar:{},ResizeObserver:class{constructor(cb){resize=cb;}observe(){}},
-    requestAnimationFrame:cb=>{frames.push(cb);return frames.length;},cancelAnimationFrame(){}};
+    requestAnimationFrame:()=>{throw Error('A layout resize must not schedule automatic refocus');},cancelAnimationFrame(){}};
   vm.createContext(context);vm.runInContext(adapter,context);
   const plugin={managers:{camera,interactivity:{lociSelects:{deselectAll(){},select(){}},lociHighlights:{clearHighlights(){}}},structure:{focus:{clear(){}}}},
-    canvas3d:{camera:{viewport:{width:200,height:100}}}};
-  const viewer=new context.window.NanoCoFoldResultViewer({plugin,handleResize(){}},{chains:[]});
+    canvas3d:{camera:{viewport:{width:200,height:100},getSnapshot:pose}}};
+  const viewer=new context.window.NanoCoFoldResultViewer({plugin,handleResize(){calls.push({resize:true});}},{chains:[]});
   viewer.loci=labels=>Array.from(labels);
-  viewer.observeResize({clientWidth:200,clientHeight:100,querySelector:()=>({getBoundingClientRect:()=>({width:200,height:100})})});
-  return {viewer,calls,resize:()=>{resize();frames.shift()();}};
+  const host={clientWidth:200,clientHeight:100};viewer.observeResize(host);
+  return {viewer,calls,pose,host,resize:()=>resize(),manualCamera(){cameraState.position=[13,7,31];cameraState.target=[1,2,3];cameraState.up=[0.3,0.8,0.1];return pose();}};
 }
-test('whole-structure view remains whole after resize without clearing the selected chain',async()=>{
-  const f=viewerFixture();await f.viewer.focus(['A:1']);await f.viewer.fit();f.resize();
+test('whole-structure view preserves manual rotation and zoom after resize without clearing selection',async()=>{
+  const f=viewerFixture();await f.viewer.focus(['A:1']);await f.viewer.fit();const manual=f.manualCamera();f.resize();
   assert.equal(f.calls.filter(call=>call.focus).length,1);
-  assert.equal(f.calls.filter(call=>call.reset).length,2);
-  assert.deepEqual(Array.from(f.viewer.selectedLabels),['A:1']);
+  assert.equal(f.calls.filter(call=>call.reset).length,1);
+  assert.equal(f.calls.filter(call=>call.resize).length,1);
+  assert.deepEqual(f.pose(),manual);assert.deepEqual(Array.from(f.viewer.selectedLabels),['A:1']);
 });
-test('clearing highlight does not lose the chosen camera framing on resize',async()=>{
-  const f=viewerFixture();await f.viewer.focus(['B:1']);await f.viewer.clearSelection();f.resize();
-  assert.equal(f.calls.filter(call=>call.focus).length,2);assert.equal(f.viewer.selectedLabels.length,0);
+test('clearing highlight does not change manual camera framing on resize',async()=>{
+  const f=viewerFixture();await f.viewer.focus(['B:1']);await f.viewer.clearSelection();const manual=f.manualCamera();f.resize();
+  assert.equal(f.calls.filter(call=>call.focus).length,1);assert.equal(f.viewer.selectedLabels.length,0);
+  assert.equal(f.calls.filter(call=>call.resize).length,1);assert.deepEqual(f.pose(),manual);
 });
-test('a pending focus followed by whole view finishes with the whole camera frame',async()=>{
-  const f=viewerFixture(),focus=f.viewer.focus(['A:1']),fit=f.viewer.fit();await Promise.all([focus,fit]);f.resize();
-  assert.ok(f.calls.at(-1).reset);assert.equal(f.viewer.cameraFocusLabels,null);
+test('a pending focus followed by explicit fit finishes whole, then resize preserves the current camera',async()=>{
+  const f=viewerFixture(),focus=f.viewer.focus(['A:1']),fit=f.viewer.fit();await Promise.all([focus,fit]);
+  assert.ok(f.calls.at(-1).reset);const before=f.pose();f.resize();
+  assert.deepEqual(f.pose(),before);assert.equal(f.viewer.cameraFocusLabels,null);
+  assert.equal(f.calls.filter(call=>call.reset).length,1);assert.equal(f.calls.filter(call=>call.resize).length,1);
+});
+test('hidden or disposed viewer resize does no camera or drawing work, while restoring size resizes once',()=>{
+  const f=viewerFixture(),manual=f.manualCamera();f.host.clientWidth=0;f.resize();
+  assert.equal(f.calls.length,0);assert.deepEqual(f.pose(),manual);
+  f.host.clientWidth=200;f.host.clientHeight=0;f.resize();assert.equal(f.calls.length,0);
+  f.host.clientHeight=100;f.resize();assert.deepEqual(f.pose(),manual);assert.equal(f.calls.filter(c=>c.resize).length,1);
+  f.viewer.disposed=true;f.resize();assert.equal(f.calls.filter(c=>c.resize).length,1);
 });

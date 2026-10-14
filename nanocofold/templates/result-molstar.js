@@ -178,26 +178,10 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
   observeResize(host) {
     if (typeof ResizeObserver === "undefined") return;
     this.resizeObserver = new ResizeObserver(() => {
-      cancelAnimationFrame(this.resizeFrame);
+      if (this.disposed || host.clientWidth === 0 || host.clientHeight === 0) return;
+      // Layout changes resize the drawing buffer only. Preserve the user's
+      // rotation and zoom; fitting/refocusing requires an explicit action.
       this.viewer.handleResize();
-      let remaining = 120;
-      const fitWhenReady = () => {
-        if (this.disposed || host.clientWidth === 0 || host.clientHeight === 0) return;
-        const canvas = host.querySelector("canvas"), viewport = this.viewer.plugin.canvas3d?.camera.viewport;
-        if (!canvas || !viewport) return;
-        const rect = canvas.getBoundingClientRect();
-        // MolStar resizes its drawing buffer after the CSS layout changes.
-        // Fit only once the camera uses the new aspect ratio.
-        if (Math.abs(viewport.width / viewport.height - rect.width / rect.height) > 0.002) {
-          if (--remaining > 0) this.resizeFrame = requestAnimationFrame(fitWhenReady);
-          return;
-        }
-        const camera = this.viewer.plugin.managers.camera;
-        if (this.cameraFocusLabels?.length)
-          camera.focusLoci(this.loci(this.cameraFocusLabels), {durationMs: 0});
-        else camera.reset(undefined, 0);
-      };
-      this.resizeFrame = requestAnimationFrame(fitWhenReady);
     });
     this.resizeObserver.observe(host);
   }

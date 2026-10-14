@@ -2,16 +2,16 @@
 from __future__ import annotations
 import copy
 import json
-import shutil
+import math
 import zipfile
 from pathlib import Path
 from .results import ResultReader
 from .paths import native, sha256
+from ..utils.atomic import atomic_writer, check_output, write_bytes, write_json
 
 
 def write(path,value):
-    path.parent.mkdir(parents=True,exist_ok=True)
-    path.write_bytes(json.dumps(native(value),ensure_ascii=False,allow_nan=False).encode('utf-8'))
+    write_json(path,native(value))
 
 
 def build_bundle(run_root, destination, snapshot_root=None):
@@ -53,12 +53,12 @@ def build_bundle(run_root, destination, snapshot_root=None):
                 if sha256(source)!=expected:raise ValueError('실행 입력 사본의 해시가 바뀌었습니다.')
             elif name=='config.yaml' and sha256(source)!=manifest['config_sha256']:
                 raise ValueError('실행 설정 사본의 해시가 바뀌었습니다.')
-            shutil.copy2(source,target)
+            write_bytes(target,source.read_bytes(),root=destination)
     html_issues=None
     for fmt in ('csv','xlsx','fasta','html','report_zip'):
         try:
             data,_,name=reader.export(fmt)
-            (destination/name).write_bytes(data)
+            write_bytes(destination/name,data,root=destination)
             if fmt=='html':html_issues=set(reader.issues)
         except (OSError,ValueError,KeyError) as exc:
             issue=f'{fmt} 내보내기: {exc}'
@@ -69,7 +69,7 @@ def build_bundle(run_root, destination, snapshot_root=None):
         # Do not leave an earlier HTML claiming complete while the index is partial.
         try:
             data,_,name=reader.export('html')
-            (destination/name).write_bytes(data)
+            write_bytes(destination/name,data,root=destination)
         except (OSError,ValueError,KeyError) as exc:
             (destination/'report_offline.html').unlink(missing_ok=True)
             issue=f'html 최종 상태 갱신: {exc}'
@@ -85,27 +85,52 @@ def build_bundle(run_root, destination, snapshot_root=None):
     index['summary']=summary
     write(destination/'index.json',index)
     # Full original run, plus cloud index/exports, with no input/environment mutation.
-    with zipfile.ZipFile(destination/'results.zip','w',compression=zipfile.ZIP_DEFLATED) as archive:
-        for p in run_root.rglob('*'):
-            if p.is_file() and not p.is_symlink() and p.name!='.run.lock':archive.write(p,'original/'+str(p.relative_to(run_root)))
-        for p in destination.rglob('*'):
-            if p.is_file() and p.name!='results.zip':archive.write(p,'exploration/'+str(p.relative_to(destination)))
+    with atomic_writer(destination/'results.zip',root=destination) as output:
+        with zipfile.ZipFile(output,'w',compression=zipfile.ZIP_DEFLATED) as archive:
+            for p in run_root.rglob('*'):
+                if p.is_file() and not p.is_symlink() and p.name!='.run.lock':archive.write(p,'original/'+str(p.relative_to(run_root)))
+            for p in destination.rglob('*'):
+                if p.is_file() and p.name!='results.zip' and not p.name.startswith('.publish-'):
+                    archive.write(p,'exploration/'+str(p.relative_to(destination)))
     manifest=[{'path':str(p.relative_to(destination)),'size':p.stat().st_size,'sha256':sha256(p)} for p in destination.rglob('*') if p.is_file()]
     write(destination/'manifest.json',{'schema_version':2,'source_readonly':True,'files':manifest})
     return {k:summary.get(k) for k in ('name','mode','mock','total','status','failed_candidates')} | {'exports':[p.name for p in destination.iterdir() if p.is_file()],'issues':index['issues']}
 
 
 def store_structure(data,destination,prefix):
+    destination=Path(destination)
+    if not isinstance(prefix,str) or not prefix or Path(prefix).is_absolute() or '..' in Path(prefix).parts:
+        raise ValueError('구조 출력 경로는 선택한 결과 디렉터리 내부의 상대경로여야 합니다.')
+    check_output(destination/prefix,destination)
     data=copy.deepcopy(data);pae=data.get('pae');tiles=[]
     if pae:
         values=pae.pop('values');n=len(values)
-        for y in range(0,n,200):
-            for x in range(0,n,200):
+        if not n or any(len(row)!=n for row in values):
+            raise ValueError('PAE는 비어 있지 않은 정사각 행렬이어야 합니다.')
+        tile_size=max(200,math.ceil(n/4))
+        for y in range(0,n,tile_size):
+            for x in range(0,n,tile_size):
                 name=f'{prefix}/pae_{y}_{x}.json'
-                write(destination/name,{'x':x,'y':y,'values':[r[x:x+200] for r in values[y:y+200]]})
-                tiles.append({'x':x,'y':y,'file':name})
-        pae.update(size=n,tiles=tiles)
+                write(destination/name,{'x':x,'y':y,'values':[r[x:x+tile_size] for r in values[y:y+tile_size]]})
+                tiles.append({'x':x,'y':y,'file':name,'sha256':sha256(destination/name)})
+        pae.update(size=n,tiles=tiles,tile_size=tile_size,tiling_schema_version=1)
     name=prefix+'/structure.json';write(destination/name,data)
     structure_name=prefix+'/model.'+('pdb' if data['format']=='pdb' else 'cif')
-    (destination/structure_name).write_bytes(data['content'].encode('utf-8'))
+    write_bytes(destination/structure_name,data['content'].encode('utf-8'),root=destination)
     return {'file':name,'model_file':structure_name}
+
+
+def import_nrf2(source,destination):
+    """Import completed campaign without inference or modification of originals."""
+    data=json.loads((source/'analysis.json').read_text()); destination.mkdir(parents=True,exist_ok=True)
+    structures=[];rows=[]
+    for obs in data['observations']:
+        identifier='seed_'+str(obs['seed']);row={'candidate_id':identifier,**obs['metrics'],'evaluated':True,'structure_available':True}
+        structure=obs['structure'];structure['candidate_id']=identifier
+        structures.append({'candidate_id':identifier,'observation_id':None,**store_structure(structure,destination,'structures/'+identifier)})
+        rows.append(row)
+    summary={'name':'KEAP1–NRF2 ETGE · 기존 결과','mode':'complex','mock':False,'total':len(rows),'status':'complete','readonly':True,'conditions':{'engine':'boltz2','seeds':[42,123,2026],'msa':'empty','restraints':False,'source':'prior_cli_prepare','training_overlap_possible':True},'config':data['campaign']}
+    write(destination/'index.json',{'schema_version':2,'summary':summary,'rows':rows,'observations':[],'structures':structures,'issues':[]})
+    for name in ('comparison.csv','KEAP1_NRF2_ETGE_report.html','KEAP1_NRF2_ETGE_package.zip'):
+        write_bytes(destination/name,(source/name).read_bytes(),root=destination)
+    return {'name':summary['name'],'mode':'complex','mock':False,'total':3,'status':'complete','readonly':True,'exports':['comparison.csv','KEAP1_NRF2_ETGE_report.html','KEAP1_NRF2_ETGE_package.zip']}

@@ -11,15 +11,19 @@ from pathlib import Path
 import platform
 import re
 import shutil
+import signal
 import sqlite3
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parents[1]
 UV_VERSION = "0.12.13"
+UV_INSTALLER_TIMEOUT_SECONDS = 600
+UV_INSTALLER_TERMINATION_GRACE_SECONDS = 3
 PROFILES = ("all", "core", "complex", "design", "screen", "mature", "boltzgen", "colabfold", "opendde")
 GPU_PATTERN = re.compile(r"GPU-[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}")
 
@@ -133,6 +137,45 @@ def reject_active_jobs(workspace):
         connection.close()
 
 
+def stop_owned_installer(process, grace_seconds):
+    """Stop only our unreaped session, keeping its PID reserved until cleanup."""
+    if process.returncode is not None:
+        return
+    # Popen(start_new_session=True) made this child's PID its process-group ID.
+    # Do not poll/wait here: reaping the leader before the final group signal
+    # could release its PID for reuse while a curl child is still alive.
+    with contextlib.suppress(ProcessLookupError):
+        os.killpg(process.pid, signal.SIGTERM)
+    with contextlib.suppress(KeyboardInterrupt):
+        time.sleep(grace_seconds)
+    with contextlib.suppress(ProcessLookupError):
+        os.killpg(process.pid, signal.SIGKILL)
+    process.wait(timeout=5)
+
+
+def run_uv_installer(script, environment, *, timeout_seconds=UV_INSTALLER_TIMEOUT_SECONDS,
+                     grace_seconds=UV_INSTALLER_TERMINATION_GRACE_SECONDS):
+    """Bound the downloaded installer and its owned child process group."""
+    arguments = ["sh", str(script)]
+    process = subprocess.Popen(arguments, env=environment, start_new_session=True)
+    try:
+        returncode = process.wait(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired as exc:
+        stop_owned_installer(process, grace_seconds)
+        raise TimeoutError(
+            f"uv 설치가 {timeout_seconds:g}초 제한을 넘었습니다. 이 설치 시도의 자식 프로세스를 정리했습니다. "
+            "네트워크 연결을 확인한 후 같은 설치 명령을 다시 실행하세요. 기존 파일과 실패 기록은 보존합니다."
+        ) from exc
+    except KeyboardInterrupt as exc:
+        stop_owned_installer(process, grace_seconds)
+        raise KeyboardInterrupt(
+            "uv 설치를 중단하고 이 설치 시도의 자식 프로세스를 정리했습니다. "
+            "기존 파일과 중단 기록을 보존했으며 같은 설치 명령으로 다시 시도할 수 있습니다."
+        ) from exc
+    if returncode:
+        raise subprocess.CalledProcessError(returncode, arguments)
+
+
 def ensure_uv(environment):
     binary = shutil.which("uv", path=environment.get("PATH"))
     if binary:
@@ -152,8 +195,10 @@ def ensure_uv(environment):
         script = Path(directory) / "install.sh"
         subprocess.run(["curl", "--proto", "=https", "--tlsv1.2", "-fLS", "--retry", "3", "--connect-timeout", "20", "--max-time", "120",
                         f"https://astral.sh/uv/{UV_VERSION}/install.sh", "-o", str(script)], check=True, env=environment)
-        subprocess.run(["sh", str(script)], check=True,
-                       env={**environment, "UV_INSTALL_DIR": str(destination), "UV_NO_MODIFY_PATH": "1"})
+        run_uv_installer(
+            script, {**environment, "UV_INSTALL_DIR": str(destination), "UV_NO_MODIFY_PATH": "1"},
+            timeout_seconds=UV_INSTALLER_TIMEOUT_SECONDS,
+        )
     version = subprocess.run([str(binary), "--version"], check=True, text=True, capture_output=True, timeout=20).stdout
     if version.strip().split()[:2] != ["uv", UV_VERSION]:
         raise ValueError("uv 버전 검증 실패")

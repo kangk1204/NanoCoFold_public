@@ -262,8 +262,11 @@ class ResultReader:
         return str(row.get("candidate_id") or row.get("design_id") or row.get("variant_id") or row.get("label") or f"row-{index + 1}")
 
     def all_rows(self):
+        from ..result_schema import model_observation_record
+        mode = self.config.get("run", {}).get("mode", "unknown")
         if self.retained:
-            return [_geometry_metadata(row) for row in copy.deepcopy(self.retained["candidates"]["rows"])]
+            return [model_observation_record(_geometry_metadata(row), mode=mode)
+                    for row in copy.deepcopy(self.retained["candidates"]["rows"])]
         if self.config.get("run", {}).get("mode") == "complex":
             recorded = self._json("complex_results.json")
             rows = recorded.get("rows", [])
@@ -300,7 +303,7 @@ class ResultReader:
                         row["structure_available"] = False
                         issue = f"{row['candidate_id']}: 저장된 구조가 누락되었습니다."
                         if issue not in self.issues:self.issues.append(issue)
-            return rows
+            return [model_observation_record(row, mode=mode) for row in rows]
         # Begin with all generated sequences; add evaluated metrics without dropping unscored rows.
         records, order = {}, []
         sources = [path for path in TABLES[1:] if self._path(path).exists()]
@@ -397,7 +400,8 @@ class ResultReader:
             else:
                 row["structure_available"] = False
             result.append(row)
-        return self._attach_pose_assessment(result)
+        return [model_observation_record(row, mode=mode)
+                for row in self._attach_pose_assessment(result)]
 
     def _attach_pose_assessment(self, rows):
         """Read persisted assessments only when bound to this exact scored table.
@@ -979,7 +983,9 @@ class ResultReader:
                         "display_sha256": display_sha, "display_relation": relation,
                         "display_transform": transform, "display_transforms": transforms,
                         "verification": verification})
-        return data
+        from ..result_schema import structure_payload
+        return structure_payload(data, observation=row,
+                                 mode=self.config.get("run", {}).get("mode", "unknown"))
 
     def _nanobody_structure(self, candidate_id, observation_id=None):
         from .structure_review import closest_atoms, cysteine_geometry, cdr_annotations, reference_overlay
@@ -1006,9 +1012,11 @@ class ResultReader:
         if not path.is_file():
             raise FileNotFoundError("이 후보의 구조 파일이 없습니다.")
         structure = pdb_io.load_structure(path)
+        model = next(structure.get_models(), None)
+        if model is None or next(model.get_atoms(), None) is None:
+            raise ValueError("이 후보의 구조를 표시할 수 없습니다: 구조 파일에 원자 좌표가 없습니다.")
         labels, index_map = score_complex.build_index_map(structure)
         chains = []
-        model = next(structure.get_models())
         target_chain, binder_chain = str(row.get("target_chain") or "A"), str(row.get("binder_chain") or "B")
         for chain in model:
             chains.append({"id": chain.id, "role": "target" if chain.id == target_chain else "binder" if chain.id == binder_chain else "context",

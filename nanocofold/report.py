@@ -178,7 +178,7 @@ def _source_identity(row: dict) -> str | None:
     identifier = _display_identity(row)
     if identifier is None:
         return None
-    for engine in (row.get("predictor_engine"), "colabfold", "boltz2", "chai1"):
+    for engine in (row.get("predictor_engine"), row.get("engine"), "colabfold", "boltz2", "chai1", "opendde"):
         if engine and identifier.startswith(str(engine) + "__"):
             return identifier[len(str(engine)) + 2:]
     return identifier
@@ -371,6 +371,12 @@ def generate_report(
     viewer_script = _viewer_script(out_path.parent, cfg) if (viewer_mode != "none" and viewer_structures) else None
     if viewer_mode == "none":
         viewer_structures = []
+    interactive_report = None
+    if viewer_mode != "none" and saved_reader and saved_reader.all_rows():
+        # Reuse the complete saved-result renderer and payload. This reads
+        # coordinates/PAE and receipts only; it never invokes a predictor or scorer.
+        interactive_report = saved_reader.export("html")[0].decode("utf-8")
+        viewer_structures = []
     warnings = list(context.get("warnings") or [])
     warnings.extend(score_complex.iptm_missing_warnings(all_scored_rows))
     hotspots_df = _safe_read_csv(run_dir / "01_target" / "hotspot_table.csv", warnings)
@@ -453,6 +459,8 @@ def generate_report(
         "hotspot_set_rows": _frame_records(hotspot_sets_df, limit=100),
         "automatic_hotspots": automatic_hotspots,
         "viewer_structures": viewer_structures,
+        "interactive_report": interactive_report,
+        "viewer_limit": viewer_max,
         "viewer_script": viewer_script,
         "selected_total": selected_total,
         "scored_total": scored_total,

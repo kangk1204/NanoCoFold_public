@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" data-renderer-version="nanocofold-report-v2">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -173,12 +173,12 @@
   {% macro candidate_table(rows, expanded=false) %}
   {% set compact = ["selection_rank", "predictor_engine", "final_eligible", "ipsae", "iptm", "interface_plddt", "interface_pae", "n_clashes", "exclusion_reason"] %}
   <div class="scroll" tabindex="0" role="region" aria-label="보고서 표"><table><caption>후보·모델의 기록 점수</caption>
-    <thead><tr><th scope="col">후보 별칭</th>{% if mode != "complex" %}<th scope="col">hotspot 접촉 수</th><th scope="col">지정 위치 충족</th>{% endif %}{% for key, label in scored_columns if expanded or key in compact %}<th scope="col">{{ metric_caption(key, label, rows) }}</th>{% endfor %}</tr></thead>
+    <thead><tr><th scope="col" data-column-key="display_alias">후보 별칭</th>{% if mode != "complex" %}<th scope="col">hotspot 접촉 수</th><th scope="col">지정 위치 충족</th>{% endif %}{% for key, label in scored_columns if expanded or key in compact %}<th scope="col" data-column-key="{{ key }}">{{ metric_caption(key, label, rows) }}</th>{% endfor %}</tr></thead>
     <tbody>{% for row in rows %}<tr>
       {% set original_id = display_identity(row) %}
       <td>{{ display_aliases.get(original_id|string, '미기록') }}</td>{% if mode != 'complex' %}{% set site = hotspot_assessment(row) %}<td>{{ (site.contacted|string ~ '/' ~ site.requested|string ~ '개') if site.status not in ['not_assessed', 'not_requested', 'mapping_failed'] else '—' }}</td><td>{{ site.label }}</td>{% endif %}
       {% for key, label in scored_columns if expanded or key in compact %}{% set v = row.get(key) %}
-      <td{% if key in ['candidate_id', 'design_id', 'variant_id'] %} class="original-id"{% endif %}>{% if key in ['candidate_id', 'design_id', 'variant_id'] and v is not none %}<details><summary>원본 ID</summary><code>{{ v }}</code></details>{% elif key in ['site_satisfied', 'site_selection_eligible', 'pose_consensus_status', 'design_consistency_status', 'review_priority', 'candidate_review_priority', 'review_priority_reason'] %}{{ pose_status_label(row, key) }}{% elif key == 'ranking_status' %}{{ '순위 산정' if v == 'ranked' else '보류' if v == 'held' else '미기록' }}{% elif key == 'ranking_unavailable_reason' %}{{ '예측 실패' if v == 'prediction_failed' else '가중 CDR 개발가능성 미평가' if v == 'weighted_cdr_assessment_unavailable' else '해당 없음' if not v and row.get('ranking_status') == 'ranked' else '보류 이유 미기록' if not v and row.get('ranking_status') == 'held' else '미평가' if not v else v }}{% elif key == 'exclusion_reason' and not v %}{{ '없음' if row.get('final_eligible') is sameas true else '제외 사유 미기록' if row.get('final_eligible') is sameas false else '미평가·제외 사유 미기록' }}{% elif v is none %}<span class="muted">미평가</span>{% elif key == 'final_evaluated' and v is sameas true %}평가 완료{% elif key == 'final_evaluated' and v is sameas false %}미평가{% elif key == 'final_eligible' and v is sameas true %}적격{% elif key == 'final_eligible' and v is sameas false %}부적격{% elif key == 'ipsae' and mode == 'complex' %}{{ v }} <span class="muted">({{ row.get('ipsae_chain_a') ~ '–' ~ row.get('ipsae_chain_b') ~ ' 체인쌍' if row.get('ipsae_chain_a') and row.get('ipsae_chain_b') else '적용 체인 미기록' }})</span>{% elif key == 'exclusion_reason' %}{% set reason_ns = namespace(labels=[]) %}{% for reason in reason_summary if reason.code in (v|string).split(';') %}{% set reason_ns.labels = reason_ns.labels + [reason.label] %}{% endfor %}{{ reason_ns.labels|join(' · ') if reason_ns.labels else '기록된 제외 사유 (상세·CSV 확인)' }}{% elif v is sameas true %}예{% elif v is sameas false %}아니오{% else %}{{ v }}{% endif %}</td>
+      <td{% if key in ['candidate_id', 'design_id', 'variant_id'] %} class="original-id"{% endif %}>{% if key in ['candidate_id', 'design_id', 'variant_id'] and v is not none %}<details><summary>원본 ID</summary><code>{{ v }}</code></details>{% elif key in ['site_satisfied', 'site_selection_eligible', 'pose_consensus_status', 'design_consistency_status', 'review_priority', 'candidate_review_priority', 'review_priority_reason'] %}{{ pose_status_label(row, key) }}{% elif key == 'ranking_status' %}{{ '순위 산정' if v == 'ranked' else '보류' if v == 'held' else '미기록' }}{% elif key == 'ranking_unavailable_reason' %}{{ '예측 실패' if v == 'prediction_failed' else '가중 CDR 개발가능성 미평가' if v == 'weighted_cdr_assessment_unavailable' else '접촉 없음 또는 가중 계면 지표 미평가' if v == 'interface_metrics_unavailable' else '해당 없음' if not v and row.get('ranking_status') == 'ranked' else '보류 이유 미기록' if not v and row.get('ranking_status') == 'held' else '미평가' if not v else v }}{% elif key == 'exclusion_reason' and not v %}{{ '없음' if row.get('final_eligible') is sameas true else '제외 사유 미기록' if row.get('final_eligible') is sameas false else '미평가·제외 사유 미기록' }}{% elif v is none %}<span class="muted">미평가</span>{% elif key == 'final_evaluated' and v is sameas true %}평가 완료{% elif key == 'final_evaluated' and v is sameas false %}미평가{% elif key == 'final_eligible' and v is sameas true %}적격{% elif key == 'final_eligible' and v is sameas false %}부적격{% elif key == 'ipsae' and mode == 'complex' %}{{ v }} <span class="muted">({{ row.get('ipsae_chain_a') ~ '–' ~ row.get('ipsae_chain_b') ~ ' 체인쌍' if row.get('ipsae_chain_a') and row.get('ipsae_chain_b') else '적용 체인 미기록' }})</span>{% elif key == 'exclusion_reason' %}{% set reason_ns = namespace(labels=[]) %}{% for reason in reason_summary if reason.code in (v|string).split(';') %}{% set reason_ns.labels = reason_ns.labels + [reason.label] %}{% endfor %}{{ reason_ns.labels|join(' · ') if reason_ns.labels else '기록된 제외 사유 (상세·CSV 확인)' }}{% elif v is sameas true %}예{% elif v is sameas false %}아니오{% else %}{{ v }}{% endif %}</td>
       {% endfor %}
     </tr>{% endfor %}</tbody>
   </table></div>
@@ -186,7 +186,7 @@
 
   <h2 id="report-models">03 후보 비교 · 표시 {{ scored_rows|length }} / 전체 {{ scored_total }} 후보·모델 기록</h2>
   <p>예측 신뢰도와 지정 결합 위치 충족은 별개입니다. hotspot 미접촉·미지정·미평가를 구분합니다. PAE는 참조 구조와의 실측 거리 오차가 아니며 pDockQ2는 실측 DockQ가 아닙니다. 지정 위치 진단은 기존 점수와 선별 기록을 바꾸지 않습니다.</p>
-  <p>일반 복합체의 요약 ipSAE는 검토한 체인 순서의 첫 쌍이며 전체 평균·최솟값이 아닙니다. 적용 체인·범위 출처와 모든 체인 쌍의 표·CSV를 함께 확인합니다.</p>
+  <p>일반 복합체의 요약 ipSAE는 기본적으로 검토한 체인 순서의 첫 쌍이며, 체인쌍을 명시한 실행에서는 해당 쌍입니다. 전체 평균·최솟값과 구분합니다. 적용 체인·범위 출처와 모든 체인 쌍의 표·CSV를 함께 확인합니다.</p>
   <p>엔진별 표의 순위와 종합점수는 기록된 엔진 안에서만 비교합니다. 엔진 간 점수를 합산하거나 통합 순위를 만들지 않습니다. RF·BG 별칭은 후보를 찾기 위한 표시명이며 원본 ID와 수치는 보존됩니다.</p>
   {% if pose_assessments_available %}
   <div class="interpretation" id="pose-assessment-guide"><h3>세 가지 별도 확인</h3><p><b>예측 신뢰도</b>는 ipTM·ipSAE 및 실행 당시 기록 적격, <b>지정 부위 충족</b>은 hotspot 접촉, <b>자세 일관성</b>은 동일 후보의 엔진별 자세와 설계·재예측 일치를 뜻합니다. 탐색적 검토 우선순위는 이 기록을 함께 확인하는 값이며 기존 적격·선별 기록을 변경하지 않습니다.</p><p>검토 순위는 표적·조건·실행 범위 안의 후보 순서이며 동률을 허용합니다. 1위도 보류일 수 있으므로 검토 판정과 이유를 함께 읽으세요. 표적만 정렬하여 같은 후보 서열의 자세를 비교합니다. 엔진 지지 수는 독립 실험 횟수가 아니며 점수를 평균하지 않습니다. 새 VHH를 기존 VHH의 자세에 맞춰 선별하지 않습니다. 설계 구조가 없거나 대응이 불가능하면 미평가로 남습니다. 우선 검토는 실제 결합·KD의 입증이 아닙니다.</p><p>검토 정책 v2는 품질·지정 부위를 충족한 엔진별 단독 유망 예측과 같은 자세의 다중 엔진 지지를 구분합니다. 한 엔진만 유망해도 합의 부족을 실패로 간주하지 않습니다. 엔진 간 자세 차이와 설계·재예측 불일치는 별도 진단이며 자동 비결합·탈락 사유가 아닙니다. 이전 정책의 판정은 기록된 버전과 함께 읽으세요.</p></div>
@@ -217,7 +217,12 @@
   </tbody></table></div>{% else %}<p class="muted">기록된 제외·미평가 사유가 없습니다. 사유 미기록만으로 판정 통과를 추정하지 않습니다.</p>{% endif %}
 
   <h2 id="report-structure">05 구조·PAE</h2>
-  <p class="muted">저장된 대표 구조를 표시합니다. PAE 원본 파일과 방향별 계면 PAE 값은 평가표 및 산출물에서 확인하세요. 구조·PAE가 없으면 미평가로 남습니다.</p>
+  {% if interactive_report %}
+  <p class="muted">아래 탐색에는 저장된 전체 후보·관측·모델과 보존된 전체 PAE가 포함됩니다. 후보를 선택하면 같은 MolStar 뷰어에서 {{ "체인·접촉·충돌 표시" if mode == "complex" else "체인·접촉·충돌·핫스팟·CDR 표시" }}, 잔기 선택과 거리 측정을 사용할 수 있습니다. 구조·PAE가 없으면 미평가로 남으며 원본 점수·선별 기록을 다시 계산하지 않습니다.</p>
+  <iframe id="complete-result-explorer" title="전체 모델·구조·PAE 결과 탐색" data-renderer-version="nanocofold-results-v3" srcdoc="{{ interactive_report }}" style="width:100%;height:1280px;border:1px solid var(--line);border-radius:4px" loading="lazy"></iframe>
+  {% else %}
+  <p class="muted">저장 결과 탐색 원본이 없는 진단·부분 기록은 대표 구조 최대 {{ viewer_limit }}개를 표시합니다. 표의 전체 기록 수와 뷰어의 표시 한도는 별개입니다. 회색은 선택한 두 체인 이외의 보조 체인입니다. PAE 원본 파일과 방향별 계면 PAE 값은 평가표 및 산출물에서 확인하세요. 구조·PAE가 없으면 미평가로 남습니다.</p>
+  {% endif %}
   {% if viewer_structures %}
   <h3>3D 구조 뷰어</h3>
   <div class="viewer">

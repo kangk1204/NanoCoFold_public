@@ -67,8 +67,14 @@ def test_chain_buttons_select_saved_chain_and_canvas_resizes(report, width, heig
         page.locator("#fit-result-structure").click()
         for viewport in ({"width": 390, "height": 844}, {"width": 1440, "height": 900}):
             page.set_viewport_size(viewport)
-            # Independently project the saved C-alpha coordinates: resize must
-            # keep both chains within the real camera viewport.
+            page.wait_for_function("""() => {
+                const host=document.getElementById('structure-view'), canvas=host.querySelector('canvas');
+                const view=state.viewer.viewer.plugin.canvas3d.camera.viewport, rect=canvas.getBoundingClientRect();
+                return Math.abs(view.width/view.height-rect.width/rect.height)<.002;
+            }""")
+            # Resize preserves manual orientation/zoom. Fitting is an explicit
+            # action; independently project every saved C-alpha afterwards.
+            page.locator("#fit-result-structure").click()
             page.wait_for_function("""() => {
                 const camera=state.viewer.viewer.plugin.canvas3d.camera, v=camera.viewport;
                 return state.structure.chains.flatMap(c=>c.residues).filter(r=>r.ca).every(r=>{

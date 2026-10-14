@@ -225,6 +225,14 @@ def _validate(cfg: dict) -> None:
     mode = cfg["run"].get("mode")
     if not isinstance(mode, str) or mode not in {"complex", "design", "screen", "mature"}:
         raise ValueError(f"run.mode 는 complex|design|screen|mature 중 하나여야 합니다: {mode}")
+    if mode == "complex":
+        from .complex import proteins, validate_settings
+        complex_config = cfg_get(cfg, "complex", {})
+        checked_settings = validate_settings(complex_config)
+        if "proteins" in complex_config:
+            entries = proteins(complex_config["proteins"])
+            if checked_settings.get("primary_pair") and not set(checked_settings["primary_pair"]) <= {p["id"] for p in entries}:
+                raise ValueError("primary_pair가 실제 분석 체인에 없습니다.")
     if cfg["target"].get("fasta") and cfg["target"].get("sequence"):
         raise ValueError("target.sequence 와 target.fasta 를 동시에 지정할 수 없습니다.")
     if not isinstance(cfg.get("rank", {}).get("require_hotspot", False), bool):
@@ -298,6 +306,8 @@ def _validate(cfg: dict) -> None:
             raise ValueError("mature.library.seed는 null 또는 0–4294967295 사이의 정수여야 합니다.")
         if cfg_get(cfg, "mature.prefilter.mode", "esm2") != "none":
             raise ValueError("random 다중 변이 라이브러리는 mature.prefilter.mode=none이 필요합니다.")
+    from .mature import validate_msa_mutation_limit
+    validate_msa_mutation_limit(cfg)
     from .engine_comparison import settings as comparison_settings
     msa_source = cfg_get(cfg, "screen.colabfold.msa_source", "cache")
     if not isinstance(msa_source, str) or msa_source not in {"cache", "local_mmseqs2", "public_mmseqs2", "public_api"}:

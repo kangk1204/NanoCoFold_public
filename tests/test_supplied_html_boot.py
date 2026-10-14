@@ -18,6 +18,30 @@ REQUIRED_INPUT_IDS = {"batch-content-details", "batch-format-help", "batch-next-
     "structure-source", "tutorial-mode", "tutorial-status", "candidate-extra-columns"}
 
 
+def expect_public_tutorial_ready(page, mode):
+    """The input-step heading is present before the async example is loaded."""
+    from playwright.sync_api import expect
+    payload = json.loads((ROOT / "examples/tutorial" / f"{mode}_batch.json").read_text())
+    entry = payload["entries"][0]
+    expect(page.locator("#tutorial-status")).to_have_text(
+        "공개 입력을 불러왔습니다. 아직 계산은 시작하지 않았습니다.")
+    expect(page.locator("#load-tutorial")).to_be_enabled()
+    expect(page.locator("#job-name")).to_have_value(payload["name"])
+    if mode == "complex":
+        fasta = "\n".join(f'>{protein["name"]}\n{protein["sequence"]}' for protein in entry["proteins"])
+        expect(page.locator("#complex-fasta")).to_have_value(fasta)
+        expect(page.locator("#novice-complex-copies input")).to_have_count(len(entry["proteins"]))
+        for index, protein in enumerate(entry["proteins"]):
+            expect(page.locator(f"#complex-copies-{index}")).to_have_value(str(protein["copies"]))
+    else:
+        expect(page.locator("#target-fasta")).to_have_value(entry["content"])
+        if mode == "screen":
+            expect(page.locator("#vhh-fasta")).to_have_value(entry["vhh_fasta"])
+        if mode == "mature":
+            expect(page.locator("#wt-fasta")).to_have_value(entry["wt_fasta"])
+    expect(page.locator(".novice-heading")).to_contain_text("2/4")
+
+
 def test_supplied_dom_and_generated_offline_contract():
     import re
     html = (ROOT / "nanocofold/templates/platform.html").read_text()
@@ -78,7 +102,7 @@ def test_supplied_app_four_purposes_steps_and_menus(supplied_server,mode,title):
             page.get_by_role("button",name=name,exact=True).click()
         page.get_by_role("button",name=title+" · 입력하기",exact=True).click()
         page.get_by_role("button",name="이 목적의 공개 예제 불러오기",exact=True).click()
-        expect(page.locator(".novice-heading")).to_contain_text("2/4")
+        expect_public_tutorial_ready(page, mode)
         page.get_by_role("button",name="입력 확인 후 다음",exact=True).click()
         expect(page.locator(".novice-heading")).to_contain_text("3/4")
         page.locator("#novice-msa").focus()
@@ -95,6 +119,42 @@ def test_supplied_app_four_purposes_steps_and_menus(supplied_server,mode,title):
         assert errors == []
         browser.close()
     assert not list((workspace/".nanocofold/jobs").glob("*/config.yaml")), "Viewing steps must not submit compute"
+
+
+@pytest.mark.skipif(os.environ.get("NANOCOFOLD_BROWSER_TEST") != "1", reason="Real Chromium release gate")
+def test_public_tutorial_pending_response_blocks_empty_input_then_advances(supplied_server):
+    from playwright.sync_api import expect, sync_playwright
+    workspace, url = supplied_server
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(args=["--enable-unsafe-swiftshader"])
+        page = browser.new_page(); held = []; errors = []; compute_requests = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.on("request", lambda request: compute_requests.append(request.url)
+                if request.method == "POST" and "/api/jobs" in request.url else None)
+        page.goto(url); expect(page.locator("body")).to_have_attribute("data-startup", "ready")
+        page.get_by_role("button", name="단백질 복합체 예측 · 입력하기", exact=True).click()
+        page.locator("#input-kind").select_option("fasta")
+        page.locator("#complex-fasta").fill("")
+        page.route("**/api/tutorials/complex", lambda route: held.append(route))
+        with page.expect_request("**/api/tutorials/complex"):
+            page.get_by_role("button", name="이 목적의 공개 예제 불러오기", exact=True).click()
+        expect(page.locator("#load-tutorial")).to_be_disabled()
+        assert len(held) == 1
+        expect(page.locator("#complex-fasta")).to_have_value("")
+        page.get_by_role("button", name="입력 확인 후 다음", exact=True).click()
+        expect(page.locator(".novice-heading")).to_contain_text("2/4")
+        expect(page.locator("#novice-blocker")).to_contain_text("빈 서열은 사용할 수 없습니다")
+        expect(page.locator("#complex-fasta")).to_have_attribute("aria-invalid", "true")
+        assert compute_requests == []
+        # Release the real server response after exercising the pending state;
+        # no arbitrary sleep, replacement example, or relaxed input validation.
+        held[0].fulfill(response=held[0].fetch())
+        expect_public_tutorial_ready(page, "complex")
+        page.get_by_role("button", name="입력 확인 후 다음", exact=True).click()
+        expect(page.locator(".novice-heading")).to_contain_text("3/4")
+        assert compute_requests == [] and errors == []
+        browser.close()
+    assert not list((workspace / ".nanocofold/jobs").glob("*/config.yaml"))
 
 
 @pytest.mark.skipif(os.environ.get("NANOCOFOLD_BROWSER_TEST") != "1", reason="Real Chromium release gate")
@@ -162,6 +222,7 @@ def test_cpu_demo_review_needs_no_public_msa_consent(supplied_server):
         assert page.evaluate("state.input === null")
         expect(page.locator("#start-job")).to_be_disabled()
         page.get_by_role("button",name="이 목적의 공개 예제 불러오기",exact=True).click()
+        expect_public_tutorial_ready(page, "complex")
         page.get_by_role("button",name="입력 확인 후 다음",exact=True).click()
         expect(page.locator("#novice-consent")).not_to_be_checked()
         page.get_by_role("button",name="조건 확인 후 다음",exact=True).click()

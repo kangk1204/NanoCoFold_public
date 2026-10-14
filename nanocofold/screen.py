@@ -611,37 +611,51 @@ def prepare_chai_precomputed_msa(cfg: dict, directory: Path, chains: dict[str, s
 
 
 def _prepare_chai_msa_directory(cfg: dict, candidate_dir: Path, target_info: dict, msa_path: str | None = None) -> Path | None:
-    """캐시된 타깃 a3m을 Chai-1 aligned.pqt 디렉터리로 변환한다(N11 로컬 MSA).
-
-    변환 실패 시 None을 반환하고 단일서열로 진행한다(경고 출력).
-    """
+    """Publish a receipt-verified target MSA cache only after full conversion."""
     if not msa_path or msa_path == "empty" or not Path(str(msa_path)).exists():
         print("  [chai] local MSA: 캐시된 타깃 a3m이 없어 단일서열로 진행합니다.")
         return None
-    import hashlib
-    msa_key = hashlib.sha256(Path(str(msa_path)).read_bytes()).hexdigest()[:16]
-    input_dir = candidate_dir.parent / "chai_msa_input"
-    key_file = input_dir / ".msa_key"
-    current_key = key_file.read_text(encoding="utf-8").strip() if key_file.exists() else None
-    input_dir.mkdir(parents=True, exist_ok=True)
-    if current_key != msa_key or not list(input_dir.glob("*.aligned.pqt")):
-        import shutil as _shutil
-        for stale in input_dir.glob("*"):
-            if stale.is_file() and stale.name != ".msa_key":
-                stale.unlink()
-        key_file.write_text(msa_key, encoding="utf-8")
-        _shutil.copy(msa_path, input_dir / "hits_uniref90.a3m")
-        env = resolve_path(cfg, cfg_get(cfg, "screen.env", cfg_get(cfg, "structure.chai1.env")))
-        try:
-            executable = shell.env_executable(env, "chai-lab")
-            shell.run_in_env(
-                env, [str(executable), "a3m-to-pqt", str(input_dir)],
-                log_path=candidate_dir.parent / "chai_a3m_to_pqt.log",
-            )
-        except shell.ToolError as exc:
-            print(f"  [chai] local MSA 변환 실패 → 단일서열로 진행: {exc}")
-            return None
-    return input_dir if list(input_dir.glob("*.aligned.pqt")) else None
+    import fcntl
+    from uuid import uuid4
+    from .utils.atomic import check_output
+    source = Path(str(msa_path))
+    chains = {"A": seq_utils.clean_sequence(target_info["sequence"])}
+    cache = candidate_dir.parent / "chai_msa_input"
+    check_output(cache, candidate_dir.parent)
+    cache.mkdir(parents=True, exist_ok=True)
+    identity = {"source_a3m_sha256": provenance.file_digest(source), "chains": chains,
+                "converter_sha256": provenance.file_digest(SCRIPTS_DIR / "chai_msa_from_a3m.py"),
+                "max_sequences": cfg_get(cfg, "screen.colabfold.msa_max_sequences", 2048)}
+    destination = cache / provenance.fingerprint(identity)
+    check_output(destination, cache)
+    with (cache / ".conversion.lock").open("a+") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        if destination.exists():
+            try:
+                receipt = _validate_chai_precomputed_directory(destination, chains)
+                manifest = _read_json_object(destination / "manifest.json")
+                if (receipt.get("inputs_fingerprint") == manifest.get("inputs_fingerprint")
+                        and manifest.get("converter_sha256") == identity["converter_sha256"]
+                        and manifest.get("chains", {}).get("A", {}).get("source_a3m_sha256") == identity["source_a3m_sha256"]):
+                    return destination
+            except ValueError:
+                pass  # Preserve corrupt published cache until a verified repair exists.
+        attempts = cache / ".attempts"
+        check_output(attempts, cache)
+        attempts.mkdir(exist_ok=True)
+        staged = attempts / uuid4().hex
+        # Conversion writes only to a fresh, unpublished directory. Failed
+        # attempts and prior cache bytes remain available for diagnosis/retry.
+        prepare_chai_precomputed_msa(cfg, staged, chains,
+                                    {"A": {"a3m": str(source), "sha256": identity["source_a3m_sha256"]}})
+        _validate_chai_precomputed_directory(staged, chains)
+        if provenance.file_digest(source) != identity["source_a3m_sha256"]:
+            raise ValueError("Chai 로컬 MSA 원본이 변환 중 변경되었습니다. 기존 자료를 보존하고 다시 준비하세요.")
+        if destination.exists():
+            provenance.archive_existing([destination], cache)
+        check_output(destination, cache)
+        staged.replace(destination)
+        return destination
 
 
 def _predict_boltz2(

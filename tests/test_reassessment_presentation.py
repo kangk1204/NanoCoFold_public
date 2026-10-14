@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from html.parser import HTMLParser
 import shutil
 import subprocess
 from urllib.parse import unquote
@@ -39,7 +40,29 @@ def test_static_report_caption_preserves_values_and_unknown_scope(tmp_path, scop
     frame = pd.DataFrame(rows); before = frame.copy(deep=True)
     path = report.generate_report(tmp_path, {"run": {"mode": "complex"}, "report": {"viewer": "none"}}, {}, scored=frame)
     document = path.read_text()
-    assert f'<th scope="col">{caption}</th>' in document
+    class MetricHeaders(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.current = None
+            self.headers = []
+
+        def handle_starttag(self, tag, attrs):
+            if tag == "th" and dict(attrs).get("data-column-key") == "iptm":
+                assert dict(attrs).get("scope") == "col"
+                self.current = []
+
+        def handle_data(self, data):
+            if self.current is not None:
+                self.current.append(data)
+
+        def handle_endtag(self, tag):
+            if tag == "th" and self.current is not None:
+                self.headers.append("".join(self.current).strip())
+                self.current = None
+
+    headers = MetricHeaders()
+    headers.feed(document)
+    assert headers.headers and all(value == caption for value in headers.headers)
     assert "0.8123456789" in document
     pd.testing.assert_frame_equal(frame, before)
 

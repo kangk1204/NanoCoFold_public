@@ -23,14 +23,10 @@ import time
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
 
-# An administrator must register a search host before enabling this backend.
-# The public distribution intentionally ships without any remote destination.
-PROFILE = {
-    "name": "operator-local", "enabled": False,
-    "host": None, "hostname": None, "db_root": None, "work_root": None,
-    "executable_roots": [],
-    "databases": {"uniref30_2302_db": "2302", "colabfold_envdb_202108_db": "202108"},
-}
+from .runtime_policy import runtime_policy
+
+# Public policy has no registered destination; private operator data is separate.
+PROFILE = runtime_policy()["local_msa_profile"]
 MAX_A3M_BYTES = 64 * 1024 * 1024
 MAX_RESPONSE_BYTES = 96 * 1024 * 1024
 DEFAULT_MIN_FREE_BYTES = 80 * 1024**3
@@ -633,7 +629,7 @@ class LocalTransport(SSHTransport):
 
 
 def acquire_local_monomers(cache_root, queries, *, approved_base_sequences, allow_search=False,
-                           profile="operator-local", transport=None, threads=8,
+                           profile=None, transport=None, threads=8,
                            min_free_bytes=DEFAULT_MIN_FREE_BYTES, resume=False):
     """Return cache hits or one persisted base-query ticket; never poll/restart.
 
@@ -646,6 +642,7 @@ def acquire_local_monomers(cache_root, queries, *, approved_base_sequences, allo
     """
     from .colabfold_msa import cached_monomer, promote_monomer
     _bounds(threads, min_free_bytes)
+    profile = PROFILE["name"] if profile is None else profile
     if profile != PROFILE["name"] or type(allow_search) is not bool or type(resume) is not bool:
         raise LocalMSAError("Registered operator profile and boolean search/resume required")
     if not isinstance(queries, (list, tuple)) or any(not isinstance(sequence, str) for sequence in queries):

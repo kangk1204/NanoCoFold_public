@@ -8,7 +8,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -28,6 +28,34 @@ class PredictionFiles:
     sample_index: int | None = None
     retained_sample_count: int = 1
     sample_selection: str = "explicit_structure_file"
+
+
+@dataclass
+class ScoringContext:
+    """Read-only per-model inputs; never shared between prediction files."""
+    pred: PredictionFiles
+    structure: object
+    labels: list[str]
+    index_map: dict[str, int]
+    pae: np.ndarray | None
+    confidence: dict
+    plddt: dict[str, float]
+    ca_plddt: dict[str, float]
+    cb_plddt: dict[str, float]
+    chain_sasa: dict[str, float] = field(default_factory=dict)
+
+
+def prepare_scoring_context(pred: PredictionFiles, *, structure=None) -> ScoringContext:
+    structure = pdb_io.load_structure(pred.cif) if structure is None else structure
+    labels, index_map = build_index_map(structure)
+    pae = load_pae(pred)
+    if pae is not None:
+        validate_pae(pae, len(labels))
+    maps = [pdb_io.parse_plddt(structure),
+            pdb_io.parse_atom_plddt(structure, atom_mode="ca"),
+            pdb_io.parse_atom_plddt(structure, atom_mode="cb")]
+    maps = [values if any(value > 0 for value in values.values()) else {} for values in maps]
+    return ScoringContext(pred, structure, labels, index_map, pae, load_confidence(pred), *maps)
 
 
 def find_prediction_files(path: str | Path, name: str | None = None, *, model_index: int | None = None) -> PredictionFiles:
@@ -430,11 +458,17 @@ def pdockq_metrics_from_structure(
     return result
 
 
-def buried_sasa(structure, chain_a: str, chain_b: str, n_contacts: int = 0) -> dict:
+def buried_sasa(structure, chain_a: str, chain_b: str, n_contacts: int = 0,
+                *, chain_sasa_cache: dict[str, float] | None = None) -> dict:
     """타깃–바인더 두 체인만의 매몰 면적 (보조 체인은 양쪽 항에서 동일하게 제외, F21).
 
     정의: SASA(A) + SASA(B) - SASA(A+B).
     """
+    if n_contacts == 0:
+        # The heavy-atom cutoff does not imply non-overlapping solvent spheres.
+        # Skip the expensive calculation without fabricating a zero buried area.
+        return {"buried_sasa": float("nan"), "buried_sasa_per_contact": float("nan"),
+                "buried_sasa_status": "not_assessed_no_contacts", "buried_sasa_assessed": False}
     def _total(structure_obj) -> float:
         return sum(pdb_io.compute_residue_sasa(structure_obj).values())
 
@@ -448,16 +482,22 @@ def buried_sasa(structure, chain_a: str, chain_b: str, n_contacts: int = 0) -> d
 
     copy_a = complex_ab.copy()
     copy_a[0].detach_child(chain_b)
-    total_a = _total(copy_a)
+    cache = chain_sasa_cache if chain_sasa_cache is not None else {}
+    if chain_a not in cache:
+        cache[chain_a] = _total(copy_a)
+    total_a = cache[chain_a]
 
     copy_b = complex_ab.copy()
     copy_b[0].detach_child(chain_a)
-    total_b = _total(copy_b)
+    if chain_b not in cache:
+        cache[chain_b] = _total(copy_b)
+    total_b = cache[chain_b]
 
     buried = max(0.0, total_a + total_b - total_ab)
     return {
         "buried_sasa": round(buried, 1),
         "buried_sasa_per_contact": round(buried / max(1, n_contacts), 2),
+        "buried_sasa_status": "evaluated", "buried_sasa_assessed": True,
     }
 
 
@@ -583,11 +623,15 @@ def score_complex(
     cfg: dict,
     pred: PredictionFiles | None = None,
     label: str = "",
+    context: ScoringContext | None = None,
 ) -> dict:
     """예측 복합체 하나에 대한 전체 계면 지표 계산."""
     structure_path = Path(structure_path)
     pred = pred or find_prediction_files(structure_path)
-    structure = pdb_io.load_structure(pred.cif)
+    context = context or prepare_scoring_context(pred)
+    if context.pred.cif.resolve() != pred.cif.resolve():
+        raise ValueError("채점 사전 로드 입력과 예측 모델 파일이 다릅니다.")
+    structure = context.structure
     chain_ids = pdb_io.chain_ids(structure)
     if target_chain not in chain_ids or binder_chain not in chain_ids:
         raise ValueError(f"체인 지정 오류: target={target_chain}, binder={binder_chain}, 구조={chain_ids}")
@@ -635,9 +679,7 @@ def score_complex(
     interface_binder = {contact["b"] for contact in contacts}
     interface_labels = interface_target | interface_binder
 
-    plddt = pdb_io.parse_plddt(structure)
-    ca_plddt = pdb_io.parse_atom_plddt(structure, atom_mode="ca")
-    cb_plddt = pdb_io.parse_atom_plddt(structure, atom_mode="cb")
+    plddt, ca_plddt, cb_plddt = context.plddt, context.ca_plddt, context.cb_plddt
     if plddt and not any(value > 0 for value in plddt.values()):
         # 예측기가 B-factor 에 pLDDT 를 쓰지 않은 구조(예: RF2 추출 PDB 는 전 원자 0.0)는 신뢰도가
         # '0' 인 것이 아니라 '없는' 것이다. 0/하한값(pDockQ 0.0183)을 측정값처럼 기록하지 않는다.
@@ -649,11 +691,7 @@ def score_complex(
     interface_values = [plddt[label] for label in interface_labels if label in plddt]
     interface_plddt = float(np.mean(interface_values)) if interface_values else float("nan")
 
-    labels, index_map = build_index_map(structure)
-    pae = load_pae(pred)
-    if pae is not None:
-        validate_pae(pae, len(labels))
-    confidence = load_confidence(pred)
+    labels, index_map, pae, confidence = context.labels, context.index_map, context.pae, context.confidence
     pair_iptm, pair_iptm_source, pair_iptm_reason = target_binder_iptm(
         confidence, target_chain, binder_chain,
         [chain.id for chain in next(structure.get_models()) if any(pdb_io.iter_residues(chain))],
@@ -693,6 +731,7 @@ def score_complex(
         "target_chain": target_chain,
         "binder_chain": binder_chain,
         "n_contacts": len(contacts),
+        "interface_assessment_status": "contacting" if contacts else "no_contacts",
         "n_contacts_ca8": len(contacts_ca8),
         "n_interface_target": len(interface_target),
         "n_interface_binder": len(interface_binder),
@@ -742,7 +781,8 @@ def score_complex(
             res.id[2].strip() for chain in (target, binder) for res in pdb_io.iter_residues(chain)
         ),
     }
-    metrics.update(buried_sasa(structure, target_chain, binder_chain, n_contacts=len(contacts)))
+    metrics.update(buried_sasa(structure, target_chain, binder_chain, n_contacts=len(contacts),
+                              chain_sasa_cache=context.chain_sasa))
     metrics.update(pdockq_metrics_from_structure(structure, target_chain, binder_chain, cb_plddt))
     metrics.update(pdockq2_from_structure(structure, target_chain, binder_chain, ca_plddt, pae, index_map))
     metrics.update(interface_pae_summary(pae, index_map, contacts))

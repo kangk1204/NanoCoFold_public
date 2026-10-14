@@ -21,6 +21,7 @@ from .utils import pdb_io
 from .utils.misc import to_native
 from .utils.seq import clean_sequence
 from .utils.atomic import check_output, write_bytes, write_json, write_csv
+from .result_schema import model_observation_record, structure_payload
 
 
 def proteins(values):
@@ -44,10 +45,21 @@ def proteins(values):
         if (not isinstance(positions, list) or len(positions) != len(sequence)
                 or any(type(n) is not int or not -999 <= n <= 9999 for n in positions) or len(set(positions)) != len(positions)):
             raise ValueError("원본 번호 대응이 모호하거나 PDB 번호 범위를 벗어납니다.")
-        for _ in range(copies):
+        reference_chains = entry.get("reference_chains")
+        if reference_chains is not None:
+            if (not isinstance(reference_chains, list) or len(reference_chains) != copies
+                    or any(not isinstance(c, str) or not c or c.strip() != c for c in reference_chains)
+                    or len(set(reference_chains)) != copies or entry.get("reference_chain") is not None):
+                raise ValueError("reference_chains는 사본 수와 같은 길이의 중복 없는 체인 목록이며 reference_chain과 함께 지정할 수 없습니다.")
+        elif copies > 1 and entry.get("reference_chain") is not None:
+            raise ValueError("여러 사본에는 단일 reference_chain 대신 사본별 reference_chains를 지정하세요.")
+        for copy_index in range(copies):
             result.append({**entry, "id": chr(65+len(result)), "sequence": sequence[start-1:end],
                            "original_positions": positions[start-1:end], "start": start, "end": end, "copies": 1,
+                           "source_protein_index": i, "copy_index": copy_index,
                            "name": str(entry.get("name") or f"protein_{i+1}")[:120]})
+            if reference_chains is not None:
+                result[-1]["reference_chain"] = reference_chains[copy_index]
     if len(result) < 2 or len(result) > 25 or sum(len(p["sequence"]) for p in result) > 2000:
         raise ValueError("복합체는 2–25체인, 합계 2,000잔기 이하여야 합니다.")
     return result
@@ -82,6 +94,17 @@ def validate_settings(settings):
     result = {"seeds": seeds, "recycles": settings.get("recycles", 3),
             "diffusion_steps": settings.get("diffusion_steps", 200), "models_per_seed": settings.get("models_per_seed", 1),
             "msa": msa, "restraints": False}
+    primary_pair = settings.get("primary_pair")
+    if primary_pair is not None:
+        if (not isinstance(primary_pair, list) or len(primary_pair) != 2
+                or any(not isinstance(c, str) or len(c) != 1 or not 'A' <= c <= 'Y' for c in primary_pair)
+                or primary_pair[0] == primary_pair[1]):
+            raise ValueError("primary_pair는 서로 다른 분석 체인 ID2개의 목록이어야 합니다.")
+        result["primary_pair"] = list(primary_pair)
+    symmetry = settings.get('reference_symmetry', True)
+    if type(symmetry) is not bool:
+        raise ValueError('reference_symmetry는 true/false여야 합니다.')
+    result['reference_symmetry'] = symmetry
     if comparison is None:
         result["engine"] = engine
     else:
@@ -95,6 +118,28 @@ def validate_settings(settings):
     return result
 
 
+def pair_summary(pair_metrics, settings):
+    """Keep the historical first-pair default and label assessed extrema."""
+    requested = settings.get("primary_pair")
+    chosen = next((p for p in pair_metrics if requested is not None
+                   and {p['chain_a'], p['chain_b']} == set(requested)), None) if requested else pair_metrics[0]
+    if chosen is None:
+        raise ValueError("primary_pair가 실제 분석 체인 쌍에 없습니다.")
+    finite = [float(p['ipsae']) for p in pair_metrics if p.get('ipsae') is not None
+              and np.isfinite(float(p['ipsae']))]
+    return {"ipsae": chosen.get("ipsae"), "interface_plddt": chosen.get("interface_plddt"),
+            "interface_pae": chosen.get("interface_pae"), "ipsae_scope": "selected_chain_pair",
+            "ipsae_chain_a": chosen["chain_a"], "ipsae_chain_b": chosen["chain_b"],
+            "ipsae_aggregation": "max_of_directional_pair_ipsae",
+            "ipsae_selection": "explicit_primary_pair" if requested else "first_pair_in_reviewed_chain_order",
+            "primary_pair": [chosen['chain_a'], chosen['chain_b']],
+            "max_pair_ipsae": max(finite) if finite else None,
+            "min_pair_ipsae": min(finite) if finite else None,
+            "pair_ipsae_assessed_count": len(finite), "pair_ipsae_total_count": len(pair_metrics),
+            "pair_ipsae_all_assessed": len(finite) == len(pair_metrics),
+            "pair_ipsae_extrema_scope": "finite_recorded_chain_pairs; missing_pairs_excluded"}
+
+
 def _write(path, value):
     write_json(path, to_native(value))
 
@@ -105,39 +150,78 @@ def _pdb(structure):
 
 
 def reference_comparison(structure, entries, reference, settings):
-    """Explicit original-number mapping; fit only the anchor chain."""
+    """Preserve anchor-fit fields and search exact sequence-equivalent mappings."""
     if not reference:
         return {"available": False, "reason": "비교 구조가 제공되지 않았습니다."}, structure
     try:
+        import math
         ref = pdb_io.load_structure(reference)
         anchor = settings.get("anchor_chain", "A")
-        matches = {}
+        initial = {e["id"]: e.get("reference_chain", e["id"]) for e in entries}
+        if len(set(initial.values())) != len(entries):
+            raise ValueError("참조 체인 대응은 사본별로 중복 없이 지정해야 합니다.")
+        groups = {}
         for entry in entries:
-            chain = pdb_io.get_chain(structure, entry["id"])
-            original = pdb_io.get_chain(ref, entry.get("reference_chain", entry["id"]))
-            lookup = {r.id[1]: r for r in pdb_io.iter_residues(original) if not r.id[2].strip()}
-            pairs = []
-            for r, number in zip(pdb_io.iter_residues(chain), entry["original_positions"]):
-                native = lookup.get(number)
-                if native is not None and native.resname != r.resname:
-                    raise ValueError(f"체인 {entry['id']} 원본 번호 {number}: 참조와 입력 서열이 다릅니다.")
-                if native is not None and native.resname == r.resname and "CA" in r and "CA" in native:
-                    pairs.append((r["CA"], native["CA"]))
-            matches[entry["id"]] = pairs
-        pairs = matches[anchor]
-        if len(pairs) < 3 or any(np.linalg.matrix_rank(np.asarray([p[k].coord for p in pairs])-np.mean([p[k].coord for p in pairs], axis=0)) < 2 for k in (0, 1)):
-            raise ValueError("명확한 비공선 기준 체인 Cα 대응이 3개 미만입니다.")
+            groups.setdefault((entry["sequence"], tuple(entry["original_positions"])), []).append(entry["id"])
+        symmetric = settings.get("reference_symmetry", True)
+        if type(symmetric) is not bool:
+            raise ValueError("reference_symmetry는 true/false여야 합니다.")
+        required = math.prod(math.factorial(len(g)) for g in groups.values()) if symmetric else 1
+        if required > 4096:
+            return {"available": False, "reason": "동일 서열 사본의 정확한 순열 탐색이4096개 한도를 넘습니다. 사본별 reference_chains를 확인하고 고정 대응 비교에는 reference_symmetry=false를 명시하세요.",
+                    "symmetry_search_complete": False, "symmetry_search_status": "exact_search_budget_exceeded",
+                    "permutations_required": str(required), "permutation_budget": 4096}, structure
+        predicted = {e["id"]: list(pdb_io.iter_residues(pdb_io.get_chain(structure, e["id"]))) for e in entries}
+        references = {c: {r.id[1]: r for r in pdb_io.iter_residues(pdb_io.get_chain(ref, c)) if not r.id[2].strip()} for c in initial.values()}
+        def matches_for(mapping):
+            result = {}
+            for entry in entries:
+                pairs = []
+                for residue, number in zip(predicted[entry["id"]], entry["original_positions"]):
+                    native = references[mapping[entry["id"]]].get(number)
+                    if native is not None and native.resname != residue.resname:
+                        raise ValueError(f"체인 {entry['id']} 원본 번호 {number}: 참조와 입력 서열이 다릅니다.")
+                    if native is not None and "CA" in residue and "CA" in native:
+                        pairs.append((residue["CA"], native["CA"]))
+                result[entry["id"]] = pairs
+            return result
+        alternatives = [list(itertools.permutations([initial[c] for c in group])) if symmetric else [tuple(initial[c] for c in group)] for group in groups.values()]
+        best = None; evaluated = 0
+        for choice in itertools.product(*alternatives):
+            mapping = {chain: reference_id for group, assignment in zip(groups.values(), choice) for chain, reference_id in zip(group, assignment)}
+            matches = matches_for(mapping)
+            anchor_pairs = matches.get(anchor, [])
+            if len(anchor_pairs) < 3 or any(np.linalg.matrix_rank(np.asarray([p[k].coord for p in anchor_pairs])-np.mean([p[k].coord for p in anchor_pairs], axis=0)) < 2 for k in (0, 1)):
+                continue
+            all_pairs = [pair for group in matches.values() for pair in group]
+            fit_all = Superimposer(); fit_all.set_atoms([p[1] for p in all_pairs], [p[0] for p in all_pairs])
+            key = (-len(all_pairs), float(fit_all.rms), tuple(mapping[e["id"]] for e in entries))
+            evaluated += 1
+            if best is None or key < best[0]: best = (key, mapping, matches)
+        if best is None:
+            raise ValueError("명확한 비공선 기준 체인 Cα 대응이3개 미만입니다.")
+        _, mapping, matches = best; pairs = matches[anchor]
         fit = Superimposer(); fit.set_atoms([p[1] for p in pairs], [p[0] for p in pairs]); fit.apply(structure.get_atoms())
         comparisons = []
+        all_distances = []
         for entry in entries:
             matched = matches[entry["id"]]
-            rmsd = float(np.sqrt(np.mean([np.sum((a.coord-b.coord)**2) for a,b in matched]))) if matched else None
+            distances = [float(np.sum((a.coord-b.coord)**2)) for a,b in matched];all_distances.extend(distances)
             interest = set(settings.get("interest_positions", []))
             region = [(a,b) for a,b in matched if b.parent.id[1] in interest]
-            comparisons.append({"chain": entry["id"], "matched_ca": len(matched), "ca_rmsd_angstrom": rmsd,
-                                "interest_ca_rmsd_angstrom": float(np.sqrt(np.mean([np.sum((a.coord-b.coord)**2) for a,b in region]))) if region else None})
+            comparisons.append({"chain": entry["id"], "reference_chain": mapping[entry["id"]], "matched_ca": len(matched),
+                "ca_rmsd_angstrom": float(np.sqrt(np.mean(distances))) if distances else None,
+                "interest_ca_rmsd_angstrom": float(np.sqrt(np.mean([np.sum((a.coord-b.coord)**2) for a,b in region]))) if region else None})
         return {"available": True, "content": _pdb(ref), "format": "pdb", "anchor_chain": anchor,
-                "matched_ca": len(pairs), "rmsd": float(fit.rms), "chains": comparisons}, structure
+                "matched_ca": len(pairs), "rmsd": float(fit.rms), "rmsd_scope": "anchor_chain_CA",
+                "display_alignment_scope": "anchor_chain_CA_with_selected_sequence_equivalent_mapping",
+                "all_chain_ca_rmsd_angstrom": best[0][1], "all_chain_ca_rmsd_scope": "all_matched_CA_single_rigid_body_fit",
+                "all_chain_matched_ca": -best[0][0],
+                "anchor_aligned_all_chain_ca_rmsd_angstrom": float(np.sqrt(np.mean(all_distances))),
+                "chain_permutation_map": mapping, "symmetry_search_complete": bool(symmetric),
+                "symmetry_search_status": "exact_sequence_equivalent_search" if symmetric else "explicit_fixed_mapping",
+                "symmetry_candidates_evaluated": evaluated, "permutation_budget": 4096,
+                "mapping_objective": "maximum_matched_CA_then_minimum_all_chain_CA_RMSD_then_lexical_map", "chains": comparisons}, structure
     except (ValueError, KeyError, OSError) as exc:
         return {"available": False, "reason": str(exc)}, structure
 
@@ -149,15 +233,13 @@ def structure_data(pred, entries, cfg):
     for entry in entries:
         if pdb_io.chain_sequence(pdb_io.get_chain(structure, entry["id"])) != entry["sequence"]:
             raise ValueError("예측 서열과 입력 서열이 다릅니다.")
-    labels, _ = scorer.build_index_map(structure)
-    pae = scorer.load_pae(pred)
-    if pae is not None:
-        scorer.validate_pae(pae, len(labels))
-    confidence = scorer.load_confidence(pred)
+    context = scorer.prepare_scoring_context(pred, structure=structure)
+    pae, confidence = context.pae, context.confidence
     chai_pairs, chai_pair_reason = _chai_pair_scores(confidence, entries) if pred.source == "chai1" else ({}, None)
     pairs = []
     for a,b in itertools.combinations(entries, 2):
-        metrics = scorer.score_complex(pred.cif, a["id"], b["id"], [], cfg, pred=pred, label=a["id"]+"–"+b["id"])
+        metrics = scorer.score_complex(pred.cif, a["id"], b["id"], [], cfg, pred=pred,
+                                       label=a["id"]+"–"+b["id"], context=context)
         pair_iptm = confidence.get("pair_chains_iptm", {})
         ai, bi = str(ord(a["id"])-65), str(ord(b["id"])-65)
         forward, reverse = pair_iptm.get(ai, {}).get(bi), pair_iptm.get(bi, {}).get(ai)
@@ -172,7 +254,10 @@ def structure_data(pred, entries, cfg):
                       "native_pair_iptm_source": "chai1.per_chain_pair_iptm" if pred.source == "chai1" else "opendde.chain_pair_iptm" if pred.source == "opendde" else "pair_chains_iptm",
                       "native_pair_iptm_axes": ["query_chain", "key_chain"] if pred.source == "chai1" else ["chain_a", "chain_b"] if pred.source == "opendde" else None,
                       "native_pair_iptm_unavailable_reason": "OpenDDE chain_pair_iptm 미제공" if pred.source == "opendde" and matrix is None else chai_pair_reason,
-                      **{k: metrics.get(k) for k in ("ipsae", "interface_plddt", "interface_pae")}})
+                      **{k: metrics.get(k) for k in ("ipsae", "interface_plddt", "interface_pae", "n_contacts",
+                          "interface_assessment_status", "buried_sasa", "buried_sasa_status")}})
+    primary = pair_summary(pairs, cfg_get(cfg, 'complex', {}))
+    selected_target, selected_binder = primary['primary_pair']
     reference, structure = reference_comparison(structure, entries, cfg_get(cfg, "complex.reference_path"), cfg_get(cfg, "complex", {}))
     # Assign unique temporary numbers first to avoid collisions in PDBIO.
     for entry in entries:
@@ -190,7 +275,7 @@ def structure_data(pred, entries, cfg):
                      "atom_ids": {a.name: a.serial_number for a in r}, "ca": r["CA"].coord.tolist() if "CA" in r else None}
                     for r in pdb_io.iter_residues(chain)]
         native_labels.extend(r["label"] for r in residues)
-        chains.append({"id": entry["id"], "name": entry["name"], "role": "target" if entry["id"] == "A" else "binder" if entry["id"] == "B" else "context", "residues": residues})
+        chains.append({"id": entry["id"], "name": entry["name"], "role": "target" if entry["id"] == selected_target else "binder" if entry["id"] == selected_binder else "context", "residues": residues})
     contacts, clashes = [], []
     from .platform.structure_review import closest_atoms
     clash_cutoff = float(cfg_get(cfg, "score.clash_cutoff", 2.0))
@@ -203,13 +288,14 @@ def structure_data(pred, entries, cfg):
         ref_struct = pdb_io.load_structure(cfg["complex"]["reference_path"])
         native_ref = set()
         for a,b in itertools.combinations(entries, 2):
-            for p in pdb_io.contact_pairs(pdb_io.get_chain(ref_struct, a.get("reference_chain", a["id"])), pdb_io.get_chain(ref_struct, b.get("reference_chain", b["id"])), cutoff=5.):
+            for p in pdb_io.contact_pairs(pdb_io.get_chain(ref_struct, reference["chain_permutation_map"][a["id"]]), pdb_io.get_chain(ref_struct, reference["chain_permutation_map"][b["id"]]), cutoff=5.):
                 a_label, b_label = p["a"].split(":",1)[1], p["b"].split(":",1)[1]
                 if a_label in {str(n) for n in a["original_positions"]} and b_label in {str(n) for n in b["original_positions"]}:
                     native_ref.add((a["id"]+":"+a_label, b["id"]+":"+b_label))
         recovered = native_ref & {(p["a"],p["b"]) for p in contacts}
         reference.update(reference_contacts_5A=len(native_ref), recovered_contacts_5A=len(recovered), fnat_5A=len(recovered)/len(native_ref) if native_ref else None)
-    return to_native({"content": content, "format": "pdb", "chains": chains, "target_chain": "A", "binder_chain": "B",
+    return to_native({"content": content, "format": "pdb", "chains": chains,
+                      "target_chain": selected_target, "binder_chain": selected_binder, **primary,
                       "contacts": contacts, "clashes": clashes, "hotspots": [], "cdr": {"ranges": {}}, "reference": reference,
                       "pae": {"values": pae.tolist(), "labels": native_labels, "unit": "Å"} if pae is not None else None,
                       "pair_metrics": pairs, "global_iptm": confidence.get("iptm", confidence.get("protein_iptm")),
@@ -392,6 +478,8 @@ def run(cfg, root, state):
         raise ValueError("일반 복합체는 합성 좌표를 생성하지 않습니다. 저장된 예제 결과를 열거나 실제 분석을 실행하세요.")
     entries = proteins(cfg_get(cfg, "complex.proteins"))
     settings = validate_settings(cfg_get(cfg, "complex", {}))
+    if settings.get("primary_pair") and not set(settings['primary_pair']) <= {p['id'] for p in entries}:
+        raise ValueError("primary_pair가 실제 분석 체인에 없습니다.")
     records = {p["id"]: p["sequence"] for p in entries}
     comparison = settings.get("comparison_engines")
     engines = comparison or [settings["engine"]]
@@ -523,14 +611,9 @@ def run(cfg, root, state):
                     data["raw_format"] = pred.cif.suffix.lstrip(".")
                     data["consumed_msa"] = consumed_msa
                     data["condition_receipt"] = conditions
-                    _write(folder / "structure.json", data)
-                    write_bytes(folder / "model.pdb", data["content"].encode("utf-8"), root=root)
-                    pair = data["pair_metrics"][0]
                     row = {"candidate_id": identifier, "seed": seed, "effective_seed": seed, "model": model, "engine": engine,
                         "iptm": data["global_iptm"], "iptm_scope": "whole_complex", "engine_aggregate_score": data["engine_aggregate_score"],
-                        "ipsae": pair.get("ipsae"), "ipsae_scope": "selected_chain_pair",
-                        "ipsae_chain_a": pair["chain_a"], "ipsae_chain_b": pair["chain_b"],
-                        "ipsae_aggregation": "max_of_directional_pair_ipsae", "ipsae_selection": "first_pair_in_reviewed_chain_order",
+                        **pair_summary(data["pair_metrics"], settings),
                         "n_clashes": sum(p.get("n_clashes") or 0 for p in data["pair_metrics"]), "n_clashes_scope": "sum_over_all_chain_pairs",
                         "elapsed_seconds": (time.time() - started) / len(pending),
                         "elapsed_scope": "analysis_only_native_reused" if "native_inference_reused" in attempt_record else "engine_seed_group_amortized",
@@ -539,6 +622,12 @@ def run(cfg, root, state):
                         "structure_available": True, "selected": False, "final_eligible": None, "exclusion_reasons": [], "pair_metrics": data["pair_metrics"],
                         "reference_comparison": {k: v for k, v in data["reference"].items() if k != "content"},
                         "identity_fingerprint": identity["fingerprint"], "prediction_receipt": groups[group], "attempt": str(attempt.relative_to(root))}
+                    row["coordinate_source"] = data["coordinate_source"]
+                    row = model_observation_record(row, mode="complex")
+                    data.update(pair_summary(data['pair_metrics'], settings))
+                    data = structure_payload(data, observation=row, mode="complex")
+                    _write(folder / "structure.json", data)
+                    write_bytes(folder / "model.pdb", data["content"].encode("utf-8"), root=root)
                     files = [folder / "structure.json", folder / "model.pdb", pred.cif]
                     files += [getattr(pred, key, None) for key in ("scores_npz", "confidence_json", "pae_npz")]
                     row["artifacts"] = {str(path.relative_to(root)): provenance.file_digest(path) for path in files if path is not None}
@@ -556,6 +645,7 @@ def run(cfg, root, state):
                     print(f"[complex] {identifier}: {row['error']}", flush=True)
                 # Every attempt retains its own observation. The active ledger
                 # is a derived view and never replaces a verified successful row.
+                row = model_observation_record(row, mode="complex")
                 row["observation_file"] = str((folder / "observation.json").relative_to(root))
                 row = to_native(row)
                 if row.get("evaluated") is True:

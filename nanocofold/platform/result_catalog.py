@@ -144,12 +144,55 @@ def _target_msa_identity(cfg, reasons):
     return {"mode": backend, "alignments_pinned": False}
 
 
+def _verified_monomer_cache_identity(cache, reasons, required_sequences=None):
+    """Hash the bounded cache the adapters consume, with receipt validation."""
+    from ..colabfold_msa import cached_monomer, read_monomer
+    cache=Path(cache)
+    receipts=sorted(cache.glob('*/receipt.json'))
+    if not 1 <= len(receipts) <= 10000:
+        reasons.append("Verified monomer MSA cache is missing or exceeds the bounded identity limit")
+        return {"mode":"cache","alignments_pinned":False}
+    files={}
+    sequences=set()
+    for receipt in receipts:
+        alignment=read_monomer(receipt.parent/'query.a3m',max_sequences=10000)
+        entry=cached_monomer(cache,alignment.sequence)
+        if not entry:
+            raise ValueError("Monomer cache has no verified alignment")
+        files[receipt.parent.name]={"a3m_sha256":entry['sha256'],"receipt_sha256":provenance.file_digest(receipt)}
+        sequences.add(alignment.sequence)
+    if required_sequences is not None:
+        for sequence in required_sequences:
+            cached_monomer(cache,sequence)
+        if not set(required_sequences) <= sequences:
+            raise ValueError("The consumed monomer cache lacks an exact input-chain alignment")
+    return {"mode":"frozen_monomer_cache","alignments":files}
+
+
+def _complex_msa_identity(cfg, reasons):
+    from ..complex import proteins, validate_settings
+    settings=validate_settings(cfg_get(cfg,'complex',{}))
+    if settings['msa']=='empty':
+        return {'mode':'empty'}
+    requested=settings.get('msa_source','cache')
+    if requested!='cache':
+        reasons.append("Complex comparison MSA acquisition is mutable/unpinned; exact verified cached monomers are required for reuse")
+        return {'mode':requested,'complex_comparison_acquisition':True,'alignments_pinned':False}
+    entries=proteins(cfg_get(cfg,'complex.proteins'))
+    # complex_comparison.configure overwrites the predictor MSA source with
+    # these reviewed settings and prepare() consumes this PROJECT_ROOT cache.
+    cache=resolve_path(cfg,cfg_get(cfg,'screen.colabfold.msa_cache_dir','msa/monomer_cache'))
+    result=_verified_monomer_cache_identity(cache,reasons,{p['sequence'] for p in entries})
+    result['complex_comparison_acquisition']=True
+    return result
+
+
 def _msa_identity(workspace, cfg, engines, reasons):
     """Identify immutable MSAs/DBs locally; never turn a URL into a DB version."""
     if cfg_get(cfg, "run.mock", False):
         return {"mode": "mock"}
     if cfg_get(cfg, "run.mode") == "complex":
-        return {"mode": "empty"}
+        return _complex_msa_identity(cfg,reasons)
     target = _target_msa_identity(cfg, reasons)
     if (not cfg_get(cfg, "target.pdb") and cfg_get(cfg, "structure.provider") == "chai1"
             and cfg_get(cfg, "structure.chai1.msa_mode", "single") == "msa"):
@@ -211,22 +254,11 @@ def _msa_identity(workspace, cfg, engines, reasons):
             result["database_manifest_sha256"] = provenance.file_digest(_path(workspace, db_manifest))
         return result
     if (uses_cf or comparison) and requested == "cache" and (cf.get("msa_cache_dir") or comparison):
-        from ..colabfold_msa import cached_monomer, read_monomer
         cache_value = cf.get("msa_cache_dir") or "msa/monomer_cache"
         cache = resolve_path(cfg, cache_value) if comparison else _path(workspace, cache_value)
-        receipts = sorted(cache.glob("*/receipt.json"))
-        if not 1 <= len(receipts) <= 10000:
-            reasons.append("Verified monomer MSA cache is missing or exceeds the bounded identity limit")
-            return {"mode": "cache", "alignments_pinned": False}
-        files = {}
-        for receipt in receipts:
-            alignment = read_monomer(receipt.parent / "query.a3m", max_sequences=10000)
-            entry = cached_monomer(cache, alignment.sequence)
-            if not entry:
-                raise ValueError("Monomer cache has no verified alignment")
-            files[receipt.parent.name] = {"a3m_sha256": entry["sha256"],
-                                         "receipt_sha256": provenance.file_digest(receipt)}
-        return {"mode": "frozen_monomer_cache", "alignments": files, "target": target}
+        result=_verified_monomer_cache_identity(cache,reasons)
+        if result['mode']=='frozen_monomer_cache':result['target']=target
+        return result
     if requested in {"public_api", "public_mmseqs2"} or cfg_get(cfg, "structure.allow_public_msa_server", False):
         reasons.append("Public MSA service/database is mutable; frozen local A3Ms are required for exact reuse")
         return {"mode": requested, "exact_database_identity": False}

@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import json
 from pathlib import Path
 
 import pandas as pd
 
 from . import colabfold, engine_comparison, provenance, screen
-from .config import cfg_get
+from .config import cfg_get, resolve_path, dump_resolved
+from .utils import shell
+from .utils.atomic import write_json
 
 
 def configure(cfg, settings):
@@ -61,16 +64,57 @@ def condition_receipt(cfg, settings, engine):
 
 
 def prepare(cfg, root, state, entries):
-    """Reuse the frozen monomer provider and its receipts for every ordered chain.
-
-    The last chain is an exact parent solely for the existing MSA manifest format.
-    No mutation, CDR projection, sequence truncation, or candidate selection occurs.
-    Homomer copies share one sequence cache while retaining their chain axes.
-    """
-    target = {"sequence": entries[0]["sequence"], "aux_chains": entries[1:-1]}
-    candidate = pd.DataFrame([{"design_id": "complex_input", "sequence": entries[-1]["sequence"]}])
-    applied, _, alignments = engine_comparison.prepare_msa(cfg, root, state, target, candidate)
-    monomers = {p["id"]: alignments["candidate::complex_input" if p is entries[-1] else "chain::" + p["id"]] for p in entries}
+    """Freeze all protein chains directly; no VHH candidate or parent projection."""
+    from .colabfold_msa import cached_monomer, read_monomer, read_multimer, _unique_chains, _query_descriptor
+    applied, root = copy.deepcopy(cfg), Path(root)
+    records = {p['id']: p['sequence'] for p in entries}
+    queries = {'chain::'+p['id']:p['sequence'] for p in entries}
+    source = cfg_get(applied, 'screen.colabfold.msa_source', 'cache')
+    acquired = {}
+    if source == 'local_mmseqs2':
+        acquired = engine_comparison._acquire_reviewed_local(applied, root, state, queries)
+    elif source == 'public_api':
+        acquired = engine_comparison._acquire_reviewed_api(applied, root, state, queries)
+    elif source != 'cache':
+        raise ValueError('Complex MSA source must be cache, local_mmseqs2, or public_api')
+    cache = resolve_path(applied, cfg_get(applied,'screen.colabfold.msa_cache_dir','msa/monomer_cache'))
+    monomers = {}
+    for chain,sequence in records.items():
+        try:
+            monomers[chain] = acquired.get(sequence) or cached_monomer(cache, sequence)
+        except ValueError as exc:
+            raise shell.ToolError(f'복합체 {chain}의 정확한 단량체 MSA가 없습니다: {exc}') from exc
+    maximum = cfg_get(applied,'screen.colabfold.msa_max_sequences',2048)
+    sequences,cardinality = _unique_chains(records)
+    alignments = tuple(read_monomer(next(v['a3m'] for c,v in monomers.items() if records[c]==s),s,maximum) for s in sequences)
+    query = _query_descriptor(sequences,cardinality,alignments,{'mode':'precomputed','role':'whole_protein_complex'})
+    folder=root/'01_msa/comparison';folder.mkdir(parents=True,exist_ok=True)
+    manifest = {'schema_version':1,'pairing':'unpaired','static_chains':{},'parents':{},
+        'queries':{'complex_input':{'chains':records,'a3m':'complex_input.a3m','sha256':query.identity['query_a3m_sha256']}},
+        'role':'whole_protein_complex','candidate_selection_applicable':False,
+        'protein_chains':{c:{'sequence':records[c],'source_monomer_sha256':v['sha256']} for c,v in monomers.items()}}
+    path=folder/'manifest.json'
+    if path.exists() and json.loads(path.read_text())!=manifest:
+        raise ValueError('Complex MSA inputs changed; preserve this run and use a new directory')
+    query_path=folder/'complex_input.a3m'
+    if query_path.exists():
+        read_multimer(query_path,records,expected_sha256=query.identity['query_a3m_sha256'],max_sequences=maximum)
+    else:query.write(query_path)
+    if not path.exists():write_json(path,manifest,root=root)
+    applied.setdefault('screen',{}).setdefault('colabfold',{}).update(msa_mode='precomputed',msa_dir=str(folder.resolve()),msa_manifest_sha256=provenance.file_digest(path))
+    dump_resolved(applied,root/'run_config.yaml')
+    if state is not None:
+        origins=[v['receipt'].get('source_provenance',{}) for v in monomers.values()]
+        uploaded=any(v.get('explicit_sequence_upload_authorized') is True for v in origins)
+        receipt_path=root/'01_msa/api_comparison_acquisition.json'
+        api=json.loads(receipt_path.read_text()) if receipt_path.is_file() else {}
+        state.set_phase('comparison_msa',{'mode':'exact_cached_protein_monomers','pairing':'unpaired','provider':source,
+            'chains':len(records),'unique_sequences':len(sequences),'candidate_selection_applicable':False,
+            'manifest':str(path.relative_to(root)),'manifest_sha256':provenance.file_digest(path),
+            'private_sequences_submitted_to_public_api':uploaded,
+            'public_api_requests':api.get('public_api_requests',0) if not uploaded or api else None,
+            'request_counter_scope':api.get('request_counter_scope','this_run; source cache history unspecified'),
+            'source_providers':sorted({v.get('provider','unspecified') for v in origins})})
     return applied, monomers
 
 

@@ -132,6 +132,8 @@ def preflight_msa(cfg, run_dir, target):
     if (cfg_get(cfg, "screen.colabfold.msa_mode") != "precomputed" or cfg_get(cfg, "run.mock", False)
             or cfg_get(cfg, "run.dry_run", False) or not cfg_get(cfg, "design.refinement.enabled", False)):
         return
+    from .mature import validate_msa_mutation_limit
+    validate_msa_mutation_limit(cfg)
     from .design_refinement import public_msa_templates, public_msa_template_sequences
     from .screen import complex_chain_records
     chains, _, binder = complex_chain_records(target, "")
@@ -144,6 +146,7 @@ def preflight_msa(cfg, run_dir, target):
 
 def _validate_msa_lineage(candidates, parents, id_column, sequence_column):
     from .colabfold_msa import AMINO
+    from .mature import MSA_PARENT_MUTATION_LIMIT
     controls = control_ids(candidates, id_column)
     for row in candidates.to_dict("records"):
         identifier = str(row[id_column])
@@ -159,8 +162,8 @@ def _validate_msa_lineage(candidates, parents, id_column, sequence_column):
             raise ValueError(f"후보 {identifier}의 길이가 MSA 부모와 다릅니다. 부모별 CDR 치환만 지원합니다.")
         changed = {index for index, (left, right) in enumerate(zip(baseline, sequence), 1) if left != right}
         allowed = {index for start, end in parent.get("cdr_ranges", {}).values() for index in range(start, end + 1)}
-        if len(changed) > 5 or not changed <= allowed or identifier in controls and changed:
-            raise ValueError(f"후보 {identifier}는 부모의 CDR 내부 1–5개 치환/원본 대조 조건을 벗어났습니다.")
+        if len(changed) > MSA_PARENT_MUTATION_LIMIT or not changed <= allowed or identifier in controls and changed:
+            raise ValueError(f"후보 {identifier}는 부모의 CDR 내부 1–{MSA_PARENT_MUTATION_LIMIT}개 치환/원본 대조 조건을 벗어났습니다.")
         declared = row.get("mutation_count")
         if declared is not None and not pd.isna(declared) and (isinstance(declared, bool) or float(declared) != len(changed)):
             raise ValueError(f"후보 {identifier}의 변이 개수 기록이 실제 부모 대비 치환과 다릅니다.")
@@ -177,6 +180,16 @@ def prepare_msa(cfg, run_dir, state, target, candidates, cdr_ranges=None, id_col
             state.set_phase("colabfold_msa", {"mode": "precomputed", "mock": True, "mock_bypass": True,
                                              "actual_homologs_evaluated": False})
         return cfg, candidates
+    from . import mature
+    mature.validate_msa_mutation_limit(cfg)
+    if cfg_get(cfg, "run.mode") == "mature":
+        sequence = mature.resolve_wt_sequence(cfg)
+        if not cdr_ranges:
+            raise ValueError("mature MSA에는 명시적으로 검토된 WT CDR 범위가 필요합니다.")
+        # Validate caller-supplied candidates before any public MSA acquisition.
+        checked = candidates.copy()
+        checked["parent_id"] = "WT"
+        _validate_msa_lineage(checked, {"WT": {"sequence": sequence, "cdr_ranges": cdr_ranges}}, id_column, sequence_column)
     from .colabfold_msa import prepare_manifest, prepare_id_aliases
     from . import mature, provenance
     cfg, candidates = copy.deepcopy(cfg), candidates.copy()

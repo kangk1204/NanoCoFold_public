@@ -12,11 +12,10 @@ from . import provenance
 from .config import cfg_get, resolve_path
 from .utils import pdb_io, shell
 
-# Public tutorial sequence, used only by the synthetic CPU design path.
-# Source: examples/tutorial/sources.json (PDB 9VQ6, anti-IL6 nanobody).
-FALLBACK_FRAMEWORK_SEQ = (
-    'MAQVQLVESGGGLVQPGGSLRLSCAASGFTFSSYRMYWFRQAPGQGLEAVAAISAGGGSTYYADSVKGRFTISRDNSKNTLYLQMNSLRAEDTAVYYCANRAGWGMGDYWGQGTLVTVSKLAAALEHHHHHH'
-)
+from .runtime_policy import runtime_policy
+
+# Only the synthetic CPU design fallback uses this distribution fixture.
+FALLBACK_FRAMEWORK_SEQ = runtime_policy()["mock_framework_sequence"]
 
 
 def _log_path(phase_dir: Path, filename: str, dry_run: bool) -> Path:

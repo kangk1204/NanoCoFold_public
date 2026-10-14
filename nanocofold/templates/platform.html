@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" data-renderer-version="nanocofold-results-v3">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -405,7 +405,7 @@
         <div id="explorer" hidden>
           <div class="card">
             <h2 id="report-comparison">03 후보 비교</h2>
-            <p class="muted">예측 신뢰도와 지정 위치 충족은 별개입니다. hotspot 접촉 수와 판정을 함께 확인하세요. 동일 엔진·실행 조건 안에서 지표를 비교하세요. 정렬은 탐색 순서이며 엔진을 합친 최종 순위가 아닙니다.</p>
+            <p class="muted" data-vhh-results>예측 신뢰도와 지정 위치 충족은 별개입니다. hotspot 접촉 수와 판정을 함께 확인하세요. 동일 엔진·실행 조건 안에서 지표를 비교하세요. 정렬은 탐색 순서이며 엔진을 합친 최종 순위가 아닙니다.</p>
             <div class="inline">
               <label for="candidate-search">후보 검색</label
               ><input
@@ -454,11 +454,11 @@
               >
             </div>
             <div class="inline">
-              <label class="check"><input id="hotspot-filter" type="checkbox" >결합 부위(hotspot) 접촉률로 후필터</label>
+              <label class="check" data-vhh-results><input id="hotspot-filter" type="checkbox" >결합 부위(hotspot) 접촉률로 후필터</label>
               <label for="hotspot-min">최소 접촉률 (%)</label>
               <input id="hotspot-min" type="number" min="0" max="100" step="1" value="50" disabled >
             </div>
-            <p class="muted">결합 부위(hotspot) 후필터는 기본 해제입니다. 켜면 미지정·접촉률 미평가·번호 대응 실패·기록 불일치 후보는 표시하지 않습니다. 접촉률만 저장된 이전 결과는 기록된 비율로 필터하며 상세 접촉 수·판정은 미평가로 남습니다.
+            <p class="muted" data-vhh-results>결합 부위(hotspot) 후필터는 기본 해제입니다. 켜면 미지정·접촉률 미평가·번호 대응 실패·기록 불일치 후보는 표시하지 않습니다. 접촉률만 저장된 이전 결과는 기록된 비율로 필터하며 상세 접촉 수·판정은 미평가로 남습니다.
               기존 결과의 적격 판정과 선별 목록은 보존하며, 품질 적격은 기록된 판정에서 hotspot만 제외한 탐색 값입니다.</p>
             <label class="check"><input id="candidate-extra-columns" type="checkbox">상세 지표 열 펼치기</label>
             <p id="candidate-count"></p><p id="candidate-sort-note" class="muted" role="status"></p>

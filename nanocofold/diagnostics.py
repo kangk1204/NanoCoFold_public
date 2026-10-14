@@ -1041,16 +1041,19 @@ def _rfantibody_blackwell_compatibility(gpu: dict[str, Any], env_probe: dict[str
 
 
 def _public_smoke_fixtures() -> tuple[Path, Path]:
-    """Find the shipped tutorial in a wheel, checkout, or initialized workspace."""
+    """Locate the registered distribution fixture without shipping private data."""
+    from .runtime_policy import runtime_policy
+    directory = runtime_policy()["smoke_fixture_directory"]
+    if directory == "data/benchmark":
+        root = PROJECT_ROOT / directory
+        return root / "target.fasta", root / "binder_library.fasta"
     package = Path(__file__).resolve().parent
-    roots = (package / "_data/examples/tutorial",
-             package.parent / "examples/tutorial",
-             PROJECT_ROOT / "examples/tutorial")
+    roots = (package / "_data/examples/tutorial", package.parent / directory,
+             PROJECT_ROOT / directory)
     for root in roots:
         paths = root / "target.fasta", root / "vhh_library.fasta"
         if all(path.is_file() for path in paths):
             return paths
-    # A missing fixture remains a diagnostic blocker; no download is implied.
     return roots[0] / "target.fasta", roots[0] / "vhh_library.fasta"
 
 

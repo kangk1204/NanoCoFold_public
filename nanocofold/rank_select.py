@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 
 import numpy as np
 import pandas as pd
@@ -65,7 +66,8 @@ def cluster_cdr3(frame: pd.DataFrame, identity: float = 0.85, sequence_column: s
     clusters: list[str] = []
     representatives: list[str] = []
     cached: dict[str, str] = {}
-    for cdr3 in sorted(set(sequences)):
+    frequencies = Counter(sequences)
+    for cdr3 in sorted(frequencies, key=lambda value: (-frequencies[value], -len(value), value)):
         if cdr3 in cached:
             clusters.append(cached[cdr3])
             continue
@@ -103,6 +105,7 @@ def _zscore(series: pd.Series, higher_is_better: bool = True) -> pd.Series:
 def composite_score(frame: pd.DataFrame, cfg: dict) -> pd.Series:
     weights = cfg_get(cfg, "rank.weights", {}) or {}
     original_index = frame.index
+    frame = frame.loc[~_interface_unavailable_rows(frame, cfg)]
     if weights.get("dev_flags", 0) and "dev_cdr_evaluated" in frame:
         assessed = frame["dev_cdr_evaluated"].map(lambda value: isinstance(value, (bool, np.bool_)) and bool(value))
         frame = frame.loc[assessed]
@@ -144,8 +147,8 @@ def ranking_policy(cfg: dict, frame: pd.DataFrame | None = None) -> dict:
         "weights": weights,
         "applied_weights": {k:v for k,v in weights.items() if frame is None or k in frame},
         "ignored_weights": {k:v for k,v in weights.items() if frame is not None and k not in frame},
-        "cdr3_similarity": "normalized_levenshtein_v2; canonical-sequence-order greedy representatives",
-        "normalization": "batch z-score; missing finite values filled with batch median; fewer than two values or constant columns contribute zero",
+        "cdr3_similarity": "normalized_levenshtein_v2; frequency-descending, length-descending, lexical-ascending greedy representatives",
+        "normalization": "batch z-score; no-contact rows and unavailable weighted interface metrics excluded/held; other missing finite values filled with batch median; fewer than two values or constant columns contribute zero",
         "normalization_population": ("recorded mixed prediction-engine input, including controls; rows with unassessed CDR liabilities excluded when developability is weighted; legacy partial-rescore path"
                                      if mixed else "recorded ranking input in the same prediction engine, including controls; rows with unassessed CDR liabilities excluded when developability is weighted"),
         "failed_row_handling": "failed/interrupted prediction rows are preserved with unavailable scores/ranks, excluded before normalization and never selected even under fallback",
@@ -157,7 +160,7 @@ def ranking_policy(cfg: dict, frame: pd.DataFrame | None = None) -> dict:
         "sequence_prior_interpretation": "sequence/folding plausibility only; no measured affinity labels or binding calibration",
         "developability_gate": "dev_severe: five severe risk flags",
         "developability_weight": "dev_flags: all evaluated True risk flags; incomplete CDR assessment holds composite_score/rank and selection",
-        "fallback_scope": "recorded ineligible rows with available composite scores only; failed predictions and unassessed weighted CDR liabilities stay held",
+        "fallback_scope": "recorded ineligible rows with available composite scores only; failed predictions, unavailable interfaces and unassessed weighted CDR liabilities stay held",
     }
 
 
@@ -176,7 +179,11 @@ def ranking_warnings(frame: pd.DataFrame, cfg: dict) -> list[str]:
     if cdr_held.any():
         message += (f"이 중 {int(cdr_held.sum())}개는 CDR 개발가능성이 미평가입니다. "
                     "ANARCI 환경 또는 서열에 맞는 CDR 범위를 확인하세요. ")
-    else:
+    interface_held = held & _interface_unavailable_rows(frame, cfg)
+    if interface_held.any():
+        message += (f"이 중 {int(interface_held.sum())}개는 접촉이 없거나 가중 계면 지표가 미평가입니다. "
+                    "성공한 무접촉 예측과 측정된 접촉0개 기록은 보존하고 순위·선정은 보류합니다. ")
+    elif not cdr_held.any():
         message += "저장된 종합점수가 없어 순위·선별을 추정하지 않습니다. "
     if cfg_get(cfg, "rank.fallback_to_ineligible", False):
         message += ("fallback_to_ineligible=true는 종합점수가 있는 부적격 후보에만 적용됩니다. "
@@ -203,8 +210,31 @@ def rank_candidates(frame: pd.DataFrame, cfg: dict, cdr_ranges: dict | None = No
     ranked["rank"] = ranked["rank"].astype("Int64").mask(failed | ranked["composite_score"].isna())
     ranked["ranking_status"] = np.where(ranked["rank"].notna(), "ranked", "held")
     ranked["ranking_unavailable_reason"] = np.where(failed, "prediction_failed",
-        np.where(ranked["composite_score"].isna(), "weighted_cdr_assessment_unavailable", None))
+        np.where(_interface_unavailable_rows(ranked, cfg), "interface_metrics_unavailable",
+                 np.where(ranked["composite_score"].isna(), "weighted_cdr_assessment_unavailable", None)))
     return ranked
+
+
+_INTERFACE_RANK_METRICS = {
+    "interface_plddt", "interface_pae", "interface_pae_ab", "interface_pae_ba",
+    "interface_pae_median", "interface_pae_p90", "pdockq", "pdockq2",
+    "pdockq2_target", "pdockq2_binder", "buried_sasa", "buried_sasa_per_contact",
+}
+
+
+def _interface_unavailable_rows(frame: pd.DataFrame, cfg: dict) -> pd.Series:
+    """Keep measured no-contact predictions, but never median-impute an interface."""
+    held = pd.Series(False, index=frame.index)
+    if "n_contacts" in frame:
+        contacts = pd.to_numeric(frame["n_contacts"], errors="coerce")
+        held |= contacts.eq(0).fillna(False) & ~frame["n_contacts"].map(lambda v: isinstance(v, (bool, np.bool_)))
+    if "interface_assessment_status" in frame:
+        held |= frame["interface_assessment_status"].eq("no_contacts").fillna(False)
+    for metric, weight in (cfg_get(cfg, "rank.weights", {}) or {}).items():
+        if weight and metric in _INTERFACE_RANK_METRICS and metric in frame:
+            values = pd.to_numeric(frame[metric], errors="coerce")
+            held |= ~np.isfinite(values).fillna(False)
+    return held
 
 
 def _failed_prediction_rows(frame: pd.DataFrame) -> pd.Series:
@@ -237,7 +267,8 @@ def select_final(
     else:
         ranked = rank_candidates(frame, cfg, cdr_ranges, sequence_column)
     fallback = bool(cfg_get(cfg, "rank.fallback_to_ineligible", False)) if allow_fallback is None else allow_fallback
-    available = ~_failed_prediction_rows(ranked) & ranked["composite_score"].notna()
+    available = (~_failed_prediction_rows(ranked) & ~_interface_unavailable_rows(ranked, cfg)
+                 & ranked["composite_score"].notna())
     if fallback and not ranked.empty and not available.any():
         messages = ranking_warnings(ranked, cfg)
         _warnings.warn(messages[0] if messages else

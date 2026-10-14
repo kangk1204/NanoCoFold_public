@@ -14,6 +14,7 @@ from .inputs import INPUT_PATHS, parse_fasta, normalized_config, normalized_fast
 from .jobs import TERMINAL
 from .errors import public_error
 from .paths import contained, sha256
+from ..utils.seq import validate_candidate_id, candidate_id_key, candidate_id_aliases
 
 MAX_BATCH = 200
 MODES = {"complex", "design", "screen", "mature"}
@@ -75,9 +76,11 @@ def expand_manifest(payload):
             if not isinstance(item, dict) or set(item) - allowed:
                 raise ValueError("지원하지 않는 항목 필드입니다. 경로/명령 대신 검토용 입력을 사용하세요.")
             name = item.get("id")
-            if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,80}", name) or ".." in name or name == "." or name.casefold() in names:
-                raise ValueError("항목 ID는 중복 없는 영문·숫자·_.:- 1–80자입니다.")
-            names.add(name.casefold())
+            if not isinstance(name, str) or validate_candidate_id(name) != name:
+                raise ValueError("항목 ID는 앞뒤 공백 없는 후보 ID여야 합니다.")
+            if candidate_id_key(name) in names:
+                raise ValueError("항목 ID는 유니코드 정규화·대소문자를 무시해도 서로 달라야 합니다.")
+            names.add(candidate_id_key(name))
             row = {**copy.deepcopy(common), **copy.deepcopy(item), "mode": mode}
             row.pop("id")
             if mode != "complex" and any(key in row for key in ("settings", "proteins", "reference", "anchor_chain", "interest_positions")):
@@ -94,7 +97,7 @@ def expand_manifest(payload):
                     parse_fasta(row.get("wt_fasta", ""), single=True)
             if "config" in common and "config" in item:
                 row["config"] = _deep_merge(common["config"], item["config"])
-            rows.append({"id": name, "input": row})
+            rows.append({"id": name, "display_id": name, "alias": candidate_id_aliases([name])[name], "input": row})
         except (ValueError, TypeError) as exc:
             raise ValueError(f"항목 {number} ({item.get('id', '?') if isinstance(item, dict) else '?'}): {exc}") from exc
     return rows
@@ -154,7 +157,7 @@ class BatchManager:
         source.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
         batch.update(manifest_path=str(source), manifest_file_sha256=sha256(source))
         for number, row in enumerate(rows):
-            entry = {"id": row["id"]}
+            entry = {key: row[key] for key in ("id", "display_id", "alias")}
             try:
                 value = copy.deepcopy(row["input"])
                 value.setdefault("mock", configs[number]["run"]["mock"])

@@ -518,6 +518,17 @@ def _validate_environment(workspace, engine):
     return installed
 
 
+def _antibody_binary_probe(env):
+    """Require the managed environment binding, not a transient installer PATH."""
+    from . import diagnostics
+    env = Path(env)
+    binary = env / "bin" / "hmmscan"
+    if not binary.is_file():
+        return {"ok": False, "stage": "binary_lookup", "name": "hmmscan",
+                "path": str(binary), "blocker": "hmmscan is missing from the registered antibody environment"}
+    return diagnostics._probe_binary(env, "hmmscan")
+
+
 def _offline_readiness(workspace, engines):
     """Import/kernel/binary/model checks with network connections disabled."""
     import yaml
@@ -578,7 +589,8 @@ print(json.dumps(report))
                                  ".platform/offline-readiness.json에 실패 기록을 보존했습니다.") from exc
             report = {"ok": process.returncode == 0, "returncode": process.returncode,
                       "stdout": (process.stdout or "")[-8192:], "stderr": (getattr(process, "stderr", None) or "")[-8192:]}
-            report["binaries"] = [diagnostics._probe_binary(env, binary, extra_env=diagnostics._engine_extra_env(cfg, name)) for binary in spec.get("binaries", [])]
+            report["binaries"] = ([_antibody_binary_probe(env)] if engine == "antibody" else
+                                  [diagnostics._probe_binary(env, binary, extra_env=diagnostics._engine_extra_env(cfg, name)) for binary in spec.get("binaries", [])])
             report["weights"] = diagnostics._engine_weights(cfg, name, env)
             report["ok"] = report["ok"] and all(item["ok"] for item in report["binaries"]) and report["weights"]["ok"]
             if spec.get("requires_headless_plot"):
@@ -617,6 +629,16 @@ def setup_profile(workspace, profile="core"):
                         raise
                     print(f"[중단된 설치 재개] {engine}", flush=True)
                     needs_install = True
+                if engine == "antibody" and not needs_install:
+                    binary = _antibody_binary_probe(env)
+                    _save(workspace / ".platform/antibody-binary-readiness.json", binary)
+                    if not binary["ok"]:
+                        managed = json.loads(marker.read_text()) if marker.exists() else {}
+                        if managed.get("workspace") != str(workspace) or managed.get("engine") != engine:
+                            raise ValueError("기존 antibody 환경의 hmmscan 실행을 확인하지 못했습니다. "
+                                             "이 환경은 보존했습니다. 새 관리 작업 공간에서 설치하거나 등록 환경을 복구하세요.")
+                        print("[중단된 항체 도구 설치 재개] hmmscan 실행 파일을 공식 설치 스크립트로 복구합니다.", flush=True)
+                        needs_install = True
             if needs_install:
                 if not shutil.which("uv"):
                     raise ValueError("uv가 필요합니다. 설치 안내의 bootstrap 명령을 먼저 실행하세요.")

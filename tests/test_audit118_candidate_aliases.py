@@ -242,11 +242,15 @@ def test_pymol_python_block_loads_exact_unicode_quote_semicolon_path(tmp_path, m
     handoff.write_pymol_session_script([(identifier, str(model), "B")], pml)
     text = pml.read_bytes().decode("utf-8")
     mapping = json.loads(next(line.split(": ", 1)[1] for line in text.splitlines() if line.startswith("# candidate_id_map:")))
-    code = text.split("\npython\n", 1)[1].split("\npython end\n", 1)[0]
-    ast.parse(code)  # Literal filename cannot create another Python statement.
+    codes = re.findall(r"(?:^|\n)python\n(.*?)\npython end(?:\n|$)", text, re.S)
+    assert len(codes) == 2
+    for code in codes:
+        ast.parse(code)  # Literal filename cannot create another Python statement.
     calls = []
     fake = SimpleNamespace(load=lambda path, name: calls.append((path, name, Path(path).read_bytes())))
     monkeypatch.setitem(sys.modules, "pymol", SimpleNamespace(cmd=fake))
-    exec(compile(code, "generated-pml-python-block", "exec"), {})
+    namespace = {"__script__": str(pml)}
+    for code in codes:
+        exec(compile(code, "generated-pml-python-block", "exec"), namespace)
     assert calls == [(str(model), mapping["object"], model.read_bytes())]
     assert mapping["candidate_id"] == identifier and re.fullmatch(r"[A-Za-z0-9_]+", mapping["object"])

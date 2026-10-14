@@ -358,8 +358,34 @@ def generate_random_library(
     return frame
 
 
+MSA_PARENT_MUTATION_LIMIT = 5
+
+
+def validate_msa_mutation_limit(cfg: dict) -> None:
+    """Reject unsupported parent-MSA projection before generation or upload."""
+    if (cfg_get(cfg, "screen.colabfold.msa_mode") != "precomputed"
+            or cfg_get(cfg, "screen.comparison.enabled", False)
+            or not (cfg_get(cfg, "screen.cascade.enabled", False)
+                    or cfg_get(cfg, "screen.engine") == "colabfold")):
+        return
+    mode = cfg_get(cfg, "run.mode")
+    field = None
+    if mode == "mature" and cfg_get(cfg, "mature.library.strategy", "dms") == "random":
+        field = "mature.library.max_mutations"
+    elif mode == "design" and cfg_get(cfg, "design.refinement.enabled", False):
+        field = "design.refinement.max_mutations"
+    if field is not None:
+        maximum = cfg_get(cfg, field, MSA_PARENT_MUTATION_LIMIT)
+        if type(maximum) is not int or not 1 <= maximum <= MSA_PARENT_MUTATION_LIMIT:
+            raise ValueError(
+                f"부모 MSA를 투영하는 precomputed 경로는 CDR 내부 최대 {MSA_PARENT_MUTATION_LIMIT}개 치환만 지원합니다. "
+                f"{field}을 {MSA_PARENT_MUTATION_LIMIT} 이하로 설정하거나 부모 MSA 투영을 사용하지 않는 예측 경로를 선택하세요."
+            )
+
+
 def generate_library(wt_sequence: str, cdr_ranges: dict, cfg: dict) -> pd.DataFrame:
     """Dispatch without changing the established DMS strategy or file columns."""
+    validate_msa_mutation_limit(cfg)
     options = dict(exclude_cys=bool(cfg_get(cfg, "mature.exclude.cys_substitution", True)),
                    protect_wt_cys=bool(cfg_get(cfg, "mature.exclude.wt_cys", True)))
     strategy = cfg_get(cfg, "mature.library.strategy", "dms")
