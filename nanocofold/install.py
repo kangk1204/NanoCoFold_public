@@ -10,21 +10,29 @@ import platform
 import re
 import shutil
 import ssl
+import stat
 import subprocess
 import tarfile
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
 from urllib.parse import urlsplit
 from uuid import uuid4
 from pathlib import Path
+from collections import OrderedDict
 
 from .startup_limits import READINESS_TIMEOUT_SECONDS as OFFLINE_IMPORT_TIMEOUT
 
 # A malformed, lengthless response must not grow without bound. Released
 # snapshots additionally enforce their exact size when the manifest records it.
 MAX_DOWNLOAD_BYTES = 64 * 1024**3
+
+# Retain only bounded inventory digests/counts, never molecule bytes or indexes.
+_BOLTZ_MOLECULE_CACHE_LIMIT = 4
+_BOLTZ_MOLECULE_CACHE = OrderedDict()
+_BOLTZ_MOLECULE_CACHE_LOCK = threading.RLock()
 
 PROFILES = {
     "core": (),
@@ -299,6 +307,46 @@ def _model_sources(workspace, relative):
     return candidates
 
 
+def _boltz_molecule_inventory(cache, archive_path):
+    """Fingerprint actual archive/tree metadata; never trust a saved index."""
+    root = cache / "mols"
+    digest = hashlib.sha256()
+
+    def record(relative, info):
+        fields = (info.st_dev, info.st_ino, info.st_mode, info.st_size,
+                  info.st_mtime_ns, info.st_ctime_ns)
+        path = os.fsencode(relative)
+        digest.update(len(path).to_bytes(8, "big") + path)
+        digest.update((":" + ":".join(map(str, fields)) + "\n").encode())
+
+    try:
+        # Alias/nonregular paths stay on the original content-validation path.
+        if cache.is_symlink():
+            return None
+        archive_info, root_info = archive_path.lstat(), root.lstat()
+        if not stat.S_ISREG(archive_info.st_mode) or not stat.S_ISDIR(root_info.st_mode):
+            return None
+        record("archive", archive_info)
+        record("tree", root_info)
+        pending = [root]
+        while pending:
+            directory = pending.pop()
+            with os.scandir(directory) as entries:
+                rows = sorted(entries, key=lambda item: item.name)
+            for entry in rows:
+                info = entry.stat(follow_symlinks=False)
+                if not (stat.S_ISREG(info.st_mode) or stat.S_ISDIR(info.st_mode)):
+                    return None
+                path = Path(entry.path)
+                record(str(path.relative_to(root)), info)
+                if stat.S_ISDIR(info.st_mode):
+                    pending.append(path)
+        return digest.hexdigest()
+    except OSError:
+        # The full verifier supplies the existing missing/corrupt-file error.
+        return None
+
+
 def _verify_boltz_molecules(cache, *, verified_index_sha=None, archive_path=None, write_index=True):
     """Every extracted molecule must match the verified tar snapshot."""
     index_path = cache / ".nanocofold-molecules.json"
@@ -314,6 +362,31 @@ def _verify_boltz_molecules(cache, *, verified_index_sha=None, archive_path=None
             if actual["file_count"] != len(saved["files"]) or actual["sha256"] != expected.hexdigest():
                 raise ValueError("Boltz 분자 사전 해시 불일치. 기존 파일을 보존했습니다.")
             return actual["file_count"]
+    if write_index:
+        return _verify_boltz_molecule_contents(cache, archive_path, write_index=True)
+    # Serialize the short cache protocol and its first full validation. External
+    # writers are detected by complete metadata snapshots before/after validation.
+    with _BOLTZ_MOLECULE_CACHE_LOCK:
+        before = _boltz_molecule_inventory(cache, archive_path)
+        key = (str(cache.absolute()), str(archive_path.absolute()), before)
+        cached = _BOLTZ_MOLECULE_CACHE.get(key) if before is not None else None
+        if cached is not None:
+            if _boltz_molecule_inventory(cache, archive_path) != before:
+                raise ValueError("Boltz 분자 사전이 검증 중 변경되었습니다. 기존 파일을 보존했습니다.")
+            _BOLTZ_MOLECULE_CACHE.move_to_end(key)
+            return cached
+        count = _verify_boltz_molecule_contents(cache, archive_path, write_index=False)
+        if before is not None:
+            if _boltz_molecule_inventory(cache, archive_path) != before:
+                raise ValueError("Boltz 분자 사전이 검증 중 변경되었습니다. 기존 파일을 보존했습니다.")
+            _BOLTZ_MOLECULE_CACHE[key] = count
+            while len(_BOLTZ_MOLECULE_CACHE) > _BOLTZ_MOLECULE_CACHE_LIMIT:
+                _BOLTZ_MOLECULE_CACHE.popitem(last=False)
+        return count
+
+
+def _verify_boltz_molecule_contents(cache, archive_path, *, write_index):
+    """Original full tar/member/content validation and optional index publication."""
     with tarfile.open(archive_path) as archive:
         count = 0
         index = {}

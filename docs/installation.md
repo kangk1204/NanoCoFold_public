@@ -9,15 +9,19 @@
 
 Python, pip, NumPy, pandas, matplotlib, PyTorch, JAX, HMMER는 미리 설치하지 않아도 됩니다. Conda, Docker, CUDA Toolkit, Node.js도 이 설치 경로의 선행 조건이 아닙니다. 공용 MSA API를 쓰는 예제에는 대형 로컬 MSA 데이터베이스가 필요하지 않습니다.
 
-## 한 명령으로 설치
+## 첫 복합체 예제 설치
 
 릴리스 소스 ZIP을 다운로드하고 압축을 푼 폴더에서 터미널을 엽니다. `README.md`와 `install.sh`가 보이는 위치에서 실행합니다.
 
+README의 첫 복합체 예제는 Boltz-2·Chai-1·ColabFold·OpenDDE를 사용합니다. **같은 폴더에서 세 명령을 순서대로** 실행하고, 각각 **`[설치 완료]`**로 끝난 뒤 다음 명령을 실행하세요.
+
 ```bash
-bash install.sh
+bash install.sh --profile complex
+bash install.sh --profile colabfold
+bash install.sh --profile opendde
 ```
 
-설치기는 시스템 기본 도구를 `apt`로 준비하고, 고정 `uv`와 여러 Python 버전을 자동 준비합니다. core, ANARCI/항체 도구, RFantibody, BoltzGen, Boltz-2, Chai-1, ColabFold, OpenDDE, ESM-2/AntiFold 환경·가중치를 `.nanocofold/workspace` 안에 분리해 설치합니다. matplotlib은 실제 그래프를 저장하는 엔진의 의존성에 포함되고, 화면 없는 환경에서 그림 저장도 검사합니다. 시스템 Python에 연구 패키지를 덮어 설치하지 않습니다.
+설치기는 시스템 기본 도구를 `apt`로 준비하고, 고정 `uv`와 필요한 Python 버전을 자동 준비합니다. core와 선택한 엔진의 환경·가중치를 `.nanocofold/workspace` 안에 분리해 설치합니다. `complex`는 Boltz-2·Chai-1, 나머지 두 명령은 각각 ColabFold·OpenDDE를 준비합니다. matplotlib은 실제 그래프를 저장하는 엔진의 의존성에 포함되고, 화면 없는 환경에서 그림 저장도 검사합니다. 시스템 Python에 연구 패키지를 덮어 설치하지 않습니다.
 
 각 패키지 파일과 모델은 고정 버전·SHA256으로 확인합니다. 모델 다운로드의 중간 파일을 보존하고 지원되는 경우 이어받습니다. 환경 import, 실제 CUDA 기본 연산, 필요한 도구·가중치 검사를 통과해야 설치 완료가 기록됩니다. **설치 완료는 단백질 분석 완료를 뜻하지 않습니다.** 다운로드 시간은 연결 속도와 캐시에 따라 크게 다릅니다.
 
@@ -25,7 +29,9 @@ GPU가 한 개이면 자동 선택합니다. 여러 개라면 설치기가 멈�
 
 ```bash
 nvidia-smi -L
-bash install.sh --gpu GPU-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+bash install.sh --profile complex --gpu GPU-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+bash install.sh --profile colabfold --gpu GPU-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+bash install.sh --profile opendde --gpu GPU-xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxx
 ```
 
 선택한 GPU에 대해 사용자별 공통 잠금을 사용합니다. 잠금 파일을 삭제하지 마세요. 설치가 끝나면 아래 명령으로 웹 화면을 엽니다.
@@ -42,21 +48,45 @@ ssh -L 8765:127.0.0.1:8765 USER@SERVER
 
 `USER@SERVER`는 자신의 계정과 서버 주소입니다. 설치 위치와 GPU는 `.nanocofold/install-location.json`에 기록되어 시작 명령이 다시 사용합니다.
 
+## 모든 기능의 환경 설치
+
+새 나노바디 설계·보유 후보·변이 평가까지 모든 기능을 사용할 때는 아래 명령으로 여덟 엔진·보조 환경을 준비합니다. 옵션 없는 `bash install.sh`도 같은 `all` 설치입니다. 첫 복합체 예제에 필요한 환경만 설치하려면 위의 세 명령을 사용하세요.
+
+```bash
+bash install.sh --profile all
+```
+
+`all`은 antibody(ANARCI/항체 도구), Boltz-2, Chai-1, RFantibody, BoltzGen, ESM-2/AntiFold, ColabFold, OpenDDE 환경과 가중치를 준비합니다. ESM-2와 AntiFold는 같은 환경을 사용합니다. 여러 GPU가 있다면 이 명령에도 사용할 `--gpu` UUID를 지정합니다.
+
+설치·기본 GPU 연산 확인과 단백질의 실제 예측은 별도 범위입니다. 최초 전체 설치의 실제 조건과 릴리스별 완료 상태는 [검증 기록](VALIDATION.md)을 확인하세요.
+
 ## 공간·대상 선택
 
 별도 디스크에 작업 공간을 둘 수 있습니다.
 
 ```bash
-bash install.sh --workspace /your/data/NanoCoFold-workspace
+bash install.sh --profile complex --workspace /your/data/NanoCoFold-workspace
 ```
 
-CPU 화면만 준비하려면 `--profile core`를 사용합니다. core는 GPU 모델을 설치하지 않아 실제 예측을 할 수 없습니다. `--profile complex`, `design`, `screen`, `mature`는 해당 기본 환경만 설치하는 관리자 옵션입니다. **네 엔진을 모두 사용하는 예제를 실행하려면 기본 `all` 설치를 권합니다.**
+여러 프로필을 같은 별도 작업 공간에 설치한다면 모든 명령에 같은 `--workspace`와 GPU 선택을 사용합니다. 설치 위치가 달라지면 이전 명령의 환경을 공유하지 않습니다.
+
+CPU 화면만 준비하려면 `--profile core`를 사용합니다. core는 GPU 모델을 설치하지 않아 실제 예측을 할 수 없습니다. 목적별 프로필은 다음 기본 환경만 준비하므로 화면에서 선택한 모든 엔진이 준비됐는지 검토·환경 점검에서 확인하세요.
+
+| 프로필 | 준비하는 엔진·보조 환경 |
+|---|---|
+| `complex` | Boltz-2, Chai-1 |
+| `colabfold` | ColabFold |
+| `opendde` | OpenDDE |
+| `screen` | antibody, Boltz-2, Chai-1 |
+| `design` | antibody, Boltz-2, Chai-1, RFantibody, BoltzGen |
+| `mature` | antibody, Boltz-2, Chai-1, ESM-2/AntiFold |
+| `all` | 위의 모든 환경 |
 
 관리자가 이미 기본 패키지를 준비했다면 `--skip-system-packages`로 apt 단계만 건너뛸 수 있습니다. 이 옵션은 Python·curl·빌드 도구를 자동 준비하지 않습니다.
 
 ## 진행 확인과 중단 복구
 
-설치는 오래 걸릴 수 있으며 단계와 다운로드가 터미널에 표시됩니다. 중복으로 설치를 실행하지 마세요. 설치 시도는 작업 공간의 `.platform/install-attempts/`, 엔진 로그는 `.platform/install-*.log`, 최종 준비 상태는 `.platform/setup-all.json`과 `.platform/offline-readiness-all.json`에 남습니다.
+설치는 오래 걸릴 수 있으며 단계와 다운로드가 터미널에 표시됩니다. 중복으로 설치를 실행하지 마세요. 설치 시도는 작업 공간의 `.platform/install-attempts/`, 엔진 로그는 `.platform/install-*.log`에 남습니다. 최종 준비 상태는 선택한 프로필의 `.platform/setup-<profile>.json`과 `.platform/offline-readiness-<profile>.json`에 남으며, `all`이면 파일 이름에 `all`이 들어갑니다.
 
 오류가 발생하면 같은 폴더에서 **같은 옵션**으로 `bash install.sh`를 다시 실행하세요. 이미 검증된 환경·가중치는 재사용합니다. 손상되었거나 예상과 다른 기존 파일은 자동 삭제하지 않고 오류를 냅니다. 기존 가중치·환경을 임의 삭제해서 우회하지 마세요.
 
@@ -70,7 +100,7 @@ v0.4.2 이하에서는 `nvidia-smi`가 표준 출력에 쓴 오류가 가려져 
 
 ## 새 릴리스로 업데이트
 
-진행 중인 분석을 모두 끝내고 웹 서버를 종료합니다. 새 릴리스 ZIP을 **새 폴더**에 압축 해제한 뒤 `bash install.sh`로 그 폴더의 새 작업 공간을 준비하는 방법을 권합니다. 이전 소스 폴더·작업 공간·분석 원본은 보관하세요. [업데이트 안내](UPGRADING.md)를 따릅니다.
+진행 중인 분석을 모두 끝내고 웹 서버를 종료합니다. 새 릴리스 ZIP을 **새 폴더**에 압축 해제한 뒤 필요한 프로필을 위와 같은 순서로 설치해 새 작업 공간을 준비하는 방법을 권합니다. 모든 기능의 환경을 원하면 `bash install.sh --profile all`을 사용합니다. 이전 소스 폴더·작업 공간·분석 원본은 보관하세요. [업데이트 안내](UPGRADING.md)를 따릅니다.
 
 기존 작업 공간의 제자리 갱신은 관리자 옵션입니다. 이 공개 설치기가 만든 `.platform/public-core-install.json` 소유 기록이 있고, 모든 작업과 웹 서버를 종료한 경우에만 `--workspace /기존/절대/경로`로 지정하세요. 대기/실행 중 작업이 확인되면 환경 갱신을 거부합니다. 기존 웹 서버의 실행 여부까지 자동 감지하지는 않으므로 먼저 직접 종료해야 합니다. 다른 설치기가 만든 환경은 자동으로 변경하지 않습니다.
 
