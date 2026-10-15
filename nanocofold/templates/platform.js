@@ -1756,8 +1756,13 @@ function coordinatePresentation(data) {
     source.verification?.status === "verified" && typeof data.raw_content === "string" && data.raw_content.length > 0;
   if (verified && source.display_relation === "native_identical" && data.content === data.raw_content)
     return {rawAvailable:true, caption:"검증된 원본 엔진 좌표와 표시 좌표가 동일합니다."};
-  if (verified && source.display_relation === "transformed_display")
-    return {rawAvailable:true, caption:`검증된 원본 엔진 좌표를 별도로 보존합니다. 화면은 변환된 표시 좌표입니다 · ${source.display_transform || "변환 종류 미기록"}`};
+  if (verified && source.display_relation === "transformed_display") {
+    const transforms = {"native origin not verified":"원본 좌표 출처 미확인", "none":"변환 없음",
+      "display differs from verified native bytes; transform not recorded":"검증된 원본과 다른 표시 좌표 · 변환 과정 미기록",
+      "coordinate serialization and recorded numbering mapping":"좌표 직렬화와 기록된 잔기 번호 대응",
+      "coordinate serialization and recorded numbering mapping; recorded reference alignment":"좌표 직렬화·기록된 잔기 번호 대응·참조 구조 정렬"};
+    return {rawAvailable:true, caption:`검증된 원본 엔진 좌표를 별도로 보존합니다. 화면은 변환된 표시 좌표입니다 · ${transforms[source.display_transform] || source.display_transform || "변환 종류 미기록"}`};
+  }
   if (verified)
     return {rawAvailable:true, caption:"검증된 원본 엔진 좌표를 별도로 보존합니다. 표시 좌표와 원본의 관계는 미확인입니다."};
   if (source?.verification?.status === "hash_mismatch")
@@ -1902,7 +1907,8 @@ async function renderStructure() {
   }
   if (reference?.chains) {
     details.append(el("h3", I18N.term("기준 체인 정렬 후 참조 비교")));
-    table(details.appendChild(el("div")), reference.chains, ["chain", "matched_ca", "ca_rmsd_angstrom", "interest_ca_rmsd_angstrom"]);
+    details.append(el("p", I18N.format("기준 체인 {0} → 참조 체인 {1} · 전체 복합체 최적 중첩 RMSD {2} Å. 화면은 기준 체인 정렬 좌표입니다.", [reference.anchor_chain || I18N.term("미기록"), reference.reference_anchor_chain || reference.chain_permutation_map?.[reference.anchor_chain] || I18N.term("미기록"), fmt(reference.complex_rmsd ?? reference.all_chain_ca_rmsd_angstrom)])));
+    table(details.appendChild(el("div")), reference.chains, ["chain", "reference_chain", "matched_ca", "ca_rmsd_angstrom", "interest_ca_rmsd_angstrom"]);
     details.append(el("p", I18N.format("5 Å 접촉 회복률: {0} ({1}/{2})", [fmt(reference.fnat_5A), reference.recovered_contacts_5A, reference.reference_contacts_5A])));
   }
   details.append(el("h3", I18N.term("접촉")));
@@ -1970,10 +1976,23 @@ async function renderStructure() {
       { responsive: true, displaylogo: false, displayModeBar: false },
     );
     if (!pae && state.structure === data) localizeEmptyPaeAnnotation();
+    const resetPae = $("pae-reset");
+    if (resetPae) resetPae.onclick = () => Plotly.relayout($("pae"), {"xaxis.autorange":true, "yaxis.autorange":"reversed"});
     $("pae").removeAllListeners?.("plotly_click");
     $("pae").on("plotly_click", event => {
       const point = event.points?.[0];
       if (!point) return;
+      const layout = $("pae")._fullLayout;
+      const span = axis => axis?.range ? Math.abs(axis.range[1]-axis.range[0]) : pae?.labels.length || 0;
+      if (pae && (span(layout?.xaxis)>60 || span(layout?.yaxis)>60)) {
+        const x = pae.labels.indexOf(point.x), y = pae.labels.indexOf(point.y);
+        if (x<0 || y<0) return;
+        Plotly.relayout($("pae"), {"xaxis.range":[Math.max(-.5,x-15.5),Math.min(pae.labels.length-.5,x+15.5)],
+          "yaxis.range":[Math.min(pae.labels.length-.5,y+15.5),Math.max(-.5,y-15.5)]})
+          .catch(error => notice(error.message, true));
+        notice(I18N.term("PAE 구간을 확대했습니다. 셀을 다시 선택하면 정확한 두 잔기로 이동합니다."));
+        return;
+      }
       focusStructure([point.x, point.y], `PAE ${Number(point.z).toFixed(2)} Å · ${point.x} / ${point.y}`, true).catch(error => notice(error.message, true));
     });
   }

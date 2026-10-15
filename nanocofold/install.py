@@ -500,6 +500,11 @@ def install_model_assets(workspace, engines):
                 for member in archive:
                     if not member.isfile():
                         continue
+                    # macOS tar metadata is not a model and must never be
+                    # extracted. Only companions of the allowlisted files are
+                    # ignored; unexpected paths/traversal still fail closed.
+                    if re.fullmatch(r"(?:__MACOSX/)?\._(?:LICENSE|params_model_[1-5](?:_ptm|_multimer_v3)?\.npz)", member.name):
+                        continue
                     if not re.fullmatch(r"LICENSE|params_model_[1-5](?:_ptm|_multimer_v3)?.npz", member.name):
                         raise ValueError("ColabFold 가중치 아카이브에 예상하지 못한 경로가 있습니다.")
                     if not re.fullmatch(r"params_model_[1-5]_multimer_v3.npz", member.name):

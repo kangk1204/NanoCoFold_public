@@ -103,10 +103,15 @@ def _zscore(series: pd.Series, higher_is_better: bool = True) -> pd.Series:
 
 
 def composite_score(frame: pd.DataFrame, cfg: dict) -> pd.Series:
-    weights = cfg_get(cfg, "rank.weights", {}) or {}
+    weights, ignored = _available_weights(frame, cfg)
+    for metric in (key for key, weight in ignored.items() if weight):
+        _warnings.warn(
+            f"rank.weights 의 '{metric}' 지표가 전체 성공 후보에서 미평가여서 가중치를 제외합니다.",
+            RuntimeWarning, stacklevel=2,
+        )
     original_index = frame.index
     frame = frame.loc[~(_interface_unavailable_rows(frame, cfg) | _weighted_unavailable_rows(frame, cfg))]
-    if weights.get("dev_flags", 0) and "dev_cdr_evaluated" in frame:
+    if cfg_get(cfg, "rank.weights.dev_flags", 0) and "dev_cdr_evaluated" in frame:
         assessed = frame["dev_cdr_evaluated"].map(lambda value: isinstance(value, (bool, np.bool_)) and bool(value))
         frame = frame.loc[assessed]
     score = pd.Series(0.0, index=frame.index)
@@ -114,13 +119,6 @@ def composite_score(frame: pd.DataFrame, cfg: dict) -> pd.Series:
     scale = max((abs(float(weight)) for metric, weight in weights.items()
                  if metric in frame.columns), default=0.0)
     for metric, weight in weights.items():
-        if metric not in frame.columns:
-            _warnings.warn(
-                f"rank.weights 의 '{metric}' 컬럼이 결과에 없어 가중치가 무시됩니다.",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-            continue
         higher_is_better = weight >= 0
         magnitude = abs(float(weight)) / scale if scale else 0.0
         score += _zscore(frame[metric], higher_is_better) * magnitude
@@ -141,14 +139,15 @@ def ranking_policy(cfg: dict, frame: pd.DataFrame | None = None) -> dict:
         if column:
             engines = sorted({str(value) for value in frame[column].dropna() if str(value).strip()})
     mixed = len(engines) > 1 and not cfg_get(cfg, "screen.comparison.enabled", False)
+    applied, ignored = _available_weights(frame, cfg) if frame is not None else (weights, {})
     return {
         "method": "mixed_engine_batch_weighted_zscore_legacy" if mixed else "within_engine_batch_weighted_zscore_v1",
         "recorded_prediction_engines": engines,
         "weights": weights,
-        "applied_weights": {k:v for k,v in weights.items() if frame is None or k in frame},
-        "ignored_weights": {k:v for k,v in weights.items() if frame is not None and k not in frame},
+        "applied_weights": applied,
+        "ignored_weights": ignored,
         "cdr3_similarity": "normalized_levenshtein_v2; frequency-descending, length-descending, lexical-ascending greedy representatives",
-        "normalization": "batch z-score; no-contact rows and rows missing any present nonzero-weighted metric excluded/held; globally absent metric columns are recorded as ignored; fewer than two values or constant columns contribute zero",
+        "normalization": "batch z-score; no-contact rows and rows missing a nonzero-weighted metric measured in other successful candidates excluded/held; globally absent or entirely unmeasured metrics are recorded as ignored; fewer than two values or constant columns contribute zero",
         "normalization_population": ("recorded mixed prediction-engine input, including controls; rows with unassessed CDR liabilities excluded when developability is weighted; legacy partial-rescore path"
                                      if mixed else "recorded ranking input in the same prediction engine, including controls; rows with unassessed CDR liabilities excluded when developability is weighted"),
         "failed_row_handling": "failed/interrupted prediction rows are preserved with unavailable scores/ranks, excluded before normalization and never selected even under fallback",
@@ -168,9 +167,13 @@ def ranking_warnings(frame: pd.DataFrame, cfg: dict) -> list[str]:
     """Explain held rankings while preserving conservative selection and all saved values."""
     if frame.empty or "composite_score" not in frame:
         return []
+    _, ignored = _available_weights(frame, cfg)
+    notices = (["전체 성공 후보에서 미평가인 순위 지표: " + ", ".join(ignored)
+                + ". 해당 가중치를 제외하고 나머지 지표로 순위를 계산했습니다. 미평가를 0점이나 부적격으로 해석하지 마세요."]
+               if any(ignored.values()) else [])
     held = frame["composite_score"].isna() & ~_failed_prediction_rows(frame)
     if not held.any():
-        return []
+        return notices
     cdr_held = (held & frame["dev_cdr_evaluated"].map(
         lambda value: not (isinstance(value, (bool, np.bool_)) and bool(value)))
         if "dev_cdr_evaluated" in frame and cfg_get(cfg, "rank.weights.dev_flags", 0)
@@ -185,13 +188,17 @@ def ranking_warnings(frame: pd.DataFrame, cfg: dict) -> list[str]:
                     "성공한 무접촉 예측과 측정된 접촉0개 기록은 보존하고 순위·선정은 보류합니다. ")
     weighted_held = held & _weighted_unavailable_rows(frame, cfg) & ~interface_held
     if weighted_held.any():
-        message += f"이 중 {int(weighted_held.sum())}개는 가중 지표 값이 없어 중앙값으로 보충하지 않고 보류합니다. "
+        applied, _ = _available_weights(frame, cfg)
+        missing = [metric for metric, weight in applied.items() if weight and
+                   (~np.isfinite(pd.to_numeric(frame.loc[weighted_held, metric], errors="coerce"))).any()]
+        message += (f"이 중 {int(weighted_held.sum())}개는 다른 성공 후보에서 평가된 가중 지표 "
+                    f"({', '.join(missing)}) 값이 없어 중앙값으로 보충하지 않고 보류합니다. ")
     elif not cdr_held.any() and not interface_held.any():
         message += "저장된 종합점수가 없어 순위·선별을 추정하지 않습니다. "
     if cfg_get(cfg, "rank.fallback_to_ineligible", False):
         message += ("fallback_to_ineligible=true는 종합점수가 있는 부적격 후보에만 적용됩니다. "
                     "실패 예측이나 가중 CDR 미평가로 보류된 후보는 포함하지 않습니다.")
-    return [message.strip()]
+    return notices + [message.strip()]
 
 
 def rank_candidates(frame: pd.DataFrame, cfg: dict, cdr_ranges: dict | None = None, sequence_column: str = "sequence") -> pd.DataFrame:
@@ -226,11 +233,27 @@ _INTERFACE_RANK_METRICS = {
 }
 
 
+def _available_weights(frame: pd.DataFrame, cfg: dict) -> tuple[dict, dict]:
+    """Use one cohort definition for normalization, holds and the policy record.
+
+    An optional measurement absent from the entire successful cohort is not an
+    individual candidate failure. Never let values on failed predictions make
+    that optional measurement appear available.
+    """
+    measured = frame.loc[~_failed_prediction_rows(frame)]
+    applied, ignored = {}, {}
+    for metric, weight in (cfg_get(cfg, "rank.weights", {}) or {}).items():
+        values = pd.to_numeric(measured[metric], errors="coerce") if metric in measured else None
+        target = applied if values is not None and np.isfinite(values).any() else ignored
+        target[metric] = weight
+    return applied, ignored
+
+
 def _weighted_unavailable_rows(frame: pd.DataFrame, cfg: dict) -> pd.Series:
     """Missing measurements must not acquire a favorable cohort median score."""
     held = pd.Series(False, index=frame.index)
-    for metric, weight in (cfg_get(cfg, "rank.weights", {}) or {}).items():
-        if weight and metric in frame:
+    for metric, weight in _available_weights(frame, cfg)[0].items():
+        if weight:
             values = pd.to_numeric(frame[metric], errors="coerce")
             held |= ~np.isfinite(values).fillna(False)
     return held
@@ -244,7 +267,7 @@ def _interface_unavailable_rows(frame: pd.DataFrame, cfg: dict) -> pd.Series:
         held |= contacts.eq(0).fillna(False) & ~frame["n_contacts"].map(lambda v: isinstance(v, (bool, np.bool_)))
     if "interface_assessment_status" in frame:
         held |= frame["interface_assessment_status"].eq("no_contacts").fillna(False)
-    for metric, weight in (cfg_get(cfg, "rank.weights", {}) or {}).items():
+    for metric, weight in _available_weights(frame, cfg)[0].items():
         if weight and metric in _INTERFACE_RANK_METRICS and metric in frame:
             values = pd.to_numeric(frame[metric], errors="coerce")
             held |= ~np.isfinite(values).fillna(False)

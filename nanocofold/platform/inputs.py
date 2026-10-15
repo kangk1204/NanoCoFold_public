@@ -310,7 +310,11 @@ class InputManager:
         from ..utils.seq import nucleotide_ambiguity_hint, read_fasta
         advisories = iptm_availability_warnings(cfg)
         if cfg.get("screen", {}).get("vhh_fasta"):
-            hints = [nucleotide_ambiguity_hint(seq) for seq in read_fasta(cfg["screen"]["vhh_fasta"]).values()]
+            library = read_fasta(cfg["screen"]["vhh_fasta"])
+            if cfg.get("screen", {}).get("comparison", {}).get("enabled"):
+                from ..engine_comparison import validate_candidate_ids
+                validate_candidate_ids(cfg, library)
+            hints = [nucleotide_ambiguity_hint(seq) for seq in library.values()]
             if any(hints):
                 advisories.append("VHH 라이브러리: " + next(hint for hint in hints if hint))
         hint = nucleotide_ambiguity_hint(cfg.get("mature", {}).get("wt_sequence") or "")

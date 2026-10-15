@@ -201,6 +201,9 @@ def test_exact_homomer_permutation_and_anchor_scope_preservation(tmp_path):
     assert result['chain_permutation_map']=={'A':'B','B':'A'}
     assert result['all_chain_ca_rmsd_angstrom']<1e-5 and result['rmsd']<1e-5
     assert result['rmsd_scope']=='anchor_chain_CA'
+    assert result['reference_anchor_chain'] == 'B'
+    assert result['complex_rmsd'] == result['all_chain_ca_rmsd_angstrom']
+    assert result['complex_rmsd_scope'] == 'all_matched_CA_single_rigid_body_fit'
     assert pred.cif.read_bytes()==original
     fixed=reference.copy()
     for a,b in zip(fixed[0]['A'].get_atoms(),reference[0]['B'].get_atoms()):a.set_coord(b.coord.copy())

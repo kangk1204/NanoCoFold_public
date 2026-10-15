@@ -7,8 +7,9 @@ import csv
 import json
 import re
 from collections import Counter
+from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 import pandas as pd
 import yaml
@@ -417,6 +418,10 @@ def generate_report(
         # requested. The sibling explorer remains a complete offline document;
         # moving the two HTML files together preserves the relative link.
         explorer = saved_reader.export("html", report_artifact=True)[0]
+        # Report-only commands change execution timestamps and the state-file
+        # digest. Reuse the prior immutable bytes when the actual result,
+        # publication outcome and renderer have not changed.
+        explorer = _reuse_report_explorer(out_path, explorer)
         # A prior entry report must keep its exact linked snapshot even when
         # this refresh fails after publishing the explorer but before the entry.
         digest = hashlib.sha256(explorer).hexdigest()
@@ -724,6 +729,96 @@ def _publish_immutable_explorer(destination: Path, content: bytes, *, root: Path
         return
     if existing != content:
         raise OSError(f"내용 해시 탐색 파일에 다른 내용이 있습니다. 기존 파일을 보존했습니다: {destination}")
+
+
+def _explorer_result_identity(content: bytes) -> bytes | None:
+    """Compare scientific content and exact assets without report-clock churn.
+
+    Original source state/hashes remain in the immutable HTML and on disk.
+    Only this comparison projection excludes operational execution history.
+    Authoritative summary status/issues and all phase/result data remain.
+    """
+    match = re.search(rb'(<script id="result-data" type="application/json">)(.*?)(</script>)', content, re.S)
+    if not match:
+        return None
+    try:
+        payload = json.loads(match[2])
+        for summary in (payload["summary"], payload["provenance"]["summary"]):
+            for key in ("report_artifact", "delivery_artifact", "source_report_status", "source_delivery_status"):
+                summary.pop(key, None)
+            state = summary.get("state", {})
+            for key in ("execution", "previous_execution", "report_source_execution", "current_phase"):
+                state.pop(key, None)
+            final = state.get("phases", {}).get("final", {})
+            for key in ("report", "report_status", "report_error", "delivery_status", "delivery_error", "delivery"):
+                final.pop(key, None)
+        provenance = payload["provenance"]
+        provenance["source_artifacts"] = [row for row in provenance.get("source_artifacts", [])
+                                          if row.get("path") != "run_state.json"]
+        canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return None
+    digest = hashlib.sha256(content[:match.start(2)])
+    digest.update(canonical)
+    digest.update(content[match.end(2):])
+    return digest.digest()
+
+
+def report_explorer_path(entry: Path, *, entry_content: bytes | None = None) -> Path | None:
+    """Resolve only the saved report's sibling explorer; never external URLs."""
+    class Link(HTMLParser):
+        href = None
+
+        def handle_starttag(self, tag, attributes):
+            attributes = dict(attributes)
+            if tag == "a" and attributes.get("id") == "complete-result-explorer":
+                self.href = attributes.get("href")
+
+    try:
+        parser = Link()
+        parser.feed(entry_content.decode("utf-8") if entry_content is not None else entry.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    if not parser.href:
+        return None
+    url = urlsplit(parser.href)
+    name = unquote(url.path)
+    if (url.scheme or url.netloc or url.query or url.fragment or
+            not re.fullmatch(r"[^/\\]+_explorer-[a-f0-9]{64}\.html|report_explorer\.html", name)):
+        return None
+    previous = entry.parent / name
+    _check_output_path(previous, entry.parent)
+    return previous
+
+
+def report_snapshot_files(entry: Path) -> dict[str, bytes] | None:
+    """Bundle the exact saved entry and linked snapshot without re-scoring."""
+    entry_content = entry.read_bytes()
+    explorer = report_explorer_path(entry, entry_content=entry_content)
+    if explorer is None:
+        return None
+    content = explorer.read_bytes()
+    match = re.search(r"_explorer-([a-f0-9]{64})\.html$", explorer.name)
+    if match and hashlib.sha256(content).hexdigest() != match[1]:
+        raise OSError("내용 해시 탐색 파일에 다른 내용이 있습니다. 기존 파일을 보존했습니다.")
+    return {entry.name: entry_content, explorer.name: content}
+
+
+def _reuse_report_explorer(entry: Path, fresh: bytes) -> bytes:
+    previous = report_explorer_path(entry)
+    if previous is None:
+        return fresh
+    match = re.search(r"_explorer-([a-f0-9]{64})\.html$", previous.name)
+    if not match:
+        return fresh
+    try:
+        old = previous.read_bytes()
+    except FileNotFoundError:
+        return fresh
+    if hashlib.sha256(old).hexdigest() != match[1]:
+        raise OSError("내용 해시 탐색 파일에 다른 내용이 있습니다. 기존 파일을 보존했습니다.")
+    identity = _explorer_result_identity(fresh)
+    return old if identity is not None and identity == _explorer_result_identity(old) else fresh
 
 
 def _viewer_script(run_dir: Path, cfg: dict) -> str:

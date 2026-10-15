@@ -15,6 +15,20 @@ def write(path,value):
     write_json(path,native(value))
 
 
+def _presentation_zip(path):
+    """Only recognized derived delivery packages may be omitted from full data."""
+    if path.name != 'report_delivery.zip':
+        return False
+    try:
+        with zipfile.ZipFile(path) as archive:
+            info=archive.getinfo('delivery_manifest.json')
+            if info.file_size>5*1024*1024:return False
+            manifest=json.loads(archive.read(info))
+            return isinstance(manifest,dict) and manifest.get('kind')=='presentation_only'
+    except (OSError,ValueError,KeyError,zipfile.BadZipFile):
+        return False
+
+
 def build_bundle(run_root, destination, snapshot_root=None):
     run_root=Path(run_root).resolve();destination=Path(destination).resolve()
     # Writing inside the source would mutate originals and let the ZIP include
@@ -38,7 +52,7 @@ def build_bundle(run_root, destination, snapshot_root=None):
             entry=store_structure(data,destination,f'structures/{i}')
             index['structures'].append({'candidate_id':candidate,'observation_id':observation,**entry})
         except (OSError,ValueError,KeyError) as exc:
-            issue=f'{candidate}: {public_error(exc)}'
+            issue=public_error(exc, stage='prediction', candidate_id=candidate)
             index['issues'].append(issue)
             reader.issues.append(issue)
     write(destination/'index.json',public_error_data(index))
@@ -62,7 +76,7 @@ def build_bundle(run_root, destination, snapshot_root=None):
             write_bytes(destination/name,data,root=destination)
             if fmt=='html':html_issues=set(reader.issues)
         except (OSError,ValueError,KeyError) as exc:
-            issue=f'{fmt} 내보내기: {public_error(exc)}'
+            issue=f'{fmt} 내보내기: {public_error(exc, stage="export")}'
             index['issues'].append(issue)
             reader.issues.append(issue)
     if html_issues is not None and set(reader.issues)!=html_issues:
@@ -73,7 +87,7 @@ def build_bundle(run_root, destination, snapshot_root=None):
             write_bytes(destination/name,data,root=destination)
         except (OSError,ValueError,KeyError) as exc:
             (destination/'report_offline.html').unlink(missing_ok=True)
-            issue=f'html 최종 상태 갱신: {public_error(exc)}'
+            issue=f'html 최종 상태 갱신: {public_error(exc, stage="export")}'
             index['issues'].append(issue);reader.issues.append(issue)
     # Structure/PAE readers and exporters can discover errors after the initial
     # summary. Preserve their artifacts, but never publish a stale complete flag.
@@ -85,14 +99,36 @@ def build_bundle(run_root, destination, snapshot_root=None):
         summary={**summary,'issues':list(dict.fromkeys([*summary.get('issues',[]),*index['issues']]))}
     index['summary']=summary
     write(destination/'index.json',public_error_data(index))
-    # Full original run, plus cloud index/exports, with no input/environment mutation.
+    # Keep native/input/result files and exact linked entry/explorer bytes.
+    # Derived delivery ZIPs and an equivalent offline HTML need not be nested
+    # again: they remain separate downloads. Record every omission explicitly.
+    from ..report import report_explorer_path, _explorer_result_identity
+    explorer=report_explorer_path(run_root/'report.html')
+    canonical=None
+    if explorer is not None and explorer.is_file():
+        canonical=_explorer_result_identity(explorer.read_bytes())
+    duplicate_html=False
+    offline=destination/'report_offline.html'
+    if canonical is not None and offline.is_file():
+        duplicate_html=canonical==_explorer_result_identity(offline.read_bytes())
+    omitted=[]
     with atomic_writer(destination/'results.zip',root=destination) as output:
         with zipfile.ZipFile(output,'w',compression=zipfile.ZIP_DEFLATED) as archive:
             for p in run_root.rglob('*'):
-                if p.is_file() and not p.is_symlink() and p.name!='.run.lock':archive.write(p,'original/'+str(p.relative_to(run_root)))
+                if not p.is_file() or p.is_symlink() or p.name=='.run.lock':continue
+                name='original/'+str(p.relative_to(run_root))
+                if _presentation_zip(p):
+                    omitted.append({'path':name,'sha256':sha256(p),'size':p.stat().st_size,'reason':'derived_presentation_package','separate_download':'report_delivery.zip'})
+                else:archive.write(p,name)
             for p in destination.rglob('*'):
                 if p.is_file() and p.name!='results.zip' and not p.name.startswith('.publish-'):
-                    archive.write(p,'exploration/'+str(p.relative_to(destination)))
+                    name='exploration/'+str(p.relative_to(destination))
+                    if p.name=='report_delivery.zip' or p==offline and duplicate_html:
+                        omitted.append({'path':name,'sha256':sha256(p),'size':p.stat().st_size,'reason':'separate_presentation_download',
+                                        'canonical_html':'original/'+explorer.name if p==offline else None})
+                    else:archive.write(p,name)
+            archive.writestr('report_packaging_manifest.json',json.dumps({'schema_version':1,'native_and_scientific_files_preserved':True,
+                'source_readonly':True,'derived_reports_omitted':omitted},ensure_ascii=False,indent=2))
     manifest=[{'path':str(p.relative_to(destination)),'size':p.stat().st_size,'sha256':sha256(p)} for p in destination.rglob('*') if p.is_file()]
     write(destination/'manifest.json',{'schema_version':2,'source_readonly':True,'files':manifest})
     return {k:summary.get(k) for k in ('name','mode','mock','total','status','failed_candidates')} | {'exports':[p.name for p in destination.iterdir() if p.is_file()],'issues':index['issues']}

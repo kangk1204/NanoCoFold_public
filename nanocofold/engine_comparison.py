@@ -65,6 +65,18 @@ def _msa_search_progress(state, payload, *, active=True):
         state.begin_phase("comparison_msa_search")
 
 
+def validate_candidate_ids(cfg, identifiers):
+    """Reject generated model-ID overflow during review, before job submission."""
+    identifiers = list(identifiers)
+    seq.candidate_id_aliases(identifiers)
+    for engine in settings(cfg)["engines"]:
+        for identifier in identifiers:
+            try:
+                seq.validate_candidate_id(engine + "__" + str(identifier))
+            except ValueError as exc:
+                raise ValueError(f"비교 후보 ID는 엔진 접두어({engine}__)를 포함해 UTF-8 120바이트 이하여야 합니다. 짧은 ID로 바꾸세요.") from exc
+
+
 def prepare_msa(cfg, run_dir, state, target, candidates, id_column="design_id", sequence_column="sequence"):
     """Freeze exact validated alignments for every chain, including generated VHHs.
 
@@ -72,15 +84,7 @@ def prepare_msa(cfg, run_dir, state, target, candidates, id_column="design_id", 
     requires explicit consent to upload the target and generated sequences.
     All predictors receive the same frozen, unpaired monomer inputs.
     """
-    seq.candidate_id_aliases(candidates[id_column])
-    # Engine IDs become output-path components later. Reject their actual size
-    # before cache lookup or authorized sequence upload, rather than afterwards.
-    for engine in settings(cfg)["engines"]:
-        for identifier in candidates[id_column]:
-            try:
-                seq.validate_candidate_id(engine + "__" + str(identifier))
-            except ValueError as exc:
-                raise ValueError(f"비교 후보 ID는 엔진 접두어({engine}__)를 포함해 UTF-8 120바이트 이하여야 합니다. 짧은 ID로 바꾸세요.") from exc
+    validate_candidate_ids(cfg, candidates[id_column])
     if cfg_get(cfg, "run.mock", False) or cfg_get(cfg, "run.dry_run", False):
         return copy.deepcopy(cfg), candidates.copy(), {}
     from .colabfold_msa import cached_monomer, prepare_manifest, prepare_id_aliases

@@ -16,6 +16,7 @@ import gzip
 import hashlib
 import json
 import os
+import re
 import sqlite3
 import stat
 import tempfile
@@ -406,6 +407,9 @@ class RetentionManager:
             return True
         if path.name in ROOT_KEEP or path.suffix.lower() in {".csv", ".fasta", ".fa", ".faa", ".yaml", ".yml"}:
             return True
+        if len(path.parts) == 1 and (path.name == "report_explorer.html" or
+                re.fullmatch(r".+_explorer-[a-f0-9]{64}\.html", path.name)):
+            return False
         if path.name.startswith("input_reference") or "manifest" in path.name or path.name.endswith(("receipt.json", "status.json", "state.json")):
             return True
         if path.parts[0] == ARCHIVE:

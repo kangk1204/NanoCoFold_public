@@ -31,3 +31,10 @@ test('formatting composes translated UI statuses with untouched scientific param
 test('unsupported language selections do not change the current language',()=>{
  const i=fixture();i.setLanguage('fr',{persist:false});assert.equal(i.language,'en');
 });
+test('coordinate provenance captions translate in both directions without Korean fragments in English',()=>{
+ const i=fixture();
+ for(const suffix of ['원본 좌표 출처 미확인','변환 없음','검증된 원본과 다른 표시 좌표 · 변환 과정 미기록','좌표 직렬화와 기록된 잔기 번호 대응','좌표 직렬화·기록된 잔기 번호 대응·참조 구조 정렬']){
+  const ko='검증된 원본 엔진 좌표를 별도로 보존합니다. 화면은 변환된 표시 좌표입니다 · '+suffix;
+  const value=i.term(ko);assert.doesNotMatch(i.value(value),/[가-힣]/);i.setLanguage('ko',{persist:false});assert.equal(i.value(value),ko);i.setLanguage('en',{persist:false});
+ }
+});

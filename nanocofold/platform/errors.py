@@ -2,7 +2,7 @@
 import re
 from ..utils.presentation import portable_metadata
 
-_GENERIC = "입력 처리에 실패했습니다. 파일 형식·서열·필수 항목을 확인하고 다시 시도하세요. 자세한 내용은 서버 로그에서 확인할 수 있습니다."
+_GENERIC = "작업 처리에 실패했습니다. 실패한 단계와 서버 로그를 확인하세요. 원본 결과와 오류 기록은 보존됩니다."
 # Actual path roots, not every slash in .pdb/.cif or true/false prose.
 # Consume a path-bearing line tail so account/path spaces cannot leak fragments.
 _PRIVATE_PATH = re.compile(r"(?<![\w./])(?:/(?:home|Users|mnt|tmp|var|opt|private|Volumes|nfs|gpfs)(?=/|$)|/(?=[A-Za-z0-9_.-]+/[^\s/]+)|file://|[A-Za-z]:[\\/]|\\\\[^\\\s]+\\)[^\r\n]*")
@@ -23,10 +23,19 @@ def _redact_paths(message):
     message = _CUSTOM_DIRECTORY.sub("[서버 경로]", message)
     return portable_metadata(message).replace("[local path]", "[서버 경로]")
 
-def public_error(exc):
+def public_error(exc, *, stage="operation", candidate_id=None):
     message = str(exc).strip()
     if isinstance(exc, KeyError) and len(message) > 1 and message[0] == message[-1] == "'":
         message = message[1:-1]
+    if candidate_id is None:
+        prefix = re.match(r"^([^\s/\\]{1,120}):\s+", message)
+        if prefix and not prefix[1].endswith(("Error", "Exception")):
+            candidate_id, message = prefix[1], message[prefix.end():]
+    rendered = _public_message(exc, message, stage)
+    return (str(candidate_id) + ": " if candidate_id is not None else "") + rendered
+
+
+def _public_message(exc, message, stage):
     if message.startswith("PDB 파싱 실패") or "defined twice" in message or "_atom_site." in message:
         return "구조 파일의 원자·잔기 레코드가 중복되거나 손상되었습니다. 원본 파일을 정리한 뒤 다시 불러오세요."
     if ("좌표" in message or "B-factor" in message or "B factor" in message) and ("NaN" in message or "Inf" in message):
@@ -36,7 +45,14 @@ def public_error(exc):
     if "invalid literal for int()" in message or "could not convert string to float" in message:
         return "숫자 입력 형식이 올바르지 않습니다. 잔기 번호·모델 수·설정값을 확인하세요."
     if not re.search(r"[가-힣]", message):
-        return _GENERIC
+        if isinstance(exc, FileNotFoundError) or "[Errno 2]" in message or "No such file or directory" in message:
+            return {"prediction": "예측 산출물을 찾지 못했습니다. 엔진 실행 상태와 작업 로그를 확인하세요.",
+                    "export": "내보낼 산출물을 찾지 못했습니다. 저장된 결과와 내보내기 로그를 확인하세요.",
+                    "input": "입력 파일을 찾지 못했습니다. 선택한 파일을 확인하세요."}.get(stage,
+                    "작업에 필요한 파일을 찾지 못했습니다. 실패한 단계와 서버 로그를 확인하세요.")
+        return {"prediction": "예측·평가 처리에 실패했습니다. 해당 후보의 엔진 실행 상태와 작업 로그를 확인하세요.",
+                "export": "결과 내보내기에 실패했습니다. 저장된 산출물과 내보내기 로그를 확인하세요.",
+                "input": "입력 처리에 실패했습니다. 파일 형식·서열·필수 항목과 서버 로그를 확인하세요."}.get(stage, _GENERIC)
     message = _redact_paths(message)
     message = re.sub(r"\s*\((?:Atom |Residue |invalid literal |could not convert)[^\n]*", "", message)
     message = re.sub(r"<Residue[^>]*>|<Atom[^>]*>", "[구조 레코드]", message)
@@ -63,7 +79,7 @@ def public_log(text):
 class PublicIssues(list):
     """Sanitize presentation issues; original artifacts retain their details."""
     def append(self, value):
-        super().append(public_error(ValueError(value)))
+        super().append(public_error(ValueError(value), stage="prediction"))
 
     def extend(self, values):
         for value in values:
@@ -84,7 +100,7 @@ def public_error_data(value):
                 private = (_PRIVATE_PATH.search(item) or _ABSOLUTE_FILE.search(item)
                            or _CUSTOM_DIRECTORY.search(item) or "_atom_site." in item
                            or "defined twice" in item or "Traceback " in item)
-                result[key] = public_error(ValueError(item)) if private else item
+                result[key] = public_error(ValueError(item), stage="prediction" if key == "prediction_error" else "operation") if private else item
             elif key == "issues" and isinstance(item, list):
                 result[key] = [public_error(ValueError(issue)) for issue in item]
             else:

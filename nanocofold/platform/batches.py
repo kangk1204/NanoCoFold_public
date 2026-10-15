@@ -182,7 +182,7 @@ class BatchManager:
                     prepared = self.inputs.fasta(value)
                 entry.update(input_id=prepared["input_id"], input_sha256=digest(prepared), input_files=self._files(prepared["config"]), config_file_sha256=sha256(Path(prepared["config_path"])), review=prepared["review"], job_id=None)
             except (ValueError, TypeError) as exc:
-                entry["error"] = public_error(exc)
+                entry["error"] = public_error(exc, stage="input")
             batch["rows"].append(entry)
         batch["review_sha256"] = digest(batch)
         self._save(batch)

@@ -217,9 +217,11 @@ def reference_comparison(structure, entries, reference, settings):
                 "ca_rmsd_angstrom": float(np.sqrt(np.mean(distances))) if distances else None,
                 "interest_ca_rmsd_angstrom": float(np.sqrt(np.mean([np.sum((a.coord-b.coord)**2) for a,b in region]))) if region else None})
         return {"available": True, "content": _pdb(ref), "format": "pdb", "anchor_chain": anchor,
+                "reference_anchor_chain": mapping[anchor],
                 "matched_ca": len(pairs), "rmsd": float(fit.rms), "rmsd_scope": "anchor_chain_CA",
                 "display_alignment_scope": "anchor_chain_CA_with_selected_sequence_equivalent_mapping",
                 "all_chain_ca_rmsd_angstrom": best[0][1], "all_chain_ca_rmsd_scope": "all_matched_CA_single_rigid_body_fit",
+                "complex_rmsd": best[0][1], "complex_rmsd_scope": "all_matched_CA_single_rigid_body_fit",
                 "all_chain_matched_ca": -best[0][0],
                 "anchor_aligned_all_chain_ca_rmsd_angstrom": float(np.sqrt(np.mean(all_distances))),
                 "chain_permutation_map": mapping, "symmetry_search_complete": bool(symmetric),

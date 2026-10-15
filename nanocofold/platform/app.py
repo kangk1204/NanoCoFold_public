@@ -111,7 +111,8 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         from .errors import public_error
         import logging
         logging.getLogger(__name__).warning("input error: %s", exc)
-        return JSONResponse({"error": public_error(exc)}, status_code=400)
+        stage = "input" if _request.url.path.startswith("/api/inputs") else "operation"
+        return JSONResponse({"error": public_error(exc, stage=stage)}, status_code=400)
 
     @app.exception_handler(FileNotFoundError)
     async def missing(_request, exc):
@@ -499,6 +500,15 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         file = reader(identifier).artifact_path(path)
         if not file.is_file():
             raise FileNotFoundError("산출물 파일이 없습니다.")
+        if file.suffix.lower() == ".html" and "_explorer" not in file.stem:
+            from ..report import report_snapshot_files
+            from ..report_delivery import package_report
+            files = report_snapshot_files(file)
+            if files is not None:
+                content = package_report(files, {"scope": "exact_saved_entry_and_linked_explorer",
+                                                "source_readonly": True})
+                return Response(content, media_type="application/zip", headers={
+                    "Content-Disposition": 'attachment; filename="report_bundle.zip"'})
         return FileResponse(file, filename=file.name)
 
     @app.post("/api/results/{identifier}/export")
