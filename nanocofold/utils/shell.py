@@ -122,7 +122,11 @@ def _command_process(argv, *, cwd, env, stdin, output, inherited, cancellation, 
             if cancellation and cancellation():
                 raise ExecutionCancelled("분석 실행이 취소되었습니다.")
             if timeout is not None and time.monotonic() - start >= timeout:
-                raise subprocess.TimeoutExpired(argv, timeout)
+                expired = subprocess.TimeoutExpired(argv, timeout, output=_output_tail(output))
+                deadline = _DEADLINE.get()
+                if deadline is not None and time.monotonic() >= deadline:
+                    raise ExecutionBudgetExceeded("캠페인 계산 시간 한도에 도달했습니다.") from expired
+                raise expired
             os.write(lifeline_write, b"G")
             yield process, status_read
     finally:

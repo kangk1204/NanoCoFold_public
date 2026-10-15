@@ -145,7 +145,7 @@
     "nanocofold/utils/presentation.py": "e28a6b5571929c074e9b6cc9e17aefdbcf73f1c1a22694013778e33607d3689a",
     "nanocofold/utils/process_guard.py": "e778ded4f7c15bf08a567eac462c91408ebae6fded7359aaf467bbe46d97e48d",
     "nanocofold/utils/seq.py": "cf672d7ec28881c7d45f8b93c97439559c2097e76dfab32effec163ae5d3298f",
-    "nanocofold/utils/shell.py": "0e070fcd70d60fe9bbfb9c34907fb2dbebc8d75c15b277b0cd9456c538b398e9",
+    "nanocofold/utils/shell.py": "8ebab95f667b794bc142d26bd901ca343811a11aaac6c49de2cf3dfb95df848e",
     "nanocofold/utils/spreadsheet.py": "f87a8c310949f405ca2214a5bd1460de30a87651346c479534390e612c83ee6e",
     "nanocofold/utils/tool_args.py": "91fecb92a190687fafce48ce0f1d24b3320fba1450cf2ed4bb2624e45b0354f9",
     "nanocofold/vendor_assets.py": "7b4da44b8e3292c6cdf2f45b19769ea8c1c28eab587eb48da74482167617f43c",

@@ -1,10 +1,14 @@
 """Durable command ownership, restart recovery, and stale-attempt boundaries."""
+import os
+import subprocess
+import sys
 import time
 from types import SimpleNamespace
 
 import pytest
 
 from nanocofold.platform import jobs
+from nanocofold.utils import shell
 
 
 def attempt(tmp_path, monkeypatch):
@@ -112,3 +116,34 @@ def test_ps_birth_stamp_does_not_treat_zombies_as_live(monkeypatch, stat, expect
     monkeypatch.setattr(jobs.subprocess, "run", lambda *_a, **_k:
                         SimpleNamespace(stdout=stat + " Thu Oct 16 12:00:00 2026\n"))
     assert jobs.process_stamp(99999999) == expected
+
+
+@pytest.mark.parametrize("enclosing_budget", [False, True])
+def test_registration_timeout_preserves_budget_classification_and_evidence(tmp_path, monkeypatch, enclosing_budget):
+    manager = jobs.JobManager(tmp_path)
+    job = manager.create({"config": {"run": {"mode": "design", "mock": True},
+                                     "target": {"sequence": "ACDEFGHIKLMNPQRSTVWY"}}})
+    job = manager.store.update(job["id"], state="running", pid=os.getpid(),
+                               process_stamp=jobs.process_stamp(os.getpid()), started=time.time())
+    register = manager.store.register_process
+
+    def delayed(*args):
+        register(*args)
+        time.sleep(.1)
+
+    monkeypatch.setattr(manager.store, "register_process", delayed)
+    marker = tmp_path / "must-not-start"
+    log = tmp_path / "command.log"
+    argv = [sys.executable, "-c", "from pathlib import Path;import sys;Path(sys.argv[1]).touch()", str(marker)]
+    with shell.managed_processes(manager.store, job):
+        if enclosing_budget:
+            with shell.execution_budget(.05), pytest.raises(shell.ExecutionBudgetExceeded) as raised:
+                shell.run(argv, log_path=log, timeout=5, quiet=True)
+            assert isinstance(raised.value.__cause__, subprocess.TimeoutExpired)
+            assert raised.value.__cause__.output.startswith("$ ")
+        else:
+            with pytest.raises(subprocess.TimeoutExpired) as raised:
+                shell.run(argv, log_path=log, timeout=.05, quiet=True)
+            assert raised.value.output.startswith("$ ")
+    assert not marker.exists()
+    assert manager.store.registered_processes(job["id"]) == []
