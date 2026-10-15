@@ -462,7 +462,9 @@ function noviceModelPlan(cfg, mode, libraryCount) {
   const top = mature.prefilter?.top_n, variants = mature.library?.max_variants;
   if (!Number.isInteger(top)) return "설정 검토 후 치환 후보와 WT의 계획 평가 상한을 확인하세요.";
   const selected = Number.isInteger(variants) ? Math.min(top, variants) : top;
-  return `${Number.isInteger(variants) ? `변이 최대 ${variants}개 준비 · ` : ""}최대 ${selected}개와 WT × 엔진 ${engines}개 = 최대 ${(selected + 1) * engines}모델 · 실제 선별 수는 실행 후 확정됩니다.`;
+  const preparation = Number.isInteger(variants) ? I18N.format("변이 최대 {0}개 준비 · ", [variants]) : "";
+  return I18N.format("{0}최대 {1}개와 WT × 엔진 {2}개 = 최대 {3}모델 · 실제 선별 수는 실행 후 확정됩니다.",
+    [preparation, selected, engines, (selected + 1) * engines]);
 }
 function fields() {
   const mode = $("mode").value;

@@ -4,6 +4,23 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 const source=readFileSync(new URL('../nanocofold/templates/platform-i18n.js',import.meta.url),'utf8');
 function fixture(){const context={};vm.createContext(context);vm.runInContext(source,context);return context.I18N;}
+test('mature model plans translate the optional preparation prefix and preserve counts',()=>{
+ const ui=readFileSync(new URL('../nanocofold/templates/platform.js',import.meta.url),'utf8');
+ const i=fixture(),context={I18N:i};vm.createContext(context);
+ vm.runInContext(ui.slice(ui.indexOf('function noviceModelPlan('),ui.indexOf('function fields()')),context);
+ for(const [variants,selected] of [[3,2],[1,1],[undefined,2]]){
+  const cfg={screen:{comparison:{enabled:true,engines:['colabfold','boltz2','chai1','opendde']}},
+   mature:{prefilter:{top_n:2},library:variants===undefined?{}:{max_variants:variants}}};
+  const saved=JSON.stringify(cfg),message=i.term(context.noviceModelPlan(cfg,'mature',0));
+  for(const language of ['en','ko','en']){
+   i.setLanguage(language,{persist:false});
+   const prefix=variants===undefined?'':language==='en'?`Prepare up to ${variants} variants · `:`변이 최대 ${variants}개 준비 · `;
+   const expected=language==='en'?`${prefix}Up to ${selected} variants plus WT × 4 engines = up to ${(selected+1)*4} models · Final selection counts are determined after execution.`:
+    `${prefix}최대 ${selected}개와 WT × 엔진 4개 = 최대 ${(selected+1)*4}모델 · 실제 선별 수는 실행 후 확정됩니다.`;
+   assert.equal(i.value(message),expected);assert.equal(JSON.stringify(cfg),saved);
+  }
+ }
+});
 test('English is default; switching is reversible for static and dynamic UI messages',()=>{
  const i=fixture(),node={textContent:'',isConnected:true};
  assert.equal(i.language,'en');i.text(node,i.format('처리 {0}/{1} · 성공 {2} · 실패 {3}',[4,4,3,1]));
