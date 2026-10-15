@@ -504,6 +504,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "설정 검토 후 생성 후보·평가 모델의 계획 상한을 확인하세요.": "Review settings to check the planned limits for generated candidates and evaluated models.",
   "최대 계획 후보 {0}개 × 엔진 {1}개 = 최대 {2}모델 · 실제 생성·선별 이후 확정 수를 기록합니다.": "Up to {0} planned candidates × {1} engines = up to {2} models · Final counts are recorded after generation and selection.",
   "설정 검토 후 치환 후보와 WT의 계획 평가 상한을 확인하세요.": "Review settings to check the planned evaluation limit for substitution variants and WT.",
+  "변이 최대 {0}개 준비 · 최대 {1}개와 WT × 엔진 {2}개 = 최대 {3}모델 · 실제 선별 수는 실행 후 확정됩니다.": "Prepare up to {0} variants · Up to {1} variants plus WT × {2} engines = up to {3} models · Final selection counts are determined after execution.",
   "{0}최대 {1}개와 WT × 엔진 {2}개 = 최대 {3}모델 · 실제 선별 수는 실행 후 확정됩니다.": "{0}Up to {1} variants plus WT × {2} engines = up to {3} models · Final selection counts are determined after execution.",
   "변이 최대 {0}개 준비 · ": "Prepare up to {0} variants · ",
   "구조 파일을 사용합니다. PDB ID를 추가할 필요가 없습니다.": "Using a structure file. No PDB ID is needed.",

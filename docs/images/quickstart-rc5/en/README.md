@@ -2,7 +2,7 @@
 
 These ten JPEGs were captured from the actual **English** interface on 2026-10-15. They were not generated, translated inside an image editor, or composited. Structures and PAE use direct region captures.
 
-Input screens use the public rc5 source based on `83a5be548ef343ee89c33a1f4a0de61995501beb`, including the small model-plan translation fix accompanying these images. The fix translates the optional preparation prefix separately and preserves the Korean wording, numerical counts and configuration. Its regression fails before the fix and passes afterward, including English → Korean → English transitions with and without a variant cap.
+Input screens use the public rc5 source based on `83a5be548ef343ee89c33a1f4a0de61995501beb`, including the small model-plan translation fix accompanying these images. The fix matches the complete bounded-variant sentence before its generic translation pattern and preserves the function's text return value, Korean wording, numerical counts and configuration. Its regression fails before the fix and passes afterward, including English → Korean → English transitions with and without a variant cap.
 
 The local macOS capture workspace had CUDA hidden. Public examples were loaded, but input/environment review and analysis submission were not executed. No new MSA request or GPU inference was submitted. Screenshot 04 is **before environment checks**, not a claim of installation success.
 

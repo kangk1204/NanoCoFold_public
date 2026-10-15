@@ -3,7 +3,7 @@
   "locale": "en",
   "captured": "2026-10-15",
   "new_GPU_inference": false,
-  "ui_platform_js_sha256": "e78429b3ee64da61341667f66b588bccfcfed3fb60605bb67b04a9e86f21adde",
+  "ui_platform_js_sha256": "96e392b3b8bc54225bf709add593a3ce514c3a8930d349a50064682359516ee2",
   "files": {
     "01-purpose.jpg": {
       "bytes": 73516,
@@ -45,5 +45,6 @@
       "bytes": 141194,
       "sha256": "d0bf5759a78c1843811b90015e2080f185840be471d1f8926c32156fc0c78161"
     }
-  }
+  },
+  "ui_i18n_sha256": "9b0e18b5812996ade001dffa160db7024465f9f1da16e6378d72779e682d7549"
 }
