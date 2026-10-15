@@ -288,7 +288,7 @@ class JobStore:
             return row["submission_hash"], self.get(row["job_id"])
         return None
 
-    def update(self, identifier: str, *, expected_states=None, expected_attempt=None, **changes) -> dict:
+    def update(self, identifier: str, *, expected_states=None, expected_attempt=None, expected_history_length=None, **changes) -> dict:
         with self.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute("SELECT payload FROM jobs WHERE id=?", (identifier,)).fetchone()
@@ -299,12 +299,14 @@ class JobStore:
                 return job
             if expected_attempt is not None and (job.get("pid"), job.get("process_stamp")) != expected_attempt:
                 return job
+            if expected_history_length is not None and len(job.get("history", [])) != expected_history_length:
+                return job
             job.update(changes, updated=time.time())
             connection.execute("UPDATE jobs SET state=?,updated=?,payload=?,needs_cleanup=? WHERE id=?",
                                (job["state"], job["updated"], json.dumps(job), int(bool(job.get("descendants"))), identifier))
         return job
 
-    def finish(self, identifier: str, *, state: str, expected_attempt=None, **changes) -> dict:
+    def finish(self, identifier: str, *, state: str, expected_attempt=None, expected_history_length=None, **changes) -> dict:
         """Finish only the current running attempt; a persisted cancel wins.
 
         The worker's last read and the HTTP cancellation request are independent
@@ -322,6 +324,8 @@ class JobStore:
             if job["state"] not in {"running", "cancelling"}:
                 return job
             if expected_attempt is not None and (job.get("pid"), job.get("process_stamp")) != expected_attempt:
+                return job
+            if expected_history_length is not None and len(job.get("history", [])) != expected_history_length:
                 return job
             if any(process_stamp(pid) == stamp for pid, stamp in self.registered_processes(identifier, connection)):
                 return job  # Never publish terminal state before owned-command cleanup.
@@ -671,19 +675,23 @@ class JobManager:
             message = public_error(ValueError(
                 "작업을 시작하지 못했습니다. 서버 저장 공간·잠금 폴더·로그 파일의 쓰기 권한을 확인한 뒤 재개하세요."))
             current = self.store.get(job["id"])
+            generation = len(job.get("history", []))
+            if len(current.get("history", [])) != generation:
+                return False  # An old launch failure cannot consume a resumed attempt.
             if current["state"] == "queued":
-                terminal = self.store.update(job["id"], expected_states={"queued"}, state="failed", phase="launch_failed",
+                terminal = self.store.update(job["id"], expected_states={"queued"}, expected_history_length=generation, state="failed", phase="launch_failed",
                                              error=message, finished=time.time(), can_resume=job["kind"] == "analysis")
             elif current["state"] == "cancelled" and not current.get("cancel_requested"):
                 # Reaping a worker after a registration-write error sends
                 # SIGTERM, which that worker can record as cancellation. The
                 # cause is still launch failure; preserve actual user cancels.
                 terminal = self.store.update(job["id"], expected_states={"cancelled"},
+                                             expected_history_length=generation,
                                              expected_attempt=(current.get("pid"), current.get("process_stamp")),
                                              state="failed", phase="launch_failed", error=message,
                                              finished=time.time(), can_resume=job["kind"] == "analysis")
             else:
-                terminal = self.store.finish(job["id"], state="failed", expected_attempt=(current.get("pid"), current.get("process_stamp")),
+                terminal = self.store.finish(job["id"], state="failed", expected_history_length=generation, expected_attempt=(current.get("pid"), current.get("process_stamp")),
                                              error=message, finished=time.time(), can_resume=job["kind"] == "analysis")
             write_platform_status(terminal)
             return False
@@ -693,7 +701,7 @@ class JobManager:
         try:
             allowed_gpu(job["gpu"])
         except ValueError as exc:
-            self.store.update(job["id"], expected_states={"queued"}, state="failed", phase="gpu_policy", error=str(exc),
+            self.store.update(job["id"], expected_states={"queued"}, expected_history_length=len(job.get("history", [])), state="failed", phase="gpu_policy", error=str(exc),
                               finished=time.time(), can_resume=False)
             return False
         path = gpu_lock_path(job["gpu"])
@@ -704,14 +712,14 @@ class JobManager:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 if job.get("phase") != "waiting_for_gpu":
-                    self.store.update(job["id"], expected_states={"queued"}, phase="waiting_for_gpu", waiting_for="gpu")
+                    self.store.update(job["id"], expected_states={"queued"}, expected_history_length=len(job.get("history", [])), phase="waiting_for_gpu", waiting_for="gpu")
                 return False
             identity = os.fstat(lock.fileno())
             with self.store.connect() as connection:
                 connection.execute("BEGIN IMMEDIATE")
                 row = connection.execute("SELECT payload FROM jobs WHERE id=?", (job["id"],)).fetchone()
                 current = json.loads(row["payload"])
-                if current["state"] != "queued":
+                if current["state"] != "queued" or len(current.get("history", [])) != len(job.get("history", [])):
                     return False
                 current.update(state="running", phase="starting", started=time.time(), finished=None, updated=time.time(),
                                waiting_for=None, gpu_lock={"path": str(path), "device": identity.st_dev,

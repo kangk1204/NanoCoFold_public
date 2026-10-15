@@ -178,6 +178,55 @@ worker.execute(workspace,identifier)
         if child.poll() is None:child.kill();child.wait(timeout=5)
 
 
+@pytest.mark.parametrize("interleave", ["before_read", "before_transaction"])
+def test_stale_launch_io_failure_cannot_consume_a_resumed_queue_generation(tmp_path, monkeypatch, interleave):
+    manager, job = _manager(tmp_path)
+    original = manager.store.update
+    resumed = False
+
+    def cancel_resume():
+        nonlocal resumed
+        manager.cancel(job["id"])
+        manager.resume(job["id"])
+        resumed = True
+
+    def fail_launch(_job):
+        if interleave == "before_read":
+            cancel_resume()
+        raise OSError("fixture late launch I/O failure")
+
+    def update_after_resume(identifier, **changes):
+        if interleave == "before_transaction" and changes.get("expected_history_length") == 0 and not resumed:
+            cancel_resume()
+        return original(identifier, **changes)
+
+    monkeypatch.setattr(manager, "_spawn_worker", fail_launch)
+    monkeypatch.setattr(manager.store, "update", update_after_resume)
+    try:
+        assert manager._spawn(job) is False
+        current = manager.store.get(job["id"])
+        assert current["state"] == "queued" and current["error"] is None
+        assert len(current["history"]) == 1 and current["cancel_requested"] is False
+    finally:
+        manager.close()
+
+
+def test_stale_dispatch_snapshot_and_finish_cannot_change_new_generation(tmp_path, monkeypatch):
+    manager, old = _manager(tmp_path)
+    monkeypatch.setenv("NANOCOFOLD_GPU_LOCK_DIR", str(tmp_path / "locks"))
+    manager.cancel(old["id"])
+    new = manager.resume(old["id"])
+    monkeypatch.setattr(jobs.subprocess, "Popen", lambda *_a, **_k: pytest.fail("Stale generation launched"))
+    try:
+        assert manager._spawn_worker(old) is False
+        manager.store.update(old["id"], state="running")
+        unchanged = manager.store.finish(old["id"], state="failed", expected_history_length=0, error="stale failure")
+        assert unchanged["state"] == "running" and unchanged["error"] is None
+        assert unchanged["history"] == new["history"]
+    finally:
+        manager.close()
+
+
 def _pending_result(tmp_path):
     manager, job = _manager(tmp_path)
     root=Path(job["run_dir"]);root.mkdir(parents=True)
