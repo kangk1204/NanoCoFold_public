@@ -107,7 +107,7 @@ def check_host(profile, gpu):
 
 
 @contextlib.contextmanager
-def lock(path):
+def lock(path, *, shared=False):
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
     try:
@@ -115,13 +115,28 @@ def lock(path):
         if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1:
             raise ValueError("잠금 파일 소유자/형식이 올바르지 않습니다: " + str(path))
         try:
-            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(descriptor, (fcntl.LOCK_SH if shared else fcntl.LOCK_EX) | fcntl.LOCK_NB)
         except BlockingIOError as exc:
             raise ValueError("다른 설치 또는 GPU 작업이 실행 중입니다. 종료 후 같은 명령을 다시 실행하세요.") from exc
         yield descriptor
     finally:
         # Persistent lock inode: never remove/recreate it.
         os.close(descriptor)
+
+
+def _process_stamp(pid):
+    """Match the queue's process birth identity without importing the core."""
+    if type(pid) is not int or pid <= 0:
+        return None
+    try:
+        if Path("/proc/self/stat").is_file():
+            fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+            return None if fields[0] == "Z" else fields[19]
+        result = subprocess.run(["ps", "-p", str(pid), "-o", "lstart="],
+                                capture_output=True, text=True, timeout=2)
+        return result.stdout.strip() or None
+    except (OSError, ValueError, IndexError, subprocess.SubprocessError):
+        return None
 
 
 def reject_active_jobs(workspace):
@@ -133,6 +148,17 @@ def reject_active_jobs(workspace):
         active = connection.execute("SELECT COUNT(*) FROM jobs WHERE state IN ('queued','running','cancelling')").fetchone()[0]
         if active:
             raise ValueError("이 작업 공간에 대기/실행 중인 작업이 있습니다. 종료 후 설치를 실행하세요.")
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(jobs)")}
+        if "payload" in columns:
+            for row in connection.execute("SELECT payload FROM jobs"):
+                job = json.loads(row[0])
+                # A worker records its terminal state before final catalog and
+                # provenance writes. Those processes must finish as well.
+                processes = [(job.get("pid"), job.get("process_stamp"))]
+                processes.extend(job.get("descendants") or [])
+                for pid, stamp in processes:
+                    if stamp and _process_stamp(pid) == stamp:
+                        raise ValueError("완료 후 결과를 정리하는 작업 프로세스가 남아 있습니다. 종료 후 다시 실행하세요. / A recorded job process is still finishing; retry after it exits.")
     finally:
         connection.close()
 

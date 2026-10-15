@@ -304,6 +304,11 @@ class JobManager:
             self.thread.join(timeout=5)
 
     def create(self, payload: dict, *, kind: str = "analysis") -> dict:
+        from .maintenance import maintenance_lock
+        with maintenance_lock(self.workspace):
+            return self._submit(payload, kind=kind)
+
+    def _submit(self, payload: dict, *, kind: str = "analysis") -> dict:
         submission = payload.get("submission_id")
         if not submission:
             return self._create(payload, kind=kind)
@@ -335,9 +340,10 @@ class JobManager:
         folder = self.store.root / "jobs" / identifier
         override = payload.get("config")
         if kind == "diagnostics" and payload.get("environment_only") is True:
-            from .environment import installation_override
-            override = installation_override(override)
-        cfg = normalized_config(self.workspace, override)
+            from .environment import normalized_installation_config
+            cfg = normalized_installation_config(self.workspace, override, mode=payload.get("mode"))
+        else:
+            cfg = normalized_config(self.workspace, override)
         if payload.get("mode"):
             if payload["mode"] not in {"complex", "design", "screen", "mature"}:
                 raise ValueError("지원하지 않는 모드입니다.")
@@ -428,6 +434,11 @@ class JobManager:
         return self.store.insert(job)
 
     def resume(self, identifier: str, additional_budget_seconds=None) -> dict:
+        from .maintenance import maintenance_lock
+        with maintenance_lock(self.workspace):
+            return self._resume(identifier, additional_budget_seconds)
+
+    def _resume(self, identifier: str, additional_budget_seconds=None) -> dict:
         job = self.store.get(identifier)
         if job.get("run_dir") and (Path(job["run_dir"]) / "retained").exists():
             raise ValueError("정리 보관본은 재개할 수 없습니다. 원본 계산이 필요하면 새 분석으로 재실행하세요.")

@@ -71,7 +71,7 @@ Then open the address above in your PC browser. Inputs and results are viewed on
 
 ### Update an existing installation
 
-When no analysis is queued or running, stop the web server with **Ctrl+C** in its terminal. In the original source folder, run:
+When no job is queued or running, stop the web server with **Ctrl+C** in its terminal. In the original source folder, run:
 
 ```bash
 git pull --ff-only
@@ -80,6 +80,8 @@ bash start.sh
 ```
 
 This updates the installed application while preserving the saved workspace, GPU selection, models, inputs and results. It does not run predictions or reinstall GPU engines. Reload the browser afterward. `git pull` alone does not update the installed application. For a source ZIP, use its complete updated contents in the original source folder, then run the last two commands. Existing exported HTML reports keep their captured appearance; export a new report to use the updated layout.
+
+If the update fails or is interrupted, run `bash update.sh` again. Starting the application is blocked until the update finishes successfully. An open web server or active job also blocks the update; close the server after its jobs finish, then retry.
 
 ## 3. Try the first public example
 

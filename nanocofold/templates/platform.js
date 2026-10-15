@@ -32,6 +32,9 @@ const state = {
   environmentJob: null,
   environmentTarget: null,
   environmentRequest: 0,
+  environmentKey: null,
+  environmentLoading: false,
+  environmentSubmitting: false,
   loaded: null,
   analyzed: null,
   jobs: [],
@@ -48,6 +51,7 @@ const state = {
   resultRequest: 0,
   pollingJobs: false,
   inputRevision: 0,
+  inputReadinessRequest: 0,
   presets: {},
   starter: null,
   capabilities: {},
@@ -246,7 +250,7 @@ function action(id, fn) {
       } catch (e) {
         notice(e.message, true);
       } finally {
-        button.disabled = id === "diagnose-environment" && Boolean(state.environmentJob);
+        button.disabled = id === "diagnose-environment" && Boolean(state.environmentJob || state.environmentSubmitting || state.environmentLoading);
       }
     });
 }
@@ -781,8 +785,9 @@ function renderInputReadiness() {
     : "입력은 확인했습니다. 선택한 엔진의 환경 확인 기록이 필요합니다. 환경 확인 후 이 화면으로 돌아오세요."));
 }
 async function readInputReadiness(input, revision = state.inputRevision) {
+  const request = ++state.inputReadinessRequest;
   const result = await api("/api/environment/status", {input_id: input.id, mode: input.config.run.mode});
-  if (revision !== state.inputRevision || state.input?.id !== input.id) return;
+  if (request !== state.inputReadinessRequest || revision !== state.inputRevision || state.input?.id !== input.id) return;
   state.readiness = result.ready === true;
   renderInputReadiness();
 }
@@ -792,25 +797,51 @@ function environmentPayload() {
   return {mode, config: state.starter.modes[mode].native_override};
 }
 function renderEnvironmentStatus() {
-  const waiting = Boolean(state.environmentJob), ready = state.environment?.ready === true;
+  const waiting = Boolean(state.environmentJob || state.environmentSubmitting), ready = state.environment?.ready === true;
   I18N.text($("environment-context"), I18N.term(state.environmentTarget ? "현재 입력에서 선택한 엔진을 확인합니다." : "작은 시작 설정의 기본 엔진을 확인합니다."));
   I18N.text($("environment-status"), I18N.term(waiting
     ? "환경을 확인하고 있습니다. 이 화면에서 기다려 주세요. 구조 예측은 실행하지 않습니다."
+    : state.environmentLoading ? "환경 확인 기록을 불러오고 있습니다."
     : ready ? "환경 확인 완료 · 분석 준비하기를 누르세요."
+    : state.environment?.reason === "status_unavailable" ? "환경 확인 기록을 불러오지 못했습니다. 잠시 후 다시 조회합니다. 기존 결과는 계속 열 수 있습니다."
     : state.environment?.reason === "check_not_passed" ? "환경 확인 미충족 · 세부 항목에서 필요한 설치를 확인하세요."
     : "이 설정의 환경 확인 기록이 없습니다. 처음 한 번 환경 확인을 시작하세요."));
-  $("diagnose-environment").disabled = waiting;
+  $("diagnose-environment").disabled = waiting || state.environmentLoading;
+  $("environment-mode").disabled = state.environmentSubmitting;
   I18N.text($("diagnose-environment"), I18N.term(ready ? "환경 다시 확인" : "환경 확인 시작"));
   if (state.environment?.diagnostics) renderDiagnostics(state.environment.diagnostics);
   else $("diagnostics-output").replaceChildren();
 }
 async function refreshEnvironmentStatus() {
+  // A submission is followed by its own fresh lookup. An older lookup must not
+  // restore a previous successful receipt while a new check is being submitted.
+  if (state.environmentSubmitting) return;
   const request = ++state.environmentRequest, payload = environmentPayload();
-  const status = await api("/api/environment/status", payload);
-  if (request !== state.environmentRequest) return;
-  state.environment = status;
-  if (["queued", "running", "cancelling"].includes(status.state)) state.environmentJob = status.job_id;
+  const key = JSON.stringify(payload);
+  if (key !== state.environmentKey) {
+    state.environmentKey = key;
+    state.environment = null;
+    state.environmentJob = null;
+  }
+  state.environmentLoading = true;
   renderEnvironmentStatus();
+  const current = () => request === state.environmentRequest && key === JSON.stringify(environmentPayload());
+  try {
+    const status = await api("/api/environment/status", payload);
+    if (!current()) return;
+    state.environment = status;
+    state.environmentJob = ["queued", "running", "cancelling"].includes(status.state) ? status.job_id : null;
+  } catch (error) {
+    if (!current()) return;
+    state.environment = {ready: false, reason: "status_unavailable"};
+    state.environmentJob = null;
+    notice(error.message, true);
+  } finally {
+    if (current()) {
+      state.environmentLoading = false;
+      renderEnvironmentStatus();
+    }
+  }
 }
 async function openEnvironment(current = false) {
   state.environmentTarget = current && state.input
@@ -820,11 +851,27 @@ async function openEnvironment(current = false) {
   await refreshEnvironmentStatus();
 }
 async function submitDiagnostic() {
-  if (state.environmentJob) return;
-  const job = await api("/api/environment/check", environmentPayload());
-  state.environmentJob = job.id;
+  if (state.environmentJob || state.environmentSubmitting) return;
+  const payload = environmentPayload();
+  ++state.environmentRequest;
+  state.environmentLoading = false;
+  state.environmentSubmitting = true;
   state.environment = null;
+  if (state.input && !state.input.config.run.mock) {
+    ++state.inputReadinessRequest;
+    state.readiness = false;
+    renderInputReadiness();
+  }
   renderEnvironmentStatus();
+  try {
+    await api("/api/environment/check", payload);
+  } finally {
+    state.environmentSubmitting = false;
+    // Query the currently selected purpose, even if navigation changed it while
+    // submission was pending. Never attach a different purpose's returned job.
+    await refreshEnvironmentStatus();
+    if (state.input && !state.input.config.run.mock) await readInputReadiness(state.input);
+  }
   // Stay on the separate environment page. Input review never submits this job.
 }
 async function selectJob(identifier) {
@@ -883,6 +930,7 @@ async function refreshJobs() {
         if (state.input && !state.input.config.run.mock) await readInputReadiness(state.input);
       }
     }
+    if (state.environment?.reason === "status_unavailable") await refreshEnvironmentStatus();
     const jobButton = job => {
       const type = job.kind === "analysis" ? "분석" : job.kind === "diagnostics" ? "환경 확인" : "프로그램 설치";
       const outcome = job.kind === "diagnostics" && job.state === "complete"
@@ -2094,6 +2142,10 @@ function renderDiagnostics(diagnosis) {
   output.replaceChildren(
     el("h3", diagnosis.ok ? I18N.term("실행 준비 통과") : I18N.term("실행 준비 미충족")),
   );
+  if (!Array.isArray(diagnosis.checks) || !diagnosis.checks.length) {
+    output.replaceChildren(el("p", I18N.term("환경 확인 세부 기록이 아직 없습니다. 작업·로그에서 진행 상태나 종료 사유를 확인하세요.")));
+    return;
+  }
   const rows = diagnosis.checks.map((c) => ({
     항목: c.name,
     필수: c.required,

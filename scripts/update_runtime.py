@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import sqlite3
 import subprocess
 import sys
 
@@ -27,31 +28,41 @@ def update(root=ROOT, *, run=subprocess.run):
     environment = {**os.environ, "PYTHONUNBUFFERED": "1", "CUDA_VISIBLE_DEVICES": ""}
     environment.pop("PYTHONPATH", None)
     environment.pop("NANOCOFOLD_GPU", None)
-    with lock(workspace / ".platform/public-install.lock"):
+    # Also exclude the scheduler of an already-running older application.
+    with lock(workspace / ".platform/public-install.lock") as install_fd, lock(workspace / ".nanocofold/supervisor.lock") as supervisor_fd:
         reject_active_jobs(workspace)
         receipt = {"status": "updating", "started_utc": now(), "workspace": str(workspace),
                    "source": str(root), "saved_gpu": location.get("gpu")}
         destination = workspace / ".platform/core-updates" / (now().replace(":", "-") + ".json")
+        current = workspace / ".platform/core-update-state.json"
+        receipt["receipt_path"] = str(destination)
         save(destination, receipt)
+        save(current, receipt)
         try:
             for args in ([uv,"pip","install","--python",python,"--no-deps","--require-hashes","-r",root/"nanocofold/_data/locks/core.txt"],
                          [uv,"pip","install","--python",python,"--no-deps","--reinstall-package","nanocofold",root],
                          [uv,"pip","check","--python",python],
                          [python,"-c",'from nanocofold.platform.app import create_app; from nanocofold.platform.environment import readiness; print("Application update verified")']):
-                run(list(map(str,args)),check=True,cwd=workspace,env=environment)
+                # A surviving package child retains exclusion if this wrapper
+                # is interrupted or killed before it can finish cleanup.
+                run(list(map(str,args)),check=True,cwd=workspace,env=environment,
+                    pass_fds=(install_fd, supervisor_fd))
             receipt.update(status="complete", finished_utc=now())
         except BaseException as error:
             receipt.update(status="failed",finished_utc=now(),error=str(error))
             raise
         finally:
-            save(destination,receipt)
+            try:
+                save(destination, receipt)
+            finally:
+                save(current, receipt)
     print("업데이트 완료 / Update complete: bash start.sh\n작업 공간·GPU 선택·기존 결과를 보존했습니다. / Workspace, GPU selection, and results preserved.")
 
 
 if __name__ == "__main__":
     try:
         update()
-    except (OSError,ValueError,KeyError,subprocess.SubprocessError) as error:
+    except (OSError,ValueError,KeyError,subprocess.SubprocessError,sqlite3.Error) as error:
         print("업데이트 실패 / Update failed: " + str(error),file=sys.stderr)
         sys.exit(1)
     except KeyboardInterrupt:

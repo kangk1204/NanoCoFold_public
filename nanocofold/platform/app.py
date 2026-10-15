@@ -52,15 +52,17 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
 
     @contextlib.asynccontextmanager
     async def lifespan(_app):
+        from .maintenance import maintenance_lock
         try:
-            if start_workers:
-                manager.start()
-            yield
+            with maintenance_lock(workspace):
+                try:
+                    if start_workers:
+                        manager.start()
+                    yield
+                finally:
+                    manager.close()
         finally:
-            try:
-                manager.close()
-            finally:
-                inputs.close()
+            inputs.close()
 
     app = FastAPI(title="NanoCoFold", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(GZipMiddleware, minimum_size=1024)
@@ -409,13 +411,9 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
 
     @app.post("/api/environment/status")
     async def environment_status(request: Request):
-        from .environment import readiness, installation_override
+        from .environment import readiness, normalized_installation_config
         payload = effective(await body(request))
-        cfg = normalized_config(workspace, installation_override(payload.get("config")))
-        mode = payload.get("mode", cfg["run"]["mode"])
-        if mode not in {"complex", "design", "screen", "mature"}:
-            raise ValueError("지원하지 않는 분석 모드입니다.")
-        cfg["run"]["mode"] = mode
+        cfg = normalized_installation_config(workspace, payload.get("config"), mode=payload.get("mode"))
         from .jobs import allowed_gpu
         gpu = allowed_gpu(payload.get("gpu", os.environ.get("NANOCOFOLD_GPU", "0")))
         return native(await asyncio.to_thread(readiness, workspace, cfg, manager.store, gpu=gpu))
