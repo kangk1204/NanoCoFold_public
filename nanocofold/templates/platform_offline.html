@@ -2199,6 +2199,7 @@ const state = {
   analysisSubmitting: false,
   currentView: "input",
   navigationReady: false,
+  navigationRequest: 0,
   inputRevision: 0,
   inputReadinessRequest: 0,
   presets: {},
@@ -2454,18 +2455,25 @@ function rememberLocation(replace = true) {
     window.history[replace ? "replaceState" : "pushState"](null, "", url);
 }
 async function restoreNavigation() {
-  const query = new URLSearchParams(window.location.search);
+  const request = ++state.navigationRequest;
+  const url = window.location.href;
+  const query = new URL(url).searchParams;
   const selected = query.get("job");
   if (selected && state.jobs.some(job => job.id === selected) && selected !== state.job)
     await selectJob(selected, false);
+  // A newer history entry or explicit selection owns the screen after this await.
+  if (request !== state.navigationRequest || url !== window.location.href) return;
   const name = query.get("view") || (query.get("result") ? "results" : "input");
   view($("view-" + name) ? name : "input", false);
 }
 function view(name, remember = true) {
   if (!$("view-" + name)) return;
-  const changed = state.currentView !== name;
   state.currentView = name;
-  if (remember && changed) rememberLocation(false);
+  if (remember) {
+    ++state.navigationRequest;
+    // Reselecting the displayed tab can supersede a pending history restoration.
+    rememberLocation(false);
+  }
   for (const section of document.querySelectorAll("main>section"))
     section.hidden = section.id !== "view-" + name;
   for (const button of document.querySelectorAll("[data-view]")) {
@@ -3054,6 +3062,7 @@ async function submitDiagnostic() {
   // Stay on the separate environment page. Input review never submits this job.
 }
 async function selectJob(identifier, remember = true) {
+  if (remember) ++state.navigationRequest;
   state.jobSelectionVersion = (state.jobSelectionVersion || 0) + 1;
   state.job = identifier;
   state.jobActionKey = null;

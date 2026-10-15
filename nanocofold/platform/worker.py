@@ -113,7 +113,7 @@ def execute(workspace: Path, identifier: str) -> int:
             raise KeyboardInterrupt("작업 시작 전 취소 요청")
         cfg = load_config(job["config_path"])
         scope = getattr(shell, "cancellation_scope", lambda _check: contextlib.nullcontext())
-        with scope(lambda: store.get(identifier)["state"] in {"cancelling", "cancelled", "budget_exhausted"}):
+        with shell.managed_processes(store, job), scope(lambda: store.get(identifier)["state"] in {"cancelling", "cancelled", "budget_exhausted"}):
             if job["kind"] == "diagnostics":
                 from ..diagnostics import doctor
                 if job.get("environment_only"):
@@ -206,7 +206,7 @@ def execute(workspace: Path, identifier: str) -> int:
         observed = refresh_complex_job({**job, "state": state})
         extra["progress"] = observed["progress"]
         extra["eta"] = observed["eta"]
-    terminal = store.finish(identifier, state=state, error=error, exit_code=code, finished=time.time(),
+    terminal = store.finish(identifier, state=state, expected_attempt=(job.get("pid"), job.get("process_stamp")), error=error, exit_code=code, finished=time.time(),
                             elapsed_seconds=elapsed, can_resume=job["kind"] == "analysis" and state != "complete", **extra)
     state, code = terminal["state"], terminal.get("exit_code", code)
     from .jobs import write_platform_status

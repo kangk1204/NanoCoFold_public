@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import json
+import select
 import shutil
 import signal
 import subprocess
@@ -8,6 +10,7 @@ import sys
 import tempfile
 import time
 import threading
+import weakref
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -18,6 +21,8 @@ from ..console_progress import activity, command_label
 _DEADLINE = ContextVar("nanocofold_deadline", default=None)
 _CANCELLATION = ContextVar("nanocofold_cancellation", default=None)
 _OUTPUT_LIMIT = 64 * 1024
+_MANAGED_OWNER = None
+_CLOSED_THREADS = weakref.WeakKeyDictionary()
 
 
 class ExecutionCancelled(RuntimeError):
@@ -59,6 +64,92 @@ def cancellation_scope(check):
         yield
     finally:
         _CANCELLATION.reset(token)
+
+
+@contextmanager
+def managed_processes(store, job):
+    """Install the detached worker's owner for commands in every worker thread.
+
+    A worker executes one attempt. Threads still alive at scope exit retain a
+    closed owner so they cannot launch unmanaged work after completion.
+    """
+    global _MANAGED_OWNER
+    previous = _MANAGED_OWNER
+    original_threads = set(threading.enumerate())
+    owner = (store, job["id"], job["pid"], job["process_stamp"], True)
+    _MANAGED_OWNER = owner
+    try:
+        yield
+    finally:
+        for thread in set(threading.enumerate()) - original_threads:
+            _CLOSED_THREADS[thread] = (*owner[:4], False)
+        _MANAGED_OWNER = previous
+
+
+@contextmanager
+def _command_process(argv, *, cwd, env, stdin, output, inherited, cancellation, start, timeout):
+    owner = _CLOSED_THREADS.get(threading.current_thread(), _MANAGED_OWNER)
+    if owner is None:
+        with subprocess.Popen(argv, cwd=cwd, env=env, stdin=stdin, stdout=output,
+                              stderr=subprocess.STDOUT, start_new_session=True, pass_fds=inherited) as process:
+            yield process, None
+        return
+    store, identifier, owner_pid, owner_stamp, active = owner
+    if not active:
+        raise ExecutionCancelled("종료된 작업에서 외부 명령을 시작할 수 없습니다.")
+    from ..platform.jobs import process_stamp
+    lifeline_read, lifeline_write = os.pipe()
+    status_read, status_write = os.pipe()
+    process = None
+    stamp = None
+    try:
+        with tempfile.TemporaryFile(mode="w+b") as request:
+            payload = {"argv": argv, "env": dict(os.environ) if env is None else env}
+            request.write(json.dumps(payload).encode("utf-8"))
+            request.seek(0)
+            helper = Path(__file__).with_name("process_guard.py")
+            process = subprocess.Popen(
+                [sys.executable, "-I", str(helper), str(lifeline_read), str(status_write),
+                 str(request.fileno()), str(inherited[0] if inherited else -1)],
+                cwd=cwd, env=env, stdin=stdin, stdout=output, stderr=subprocess.STDOUT,
+                start_new_session=True, pass_fds=(*inherited, lifeline_read, status_write, request.fileno()))
+            os.close(lifeline_read)
+            lifeline_read = None
+            os.close(status_write)
+            status_write = None
+            stamp = process_stamp(process.pid)
+            store.register_process(identifier, owner_pid, owner_stamp, process.pid, stamp)
+            if cancellation and cancellation():
+                raise ExecutionCancelled("분석 실행이 취소되었습니다.")
+            if timeout is not None and time.monotonic() - start >= timeout:
+                raise subprocess.TimeoutExpired(argv, timeout)
+            os.write(lifeline_write, b"G")
+            yield process, status_read
+    finally:
+        # Closing the only write end is also the worker-death fallback. Never
+        # let Popen.__exit__ wait on a helper still blocked at its launch gate.
+        os.close(lifeline_write)
+        try:
+            if process is not None and process.returncode is None:
+                _kill_process_group(process)
+        finally:
+            for descriptor in (lifeline_read, status_read, status_write):
+                if descriptor is not None:
+                    os.close(descriptor)
+            if process is not None and stamp and process_stamp(process.pid) != stamp:
+                store.forget_process(identifier, process.pid, stamp)
+
+
+def _command_status(descriptor, argv):
+    if descriptor is None or not select.select([descriptor], [], [], 0)[0]:
+        return None
+    data = os.read(descriptor, 4096)
+    if not data:
+        raise RuntimeError("외부 명령의 소유 프로세스가 상태를 전달하지 못했습니다.")
+    status = json.loads(data)
+    if "errno" in status:
+        raise OSError(status["errno"], status["strerror"], argv[0])
+    return status
 
 
 def remaining_budget(timeout: float | None = None) -> float | None:
@@ -103,11 +194,16 @@ def _budgeted_process(argv, *, cwd, env, timeout, stdin_text: str | None = None,
         if stdin_text is not None:
             stdin.write(stdin_text.encode("utf-8"))
             stdin.seek(0)
-        with subprocess.Popen(argv, cwd=cwd, env=env, stdin=stdin if stdin_text is not None else None,
-                              stdout=output, stderr=subprocess.STDOUT, start_new_session=True, pass_fds=inherited) as process:
-            start = time.monotonic()
+        start = time.monotonic()
+        with _command_process(argv, cwd=cwd, env=env, stdin=stdin if stdin_text is not None else None,
+                              output=output, inherited=inherited, cancellation=cancellation,
+                              start=start, timeout=timeout) as (process, status_descriptor):
+            status = None
             try:
-                while not _exit_ready(process):
+                while True:
+                    status = _command_status(status_descriptor, argv)
+                    if status is not None or _exit_ready(process):
+                        break
                     if cancellation and cancellation():
                         raise ExecutionCancelled("분석 실행이 취소되었습니다.")
                     if timeout is not None and time.monotonic() - start >= timeout:
@@ -130,7 +226,7 @@ def _budgeted_process(argv, *, cwd, env, timeout, stdin_text: str | None = None,
             # avoiding a recycled numeric process/group identity.
             _kill_process_group(process)
             tail = _output_tail(output)
-            return subprocess.CompletedProcess(argv, process.returncode, tail)
+            return subprocess.CompletedProcess(argv, status["returncode"] if status is not None else process.returncode, tail)
 
 
 def _output_tail(output):

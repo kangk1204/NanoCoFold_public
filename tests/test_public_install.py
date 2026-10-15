@@ -121,6 +121,20 @@ def test_finished_jobs_allow_setup_without_modifying_database(tmp_path):
     assert database.read_bytes() == before
 
 
+def test_registered_terminal_command_blocks_update_until_dead(tmp_path, monkeypatch):
+    from nanocofold.platform.jobs import JobStore
+    store = JobStore(tmp_path)
+    with store.connect() as connection:
+        connection.execute("INSERT INTO job_processes VALUES ('old',12,'child',11,'owner')")
+    before = store.db.read_bytes()
+    monkeypatch.setattr(bootstrap, "_process_stamp", lambda pid: "child" if pid == 12 else None)
+    with pytest.raises(ValueError, match="owned command"):
+        bootstrap.reject_active_jobs(tmp_path)
+    monkeypatch.setattr(bootstrap, "_process_stamp", lambda _pid: None)
+    bootstrap.reject_active_jobs(tmp_path)
+    assert store.db.read_bytes() == before
+
+
 @pytest.fixture
 def mock_install(tmp_path, monkeypatch):
     root = tmp_path / "source with spaces"

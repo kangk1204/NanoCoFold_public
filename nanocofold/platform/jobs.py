@@ -112,8 +112,9 @@ def process_stamp(pid: int | None) -> str | None:
             if fields[0] == "Z":
                 return None
             return fields[19]  # Linux starttime, insensitive to pid reuse.
-        result = subprocess.run(["ps", "-p", str(pid), "-o", "lstart="], capture_output=True, text=True, timeout=2)
-        return result.stdout.strip() or None
+        result = subprocess.run(["ps", "-p", str(pid), "-o", "stat=,lstart="], capture_output=True, text=True, timeout=2)
+        fields = result.stdout.strip().split(None, 1)
+        return fields[1].strip() if len(fields) == 2 and not fields[0].startswith("Z") else None
     except (OSError, ValueError, subprocess.SubprocessError):
         return None
 
@@ -157,6 +158,10 @@ class JobStore:
             connection.execute("CREATE INDEX IF NOT EXISTS jobs_run_dir ON jobs(json_extract(payload,'$.run_dir'))")
             connection.execute("CREATE INDEX IF NOT EXISTS jobs_active_run_dir ON jobs(json_extract(payload,'$.run_dir')) WHERE state IN ('queued','running','cancelling')")
             connection.execute("CREATE TABLE IF NOT EXISTS submission_links (id TEXT PRIMARY KEY,submission_hash TEXT NOT NULL,job_id TEXT NOT NULL)")
+            connection.execute("""CREATE TABLE IF NOT EXISTS job_processes (
+                job_id TEXT NOT NULL, pid INTEGER NOT NULL, stamp TEXT NOT NULL,
+                owner_pid INTEGER NOT NULL, owner_stamp TEXT NOT NULL,
+                PRIMARY KEY(job_id,pid,stamp))""")
 
     @contextlib.contextmanager
     def connect(self):
@@ -176,6 +181,43 @@ class JobStore:
         """Heartbeat statistics must not parse/reconcile every result directory."""
         with self.connect() as connection:
             return connection.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+
+    def register_process(self, identifier, owner_pid, owner_stamp, pid, stamp):
+        """Commit command ownership before its launch gate can be opened."""
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("SELECT payload FROM jobs WHERE id=?", (identifier,)).fetchone()
+            job = json.loads(row["payload"]) if row else {}
+            if (job.get("state") != "running" or job.get("pid") != owner_pid
+                    or not owner_stamp or job.get("process_stamp") != owner_stamp
+                    or process_stamp(owner_pid) != owner_stamp
+                    or not stamp or process_stamp(pid) != stamp):
+                raise RuntimeError("작업 소유권 또는 실행 상태가 바뀌어 외부 명령을 시작하지 않았습니다.")
+            connection.execute("INSERT INTO job_processes VALUES (?,?,?,?,?)",
+                               (identifier, pid, stamp, owner_pid, owner_stamp))
+
+    def registered_processes(self, identifier, connection=None, *, owner=None):
+        if connection is None:
+            with self.connect() as current:
+                return self.registered_processes(identifier, current, owner=owner)
+        query, values = "SELECT pid,stamp FROM job_processes WHERE job_id=?", (identifier,)
+        if owner is not None:
+            query += " AND owner_pid=? AND owner_stamp=?"
+            values += tuple(owner)
+        return [(row["pid"], row["stamp"]) for row in connection.execute(query, values)]
+
+    def registered_jobs(self):
+        with self.connect() as connection:
+            return {row[0] for row in connection.execute("SELECT DISTINCT job_id FROM job_processes")}
+
+    def forget_process(self, identifier, pid, stamp):
+        # A signal request alone is not proof of death. Retain live identities
+        # across worker/server restarts until cleanup is actually observable.
+        if process_stamp(pid) == stamp:
+            return
+        with self.connect() as connection:
+            connection.execute("DELETE FROM job_processes WHERE job_id=? AND pid=? AND stamp=?",
+                               (identifier, pid, stamp))
 
     def list(self, *, states=None, kind=None, limit=None, before=None, before_id=None, cleanup=False) -> list[dict]:
         clauses, values = [], []
@@ -223,7 +265,7 @@ class JobStore:
             return row["submission_hash"], self.get(row["job_id"])
         return None
 
-    def update(self, identifier: str, *, expected_states=None, **changes) -> dict:
+    def update(self, identifier: str, *, expected_states=None, expected_attempt=None, **changes) -> dict:
         with self.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute("SELECT payload FROM jobs WHERE id=?", (identifier,)).fetchone()
@@ -232,12 +274,14 @@ class JobStore:
             job = json.loads(row["payload"])
             if expected_states is not None and job["state"] not in expected_states:
                 return job
+            if expected_attempt is not None and (job.get("pid"), job.get("process_stamp")) != expected_attempt:
+                return job
             job.update(changes, updated=time.time())
             connection.execute("UPDATE jobs SET state=?,updated=?,payload=?,needs_cleanup=? WHERE id=?",
                                (job["state"], job["updated"], json.dumps(job), int(bool(job.get("descendants"))), identifier))
         return job
 
-    def finish(self, identifier: str, *, state: str, **changes) -> dict:
+    def finish(self, identifier: str, *, state: str, expected_attempt=None, **changes) -> dict:
         """Finish only the current running attempt; a persisted cancel wins.
 
         The worker's last read and the HTTP cancellation request are independent
@@ -254,6 +298,10 @@ class JobStore:
             job = json.loads(row["payload"])
             if job["state"] not in {"running", "cancelling"}:
                 return job
+            if expected_attempt is not None and (job.get("pid"), job.get("process_stamp")) != expected_attempt:
+                return job
+            if any(process_stamp(pid) == stamp for pid, stamp in self.registered_processes(identifier, connection)):
+                return job  # Never publish terminal state before owned-command cleanup.
             if job["state"] == "cancelling":
                 state = "budget_exhausted" if job.get("budget_exceeded") else "cancelled"
                 changes.update(exit_code=130, can_resume=job["kind"] == "analysis",
@@ -315,6 +363,7 @@ class JobManager:
         self.children: dict[str, subprocess.Popen] = {}
         self.failed_launches: dict[str, subprocess.Popen] = {}
         self.pending_kills: dict[str, tuple[float, list[tuple[int, str | None]]]] = {}
+        self.pending_kill_attempts = {}
         self.observed_descendants: dict[str, list[tuple[int, str | None]]] = {}
         self.lockfile = None
 
@@ -493,7 +542,7 @@ class JobManager:
             current = json.loads(row["payload"])
             if current["state"] not in {"interrupted", "failed", "partial_failure", "budget_exhausted", "cancelled"}:
                 raise ValueError("작업이 이미 대기 또는 실행 중입니다.")
-            if identifier in self.pending_kills or self._live_attempt_processes(current):
+            if identifier in self.pending_kills or self._live_attempt_processes(current, connection):
                 raise ValueError("앞선 실행 프로세스를 정리 중입니다. 잠시 뒤 재개하세요.")
             if current["state"] == "budget_exhausted" and additional_budget_seconds is None:
                 raise ValueError("시간 한도가 소진되었습니다. 재개할 추가 시간(분)을 입력하세요.")
@@ -511,10 +560,25 @@ class JobManager:
             connection.execute("UPDATE jobs SET state='queued',updated=?,payload=? WHERE id=?", (current["updated"], json.dumps(current), identifier))
         return current
 
-    @staticmethod
-    def _live_attempt_processes(job: dict) -> bool:
-        targets = [(job.get("pid"), job.get("process_stamp")), *job.get("descendants", [])]
+    def _live_attempt_processes(self, job: dict, connection=None) -> bool:
+        targets = [(job.get("pid"), job.get("process_stamp")), *job.get("descendants", []),
+                   *self.store.registered_processes(job["id"], connection)]
         return any(pid and stamp and process_stamp(pid) == stamp for pid, stamp in targets)
+
+    def _cleanup_commands(self, job, targets):
+        """Signal only birth-matched owned groups and keep live registry rows."""
+        identifier = job["id"]
+        for pid, stamp in self.store.registered_processes(identifier):
+            self.store.forget_process(identifier, pid, stamp)
+        registered = self.store.registered_processes(identifier, owner=(job.get("pid"), job.get("process_stamp")))
+        targets = list(dict.fromkeys((pid, stamp) for pid, stamp in [*targets, *registered]))
+        for pid, stamp in reversed(targets):
+            if stamp and process_stamp(pid) == stamp:
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(os.getpgid(pid), signal.SIGKILL)
+        for pid, stamp in registered:
+            self.store.forget_process(identifier, pid, stamp)
+        return [(pid, stamp) for pid, stamp in targets if stamp and process_stamp(pid) == stamp]
 
     def cancel(self, identifier: str) -> dict:
         # Dispatch and worker completion can happen between an API read and
@@ -651,33 +715,44 @@ class JobManager:
 
     def _terminate(self, job: dict):
         identifier = job["id"]
+        attempt = (job.get("pid"), job.get("process_stamp"))
+        if (identifier in self.pending_kills
+                and self.pending_kill_attempts.get(identifier, attempt) != attempt):
+            self.pending_kills.pop(identifier, None)
+            self.pending_kill_attempts.pop(identifier, None)
+            return
         if identifier not in self.pending_kills:
             owned = bool(job.get("process_stamp")) and process_stamp(job.get("pid")) == job["process_stamp"]
             targets = descendants(job["pid"]) if owned else self.observed_descendants.get(identifier, job.get("descendants", []))
+            targets = [*targets, *self.store.registered_processes(identifier, owner=(job.get("pid"), job.get("process_stamp")))]
             # Save the child birth identities before signalling their parent.
             # A browser/server restart during the grace period must retain the
             # authority to clean independent-session engine children.
-            current = self.store.update(identifier, expected_states={"running", "cancelling"}, descendants=targets)
-            if current["state"] not in {"running", "cancelling"}:
+            current = self.store.update(identifier, expected_states={"running", "cancelling"},
+                                        expected_attempt=(job.get("pid"), job.get("process_stamp")), descendants=targets)
+            if (current["state"] not in {"running", "cancelling"}
+                    or (current.get("pid"), current.get("process_stamp")) != (job.get("pid"), job.get("process_stamp"))):
                 return
             self.pending_kills[identifier] = (time.monotonic(), targets)
+            self.pending_kill_attempts[identifier] = attempt
             if owned and process_stamp(job["pid"]) == job["process_stamp"]:
                 with contextlib.suppress(ProcessLookupError):
                     os.kill(job["pid"], signal.SIGTERM)
         started, targets = self.pending_kills[identifier]
         if time.monotonic() - started < 3:
             return
-        for pid, stamp in reversed(targets):
-            if stamp and process_stamp(pid) == stamp:
-                with contextlib.suppress(ProcessLookupError):
-                    os.killpg(os.getpgid(pid), signal.SIGKILL)
+        remaining = self._cleanup_commands(job, targets)
+        if remaining:
+            self.pending_kills[identifier] = (started, remaining)
+            return
         self.pending_kills.pop(identifier, None)
+        self.pending_kill_attempts.pop(identifier, None)
         latest = self.store.get(identifier)
         state = "budget_exhausted" if latest.get("budget_exceeded") else "cancelled"
         now = time.time()
         previous_elapsed = latest.get("history", [])[-1].get("elapsed_seconds", 0) if latest.get("history") else 0
         elapsed = previous_elapsed + now - (latest.get("started") or now)
-        terminal = self.store.finish(identifier, state=state, finished=now, elapsed_seconds=elapsed,
+        terminal = self.store.finish(identifier, state=state, expected_attempt=(job.get("pid"), job.get("process_stamp")), finished=now, elapsed_seconds=elapsed,
                                      can_resume=job["kind"] == "analysis")
         write_platform_status(terminal)
 
@@ -691,7 +766,7 @@ class JobManager:
         jobs_by_id = {job["id"]: job for job in self.store.list(states=ACTIVE)}
         for job in self.store.list(states=TERMINAL, cleanup=True):
             jobs_by_id[job["id"]] = job
-        for identifier in set(self.children) | set(self.observed_descendants):
+        for identifier in set(self.children) | set(self.observed_descendants) | self.store.registered_jobs():
             if identifier not in jobs_by_id:
                 with contextlib.suppress(KeyError):
                     jobs_by_id[identifier] = self.store.get(identifier)
@@ -702,12 +777,9 @@ class JobManager:
                 if child and child.poll() is not None:
                     self.children.pop(job["id"], None)
                 recorded = self.observed_descendants.pop(job["id"], job.get("descendants", []))
-                for pid, stamp in recorded:
-                    if pid != job.get("pid") and stamp and process_stamp(pid) == stamp:
-                        with contextlib.suppress(ProcessLookupError):
-                            os.killpg(os.getpgid(pid), signal.SIGKILL)
+                remaining = self._cleanup_commands(job, [(pid, stamp) for pid, stamp in recorded if pid != job.get("pid")])
                 if recorded:
-                    self.store.update(job["id"], descendants=[], last_descendants=recorded)
+                    self.store.update(job["id"], expected_attempt=(job.get("pid"), job.get("process_stamp")), descendants=remaining, last_descendants=recorded)
                 continue
             if job["state"] not in {"running", "cancelling"}:
                 continue
@@ -718,12 +790,15 @@ class JobManager:
                 child.poll()  # reap our child; worker itself persists successful completion.
             if not alive:
                 current = self.store.get(identifier)
+                if (current.get("pid"), current.get("process_stamp")) != (job.get("pid"), job.get("process_stamp")):
+                    continue
                 # Tool processes can use independent sessions. Reap descendants
                 # recorded before a forced worker death, even after reparenting.
-                for pid, stamp in self.observed_descendants.pop(identifier, job.get("descendants", [])):
-                    if stamp and process_stamp(pid) == stamp:
-                        with contextlib.suppress(ProcessLookupError):
-                            os.killpg(os.getpgid(pid), signal.SIGKILL)
+                remaining = self._cleanup_commands(job, self.observed_descendants.get(identifier, job.get("descendants", [])))
+                if remaining:
+                    self.observed_descendants[identifier] = remaining
+                    continue
+                self.observed_descendants.pop(identifier, None)
                 if current["state"] in {"running", "cancelling"}:
                     state = "cancelled" if current["state"] == "cancelling" else "interrupted"
                     if current.get("budget_exceeded"):
@@ -731,7 +806,7 @@ class JobManager:
                     now = time.time()
                     previous_elapsed = current.get("history", [])[-1].get("elapsed_seconds", 0) if current.get("history") else 0
                     elapsed = previous_elapsed + now - (current.get("started") or now)
-                    terminal = self.store.finish(identifier, state=state, finished=now, elapsed_seconds=elapsed,
+                    terminal = self.store.finish(identifier, state=state, expected_attempt=(job.get("pid"), job.get("process_stamp")), finished=now, elapsed_seconds=elapsed,
                                                  error="실행 프로세스가 종료되었습니다. 기록된 완료 단계만 재개할 수 있습니다.", can_resume=job["kind"] == "analysis")
                     write_platform_status(terminal)
                 # A dead worker may leave tool children; finish pending cleanup.
@@ -744,12 +819,15 @@ class JobManager:
             observed = descendants(job["pid"])
             self.observed_descendants[identifier] = observed
             if job.get("budget_seconds") and elapsed >= job["budget_seconds"]:
-                job = self.store.update(identifier, expected_states={"running"}, state="cancelling", phase="budget_exhausted", budget_exceeded=True)
+                attempt = (job.get("pid"), job.get("process_stamp"))
+                job = self.store.update(identifier, expected_states={"running"}, expected_attempt=attempt, state="cancelling", phase="budget_exhausted", budget_exceeded=True)
+                if (job.get("pid"), job.get("process_stamp")) != attempt:
+                    continue
             if job["state"] == "cancelling":
                 self._terminate(job)
             else:
                 progress = {**self._progress(job), **msa_acquisition_status(job["run_dir"])} if job.get("run_dir") else self._progress(job)
-                self.store.update(identifier, expected_states={"running"}, elapsed_seconds=elapsed, descendants=observed, **progress)
+                self.store.update(identifier, expected_states={"running"}, expected_attempt=(job.get("pid"), job.get("process_stamp")), elapsed_seconds=elapsed, descendants=observed, **progress)
         jobs = self.store.list(states=ACTIVE)
         occupied = {job["gpu"] for job in jobs if job["kind"] in {"analysis", "diagnostics"} and job["state"] in {"running", "cancelling"}}
         cpu_kinds = {job["kind"] for job in jobs if job["kind"] != "analysis" and job["state"] in {"running", "cancelling"}}

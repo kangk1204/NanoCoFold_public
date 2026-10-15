@@ -132,9 +132,10 @@ def _process_stamp(pid):
         if Path("/proc/self/stat").is_file():
             fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
             return None if fields[0] == "Z" else fields[19]
-        result = subprocess.run(["ps", "-p", str(pid), "-o", "lstart="],
+        result = subprocess.run(["ps", "-p", str(pid), "-o", "stat=,lstart="],
                                 capture_output=True, text=True, timeout=2)
-        return result.stdout.strip() or None
+        fields = result.stdout.strip().split(None, 1)
+        return fields[1].strip() if len(fields) == 2 and not fields[0].startswith("Z") else None
     except (OSError, ValueError, IndexError, subprocess.SubprocessError):
         return None
 
@@ -148,6 +149,10 @@ def reject_active_jobs(workspace):
         active = connection.execute("SELECT COUNT(*) FROM jobs WHERE state IN ('queued','running','cancelling')").fetchone()[0]
         if active:
             raise ValueError("이 작업 공간에 대기/실행 중인 작업이 있습니다. 종료 후 설치를 실행하세요.")
+        if connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='job_processes'").fetchone():
+            for pid, stamp in connection.execute("SELECT pid,stamp FROM job_processes"):
+                if stamp and _process_stamp(pid) == stamp:
+                    raise ValueError("등록된 외부 명령을 정리 중입니다. 종료 후 다시 실행하세요. / An owned command is still finishing.")
         columns = {row[1] for row in connection.execute("PRAGMA table_info(jobs)")}
         if "payload" in columns:
             for row in connection.execute("SELECT payload FROM jobs"):
