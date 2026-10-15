@@ -494,7 +494,10 @@ def _multimer_lines(sequences, cardinality, alignments):
         after = "-" * sum(len(query) for query in sequences[index + 1:])
         for row_index, (header, row) in enumerate(alignment.rows):
             # Every unpaired block must start with its updated actual query.
-            yield f">chain_{index}_{row_index} {header[1:]}\n"
+            # Strip only our own canonical wrapper when reserializing. Retain
+            # the original homolog label and produce byte-identical frozen MSA.
+            label = re.sub(r"^chain_\d+_\d+ ", "", header[1:])
+            yield f">chain_{index}_{row_index} {label}\n"
             yield before + (sequence if row_index == 0 else row) + after + "\n"
 
 

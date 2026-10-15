@@ -6,6 +6,7 @@ import math
 import zipfile
 from pathlib import Path
 from .results import ResultReader
+from .errors import public_error, public_error_data
 from .paths import native, sha256
 from ..utils.atomic import atomic_writer, check_output, write_bytes, write_json
 
@@ -37,10 +38,10 @@ def build_bundle(run_root, destination, snapshot_root=None):
             entry=store_structure(data,destination,f'structures/{i}')
             index['structures'].append({'candidate_id':candidate,'observation_id':observation,**entry})
         except (OSError,ValueError,KeyError) as exc:
-            issue=f'{candidate}: {exc}'
+            issue=f'{candidate}: {public_error(exc)}'
             index['issues'].append(issue)
             reader.issues.append(issue)
-    write(destination/'index.json',index)
+    write(destination/'index.json',public_error_data(index))
     if snapshot_root is not None:
         manifest_path=snapshot_root/'manifest.json'
         manifest=json.loads(manifest_path.read_text())
@@ -61,7 +62,7 @@ def build_bundle(run_root, destination, snapshot_root=None):
             write_bytes(destination/name,data,root=destination)
             if fmt=='html':html_issues=set(reader.issues)
         except (OSError,ValueError,KeyError) as exc:
-            issue=f'{fmt} 내보내기: {exc}'
+            issue=f'{fmt} 내보내기: {public_error(exc)}'
             index['issues'].append(issue)
             reader.issues.append(issue)
     if html_issues is not None and set(reader.issues)!=html_issues:
@@ -72,7 +73,7 @@ def build_bundle(run_root, destination, snapshot_root=None):
             write_bytes(destination/name,data,root=destination)
         except (OSError,ValueError,KeyError) as exc:
             (destination/'report_offline.html').unlink(missing_ok=True)
-            issue=f'html 최종 상태 갱신: {exc}'
+            issue=f'html 최종 상태 갱신: {public_error(exc)}'
             index['issues'].append(issue);reader.issues.append(issue)
     # Structure/PAE readers and exporters can discover errors after the initial
     # summary. Preserve their artifacts, but never publish a stale complete flag.
@@ -83,7 +84,7 @@ def build_bundle(run_root, destination, snapshot_root=None):
     if index['issues']:
         summary={**summary,'issues':list(dict.fromkeys([*summary.get('issues',[]),*index['issues']]))}
     index['summary']=summary
-    write(destination/'index.json',index)
+    write(destination/'index.json',public_error_data(index))
     # Full original run, plus cloud index/exports, with no input/environment mutation.
     with atomic_writer(destination/'results.zip',root=destination) as output:
         with zipfile.ZipFile(output,'w',compression=zipfile.ZIP_DEFLATED) as archive:

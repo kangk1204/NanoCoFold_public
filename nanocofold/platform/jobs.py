@@ -172,6 +172,11 @@ class JobStore:
         finally:
             connection.close()
 
+    def count(self) -> int:
+        """Heartbeat statistics must not parse/reconcile every result directory."""
+        with self.connect() as connection:
+            return connection.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+
     def list(self, *, states=None, limit=None, before=None, before_id=None, cleanup=False) -> list[dict]:
         clauses, values = [], []
         if states is not None:
@@ -198,7 +203,8 @@ class JobStore:
             return [self._read_payload(row["payload"]) for row in connection.execute(query, values)]
 
     def _read_payload(self, payload):
-        return self._complex_read_cache.read(json.loads(payload), record_key=payload, terminal_states=TERMINAL)
+        from .errors import public_error_data
+        return public_error_data(self._complex_read_cache.read(json.loads(payload), record_key=payload, terminal_states=TERMINAL))
 
     def get(self, identifier: str) -> dict:
         with self.connect() as connection:

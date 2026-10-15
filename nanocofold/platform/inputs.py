@@ -14,7 +14,7 @@ from functools import wraps
 import yaml
 
 from ..config import _deep_merge, _validate, cfg_get, cfg_set, load_config, read_config_yaml
-from ..utils.seq import clean_sequence, validate_candidate_id, validate_candidate_ids, validate_fasta_controls
+from ..utils.seq import clean_sequence, validate_candidate_id, validate_candidate_ids, validate_fasta_controls, validate_fasta_id
 from ..wizard import WizardSession
 from .paths import contained, native, sha256
 from .regions import apply_regions
@@ -33,12 +33,13 @@ RUNTIME_PATHS = (
 )
 
 
-def parse_fasta(content: str, *, single: bool = False) -> list[tuple[str, str]]:
+def parse_fasta(content: str, *, single: bool = False, candidate_ids: bool = True) -> list[tuple[str, str]]:
     """Accept a FASTA record or an explicitly supported raw amino-acid paste.
 
     The browser assigns raw pasted sequence the neutral identifier ``sequence``;
     callers record that assignment in the review. File-based CLI FASTA parsing
-    continues to require a header.
+    continues to require a header. ``single`` only controls the record count;
+    reference-only consumers explicitly opt out of candidate pathname rules.
     """
     if not isinstance(content, str) or not content.strip():
         raise ValueError("FASTA 서열을 입력하세요.")
@@ -78,11 +79,12 @@ def parse_fasta(content: str, *, single: bool = False) -> list[tuple[str, str]]:
         # Both entry points reject residue-number digits instead of dropping them.
         if not name or not sequence_clean or len(sequence_clean) != len(sequence) or set(sequence_clean) - AA:
             raise ValueError("서열 이름과 표준 아미노산 20종으로 구성된 서열을 확인하세요.")
-        validate_candidate_id(name)
+        (validate_candidate_id if candidate_ids else validate_fasta_id)(name)
         normalized.append((name, sequence_clean))
     if sum(len(sequence) for _, sequence in normalized) > 2_000_000:
         raise ValueError("라이브러리 입력은 합계 2,000,000잔기까지 지원합니다. 여러 분석으로 나누어 입력하세요.")
-    validate_candidate_ids(name for name, _ in normalized)
+    if candidate_ids:
+        validate_candidate_ids(name for name, _ in normalized)
     return normalized
 
 
@@ -340,7 +342,7 @@ class InputManager:
             path.write_text("".join(f">{name}\n{seq}\n" for name, seq in rows))
             cfg["screen"]["vhh_fasta"] = str(path)
         if payload.get("wt_fasta"):
-            _, seq = parse_fasta(payload["wt_fasta"], single=True)[0]
+            _, seq = parse_fasta(payload["wt_fasta"], single=True, candidate_ids=False)[0]
             cfg["mature"]["wt_sequence"] = seq
             cfg["mature"]["wt_fasta"] = None
         if payload.get("wt_structure"):
@@ -592,7 +594,7 @@ class InputManager:
 
     @preserve_failed_review
     def fasta(self, payload: dict):
-        rows = parse_fasta(payload.get("content", ""), single=True)
+        rows = parse_fasta(payload.get("content", ""), single=True, candidate_ids=False)
         from ..protein_input import MAX_PREDICTION_RESIDUES
         if len(rows[0][1]) > MAX_PREDICTION_RESIDUES:
             raise ValueError(f"표적 예측 입력은 {MAX_PREDICTION_RESIDUES}잔기까지 지원합니다. 전체 서열 길이를 확인하세요.")

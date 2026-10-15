@@ -123,7 +123,7 @@ def _external_viewer_url(cfg: dict) -> str | None:
     return external
 
 
-def load_config(path: str | Path | None = None, overrides: list[str] | None = None) -> dict:
+def load_config(path: str | Path | None = None, overrides: list[str] | None = None, *, historical: bool = False) -> dict:
     """default.yaml 위에 사용자 config와 CLI 오버라이드(a.b=c)를 병합한다."""
     # A partial substitute changes the scientific/runtime policy silently when a
     # wheel is damaged. User overrides cannot repair a missing installation asset.
@@ -163,11 +163,11 @@ def load_config(path: str | Path | None = None, overrides: list[str] | None = No
         key, value = item.split("=", 1)
         _set_dotted(cfg, key.strip(), _parse_scalar(value.strip()))
 
-    _validate(cfg)
+    _validate(cfg, historical=historical)
     return cfg
 
 
-def _validate(cfg: dict) -> None:
+def _validate(cfg: dict, *, historical: bool = False) -> None:
     from .utils.tool_args import BOLTZ_MANAGED, CHAI_MANAGED, validate_extra_args, validate_colabfold_extra_args
 
     _validate_scalar_shapes(cfg)
@@ -230,7 +230,7 @@ def _validate(cfg: dict) -> None:
         complex_config = cfg_get(cfg, "complex", {})
         checked_settings = validate_settings(complex_config)
         if "proteins" in complex_config:
-            entries = proteins(complex_config["proteins"])
+            entries = proteins(complex_config["proteins"], historical=historical)
             if checked_settings.get("primary_pair") and not set(checked_settings["primary_pair"]) <= {p["id"] for p in entries}:
                 raise ValueError("primary_pair가 실제 분석 체인에 없습니다.")
     if cfg["target"].get("fasta") and cfg["target"].get("sequence"):
@@ -251,28 +251,28 @@ def _validate(cfg: dict) -> None:
         raise ValueError("design.engine은 rfantibody, boltzgen, both 중 하나를 선택하세요.")
     hotspot_mode = cfg_get(cfg, "design.hotspot_mode", "none")
     if not isinstance(hotspot_mode, str) or hotspot_mode not in {"none", "specified"}:
-        raise ValueError("design.hotspot_mode must be none|specified")
+        raise ValueError("design.hotspot_mode는 none 또는 specified여야 합니다.")
     if mode == "design" and hotspot_mode == "specified":
         hotspots = cfg_get(cfg, "target.hotspots")
         if not isinstance(hotspots, list) or not hotspots:
-            raise ValueError("Specified design hotspots require an explicit nonempty target.hotspots list")
+            raise ValueError("지정 부위 설계에는 비어 있지 않은 target.hotspots 목록이 필요합니다.")
     refinement = cfg_get(cfg, "design.refinement", {})
     if not isinstance(refinement, dict) or type(refinement.get("enabled", False)) is not bool:
-        raise ValueError("design.refinement.enabled must be true/false")
+        raise ValueError("design.refinement.enabled는 true/false여야 합니다.")
     if refinement.get("enabled", False):
         if mode != "design":
-            raise ValueError("design.refinement requires design mode")
+            raise ValueError("design.refinement는 design 모드에서만 사용할 수 있습니다.")
         for key, default, low, high in (("library_size", 1000, 2, 10000), ("parents_per_engine", 2, 1, 100),
                                        ("min_mutations", 1, 1, 50), ("max_mutations", 5, 1, 50), ("final_count", 100, 1, 2000)):
             value = refinement.get(key, default)
             if type(value) is not int or not low <= value <= high:
-                raise ValueError(f"design.refinement.{key} must be integer {low}..{high}")
+                raise ValueError(f"design.refinement.{key}는 {low}–{high} 정수여야 합니다.")
         if refinement.get("min_mutations", 1) > refinement.get("max_mutations", 5):
-            raise ValueError("design.refinement.min_mutations exceeds max_mutations")
+            raise ValueError("design.refinement.min_mutations는 max_mutations 이하여야 합니다.")
         if refinement.get("final_count", 100) > refinement.get("library_size", 1000):
-            raise ValueError("design.refinement.final_count exceeds library_size")
+            raise ValueError("design.refinement.final_count는 library_size 이하여야 합니다.")
         if not cfg_get(cfg, "screen.cascade.enabled", False):
-            raise ValueError("design.refinement requires the ColabFold→Boltz-2 cascade")
+            raise ValueError("design.refinement에는 ColabFold→Boltz-2 cascade가 필요합니다.")
     if design_engine in {"boltzgen", "both"}:
         from .design_boltzgen import settings
         settings(cfg)
@@ -311,20 +311,20 @@ def _validate(cfg: dict) -> None:
     from .engine_comparison import settings as comparison_settings
     msa_source = cfg_get(cfg, "screen.colabfold.msa_source", "cache")
     if not isinstance(msa_source, str) or msa_source not in {"cache", "local_mmseqs2", "public_mmseqs2", "public_api"}:
-        raise ValueError("screen.colabfold.msa_source must be cache|local_mmseqs2|public_mmseqs2|public_api")
+        raise ValueError("screen.colabfold.msa_source는 cache, local_mmseqs2, public_mmseqs2, public_api 중 하나여야 합니다.")
     consent = cfg_get(cfg, "screen.allow_public_msa_server", False)
     if type(consent) is not bool:
-        raise ValueError("screen.allow_public_msa_server must be true/false")
+        raise ValueError("screen.allow_public_msa_server는 true/false여야 합니다.")
     if msa_source == "public_api" and consent is not True:
         raise ValueError("public_api uploads target/generated sequences; screen.allow_public_msa_server=true is required")
     comparison = comparison_settings(cfg)
     if comparison["enabled"]:
         if mode not in {"design", "screen", "mature"} or cfg_get(cfg, "specificity.enabled", False):
-            raise ValueError("Engine comparison requires design/screen/mature without specificity campaign")
+            raise ValueError("엔진 비교는 특이성 캠페인 없이 design/screen/mature 모드에서만 사용할 수 있습니다.")
         if cfg_get(cfg, "screen.cascade.enabled", False) or int(cfg_get(cfg, "screen.boltz2_rescore_top", 0) or 0):
-            raise ValueError("Engine comparison cannot also enable cascade or Boltz-2 rescore; disable those explicitly")
+            raise ValueError("엔진 비교와 cascade 또는 Boltz-2 재채점은 함께 켤 수 없습니다. 해당 옵션을 명시적으로 끄세요.")
         if refinement.get("enabled", False):
-            raise ValueError("Direct engine comparison cannot also enable design.refinement")
+            raise ValueError("직접 엔진 비교와 design.refinement는 함께 켤 수 없습니다.")
         if "colabfold" in comparison["engines"]:
             from .colabfold import settings as colabfold_settings
             colabfold_settings(cfg)
@@ -343,7 +343,8 @@ def _validate(cfg: dict) -> None:
         if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= 10000:
             raise ValueError(f"screen.cascade.{key} 는 {minimum}–10000 사이의 정수여야 합니다.")
     metric = cascade.get("ranking_metric", "iptm")
-    if not isinstance(metric, str) or metric not in {"iptm", "ipsae", "interface_plddt", "interface_pae", "n_clashes"}:
+    from .cascade import RANKING_DIRECTIONS
+    if not isinstance(metric, str) or metric not in RANKING_DIRECTIONS:
         raise ValueError("screen.cascade.ranking_metric 은 iptm|ipsae|interface_plddt|interface_pae|n_clashes 중 하나여야 합니다.")
     identity = cascade.get("diversity_identity", .85)
     if isinstance(identity, bool) or not isinstance(identity, (int, float)) or not 0 < identity <= 1:
@@ -357,7 +358,7 @@ def _validate(cfg: dict) -> None:
         raise ValueError("screen.cascade.audit_seed 는 null 또는 0–4294967295 사이의 정수여야 합니다.")
     if cascade.get("enabled", False):
         if mode not in {"screen", "mature"} and not (mode == "design" and refinement.get("enabled", False)):
-            raise ValueError("ColabFold→Boltz-2 cascade requires screen/mature or enabled design.refinement")
+            raise ValueError("ColabFold→Boltz-2 cascade에는 screen/mature 또는 활성화된 design.refinement가 필요합니다.")
         if cfg_get(cfg, "screen.engine") != "colabfold":
             raise ValueError("cascade 활성화에는 screen.engine=colabfold가 필요합니다.")
         if int(cfg_get(cfg, "screen.boltz2_rescore_top", 0) or 0) > 0:

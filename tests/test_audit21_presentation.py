@@ -3,6 +3,7 @@ import json
 import os
 import re
 from html.parser import HTMLParser
+from urllib.parse import unquote
 
 import numpy as np
 import pandas as pd
@@ -14,12 +15,12 @@ from nanocofold.platform.results import ResultReader
 
 
 class FrameDocument(HTMLParser):
-    document = None
+    href = None
 
     def handle_starttag(self, tag, attributes):
         attributes = dict(attributes)
-        if tag == "iframe" and attributes.get("id") == "complete-result-explorer":
-            self.document = attributes["srcdoc"]
+        if tag == "a" and attributes.get("id") == "complete-result-explorer":
+            self.href = attributes["href"]
 
 
 @pytest.mark.parametrize("row", [
@@ -56,17 +57,21 @@ def saved_run(tmp_path, count=8):
 def test_general_report_uses_complete_saved_explorer_without_modifying_originals(tmp_path):
     run, cfg = saved_run(tmp_path)
     originals = {path: path.read_bytes() for path in run.rglob("*") if path.is_file()}
-    document = report.generate_report(run, cfg, {}, viewer_max=1).read_text()
+    output = report.generate_report(run, cfg, {}, viewer_max=1)
+    document = output.read_text()
     frame = FrameDocument();frame.feed(document)
-    assert frame.document
-    match = re.search(r'<script id="result-data" type="application/json">(.*?)</script>', frame.document, re.S)
+    assert frame.href
+    explorer_document = (output.parent / unquote(frame.href)).read_text()
+    assert "<iframe" not in document and "srcdoc=" not in document
+    assert len(document.encode()) < 100_000
+    match = re.search(r'<script id="result-data" type="application/json">(.*?)</script>', explorer_document, re.S)
     payload = json.loads(match.group(1))
     assert len(payload["candidates"]["rows"]) == 8  # Both former viewer/table limits are bypassed here.
     expected = json.loads(re.search(r'<script id="result-data" type="application/json">(.*?)</script>',
                           ResultReader(run).export("html")[0].decode(), re.S).group(1))
     assert payload["candidates"] == expected["candidates"]
     assert payload["structures"] == expected["structures"]
-    assert 'data-layer="contacts"' in frame.document and 'id="measure-result-distance"' in frame.document
+    assert 'data-layer="contacts"' in explorer_document and 'id="measure-result-distance"' in explorer_document
     assert all(path.read_bytes() == data for path, data in originals.items())
 
 
@@ -84,11 +89,13 @@ def test_complete_report_mode_controls_and_rotated_zoomed_camera_survive_resize(
         page.on("request", lambda request: external.append(request.url) if request.url.startswith("http") else None)
         page.goto(output.as_uri())
         page.locator("#complete-result-explorer").scroll_into_view_if_needed()
-        frame = page.frame_locator("#complete-result-explorer")
+        page.screenshot(path=str(tmp_path / "linked-report-entry.png"))
+        page.locator("#complete-result-explorer").click()
+        frame = page
         expect(frame.locator("#candidate-table tbody tr")).to_have_count(8)
         frame.locator("#candidate-table tbody button").filter(has_text="model-7").click()
         frame.locator("#structure-view canvas").wait_for()
-        inner = next(f for f in page.frames if f != page.main_frame)
+        inner = page
         inner.wait_for_function("() => !!state.viewer?.viewer.plugin.canvas3d?.camera")
         original = inner.evaluate("JSON.stringify(state.rows)")
         inner.evaluate("() => {state.result.mode='complex';syncResultModeControls();renderCandidates();}")
@@ -115,12 +122,26 @@ def test_complete_report_mode_controls_and_rotated_zoomed_camera_survive_resize(
             return camera.getSnapshot();
         }""")
         page.set_viewport_size({"width": 900, "height": 750})
-        inner.wait_for_function("() => {const c=state.viewer.viewer.plugin.canvas3d.camera;return c.viewport.width>0 && c.viewport.height>0;}")
+        inner.wait_for_function("""() => {
+            const c=state.viewer.viewer.plugin.canvas3d.camera, r=document.querySelector('#structure-view canvas').getBoundingClientRect();
+            return Math.abs(c.viewport.width/c.viewport.height-r.width/r.height)<.002;
+        }""")
+        # ResizeObserver and MolStar camera transitions run asynchronously. The
+        # former viewer resets only after this immediate viewport check passes.
+        inner.wait_for_timeout(3000)
         after = inner.evaluate("state.viewer.viewer.plugin.canvas3d.camera.getSnapshot()")
         for field in ("position", "target", "up"):
             assert after[field] == pytest.approx(pose[field], abs=1e-5)
         assert inner.evaluate("JSON.stringify(state.rows)") == original
         frame.locator("#fit-result-structure").click()  # Fitting remains an explicit user action.
+        inner.wait_for_function("""() => {
+            const camera=state.viewer.viewer.plugin.canvas3d.camera, v=camera.viewport;
+            return state.structure.chains.flatMap(c=>c.residues).filter(r=>r.ca).every(r=>{
+                const p=camera.project([0,0,0],r.ca);
+                return p[0]>=v.x && p[0]<=v.x+v.width && p[1]>=v.y && p[1]<=v.y+v.height;
+            });
+        }""")
+        frame.locator("#structure-view").screenshot(path=str(tmp_path / "linked-explorer-structure.png"))
         inner.evaluate("() => {state.result.mode='screen';syncResultModeControls();renderCandidates();}")
         expect(frame.locator("#eligibility-basis")).to_be_visible()
         expect(frame.locator('[data-layer="cdr"]')).to_be_visible()

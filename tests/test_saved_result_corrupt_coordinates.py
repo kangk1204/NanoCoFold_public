@@ -5,6 +5,7 @@ import json
 import re
 import zipfile
 from html.parser import HTMLParser
+from urllib.parse import unquote
 
 import numpy as np
 import pandas as pd
@@ -16,12 +17,12 @@ from nanocofold.platform.results import ResultReader
 
 
 class ExplorerFrame(HTMLParser):
-    document = None
+    href = None
 
     def handle_starttag(self, tag, attributes):
         attributes = dict(attributes)
-        if tag == "iframe" and attributes.get("id") == "complete-result-explorer":
-            self.document = attributes["srcdoc"]
+        if tag == "a" and attributes.get("id") == "complete-result-explorer":
+            self.href = attributes["href"]
 
 
 def payload(document):
@@ -67,10 +68,11 @@ def test_corrupt_saved_model_is_unavailable_but_other_model_and_delivery_survive
     with zipfile.ZipFile(io.BytesIO(reader.export("report_zip")[0])) as archive:
         assert archive.testzip() is None
         exported.append(payload(archive.read("report.html").decode()))
-    document = report.generate_report(run, cfg, {}).read_text()
+    output = report.generate_report(run, cfg, {})
+    document = output.read_text()
     frame = ExplorerFrame(); frame.feed(document)
-    assert frame.document
-    exported.append(payload(frame.document))
+    assert frame.href
+    exported.append(payload((output.parent / unquote(frame.href)).read_text()))
     for result in exported:
         assert {row["candidate_id"] for row in result["candidates"]["rows"]} == {"ok", "broken"}
         assert result["structures"]

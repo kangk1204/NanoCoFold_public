@@ -60,8 +60,8 @@ def test_failed_download_is_bounded_and_partial_preserved(shell_workspace):
     assert result.returncode == 28
     assert "같은 설치 명령을 다시 실행" in result.stderr
     args = json.loads(Path(env["CURL_ARGS"]).read_text())
-    for flag, value in (("--connect-timeout", "20"), ("--max-time", "120"),
-                        ("--retry", "2"), ("--retry-max-time", "240")):
+    for flag, value in (("--connect-timeout", "20"), ("--max-time", "600"),
+                        ("--retry", "2"), ("--retry-max-time", "1800")):
         assert args[args.index(flag)+1] == value
     assert "https://eddylab.org/software/hmmer/hmmer-3.4.tar.gz" in args
     attempt, = attempts(root)
@@ -93,3 +93,26 @@ def test_downloaded_unverified_archive_is_not_extracted(shell_workspace):
     assert (attempt / "hmmer.tar.gz.part").read_bytes() == b"preserved-download-prefix"
     assert not (attempt / "hmmer.tar.gz").exists()
     assert not Path(env["TAR_CALLED"]).exists()
+
+
+def test_download_budget_override_is_applied_to_each_attempt_and_retries(shell_workspace):
+    root, env = shell_workspace
+    env["NANOCOFOLD_HMMER_DOWNLOAD_TIMEOUT"] = "1200"
+    assert invoke(root, env).returncode == 28
+    args = json.loads(Path(env["CURL_ARGS"]).read_text())
+    assert args[args.index("--max-time")+1] == "1200"
+    assert args[args.index("--retry-max-time")+1] == "3600"
+    attempt, = attempts(root)
+    assert (attempt / "hmmer.tar.gz.part").read_bytes() == b"preserved-download-prefix"
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "abc", "1.5"])
+def test_invalid_download_budget_is_rejected_before_transfer(shell_workspace, value):
+    root, env = shell_workspace
+    env["NANOCOFOLD_HMMER_DOWNLOAD_TIMEOUT"] = value
+    result = invoke(root, env)
+    assert result.returncode == 1 and "양의 정수" in result.stderr
+    assert not Path(env["CURL_ARGS"]).exists()
+    assert not Path(env["TAR_CALLED"]).exists()
+    attempt, = attempts(root)
+    assert "status=failed" in (attempt / "status.txt").read_text()

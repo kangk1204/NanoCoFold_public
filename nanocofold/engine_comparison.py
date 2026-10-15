@@ -31,18 +31,18 @@ def enabled(cfg):
 def settings(cfg):
     value = cfg_get(cfg, "screen.comparison", {})
     if not isinstance(value, dict) or type(value.get("enabled", False)) is not bool:
-        raise ValueError("screen.comparison.enabled must be true/false")
+        raise ValueError("screen.comparison.enabled는 true/false여야 합니다.")
     # A historical stored request may omit this field. New resolved configs
     # explicitly select four; missing fields must retain the original contract.
     engines = value.get("engines", list(LEGACY_ENGINES))
     if (not isinstance(engines, list) or not engines or any(not isinstance(e, str) or e not in AVAILABLE_ENGINES for e in engines)
             or len(set(engines)) != len(engines)):
-        raise ValueError("screen.comparison.engines must contain unique colabfold|boltz2|chai1|opendde predictors")
+        raise ValueError("screen.comparison.engines는 중복 없는 colabfold, boltz2, chai1, opendde 목록이어야 합니다.")
     if "opendde" in engines:
         from .opendde import settings as opendde_settings
         opendde_settings(cfg, require_enabled=value.get("enabled", False))
     if type(value.get("continue_on_error", True)) is not bool:
-        raise ValueError("screen.comparison.continue_on_error must be true/false")
+        raise ValueError("screen.comparison.continue_on_error는 true/false여야 합니다.")
     return {"enabled": value.get("enabled", False), "engines": engines,
             "continue_on_error": value.get("continue_on_error", True)}
 
@@ -73,6 +73,14 @@ def prepare_msa(cfg, run_dir, state, target, candidates, id_column="design_id", 
     All predictors receive the same frozen, unpaired monomer inputs.
     """
     seq.candidate_id_aliases(candidates[id_column])
+    # Engine IDs become output-path components later. Reject their actual size
+    # before cache lookup or authorized sequence upload, rather than afterwards.
+    for engine in settings(cfg)["engines"]:
+        for identifier in candidates[id_column]:
+            try:
+                seq.validate_candidate_id(engine + "__" + str(identifier))
+            except ValueError as exc:
+                raise ValueError(f"비교 후보 ID는 엔진 접두어({engine}__)를 포함해 UTF-8 120바이트 이하여야 합니다. 짧은 ID로 바꾸세요.") from exc
     if cfg_get(cfg, "run.mock", False) or cfg_get(cfg, "run.dry_run", False):
         return copy.deepcopy(cfg), candidates.copy(), {}
     from .colabfold_msa import cached_monomer, prepare_manifest, prepare_id_aliases
@@ -92,7 +100,7 @@ def prepare_msa(cfg, run_dir, state, target, candidates, id_column="design_id", 
     elif source == "public_api":
         acquired = _acquire_reviewed_api(copied, run_dir, state, sequences)
     elif source != "cache":
-        raise ValueError("Engine comparison MSA source must be cache, local_mmseqs2, or public_api")
+        raise ValueError("엔진 비교 MSA 방식은 cache, local_mmseqs2, public_api 중 하나여야 합니다.")
     alignments = {}
     for identifier, sequence in sequences.items():
         try:
@@ -330,7 +338,7 @@ def run(cfg, run_dir, state, target, candidates, cdr_ranges=None, *, predict, fi
         from .pose_integration import preserve_generation_structure
         candidates = preserve_generation_structure(candidates)
     if candidates[id_column].astype(str).duplicated().any():
-        raise ValueError("Comparison source candidate IDs must be unique")
+        raise ValueError("비교 후보 ID는 중복될 수 없습니다.")
     seq.validate_candidate_ids(candidates[id_column].astype(str))
     cfg, candidates, alignments = prepare_msa(cfg, run_dir, state, target, candidates, id_column, sequence_column)
     root = Path(run_dir) / "02_comparison"
@@ -350,7 +358,7 @@ def run(cfg, run_dir, state, target, candidates, cdr_ranges=None, *, predict, fi
     identity_path = root / "comparison_identity.json"
     identity = {"fingerprint": provenance.fingerprint(condition_identity), **condition_identity}
     if identity_path.exists() and json.loads(identity_path.read_text()) != identity:
-        raise ValueError("Comparison input/engine/MSA conditions changed; preserve this run and submit a new analysis")
+        raise ValueError("비교 입력·엔진·MSA 조건이 바뀌었습니다. 기존 실행을 보존하고 새 분석으로 제출하세요.")
     _save(identity_path, identity)
     snapshot = {"schema_version": SCHEMA_VERSION, "engines": options["engines"], "mock": bool(cfg_get(cfg, "run.mock", False)),
                 "input_candidates": len(candidates), "expected_rows": len(candidates) * len(options["engines"]),
@@ -388,7 +396,7 @@ def run(cfg, run_dir, state, target, candidates, cdr_ranges=None, *, predict, fi
                                  mock=bool(cfg_get(cfg, "run.mock", False)), dry_run=bool(cfg_get(cfg, "run.dry_run", False)),
                                  id_column=id_column, sequence_column=sequence_column)
                 if len(result) != 1 or str(result.iloc[0][id_column]) != identifier:
-                    raise ValueError("Prediction result identity/count differs from comparison input")
+                    raise ValueError("예측 결과 ID·개수가 비교 입력과 다릅니다.")
                 prediction = result.iloc[0].to_dict()
                 # Adapter stage manifests describe only this call. The global
                 # comparison manifest is the single observation source.

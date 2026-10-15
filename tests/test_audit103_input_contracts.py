@@ -33,7 +33,7 @@ def test_reviewed_fasta_preserves_ordinary_ids_and_header_tokens(identifier):
 
 
 @pytest.mark.parametrize("identifier", ["=cmd_variant", "+v1", "-v1", "@v1"])
-@pytest.mark.parametrize("field,mode", [("content", "design"), ("vhh_fasta", "screen"), ("wt_fasta", "mature")])
+@pytest.mark.parametrize("field,mode", [("vhh_fasta", "screen")])
 def test_batch_manifest_rejects_formula_ids_in_each_fasta_input(identifier, field, mode):
     payload = {"version": 1, "mode": mode, "mock": True,
                "entries": [{"id": "review", "content": ">target\nACDEFGHI\n"}],
@@ -44,6 +44,28 @@ def test_batch_manifest_rejects_formula_ids_in_each_fasta_input(identifier, fiel
     with pytest.raises(ValueError, match="스프레드시트 수식 시작 문자"):
         expand_manifest(payload)
     assert payload == original
+
+
+
+@pytest.mark.parametrize("identifier", ["=reference", "+reference", "-reference", "@reference", "sp|P42212|GFP_AEQVI/1-238"])
+@pytest.mark.parametrize("field,mode", [("content", "design"), ("wt_fasta", "mature")])
+def test_reference_header_labels_are_distinct_from_candidate_and_batch_ids(identifier, field, mode):
+    payload = {"version": 1, "mode": mode, "mock": True,
+               "entries": [{"id": "review", "content": ">target\nACDEFGHI\n"}],
+               "wt_fasta": ">WT\nQVQLVESGGG\n"}
+    destination = payload["entries"][0] if field == "content" else payload
+    destination[field] = f">{identifier} description\nQVQLVESGGG\n"
+    original = copy.deepcopy(payload)
+    expanded = expand_manifest(payload)
+    assert expanded[0]["input"][field] == destination[field]
+    assert payload == original
+    # Count validation never bypasses safeguards when this same header is used
+    # as a candidate identity or as the source of an independent batch ID.
+    for single in (False, True):
+        with pytest.raises(ValueError):
+            parse_fasta(destination[field], single=single)
+    with pytest.raises(ValueError):
+        expand_manifest({"version": 1, "mode": "design", "targets_fasta": destination[field], "mock": True})
 
 
 def test_batch_review_rejects_formula_library_before_saving_inputs_or_jobs(tmp_path):

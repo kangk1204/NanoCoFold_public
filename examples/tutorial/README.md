@@ -21,7 +21,7 @@ screen·mature·design은 ColabFold·Boltz-2·Chai-1·OpenDDE를 사용합니다
 bash run_example.sh complex
 ```
 
-두 단백질 서열을 읽고 Boltz-2 예측과 점수 계산을 수행한 뒤 결과 경로를 표시합니다. 나노바디 없이 단백질–단백질 복합체를 분석할 때 사용하는 모드입니다. 이 작은 예제는 single-sequence 설정으로 실행하며 공개 MSA API를 사용하지 않습니다.
+두 단백질 서열을 읽고 Boltz-2 예측과 점수 계산을 수행한 뒤 결과 경로를 표시합니다. 나노바디 없이 단백질–단백질 복합체를 분석할 때 사용하는 모드입니다. 이 작은 예제는 single-sequence 설정으로 실행하며 공용 MSA API를 사용하지 않습니다.
 
 ## 2. 기존 VHH 평가
 
@@ -61,7 +61,7 @@ bash run_example.sh design --allow-public-msa
 
 같은 명령을 다시 실행하면 저장된 배치를 확인합니다. 이미 완료한 분석을 자동으로 다시 계산하지 않습니다. 종료된 분석을 별도로 한 번 더 실행하려면 `--new-run`을 붙이세요. 이전 입력·구조·보고서는 보존됩니다.
 
-입력 검토만 하려면 `--review-only`를 추가합니다. 이 단계에서는 GPU 예측을 실행하지 않습니다. 실제 설치 환경이 있어야 하며, 공개 MSA를 쓰는 모드에서는 배치 입력 검토에도 명시적인 전송 동의 옵션이 필요합니다.
+입력 검토만 하려면 `--review-only`를 추가합니다. 이 단계에서는 GPU 예측을 실행하지 않습니다. 실제 설치 환경이 있어야 하며, 공용 MSA 서버를 쓰는 모드에서는 배치 입력 검토에도 명시적인 전송 동의 옵션이 필요합니다.
 
 ```bash
 bash run_example.sh screen --allow-public-msa --review-only

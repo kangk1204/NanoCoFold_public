@@ -26,6 +26,9 @@ from .score_complex import iptm_missing_warnings
 SCHEMA_VERSION = 1
 FINAL_METRICS = ("ipsae", "iptm", "interface_plddt", "interface_pae")
 VALID_METRICS = ("ipsae", "iptm")
+# Explicit score semantics shared with configuration validation and receipts.
+RANKING_DIRECTIONS = {"ipsae": "descending", "iptm": "descending", "interface_plddt": "descending",
+                      "interface_pae": "ascending", "n_clashes": "ascending"}
 PREDICTION_FIELDS = ("pred_dir", "engine", "target_chain", "binder_chain", "aux_chains")
 
 
@@ -345,7 +348,7 @@ def select_candidates(candidates: pd.DataFrame, metrics: pd.DataFrame, cfg: dict
     frame["_valid"] = frame[metric].map(_finite)
     if "error" in frame:
         frame["_valid"] &= ~frame["error"].map(_error)
-    ascending = metric in {"interface_pae", "n_clashes"}
+    ascending = RANKING_DIRECTIONS[metric] == "ascending"
     valid = frame[frame["_valid"]].sort_values([metric, id_column], ascending=[ascending, True], kind="stable")
     ranks = {str(identifier): index + 1 for index, identifier in enumerate(valid[id_column])}
     reasons: dict[str, list[str]] = {str(identifier): [] for identifier in frame[id_column]}
@@ -389,7 +392,7 @@ def select_candidates(candidates: pd.DataFrame, metrics: pd.DataFrame, cfg: dict
             reason = "outside_boltz_budget" if bool(row["_valid"]) else "colabfold_metric_unavailable"
         rows.append({id_column: identifier, "colabfold_rank": ranks.get(identifier),
                      "selected_for_boltz": bool(reasons[identifier]),
-                     "cascade_selection_reason": reason, "cascade_ranking_metric": metric,
+                     "cascade_selection_reason": reason, "cascade_ranking_metric": metric, "cascade_ranking_direction": RANKING_DIRECTIONS[metric],
                      "cascade_ranking_value": float(row[metric]) if _finite(row[metric]) else None})
     return pd.DataFrame(rows)
 

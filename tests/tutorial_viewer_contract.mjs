@@ -154,3 +154,14 @@ test('hidden or disposed viewer resize does no camera or drawing work, while res
   f.host.clientHeight=100;f.resize();assert.deepEqual(f.pose(),manual);assert.equal(f.calls.filter(c=>c.resize).length,1);
   f.viewer.disposed=true;f.resize();assert.equal(f.calls.filter(c=>c.resize).length,1);
 });
+
+test('both complex comparison paths retain primary pair and symmetry without mutating restored settings',()=>{
+  for(const preset of ['legacy','small-four-v1']){
+    const {context:c,fields}=noviceSettingsFixture();fields['analysis-preset'].value=preset;
+    const cfg={complex:{primary_pair:['A','C'],reference_symmetry:false,engine:'boltz2',comparison_engines:['chai1'],msa_source:'cache'},screen:{comparison:{engines:['colabfold','boltz2','chai1','opendde']},colabfold:{msa_source:'cache'}}};
+    const before=JSON.stringify(cfg),settings=c.noviceComplexSettings(cfg);
+    assert.deepEqual(settings.primary_pair,['A','C']);assert.equal(settings.reference_symmetry,false);assert.equal('engine' in settings,false);
+    assert.equal(JSON.stringify(cfg),before);
+    assert.deepEqual(settings.comparison_engines,preset==='legacy'?['chai1']:cfg.screen.comparison.engines);
+  }
+});

@@ -21,7 +21,7 @@ def resolve_wt_sequence(cfg: dict) -> str:
         return seq_utils.clean_sequence(sequence)
     fasta = resolve_path(cfg, cfg_get(cfg, "mature.wt_fasta"))
     if fasta and fasta.exists():
-        records = seq_utils.read_fasta(fasta)
+        records = seq_utils.read_fasta(fasta, candidate_ids=False)
         if len(records) != 1:
             raise ValueError("WT FASTA에는 서열을 1개만 넣으세요.")
         if records:

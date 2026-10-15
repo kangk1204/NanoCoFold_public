@@ -24,7 +24,7 @@ from .utils.atomic import check_output, write_bytes, write_json, write_csv
 from .result_schema import model_observation_record, structure_payload
 
 
-def proteins(values):
+def proteins(values, *, historical=False):
     if not isinstance(values, list) or not values:
         raise ValueError("단백질 목록이 필요합니다.")
     result = []
@@ -51,8 +51,8 @@ def proteins(values):
                     or any(not isinstance(c, str) or not c or c.strip() != c for c in reference_chains)
                     or len(set(reference_chains)) != copies or entry.get("reference_chain") is not None):
                 raise ValueError("reference_chains는 사본 수와 같은 길이의 중복 없는 체인 목록이며 reference_chain과 함께 지정할 수 없습니다.")
-        elif copies > 1 and entry.get("reference_chain") is not None:
-            raise ValueError("여러 사본에는 단일 reference_chain 대신 사본별 reference_chains를 지정하세요.")
+        elif copies > 1 and entry.get("reference_chain") is not None and not historical:
+            raise ValueError("여러 사본에는 단일 reference_chain 대신 사본별 reference_chains를 지정하세요. 예전 결과는 report 명령으로 다시 열 수 있습니다. 재개·새 계산은 사본별 대응을 검토한 새 설정이 필요합니다.")
         for copy_index in range(copies):
             result.append({**entry, "id": chr(65+len(result)), "sequence": sequence[start-1:end],
                            "original_positions": positions[start-1:end], "start": start, "end": end, "copies": 1,
@@ -127,7 +127,11 @@ def pair_summary(pair_metrics, settings):
         raise ValueError("primary_pair가 실제 분석 체인 쌍에 없습니다.")
     finite = [float(p['ipsae']) for p in pair_metrics if p.get('ipsae') is not None
               and np.isfinite(float(p['ipsae']))]
-    return {"ipsae": chosen.get("ipsae"), "interface_plddt": chosen.get("interface_plddt"),
+    other_contacts = [p for p in pair_metrics if p is not chosen and p.get("n_contacts", 0) is not None
+                      and p.get("n_contacts", 0) > 0]
+    warning = ("대표 체인쌍에 접촉이 없지만 다른 체인쌍에는 접촉이 있습니다. complex.primary_pair를 확인하세요."
+               if chosen.get("n_contacts") == 0 and other_contacts else None)
+    return {"ipsae": chosen.get("ipsae"), "primary_pair_warning": warning, "interface_plddt": chosen.get("interface_plddt"),
             "interface_pae": chosen.get("interface_pae"), "ipsae_scope": "selected_chain_pair",
             "ipsae_chain_a": chosen["chain_a"], "ipsae_chain_b": chosen["chain_b"],
             "ipsae_aggregation": "max_of_directional_pair_ipsae",
@@ -299,7 +303,7 @@ def structure_data(pred, entries, cfg):
                       "contacts": contacts, "clashes": clashes, "hotspots": [], "cdr": {"ranges": {}}, "reference": reference,
                       "pae": {"values": pae.tolist(), "labels": native_labels, "unit": "Å"} if pae is not None else None,
                       "pair_metrics": pairs, "global_iptm": confidence.get("iptm", confidence.get("protein_iptm")),
-                      "engine_aggregate_score": confidence.get("aggregate_score"), "issues": []})
+                      "engine_aggregate_score": confidence.get("aggregate_score"), "issues": [primary["primary_pair_warning"]] if primary["primary_pair_warning"] else []})
 
 
 def _chai_pair_scores(confidence, entries):

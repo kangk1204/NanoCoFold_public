@@ -38,7 +38,7 @@ def resolve_target_sequence(cfg: dict) -> str:
         return sequence
     fasta = resolve_path(cfg, cfg_get(cfg, "target.fasta"))
     if fasta and fasta.exists():
-        records = seq_utils.read_fasta(fasta)
+        records = seq_utils.read_fasta(fasta, candidate_ids=False)
         if not records:
             raise ValueError(f"FASTA에서 서열을 읽지 못했습니다: {fasta}")
         if len(records) != 1:

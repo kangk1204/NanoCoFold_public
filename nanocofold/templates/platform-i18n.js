@@ -1,6 +1,12 @@
 /* UI catalog: Korean source keys, English translations. Research records are never rewritten. */
 "use strict";
 const NCF_TRANSLATIONS = Object.freeze({
+  "대표 체인쌍에 접촉이 없지만 다른 체인쌍에는 접촉이 있습니다. complex.primary_pair를 확인하세요.": "The primary pair has no contacts, while another chain pair does. Check complex.primary_pair.",
+  "입력 방식": "Input method",
+  "지정 부위 접촉률": "Specified-site contact fraction",
+  "현재 입력의 단백질 서열 전송 동의가 필요합니다.": "Consent is required to transmit the protein sequences in this input.",
+  "이 입력의 단백질 서열을 api.colabfold.com으로 전송하는 데 동의합니다.": "I consent to sending the protein sequences in this input to api.colabfold.com.",
+  "요약 ipSAE는 명시한 체인쌍 또는 검토 순서의 첫 쌍입니다. 전체 평균·최솟값과 구분하고 모든 체인쌍의 결과는 상세 표·CSV에서 확인하세요. ipTM은 기록된 적용 범위로 해석하며, 범위가 없으면 전체 복합체 값으로 추정하지 않습니다.": "Summary ipSAE uses the explicit chain pair or the first pair in reviewed order. Distinguish it from the overall mean and minimum; inspect every pair in the detail table or CSV. Interpret ipTM using its recorded scope; do not infer a whole-complex value when scope is missing.",
   "비교 구조가 제공되지 않았습니다.": "No comparison structure was supplied.",
   "{0} 선택": "Select {0}",
   "NanoCoFold 연구자 플랫폼": "NanoCoFold researcher platform",

@@ -997,6 +997,12 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
 </script><script>/* UI catalog: Korean source keys, English translations. Research records are never rewritten. */
 "use strict";
 const NCF_TRANSLATIONS = Object.freeze({
+  "대표 체인쌍에 접촉이 없지만 다른 체인쌍에는 접촉이 있습니다. complex.primary_pair를 확인하세요.": "The primary pair has no contacts, while another chain pair does. Check complex.primary_pair.",
+  "입력 방식": "Input method",
+  "지정 부위 접촉률": "Specified-site contact fraction",
+  "현재 입력의 단백질 서열 전송 동의가 필요합니다.": "Consent is required to transmit the protein sequences in this input.",
+  "이 입력의 단백질 서열을 api.colabfold.com으로 전송하는 데 동의합니다.": "I consent to sending the protein sequences in this input to api.colabfold.com.",
+  "요약 ipSAE는 명시한 체인쌍 또는 검토 순서의 첫 쌍입니다. 전체 평균·최솟값과 구분하고 모든 체인쌍의 결과는 상세 표·CSV에서 확인하세요. ipTM은 기록된 적용 범위로 해석하며, 범위가 없으면 전체 복합체 값으로 추정하지 않습니다.": "Summary ipSAE uses the explicit chain pair or the first pair in reviewed order. Distinguish it from the overall mean and minimum; inspect every pair in the detail table or CSV. Interpret ipTM using its recorded scope; do not infer a whole-complex value when scope is missing.",
   "비교 구조가 제공되지 않았습니다.": "No comparison structure was supplied.",
   "{0} 선택": "Select {0}",
   "NanoCoFold 연구자 플랫폼": "NanoCoFold researcher platform",
@@ -1954,7 +1960,7 @@ function iptmCaption(records) {
   if (scopes.has("selected_target_binder_pair")) return "표적–VHH ipTM";
   return "ipTM · 적용 범위 미기록";
 }
-const complexMetricCaptions = Object.freeze({interface_pae_ab:"PAE 행 기준 체인·열 파트너 (Å)",interface_pae_ba:"PAE 행 파트너·열 기준 체인 (Å)",target_plddt:"기준 체인 pLDDT",binder_plddt:"파트너 pLDDT",pdockq2_target:"pDockQ2 기준 체인 방향",pdockq2_binder:"pDockQ2 파트너 방향"});
+const complexMetricCaptions = Object.freeze({hotspot_contact_frac:"지정 부위 접촉률",interface_pae_ab:"PAE 행 기준 체인·열 파트너 (Å)",interface_pae_ba:"PAE 행 파트너·열 기준 체인 (Å)",target_plddt:"기준 체인 pLDDT",binder_plddt:"파트너 pLDDT",pdockq2_target:"pDockQ2 기준 체인 방향",pdockq2_binder:"pDockQ2 파트너 방향"});
 const metricCaption = (key, records, mode) => key === "iptm" ? iptmCaption(records) : (mode === "complex" ? complexMetricCaptions[key] : null) || metricCaptions[key] || key;
 function refreshMetricCaptions(records, mode) {
   for (const id of ["sort-metric", "plot-x", "plot-y"])
@@ -2330,7 +2336,7 @@ function inputSettings(forPlan = false) {
     cfg.screen.comparison.engines = [...document.querySelectorAll('[data-novice-engine]:checked')].map(i => i.value);
     if (!cfg.screen.comparison.engines.length) throw Error("평가 엔진을 하나 이상 선택하세요.");
     if (!forPlan && !simulated && cfg.screen.colabfold.msa_source === "public_api" && !cfg.screen.allow_public_msa_server)
-      throw Error("현재 입력의 표적·후보 서열 전송 동의가 필요합니다.");
+      throw Error("현재 입력의 단백질 서열 전송 동의가 필요합니다.");
   }
   if (simulated) {
     // CPU demonstrations create synthetic data and never acquire an MSA.
@@ -2373,7 +2379,9 @@ function noviceComplexSettings(cfg) {
     seeds: current.seeds || [Number($("seed").value)]};
   const source = small ? cfg.screen?.colabfold?.msa_source : current.msa_source ?? cfg.screen?.colabfold?.msa_source;
   if (!source) throw Error("복합체 비교의 MSA 준비 방식을 지정하세요. 자동으로 다른 방식을 선택하지 않습니다.");
-  return {comparison_engines: engines, seeds: current.seeds || [Number($("seed").value)], msa: "precomputed",
+  const preserved = {...current};
+  delete preserved.engine;
+  return {...preserved, comparison_engines: engines, seeds: current.seeds || [Number($("seed").value)], msa: "precomputed",
     msa_source: source, allow_public_msa_server: source === "public_api" && $("novice-consent").checked,
     models_per_seed: current.models_per_seed ?? 1, recycles: current.recycles ?? 3,
     diffusion_steps: current.diffusion_steps ?? 200};
@@ -3483,6 +3491,7 @@ async function selectCandidate(id) {
   if (row.quality_eligibility_source === "hotspot_only_exclusion_removed")
     detail.append(el("p", I18N.term("실행 당시 hotspot 조건만으로 제외됐습니다. 나머지 기록 기준은 통과했으며 원본 판정·선별 목록은 보존됩니다.")));
   warnings(detail.appendChild(el("div")), [
+    ...(row.primary_pair_warning ? [row.primary_pair_warning] : []),
     ...(row.exclusion_reasons || []).map((r) => "기록 제외 사유: " + reportReasonLabel(r) + " (" + r + ")"),
     ...(recordedEvaluationError(row) ? ["후보 평가 오류: " + recordedEvaluationError(row)] : []),
     ...(row.missing_metrics?.length
@@ -3498,7 +3507,7 @@ async function selectCandidate(id) {
   detail.append(dl);
   const confidenceScope=el("details");confidenceScope.append(el("summary",I18N.term("ipSAE·ipTM 적용 체인과 출처")));
   confidenceScope.append(el("p", I18N.format("ipSAE 적용 체인: {0}–{1} · {2}", [(row.ipsae_chain_a ? row.ipsae_chain_a : I18N.term("미기록")), (row.ipsae_chain_b ? row.ipsae_chain_b : I18N.term("미기록")), ["selected_chain_pair","legacy_first_recorded_pair"].includes(row.ipsae_scope) ? I18N.term("표시된 체인 쌍") : I18N.term("범위 미기록·상세 원문 확인")])));
-  confidenceScope.append(el("p",I18N.term("일반 복합체의 요약 ipSAE는 기본적으로 검토한 체인 순서의 첫 쌍이며, 체인쌍을 명시한 실행에서는 해당 쌍입니다. 전체 평균·최솟값과 구분하고 모든 체인 쌍의 결과는 상세 표·CSV에서 확인합니다. ipTM 전체 값과 선택 표적–VHH 쌍 값은 구분하며, 범위가 없으면 전체 복합체로 추정하지 않습니다."),"muted"));
+  confidenceScope.append(el("p",I18N.term(state.result?.mode === "complex" ? "요약 ipSAE는 명시한 체인쌍 또는 검토 순서의 첫 쌍입니다. 전체 평균·최솟값과 구분하고 모든 체인쌍의 결과는 상세 표·CSV에서 확인하세요. ipTM은 기록된 적용 범위로 해석하며, 범위가 없으면 전체 복합체 값으로 추정하지 않습니다." : "일반 복합체의 요약 ipSAE는 기본적으로 검토한 체인 순서의 첫 쌍이며, 체인쌍을 명시한 실행에서는 해당 쌍입니다. 전체 평균·최솟값과 구분하고 모든 체인 쌍의 결과는 상세 표·CSV에서 확인합니다. ipTM 전체 값과 선택 표적–VHH 쌍 값은 구분하며, 범위가 없으면 전체 복합체로 추정하지 않습니다."),"muted"));
   if (state.result?.mode === "complex") {
     const selection = row.ipsae_selection === "explicit_primary_pair" ? "명시한 체인쌍" : row.ipsae_selection === "first_pair_in_reviewed_chain_order" ? "검토 순서의 첫 체인쌍" : "선택 기준 미기록";
     confidenceScope.append(el("p", I18N.format("요약 쌍 선택: {0} · 유한한 기록값의 최솟값 {1} / 최댓값 {2} · 평가 쌍 {3} / 전체 쌍 {4}. 미평가 체인쌍은 최솟값·최댓값에서 제외됩니다.", [selection, fmt(row.min_pair_ipsae), fmt(row.max_pair_ipsae), fmt(row.pair_ipsae_assessed_count), fmt(row.pair_ipsae_total_count)])));
@@ -4658,7 +4667,7 @@ async function initNoviceFlow() {
   for (const engine of state.starter.engines) {const label=el("label", null,"check"), box=el("input");box.type="checkbox";box.checked=true;box.value=engine;box.dataset.noviceEngine="";label.append(box,document.createTextNode(({colabfold:"ColabFold",boltz2:"Boltz-2",chai1:"Chai-1",opendde:"OpenDDE Preview"})[engine]||engine));controls.append(label);}
   const msa=el("select");msa.id="novice-msa"; for(const [v,label] of [["public_api","공용 MSA 서버 · 정확한 서열 전송 동의 필요"],["cache","검증된 MSA 캐시 재사용"],["local_mmseqs2","등록된 로컬 MSA 검색"]]) {const o=el("option",I18N.term(label));o.value=v;msa.append(o);}
   const ml=el("label",I18N.term("MSA 준비 방식"));ml.htmlFor=msa.id;controls.append(ml,msa);
-  const consent=el("input");consent.id="novice-consent";consent.type="checkbox";const cl=el("label",null,"check");cl.append(consent,el("span", I18N.term("이 입력의 표적·후보 서열을 api.colabfold.com으로 전송하는 데 동의합니다.")));controls.append(cl);
+  const consent=el("input");consent.id="novice-consent";consent.type="checkbox";const cl=el("label",null,"check");cl.append(consent,el("span", I18N.term("이 입력의 단백질 서열을 api.colabfold.com으로 전송하는 데 동의합니다.")));controls.append(cl);
   const demoMsaNote=el("p",I18N.term("CPU 합성 데모는 MSA를 준비하거나 외부 서버로 서열을 전송하지 않습니다."),"muted");controls.append(demoMsaNote);
   const plan=el("p","","next-step");plan.id="novice-model-plan";settingsCard.insertBefore(controls,advanced);settingsCard.insertBefore(plan,advanced);
   settingsCard.insertBefore(cl,advanced);

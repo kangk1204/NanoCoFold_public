@@ -31,7 +31,12 @@ else
   STATUS_FILE="$TMP_DIR/status.txt"
   printf 'status=started\n' > "$STATUS_FILE"
   trap 'attempt_exit=$?; if [ "$attempt_exit" -ne 0 ]; then printf "status=failed\nexit_code=%s\n" "$attempt_exit" >> "$STATUS_FILE"; fi' EXIT
-  if curl -fsSL --connect-timeout 20 --max-time 120 --retry 2 --retry-max-time 240 \
+  # Users on slow links can extend the transfer budget without editing source.
+  HMMER_DOWNLOAD_TIMEOUT="${NANOCOFOLD_HMMER_DOWNLOAD_TIMEOUT:-600}"
+  case "$HMMER_DOWNLOAD_TIMEOUT" in
+    ''|*[!0-9]*|0) echo "NANOCOFOLD_HMMER_DOWNLOAD_TIMEOUT은 양의 정수(초)여야 합니다." >&2; exit 1 ;;
+  esac
+  if curl -fsSL --connect-timeout 20 --max-time "$HMMER_DOWNLOAD_TIMEOUT" --retry 2 --retry-max-time "$((HMMER_DOWNLOAD_TIMEOUT * 3))" \
       https://eddylab.org/software/hmmer/hmmer-3.4.tar.gz -o "$TMP_DIR/hmmer.tar.gz.part"; then
     printf 'status=downloaded\n' >> "$STATUS_FILE"
   else
@@ -57,6 +62,10 @@ else
     ln -sf "$HMMER_PREFIX/bin/$exe" "envs/antibody/bin/$exe"
   done
   printf 'status=complete\n' >> "$STATUS_FILE"
+  cp "$STATUS_FILE" "$HMMER_PREFIX/source-build-status.txt"
+  # Executables live under tools/hmmer; successful source trees are disposable.
+  trap - EXIT
+  rm -rf -- "$TMP_DIR"
 fi
 
 echo

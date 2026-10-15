@@ -18,7 +18,8 @@ def test_readme_install_commands_match_in_both_languages():
 
 
 def test_actual_translator_preserves_user_data_and_logs():
-    subprocess.run(['node', '--test', str(ROOT / 'tests/platform_i18n_contract.mjs')], check=True, capture_output=True)
+    subprocess.run(['node', '--test', str(ROOT / 'tests/platform_i18n_contract.mjs'),
+                    str(ROOT / 'tests/final_review_i18n_scope_contract.mjs')], check=True, capture_output=True)
 
 
 @pytest.mark.skipif(os.environ.get('NANOCOFOLD_BROWSER_TEST') != '1', reason='Real Chromium release gate')
@@ -86,10 +87,10 @@ def test_offline_toggle_preserves_structure_observation_user_id_and_numeric_arra
         coord = f'model_{index}.cif'
         mock.write_cif(mock.build_complex_structure('ACDEFGHIKL','ACCDEFGHIK',[],seed=42+index),run/coord)
         np.savez(run/f'pae_model_{index}.npz',pae=np.arange(400,dtype=float).reshape(20,20)/20)
-        rows.append(f'"{name}",ACCDEFGHIK,{coord},A,B,colabfold,{0.4-index*.1},false')
+        rows.append(f'"{name}",ACCDEFGHIK,{coord},A,B,colabfold,{0.4-index*.1},{(.2,.9)[index]},selected_target_binder_pair,false')
     (run/'run_config.yaml').write_text('run:\n  mode: screen\n  mock: true\n')
     (run/'run_state.json').write_text('{"phases":{"final":{}}}')
-    (run/'03_score/scored_candidates.csv').write_text('design_id,sequence,cif_path,target_chain,binder_chain,predictor_engine,ipsae,final_eligible\n'+'\n'.join(rows)+'\n')
+    (run/'03_score/scored_candidates.csv').write_text('design_id,sequence,cif_path,target_chain,binder_chain,predictor_engine,ipsae,iptm,iptm_scope,final_eligible\n'+'\n'.join(rows)+'\n')
     report=tmp_path/'report.html'; report.write_bytes(ResultReader(run).export('html')[0])
     with sync_playwright() as pw:
         browser=pw.chromium.launch(args=['--enable-unsafe-swiftshader'])
@@ -100,6 +101,8 @@ def test_offline_toggle_preserves_structure_observation_user_id_and_numeric_arra
         page.wait_for_function('()=>Boolean(state.viewer?.viewer.plugin.canvas3d)',timeout=30000)
         expect(page.locator('html')).to_have_attribute('lang','en')
         expect(page.locator('#candidate-title')).to_have_text('완료')
+        assert page.locator('#distribution').evaluate('(node)=>node.data.map(trace=>trace.y)') == [[0.2]]
+        assert page.locator('#distribution').evaluate('(node)=>node.layout.xaxis.ticktext') == ['Condition 1']
         page.locator('#select-result-target').click()
         page.wait_for_function('()=>state.viewer.selectedLabels?.length>0')
         snapshot='''()=>JSON.stringify({data:document.getElementById('result-data').textContent,
@@ -113,8 +116,15 @@ def test_offline_toggle_preserves_structure_observation_user_id_and_numeric_arra
         expect(page.locator('#structure-note')).to_contain_text('체인')
         expect(page.locator('#candidate-title')).to_have_text('완료')
         assert page.evaluate(snapshot)==before
+        assert page.locator('#distribution').evaluate('(node)=>node.layout.xaxis.ticktext') == ['조건 1']
         page.locator('#language-select').select_option('en')
         expect(page.locator('#candidate-title')).to_have_text('완료')
         assert page.evaluate(snapshot)==before
+        page.locator('#candidate-table tbody tr').filter(has_text="나노바디2(A3);O'Neil").locator("button").click()
+        expect(page.locator('#candidate-title')).to_have_text("나노바디2(A3);O'Neil")
+        assert page.locator('#distribution').evaluate('(node)=>node.data.map(trace=>trace.y)') == [[0.9]]
+        page.locator('#language-select').select_option('ko')
+        page.locator('#language-select').select_option('en')
+        assert page.locator('#distribution').evaluate('(node)=>node.data.map(trace=>trace.y)') == [[0.9]]
         assert errors==[] and external==[]
         browser.close()

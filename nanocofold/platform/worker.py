@@ -177,7 +177,8 @@ def execute(workspace: Path, identifier: str) -> int:
         if store.get(identifier)["state"] == "cancelling":
             current = store.get(identifier)
             state = "budget_exhausted" if current.get("budget_exceeded") else "cancelled"
-        error = f"{type(exc).__name__}: {exc}"
+        from .errors import public_error
+        error = public_error(exc)
         traceback.print_exc()
     finally:
         relay.close()

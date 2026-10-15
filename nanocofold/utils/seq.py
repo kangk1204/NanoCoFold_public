@@ -47,7 +47,7 @@ ORGANISM_CODONS = {
 
 
 
-def read_fasta(path: str | Path) -> dict[str, str]:
+def read_fasta(path: str | Path, *, candidate_ids: bool = True) -> dict[str, str]:
     """간단 FASTA 파서 (id → sequence, 첫 토큰을 id로 사용).
 
     중복 ID와 빈 ID는 조용히 덮어쓰지 않고 오류로 처리한다(F17).
@@ -76,7 +76,7 @@ def read_fasta(path: str | Path) -> dict[str, str]:
             tokens = line[1:].split()
             if not tokens:
                 raise ValueError("FASTA 헤더에 ID가 없습니다.")
-            name = validate_candidate_id(tokens[0])
+            name = validate_candidate_id(tokens[0]) if candidate_ids else validate_fasta_id(tokens[0])
             chunks = []
         else:
             if name is None:
@@ -97,9 +97,17 @@ def write_fasta(records: dict[str, str] | list[tuple[str, str]], path: str | Pat
     Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def validate_fasta_id(identifier: str) -> str:
+    """Reference FASTA headers are labels, never candidate output paths."""
+    if not isinstance(identifier, str) or not identifier or any(
+            ch.isspace() or unicodedata.category(ch) in {"Cc", "Cf", "Zl", "Zp"} for ch in identifier):
+        raise ValueError("FASTA 머리글 ID는 비어 있거나 숨은 줄바꿈·제어 문자를 포함할 수 없습니다.")
+    return identifier
+
+
 def validate_candidate_id(candidate_id: str) -> str:
     """후보 ID를 파일 경로 성분으로 안전하게 사용할 수 있는지 검증한다(N06)."""
-    if any(unicodedata.category(ch) in {"Cc", "Cf"} for ch in str(candidate_id)):
+    if any(unicodedata.category(ch) in {"Cc", "Cf", "Zl", "Zp"} for ch in str(candidate_id)):
         raise ValueError("후보 ID에 제어 문자를 사용할 수 없습니다.")
     text = str(candidate_id).strip()
     # Leave room for engine/seed prefixes and filenames on common filesystems.
@@ -130,7 +138,7 @@ def candidate_id_key(identifier):
 
 def validate_fasta_controls(text):
     """Reject hidden delimiters before splitlines can silently split an ID."""
-    if any(unicodedata.category(ch) in {"Cc", "Cf"} and ch not in "\n\r\t" for ch in text):
+    if any(unicodedata.category(ch) in {"Cc", "Cf", "Zl", "Zp"} and ch not in "\n\r\t" for ch in text):
         raise ValueError("FASTA에 숨은 제어·서식 문자를 사용할 수 없습니다. 일반 줄바꿈과 탭만 사용하세요.")
 
 

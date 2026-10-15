@@ -28,7 +28,7 @@ def cdr3_library(value):
     """Replace an explicitly supplied, inclusive, 1-based scaffold interval."""
     if not isinstance(value, dict) or set(value) - {"fasta", "scaffold_fasta", "start", "end"}:
         raise ValueError("CDR3는 fasta/scaffold_fasta/start/end 객체로 입력하세요.")
-    _, scaffold = parse_fasta(value.get("scaffold_fasta", ""), single=True)[0]
+    _, scaffold = parse_fasta(value.get("scaffold_fasta", ""), single=True, candidate_ids=False)[0]
     start, end = value.get("start"), value.get("end")
     if type(start) is not int or type(end) is not int or not 1 <= start <= end <= len(scaffold):
         raise ValueError("CDR3 교체 구간은 기준 VHH 전체 서열의 1-based 시작·끝 번호입니다.")
@@ -90,11 +90,11 @@ def expand_manifest(payload):
                 proteins(row.get("proteins"))
                 validate_settings(row.get("settings", {}))
             else:
-                parse_fasta(row.get("content", ""), single=True)
+                parse_fasta(row.get("content", ""), single=True, candidate_ids=False)
                 if mode == "screen":
                     parse_fasta(row.get("vhh_fasta", ""))
                 if mode == "mature":
-                    parse_fasta(row.get("wt_fasta", ""), single=True)
+                    parse_fasta(row.get("wt_fasta", ""), single=True, candidate_ids=False)
             if "config" in common and "config" in item:
                 row["config"] = _deep_merge(common["config"], item["config"])
             rows.append({"id": name, "display_id": name, "alias": candidate_id_aliases([name])[name], "input": row})

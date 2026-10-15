@@ -328,7 +328,7 @@ def _execute_command(args) -> int:
     from .state import RunLock
     cfg = _normalized_cli_config(_load(args), args)
     from .config import _validate
-    _validate(cfg)
+    _validate(cfg, historical=args.command == "report")
     directory = getattr(args, "run_dir", None)
     args._existing_run_requested = bool(directory)
     if directory:
@@ -372,6 +372,18 @@ def _execute_command(args) -> int:
         cfg.clear()
         cfg.update(normalized)
         dry = _is_dry_run(cfg)
+        legacy_reference = (cfg_get(cfg, "run.mode") == "complex" and any(
+            entry.get("copies", 1) > 1 and entry.get("reference_chain") is not None
+            for entry in cfg_get(cfg, "complex.proteins", []) if isinstance(entry, dict)))
+        if args.command == "report" and legacy_reference:
+            # Read-only recovery of archived results must neither invent a
+            # per-copy reference mapping nor relabel the old computation/state.
+            code = cmd_report(args)
+            if code == 0 and not dry:
+                from .report_delivery import save_result_report
+                delivery = save_result_report(run_dir)
+                print(f"[전달용 보고서] {delivery} · {delivery.stat().st_size / 1024**2:.2f} MiB", flush=True)
+            return code
         started = time.time()
         previous_execution = dict(state.data.get("execution", {}))
         if previous_execution and not dry:
@@ -472,7 +484,7 @@ def _load(args) -> dict:
     if mode:
         # Validate the selected CLI mode together with mode-specific options.
         overrides.append(f"run.mode={mode}")
-    cfg = load_config(args.config, overrides)
+    cfg = load_config(args.config, overrides, historical=getattr(args, "command", None) == "report")
     if getattr(args, "mode", None):
         cfg["run"]["mode"] = args.mode
     if getattr(args, "mock", False):
@@ -498,7 +510,7 @@ def _open_run(cfg: dict, args, new: bool = True) -> tuple[Path, RunState]:
             import yaml as _yaml
             from .config import _set_dotted
 
-            effective = _load_saved(saved)
+            effective = _load_saved(saved, historical=getattr(args, "command", None) == "report")
             if getattr(args, "config", None):
                 # 부분 config는 "명시된 키만" 덮어쓴다(H10).
                 partial = read_config_yaml(Path(args.config).read_text(encoding="utf-8")) or {}
@@ -512,7 +524,7 @@ def _open_run(cfg: dict, args, new: bool = True) -> tuple[Path, RunState]:
             from .config import _validate
 
             effective = _normalized_cli_config(effective, args)
-            _validate(effective)  # 병합 후 상호 배타 입력 검증(I07)
+            _validate(effective, historical=getattr(args, "command", None) == "report")  # 보고서에서는 과거 참조 대응을 변경하지 않는다.
             cfg.clear()
             cfg.update(effective)
         effective = _normalized_cli_config(cfg, args)

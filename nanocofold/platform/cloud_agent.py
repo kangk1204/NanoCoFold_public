@@ -244,7 +244,7 @@ class Agent:
             with urllib.request.urlopen('https://rest.uniprot.org/uniprotkb/'+accession+'.fasta',timeout=30) as r:
                 fasta=r.read(100000).decode()
             from .inputs import parse_fasta
-            name,sequence=parse_fasta(fasta,single=True)[0]
+            name,sequence=parse_fasta(fasta,single=True,candidate_ids=False)[0]
             response={'state':'complete','response':{'name':name,'sequence':sequence,'accession':accession,'isoform':accession.split('-',1)[1] if '-' in accession else 'canonical','source_url':'https://rest.uniprot.org/uniprotkb/'+accession+'.fasta','fasta_sha256':hashlib.sha256(fasta.encode()).hexdigest()}}
         elif kind=='diagnostics':
             from ..diagnostics import doctor
@@ -612,7 +612,7 @@ class Agent:
     def heartbeat(self):
         self.client.request('agent/heartbeat',{'host':os.uname().nodename,'agent_id':self.agent_id,'version':AGENT_VERSION,
             'capabilities':self.capabilities(),'installation_identity':self.installation_identity(),
-            'diagnostics':public_diagnostics(self.diagnostics),'sync_errors':{k:public_error(ValueError(v)) for k,v in {**self.sync_errors,**self.export_errors}.items()},'queue_jobs':len(self.manager.store.list())})
+            'diagnostics':public_diagnostics(self.diagnostics),'sync_errors':{k:public_error(ValueError(v)) for k,v in {**self.sync_errors,**self.export_errors}.items()},'queue_jobs':self.manager.store.count()})
     def heartbeat_loop(self):
         # File transfer and model diagnostics must not look like a disconnected server.
         while not self.heartbeat_stop.is_set():

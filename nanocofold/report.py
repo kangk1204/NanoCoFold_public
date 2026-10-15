@@ -5,9 +5,10 @@ import hashlib
 import html
 import csv
 import json
+import re
 from collections import Counter
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 import pandas as pd
 import yaml
@@ -148,6 +149,25 @@ def pose_status_label(row: dict, key: str) -> str:
         return "충족" if value is True else "미충족" if value is False else "미평가"
     labels = POSE_STATUS_LABELS.get("review_priority" if key in ("candidate_review_priority", "review_priority_reason") else key, {})
     return labels.get(value, "미평가") if isinstance(value, str) else "미평가"
+
+
+def metric_record_label(value) -> str:
+    labels = {
+        "selected_chain_pair": "선택한 체인쌍",
+        "selected_target_binder_pair": "선택 표적–VHH 체인쌍",
+        "whole_complex": "전체 복합체",
+        "legacy_first_recorded_pair": "이전 기록의 첫 체인쌍",
+        "native_global_iptm_two_chain_complex": "두 체인 복합체의 원본 전체 ipTM",
+        "pair_chains_iptm_chain_labels_directional_minimum": "체인 이름에 대응한 방향별 원본 ipTM 최솟값",
+        "boltz2_zero_based_asym_pair_directional_minimum": "Boltz-2 체인 인덱스에 대응한 방향별 ipTM 최솟값",
+        "chai1_native_axis_pair_directional_minimum": "Chai-1 원본 체인 축에 대응한 방향별 ipTM 최솟값",
+        "opendde_verified_axis_pair_directional_minimum": "OpenDDE 검증된 체인 축에 대응한 방향별 ipTM 최솟값",
+        "unavailable": "미평가",
+        "not_assessed": "미평가",
+        "not_recorded": "미기록",
+        "unrecorded": "미기록",
+    }
+    return labels.get(value, "기록된 범위·출처 (원문 확인)") if isinstance(value, str) and value else "미기록"
 
 
 def _recorded_bool(value) -> bool | None:
@@ -322,6 +342,28 @@ def _selection_display_records(rows: list[dict], selected_rows: list[dict] | Non
     return result
 
 
+def _truncation_summary(info) -> str:
+    """Display recorded truncation facts without paths or internal dictionaries."""
+    if not isinstance(info, dict) or type(info.get("enabled")) is not bool:
+        return "미기록"
+    if not info["enabled"]:
+        return "사용 안 함"
+    parts = ["사용"]
+    for key, label in (("original_residues", "원본 잔기"), ("kept_residues", "유지 잔기"),
+                       ("kept_other_chain_residues", "다른 체인 유지 잔기")):
+        value = info.get(key)
+        if type(value) is int and value >= 0:
+            parts.append(f"{label} {value}개")
+    for key, label in (("kept_ranges", "유지 구간"), ("missing_hotspots", "누락 핫스팟")):
+        values = info.get(key)
+        if isinstance(values, list) and values:
+            # Labels/ranges are recorded residue identifiers, never file names.
+            safe = [str(value) for value in values if re.fullmatch(r"[A-Za-z0-9:,+.\- ]+", str(value))]
+            if safe:
+                parts.append(f"{label}: {', '.join(safe)}")
+    return " · ".join(parts)
+
+
 def generate_report(
     run_dir: Path,
     cfg: dict,
@@ -364,19 +406,24 @@ def generate_report(
     scored_rows = display_rows[:int(cfg_get(cfg, "report.top_n_table", 50))]
     selected_rows = (all_selected_rows or [])[:50]
 
-    viewer_structures = _viewer_structures(selected, scored, viewer_max, run_dir=run_dir)
     selected_total = int(len(selected)) if selected is not None else 0
     scored_total = int(len(population)) if population is not None else 0
     viewer_mode = str(cfg_get(cfg, "report.viewer", "3dmol")).lower()
-    viewer_script = _viewer_script(out_path.parent, cfg) if (viewer_mode != "none" and viewer_structures) else None
-    if viewer_mode == "none":
-        viewer_structures = []
-    interactive_report = None
+    viewer_structures, viewer_script = [], None
+    interactive_report_href = None
     if viewer_mode != "none" and saved_reader and saved_reader.all_rows():
-        # Reuse the complete saved-result renderer and payload. This reads
-        # coordinates/PAE and receipts only; it never invokes a predictor or scorer.
-        interactive_report = saved_reader.export("html")[0].decode("utf-8")
-        viewer_structures = []
+        # Keep the entry report small and avoid loading every model/PAE until
+        # requested. The sibling explorer remains a complete offline document;
+        # moving the two HTML files together preserves the relative link.
+        explorer_path = out_path.with_name(out_path.stem + "_explorer.html")
+        _check_output_path(explorer_path, out_path.parent)
+        explorer = saved_reader.export("html", report_artifact=True)[0]
+        _atomic_write(explorer_path, explorer, prefix=".report-explorer-", root=out_path.parent)
+        interactive_report_href = quote(explorer_path.name)
+    elif viewer_mode != "none":
+        viewer_structures = _viewer_structures(selected, scored, viewer_max, run_dir=run_dir)
+        if viewer_structures:
+            viewer_script = _viewer_script(out_path.parent, cfg)
     warnings = list(context.get("warnings") or [])
     warnings.extend(score_complex.iptm_missing_warnings(all_scored_rows))
     hotspots_df = _safe_read_csv(run_dir / "01_target" / "hotspot_table.csv", warnings)
@@ -433,10 +480,12 @@ def generate_report(
         "mode": cfg_get(cfg, "run.mode"),
         "target_name": cfg_get(cfg, "target.name"),
         "context": to_native(context),
+        "truncation_summary": _truncation_summary((context.get("target_qc") or {}).get("truncation")),
         "report_summary": presentation["summary"],
         "display_aliases": presentation["aliases"],
         "hotspot_assessment": hotspot_assessment,
         "pose_status_label": pose_status_label,
+        "metric_record_label": metric_record_label,
         "pose_assessments_available": any(key in row for row in scored_rows for key in POSE_STATUS_LABELS),
         "display_identity": _display_identity,
         "reason_summary": presentation["reasons"],
@@ -459,7 +508,8 @@ def generate_report(
         "hotspot_set_rows": _frame_records(hotspot_sets_df, limit=100),
         "automatic_hotspots": automatic_hotspots,
         "viewer_structures": viewer_structures,
-        "interactive_report": interactive_report,
+        "interactive_report_href": interactive_report_href,
+        "viewer_enabled": viewer_mode != "none",
         "viewer_limit": viewer_max,
         "viewer_script": viewer_script,
         "selected_total": selected_total,

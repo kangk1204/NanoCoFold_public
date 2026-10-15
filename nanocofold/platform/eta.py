@@ -25,7 +25,7 @@ def _file_identity(path):
 
 class MetadataReadCache:
     """Bound parsed metadata to file identity; never use it as queue control state."""
-    def __init__(self, limit=2048):
+    def __init__(self, limit=16384):
         self.limit = limit
         self.entries = OrderedDict()
         self._lock = threading.RLock()
@@ -407,7 +407,7 @@ class ComplexJobReadCache:
     size, creation/deletion or lifecycle state forces fresh reconciliation.
     Running ETA is recomputed from cached parses so finish times stay current.
     """
-    def __init__(self, limit=512):
+    def __init__(self, limit=4096):
         self.limit = limit
         self.entries = OrderedDict()
         self._lock = threading.RLock()

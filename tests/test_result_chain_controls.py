@@ -72,6 +72,7 @@ def test_chain_buttons_select_saved_chain_and_canvas_resizes(report, width, heig
                 const view=state.viewer.viewer.plugin.canvas3d.camera.viewport, rect=canvas.getBoundingClientRect();
                 return Math.abs(view.width/view.height-rect.width/rect.height)<.002;
             }""")
+            page.wait_for_timeout(3000)
             # Resize preserves manual orientation/zoom. Fitting is an explicit
             # action; independently project every saved C-alpha afterwards.
             page.locator("#fit-result-structure").click()

@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.background import BackgroundTask
@@ -100,6 +101,10 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
             "style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; worker-src 'self' blob:; "
             "frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
         return secure(response)
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid_request(_request, _exc):
+        return JSONResponse({"error": "요청 인자 형식이 올바르지 않습니다. 숫자·범위·필수 항목을 확인하고 다시 시도하세요."}, status_code=422)
 
     @app.exception_handler(ValueError)
     async def value_error(_request, exc):

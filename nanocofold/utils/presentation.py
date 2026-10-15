@@ -58,7 +58,9 @@ def _path_patterns(root):
     quoted = re.compile(r'''(["'])(''' + path_root + r'''[^\r\n]*?)\1''')
     continuation = r'''(?:[ \t]+[^\s"\'<>()[\]{};,`|:]+(?=/)''' + _PATH_TAIL + ")*"
     token = re.compile(_BOUNDARY + path_root + _PATH_TAIL + continuation)
-    return quoted, token
+    # A filename extension provides an exact end for paths containing spaces.
+    spaced_file = re.compile(_BOUNDARY + path_root + r'''[^\r\n"'<>()[\]{};,`|:]*?\.[A-Za-z0-9]{1,12}(?=$|[\s"'<>()[\]{};,`|:])''')
+    return quoted, token, spaced_file
 
 
 def _portable(value, root, patterns, field=''):
@@ -104,8 +106,9 @@ def _portable(value, root, patterns, field=''):
             return _portable_path(value, root)
     # Free text is always tokenized: a path at the start of an error message
     # must not consume the explanation that follows it.
-    quoted, token = patterns
+    quoted, token, spaced_file = patterns
     value = quoted.sub(lambda match: match[1] + _portable_path(match[2], root) + match[1], value)
+    value = spaced_file.sub(lambda match: _portable_path(match[0], root), value)
     return token.sub(lambda match: _portable_path(match[0], root), value)
 
 

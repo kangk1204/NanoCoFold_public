@@ -70,7 +70,7 @@ def resolve_definition(cfg: dict) -> dict:
     if not cfg_get(cfg, "target.sequence") and not cfg_get(cfg, "target.fasta"):
         raise ValueError("전장 target.sequence 또는 단일 서열 target.fasta 가 필요합니다.")
     fasta = resolve_path(cfg, cfg_get(cfg, "target.fasta"))
-    if fasta and len(seq.read_fasta(fasta)) != 1:
+    if fasta and len(seq.read_fasta(fasta, candidate_ids=False)) != 1:
         raise ValueError("전장 FASTA에는 정확히 한 서열이 필요합니다.")
     full = target_prep.resolve_target_sequence(cfg)
     cut = _position((spec.get("cleavage") or {}).get("after"), "specificity.cleavage.after")

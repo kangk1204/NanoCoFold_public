@@ -18,6 +18,7 @@ import yaml
 from ..config import ASSET_ROOT, resolve_run_artifact
 from ..binding_site_assessment import hotspot_filter_fraction
 from ..utils.metric_provenance import metric_provenance
+from .errors import PublicIssues, public_error_data
 from .paths import contained, native, sha256
 
 METRICS = ("ipsae", "iptm", "interface_plddt", "hotspot_contact_frac", "n_clashes", "interface_pae", "dev_severe")
@@ -175,7 +176,7 @@ class ResultReader:
         self.root = Path(run_dir).resolve()
         if not self.root.is_dir():
             raise FileNotFoundError("결과 디렉터리가 없습니다.")
-        self.issues: list[str] = []
+        self.issues: list[str] = PublicIssues()
         self.config = self._yaml("run_config.yaml")
         self.state = self._json("run_state.json")
         self.platform_status = self._json("platform_status.json")
@@ -184,7 +185,7 @@ class ResultReader:
         self.retained = None
         if (self.root / "retained").exists():
             from .retention import retained_record
-            self.retained = retained_record(self.root)
+            self.retained = public_error_data(retained_record(self.root))
             if self.retained:
                 self.config = copy.deepcopy(self.retained["config"])
                 self.state = copy.deepcopy(self.retained["state"])
@@ -212,7 +213,7 @@ class ResultReader:
                     or data["state"] not in {"cancelled", "interrupted", "failed", "partial_failure", "budget_exhausted", "complete"}
                     or isinstance(data.get("updated"), bool) or not isinstance(data.get("updated"), (int, float)) or not math.isfinite(data["updated"])):
                 raise ValueError("플랫폼 상태 필드 형식 오류")
-            return data
+            return public_error_data(data)
         except (ValueError, OSError) as exc:
             self.issues.append(f"{relative}: 읽을 수 없는 JSON ({type(exc).__name__})")
             return {}
@@ -251,7 +252,7 @@ class ResultReader:
                 for row in reader:
                     if None in row or any(value is None for value in row.values()):
                         raise ValueError("CSV 열 개수 불일치")
-                    rows.append({key: _cell(value, key) for key, value in row.items()})
+                    rows.append(public_error_data({key: _cell(value, key) for key, value in row.items()}))
             return rows
         except (ValueError, csv.Error, UnicodeError, OSError) as exc:
             self.issues.append(f"{relative}: 읽을 수 없는 CSV ({exc})")
@@ -530,7 +531,7 @@ class ResultReader:
         return {"total": total, "filtered_total": len(rows), "rows": rows[max(0, offset):max(0, offset) + limit] if limit is not None else rows,
                 "columns": columns, "issues": list(dict.fromkeys(self.issues)), "metric_help": METRIC_HELP}
 
-    def summary(self, *, delivery_artifact=False):
+    def summary(self, *, delivery_artifact=False, report_artifact=False):
         if self.retained:
             summary = copy.deepcopy(self.retained["summary"])
             summary.update(retention="minimal", full_execution_available=False,
@@ -546,7 +547,17 @@ class ResultReader:
         from ..publication import publication_issue, tables_available
         final = self.state.get("phases", {}).get("final", {})
         source_delivery_status = final.get("delivery_status")
-        if delivery_artifact and source_delivery_status == "pending":
+        source_report_status = final.get("report_status")
+        # A successfully written report is its own publication receipt. Its
+        # snapshot must not depend on the later run-state write that confirms
+        # that same report. Computation/exports failures remain authoritative.
+        report_finalized = (report_artifact and source_report_status == "pending"
+                            and final.get("exports_status") in {"complete", "not_applicable"}
+                            and final.get("tables_committed") is True
+                            and tables_available(self.root, final))
+        if report_artifact and source_report_status == "pending":
+            final = {k: v for k, v in final.items() if k != "report_status"}
+        if (delivery_artifact or report_artifact) and source_delivery_status == "pending":
             # The exported artifact is built now. Its source run is still
             # awaiting storage; this exception never authorizes retention.
             final = {k: v for k, v in final.items() if k != "delivery_status"}
@@ -557,6 +568,8 @@ class ResultReader:
         if self.config.get("run", {}).get("mode") == "complex":
             failures = sum(bool(r.get("error")) for r in rows)
             execution = self.state.get("execution", {}).get("state", "incomplete")
+            if report_finalized and execution == "running":
+                execution = "complete"
             status = "partial_failure" if (failures or issues) and execution == "complete" else execution
             expected = self.state.get("phases", {}).get("prediction", {}).get("total_models")
             if type(expected) is not int or expected < 0:
@@ -568,6 +581,7 @@ class ResultReader:
                     "mock": False, "status": status, "complete": status == "complete", "readonly": True,
                     "config": self.config, "state": self.state, "conditions": self.config.get("complex", {}),
                     "source_delivery_status": source_delivery_status, "delivery_artifact": delivery_artifact,
+                    "source_report_status": source_report_status, "report_artifact": report_artifact,
                     "expected_total": expected,
                     "engine_provenance": recorded_engines}
 
@@ -579,6 +593,8 @@ class ResultReader:
                             (isinstance(execution_started, (int, float)) and not isinstance(execution_started, bool)
                              and self.platform_status["updated"] >= execution_started))
         authoritative_status = self.platform_status.get("state") if status_applies else execution_state
+        if report_finalized and authoritative_status == "running" and execution_state not in {"failed", "interrupted", "cancelled"}:
+            authoritative_status = "complete"
         cascade = self._json("03_score/cascade_summary.json") if self._path("03_score/cascade_summary.json").exists() else None
         recorded_cascade = self.state.get("phases", {}).get("cascade", {})
         if cascade is None and recorded_cascade:
@@ -607,6 +623,7 @@ class ResultReader:
                 "platform_status": {**self.platform_status, "applies": status_applies} if self.platform_status else None,
                 "issues": issues, "config": self.config, "state": self.state,
                 "source_delivery_status": source_delivery_status, "delivery_artifact": delivery_artifact,
+                "source_report_status": source_report_status, "report_artifact": report_artifact,
                 "expected_total": comparison.get("expected_rows"),
                 "engine_provenance": recorded_engines,
                 "ranking_policy": self._json("03_score/ranking_policy.json") if self._path("03_score/ranking_policy.json").is_file() else None,
@@ -1174,7 +1191,9 @@ class ResultReader:
             path.unlink(missing_ok=True)
             raise
 
-    def export(self, format: str, filters: dict | None = None, *, destination: Path | None = None):
+    def export(self, format: str, filters: dict | None = None, *, destination: Path | None = None, report_artifact=False):
+        if report_artifact and format != "html":
+            raise ValueError("보고서 발행 스냅숏은 HTML 형식에만 적용합니다.")
         allowed = _exploration({} if filters is None else filters)
         query = {key: value for key, value in allowed.items() if key in {"search", "sort", "descending", "eligible", "eligibility_basis", "hotspot_min", "engine_filter"}}
         eligibility = allowed.get("eligibility")
@@ -1195,7 +1214,7 @@ class ResultReader:
         from ..utils.presentation import portable_metadata
         all_table = portable_metadata(all_table, root=self.root)
         rows = all_table["rows"]
-        provenance = {"summary": self.summary(), "filters": allowed, "filtered_ids": [row["candidate_id"] for row in table["rows"]],
+        provenance = {"summary": self.summary(report_artifact=report_artifact), "filters": allowed, "filtered_ids": [row["candidate_id"] for row in table["rows"]],
                       **self.provenance()}
         provenance = portable_metadata(provenance, root=self.root)
         def csv_bytes():
@@ -1211,7 +1230,7 @@ class ResultReader:
             content = "".join(f">{row['candidate_id']}\n{row['sequence']}\n" for row in rows if row.get("sequence"))
             if self.config.get("run", {}).get("mode") == "complex":
                 from ..complex import proteins
-                entries = proteins(self.config["complex"]["proteins"])
+                entries = proteins(self.config["complex"]["proteins"], historical=True)
                 content = "".join(f">{p['id']} {' '.join(p['name'].split())} original_positions={','.join(map(str,p['original_positions']))}\n{p['sequence']}\n" for p in entries)
             return content.encode(), "text/plain; charset=utf-8", "candidates.fasta"
         if format == "xlsx":
@@ -1245,7 +1264,7 @@ class ResultReader:
             book.save(stream)
             return stream.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "candidates.xlsx"
         if format == "html":
-            payload = self._offline_payload(all_table, allowed, provenance)
+            payload = self._offline_payload(all_table, allowed, provenance, report_artifact=report_artifact)
             return self._offline_document(payload), "text/html; charset=utf-8", "report_offline.html"
         if format == "zip":
             stream = io.BytesIO() if destination is None else destination
@@ -1259,7 +1278,7 @@ class ResultReader:
             return stream.getvalue() if destination is None else destination, "application/zip", "result_package.zip"
         raise ValueError("내보내기 형식은 report_zip/csv/xlsx/fasta/html/zip 중 하나입니다.")
 
-    def _offline_payload(self, all_table, filters, provenance, *, delivery_artifact=False):
+    def _offline_payload(self, all_table, filters, provenance, *, delivery_artifact=False, report_artifact=False):
         structures = []
         for row in all_table["rows"]:
             if row["structure_available"]:
@@ -1277,7 +1296,7 @@ class ResultReader:
             except (OSError, ValueError, KeyError) as exc:
                 self.issues.append(f"{observation['observation_id']}: {exc}")
         from ..utils.presentation import portable_metadata
-        return portable_metadata({"summary": self.summary(delivery_artifact=delivery_artifact), "candidates": all_table, "observations": observations,
+        return portable_metadata({"summary": self.summary(delivery_artifact=delivery_artifact, report_artifact=report_artifact), "candidates": all_table, "observations": observations,
                                   "structures": structures, "filters": filters, "provenance": provenance}, root=self.root)
 
     @staticmethod
@@ -1358,7 +1377,7 @@ class ResultReader:
         files["candidates.csv"] = ("\ufeff" + stream.getvalue()).encode()
         if self.config.get("run", {}).get("mode") == "complex":
             from ..complex import proteins
-            entries = proteins(self.config["complex"]["proteins"])
+            entries = proteins(self.config["complex"]["proteins"], historical=True)
             fasta = "".join(f">{p['id']} {' '.join(p['name'].split())} original_positions={','.join(map(str, p['original_positions']))}\n{p['sequence']}\n" for p in entries)
         else:
             fasta = "".join(f">{row['candidate_id']}\n{row['sequence']}\n" for row in all_table["rows"] if row.get("sequence"))

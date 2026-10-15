@@ -1,11 +1,27 @@
 """Actionable public errors; parser details and private paths stay in logs."""
 import re
+from ..utils.presentation import portable_metadata
 
 _GENERIC = "입력 처리에 실패했습니다. 파일 형식·서열·필수 항목을 확인하고 다시 시도하세요. 자세한 내용은 서버 로그에서 확인할 수 있습니다."
 # Actual path roots, not every slash in .pdb/.cif or true/false prose.
 # Consume a path-bearing line tail so account/path spaces cannot leak fragments.
 _PRIVATE_PATH = re.compile(r"(?<![\w./])(?:/(?:home|Users|mnt|tmp|var|opt|private|Volumes|nfs|gpfs)(?=/|$)|/(?=[A-Za-z0-9_.-]+/[^\s/]+)|file://|[A-Za-z]:[\\/]|\\\\[^\\\s]+\\)[^\r\n]*")
-_SOURCE_LINE = re.compile(r"^\s{2,}(?:[A-Za-z_]\w*[\[(]|return\s|raise\s|if\s|elif\s|else:|for\s|with\s|assert\s)")
+_QUOTED_PATH = re.compile(r'''(["'])((?:(?:/(?:home|Users|mnt|tmp|var|opt|private|Volumes|nfs|gpfs)(?=/)|file://|[A-Za-z]:[\\/]|\\\\)[^\r\n]*?|/(?!/)[^\r\n"'=()[\]{}]*?))\1''')
+_ABSOLUTE_FILE = re.compile(r'''(?<![\w./:])/(?:[^\r\n/"'<>()[\]{};,`|:]+/)*[^\r\n/"'<>()[\]{};,`|:]+?\.[A-Za-z0-9]{1,12}(?=$|[\s"'<>()[\]{};,`|:])''')
+_CUSTOM_DIRECTORY = re.compile(r'''(?<![\w./:])/(?:[^\r\n/"'<>()[\]{};,`|:]+/)+[^\s"'<>()[\]{};,`|:]+''')
+_SOURCE_LINE = re.compile(r"^\s{2,}(?:[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*[\[(]|return\s|raise\s|if\s|elif\s|else:|for\s|with\s|assert\s)")
+
+
+def _redact_paths(message):
+    # Quotes delimit the complete path, including its final spaced component.
+    # Finite filenames then preserve following actions. Extensionless unquoted
+    # roots have no reliable end: withhold their tail before token masking can
+    # discard the root and leave private account/path fragments behind.
+    message = _QUOTED_PATH.sub(lambda match: match[1] + "[서버 경로]" + match[1], message)
+    message = _ABSOLUTE_FILE.sub("[서버 경로]", message)
+    message = _PRIVATE_PATH.sub("[서버 경로]", message)
+    message = _CUSTOM_DIRECTORY.sub("[서버 경로]", message)
+    return portable_metadata(message).replace("[local path]", "[서버 경로]")
 
 def public_error(exc):
     message = str(exc).strip()
@@ -21,7 +37,7 @@ def public_error(exc):
         return "숫자 입력 형식이 올바르지 않습니다. 잔기 번호·모델 수·설정값을 확인하세요."
     if not re.search(r"[가-힣]", message):
         return _GENERIC
-    message = _PRIVATE_PATH.sub("[서버 경로]", message)
+    message = _redact_paths(message)
     message = re.sub(r"\s*\((?:Atom |Residue |invalid literal |could not convert)[^\n]*", "", message)
     message = re.sub(r"<Residue[^>]*>|<Atom[^>]*>", "[구조 레코드]", message)
     return message or _GENERIC
@@ -31,9 +47,47 @@ def public_log(text):
     """Share progress without path-bearing or traceback lines."""
     lines = []
     for line in str(text).splitlines():
-        if _PRIVATE_PATH.search(line) or _SOURCE_LINE.search(line) or line.lstrip().startswith(("Traceback ", 'File "')):
+        if _SOURCE_LINE.search(line) or line.lstrip().startswith(("Traceback ", 'File "')):
             lines.append("[서버 로그 상세는 로컬 로그 파일에 보존됩니다.]")
+        elif re.search(r"[가-힣]", line):
+            lines.append(public_error(ValueError(line)))
+        elif (_PRIVATE_PATH.search(line) or _ABSOLUTE_FILE.search(line)
+              or _CUSTOM_DIRECTORY.search(line) or portable_metadata(line) != line):
+            lines.append(_redact_paths(line))
         else:
             lines.append(line)
     result = "\n".join(lines)
     return re.sub(r"(?:MIG-)?GPU-[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", "[GPU 식별자]", result)
+
+
+class PublicIssues(list):
+    """Sanitize presentation issues; original artifacts retain their details."""
+    def append(self, value):
+        super().append(public_error(ValueError(value)))
+
+    def extend(self, values):
+        for value in values:
+            self.append(value)
+
+
+def public_error_data(value):
+    """Copy error-bearing presentation fields without changing scientific data."""
+    if isinstance(value, list):
+        return [public_error_data(item) for item in value]
+    if isinstance(value, dict):
+        result = {}
+        for key, item in value.items():
+            if isinstance(key, str) and (key == "error" or key.endswith("_error")) and isinstance(item, str) and item:
+                # Safe recorded failure labels remain exact in result exports.
+                # Apply exception abstraction when the stored diagnostic carries
+                # server paths or parser/traceback internals.
+                private = (_PRIVATE_PATH.search(item) or _ABSOLUTE_FILE.search(item)
+                           or _CUSTOM_DIRECTORY.search(item) or "_atom_site." in item
+                           or "defined twice" in item or "Traceback " in item)
+                result[key] = public_error(ValueError(item)) if private else item
+            elif key == "issues" and isinstance(item, list):
+                result[key] = [public_error(ValueError(issue)) for issue in item]
+            else:
+                result[key] = public_error_data(item)
+        return result
+    return value
