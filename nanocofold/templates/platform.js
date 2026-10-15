@@ -1195,9 +1195,9 @@ function syncCandidateNavigation() {
   if (row) {
     const eligibility = candidateEligibility(row);
     const basis = $("eligibility-basis").value === "quality" ? "품질 판정 (결합 부위 제외)" : "실행 당시 기록 판정";
-    const assessment = recordedEvaluationError(row) ? modelAssessmentCaption(row) : !row.evaluated ? "미평가" : state.result.mode === "complex" ? modelAssessmentCaption(row)
-      : `${basis}: ${eligibility === true ? "적격" : eligibility === false ? "부적격" : "미평가"}`;
-    I18N.text($("candidate-status"), I18N.format("{0} · ipSAE {1} · {2} {3} · {4}", [(row.predictor_engine ? row.predictor_engine : I18N.term("엔진 미기록")), fmt(row.ipsae), I18N.term(metricCaption("iptm", row)), fmt(row.iptm), I18N.term(assessment)]));
+    const assessment = recordedEvaluationError(row) ? I18N.term(modelAssessmentCaption(row)) : !row.evaluated ? I18N.term("미평가") : state.result.mode === "complex" ? I18N.term(modelAssessmentCaption(row))
+      : I18N.concat([I18N.term(basis), ": ", I18N.term(decisionCaption(eligibility))]);
+    I18N.text($("candidate-status"), I18N.format("{0} · ipSAE {1} · {2} {3} · {4}", [(row.predictor_engine ? row.predictor_engine : I18N.term("엔진 미기록")), fmt(row.ipsae), I18N.term(metricCaption("iptm", row)), fmt(row.iptm), assessment]));
   } else I18N.text($("candidate-status"), I18N.term("현재 목록에서 후보를 선택하세요."));
 }
 function stepCandidate(offset) {

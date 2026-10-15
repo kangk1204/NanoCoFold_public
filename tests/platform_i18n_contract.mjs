@@ -55,3 +55,31 @@ test('binding sites and general-complex residues of interest have separate bilin
   i.setLanguage('ko',{persist:false});assert.equal(i.value(value),key);i.setLanguage('en',{persist:false});
  }
 });
+test('candidate eligibility captions translate composed UI terms and preserve raw engine labels',()=>{
+ const ui=readFileSync(new URL('../nanocofold/templates/platform.js',import.meta.url),'utf8');
+ const i=fixture(),nodes=new Map(),engine='원본 엔진(007)';
+ const get=id=>{if(!nodes.has(id))nodes.set(id,{value:'recorded',textContent:'',isConnected:true});return nodes.get(id);};
+ const row={candidate_id:'원본 후보2',predictor_engine:engine,iptm:.6,ipsae:.7,evaluated:true};
+ const context={I18N:i,state:{result:{mode:'screen'},candidate:row,filtered:[row]},
+  $:get,options(){},fmt:String,metricCaption:()=> '표적–VHH ipTM',
+  recordedEvaluationError:()=>false,modelAssessmentCaption:()=>'',
+  decisionCaption:value=>value===true?'적격':value===false?'부적격':'미평가',
+  candidateEligibility:()=>row.final_eligible};
+ vm.createContext(context);
+ vm.runInContext(ui.slice(ui.indexOf('function syncCandidateNavigation()'),ui.indexOf('function stepCandidate(')),context);
+ const original=JSON.stringify(row);
+ for(const [basis,ko,en] of [['recorded','실행 당시 기록 판정','Assessment recorded at execution'],['quality','품질 판정 (결합 부위 제외)','Quality assessment (excluding hotspots)']]){
+  get('eligibility-basis').value=basis;
+  for(const [value,koStatus,enStatus] of [[true,'적격','Eligible'],[false,'부적격','Ineligible'],[null,'미평가','Not evaluated']]){
+   row.final_eligible=value;
+   const saved=JSON.stringify(row);
+   context.syncCandidateNavigation();
+   for(const language of ['en','ko','en']){
+    i.setLanguage(language,{persist:false});
+    assert.equal(get('candidate-status').textContent,`${engine} · ipSAE 0.7 · ${language==='en'?'Target–VHH ipTM':'표적–VHH ipTM'} 0.6 · ${language==='en'?en:ko}: ${language==='en'?enStatus:koStatus}`);
+    assert.equal(JSON.stringify(row),saved);
+   }
+  }
+ }
+ delete row.final_eligible;assert.equal(JSON.stringify(row),original);
+});
