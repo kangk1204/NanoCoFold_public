@@ -54,7 +54,7 @@ def test_report_entry_stays_small_and_separate_explorer_preserves_all_48_models(
     output = report.generate_report(run, cfg, {}, out_path=run / "review copy.html", viewer_max=1)
     document = output.read_text()
     link = ExplorerLink(); link.feed(document)
-    assert link.href == "review%20copy_explorer.html"
+    assert "%20" in link.href and "/" not in link.href
     assert output.stat().st_size < 100_000
     assert "<iframe" not in document and "srcdoc=" not in document
     explorer = output.parent / unquote(link.href)
@@ -126,14 +126,18 @@ def test_viewer_none_has_no_viewer_limit_notice_and_truncation_is_readable(tmp_p
     assert "유지 잔기 80개" in document and "유지 구간: 3-82" in document
     truncation_row = document.split('scope="row">표적 구조 절단', 1)[1].split('</tr>', 1)[0]
     assert "Truncation" not in document and "out_path" not in truncation_row and "/Users/private" not in truncation_row
-    assert not (run / "report_explorer.html").exists()
+    assert not list(run.glob("*explorer*.html"))
 
 
 def test_linked_explorer_publication_refuses_symlink_and_preserves_previous_report(tmp_path):
     run, cfg = saved_run(tmp_path, count=2)
+    report.generate_report(run, cfg, {})
+    link = ExplorerLink(); link.feed((run / "report.html").read_text())
+    explorer = run / unquote(link.href)
+    explorer.unlink()
     output = run / "report.html"; output.write_text("previous report")
     protected = tmp_path / "protected.html"; protected.write_text("keep")
-    (run / "report_explorer.html").symlink_to(protected)
+    explorer.symlink_to(protected)
     with pytest.raises(OSError, match="심볼릭 링크"):
         report.generate_report(run, cfg, {})
     assert output.read_text() == "previous report"

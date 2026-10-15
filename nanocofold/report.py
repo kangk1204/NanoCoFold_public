@@ -411,14 +411,20 @@ def generate_report(
     viewer_mode = str(cfg_get(cfg, "report.viewer", "3dmol")).lower()
     viewer_structures, viewer_script = [], None
     interactive_report_href = None
+    explorer_path, explorer = None, None
     if viewer_mode != "none" and saved_reader and saved_reader.all_rows():
         # Keep the entry report small and avoid loading every model/PAE until
         # requested. The sibling explorer remains a complete offline document;
         # moving the two HTML files together preserves the relative link.
-        explorer_path = out_path.with_name(out_path.stem + "_explorer.html")
-        _check_output_path(explorer_path, out_path.parent)
         explorer = saved_reader.export("html", report_artifact=True)[0]
-        _atomic_write(explorer_path, explorer, prefix=".report-explorer-", root=out_path.parent)
+        # A prior entry report must keep its exact linked snapshot even when
+        # this refresh fails after publishing the explorer but before the entry.
+        digest = hashlib.sha256(explorer).hexdigest()
+        explorer_name = out_path.stem + "_explorer-" + digest + ".html"
+        if len(explorer_name.encode("utf-8")) > 255:
+            explorer_name = "report_explorer-" + digest + ".html"
+        explorer_path = out_path.with_name(explorer_name)
+        _check_output_path(explorer_path, out_path.parent)
         interactive_report_href = quote(explorer_path.name)
     elif viewer_mode != "none":
         viewer_structures = _viewer_structures(selected, scored, viewer_max, run_dir=run_dir)
@@ -518,8 +524,10 @@ def generate_report(
         "files": _file_index(run_dir),
         "warnings": list(dict.fromkeys(warnings)),
     }
-    html_text = template.render(**render_context)
-    _atomic_write(out_path, html_text.encode("utf-8"), prefix=".report-")
+    html_bytes = template.render(**render_context).encode("utf-8")
+    if explorer_path is not None:
+        _publish_immutable_explorer(explorer_path, explorer, root=out_path.parent)
+    _atomic_write(out_path, html_bytes, prefix=".report-")
     return out_path
 
 
@@ -704,6 +712,18 @@ def _check_output_path(destination: Path, root: Path | None = None) -> None:
 
 def _atomic_write(destination: Path, content: bytes, *, prefix: str, root: Path | None = None) -> None:
     write_bytes(destination, content, prefix=prefix, root=root)
+
+
+def _publish_immutable_explorer(destination: Path, content: bytes, *, root: Path) -> None:
+    """Callers hold the run lock; never replace an existing linked snapshot."""
+    _check_output_path(destination, root)
+    try:
+        existing = destination.read_bytes()
+    except FileNotFoundError:
+        _atomic_write(destination, content, prefix=".report-explorer-", root=root)
+        return
+    if existing != content:
+        raise OSError(f"내용 해시 탐색 파일에 다른 내용이 있습니다. 기존 파일을 보존했습니다: {destination}")
 
 
 def _viewer_script(run_dir: Path, cfg: dict) -> str:

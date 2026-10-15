@@ -3628,6 +3628,13 @@ function renderDistribution(observations) {
       { responsive: true, displaylogo: false, modeBarButtonsToRemove: ["sendChartToCloud", "sendDataToCloud", "editInChartStudio"] },
     );
 }
+function localizeEmptyPaeAnnotation() {
+  const plot = $("pae");
+  if (!window.Plotly || plot?.data?.length !== 0 || !plot.layout?.annotations?.length) return;
+  const text = !state.structure ? "구조 / PAE 미평가"
+    : state.structure.pae_status === "removed_by_retention" ? "PAE · 용량 정리로 삭제됨" : "PAE 미평가";
+  Plotly.relayout(plot, {"annotations[0].text": I18N.value(I18N.term(text))});
+}
 async function loadStructure() {
   if (!state.candidate) return;
   const id = state.candidate.candidate_id,
@@ -3657,13 +3664,15 @@ async function loadStructure() {
     disposeResultViewer();
     I18N.text($("structure-note"), I18N.term(e.message));
     $("structure-details").replaceChildren();
-    if (window.Plotly)
-      Plotly.react(
+    if (window.Plotly) {
+      await Plotly.react(
         $("pae"),
         [],
-        { annotations: [{ text: "구조 / PAE 미평가", showarrow: false }] },
+        { annotations: [{ text: I18N.value(I18N.term("구조 / PAE 미평가")), showarrow: false }] },
         { responsive: true, displaylogo: false, modeBarButtonsToRemove: ["sendChartToCloud", "sendDataToCloud", "editInChartStudio"] },
       );
+      if (request === state.structureRequest) localizeEmptyPaeAnnotation();
+    }
   }
 }
 function labelSelection(label) {
@@ -3910,6 +3919,7 @@ async function renderStructure() {
       },
       { responsive: true, displaylogo: false, displayModeBar: false },
     );
+    if (!pae && state.structure === data) localizeEmptyPaeAnnotation();
     $("pae").removeAllListeners?.("plotly_click");
     $("pae").on("plotly_click", event => {
       const point = event.points?.[0];
@@ -4713,6 +4723,7 @@ document.addEventListener("nanocofold:language", () => {
     Plotly.relayout(pae, {"xaxis.title.text": I18N.value(I18N.term("열 · 평가 잔기")),
       "yaxis.title.text": I18N.value(I18N.term("행 · 정렬 기준 잔기"))});
     if (pae.data.length) Plotly.restyle(pae, {hovertemplate: I18N.value(I18N.term("정렬 기준 (행) %{y}<br>평가 잔기 (열) %{x}<br>PAE %{z:.2f} Å<extra></extra>"))});
+    else localizeEmptyPaeAnnotation();
   }
 });
 startPlatform();
