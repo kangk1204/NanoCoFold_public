@@ -587,7 +587,7 @@ class JobManager:
             history = current.get("history", []) + [previous]
             current.update(state="queued", resume=Path(current["run_dir"]).exists(), started=None, finished=None,
                            pid=None, pgid=None, process_stamp=None, error=None, history=history, can_resume=False,
-                           budget_exceeded=False, catalog_pending=False, updated=time.time())
+                           budget_exceeded=False, catalog_pending=False, cancel_requested=False, updated=time.time())
             current.update(phase="resume_validation", progress={"completed": 0, "total": current.get("progress", {}).get("total")})
             connection.execute("UPDATE jobs SET state='queued',updated=?,payload=? WHERE id=?", (current["updated"], json.dumps(current), identifier))
         return current
@@ -625,10 +625,11 @@ class JobManager:
             job = json.loads(row["payload"])
             if job["state"] == "queued":
                 job.update(state="cancelled", phase="cancelled", finished=time.time(),
+                           cancel_requested=True,
                            can_resume=job["kind"] == "analysis",
                            catalog_pending=bool(job.get("run_dir") and Path(job["run_dir"]).is_dir()))
             elif job["state"] in {"running", "cancelling"}:
-                job.update(state="cancelling", phase="cancelling")
+                job.update(state="cancelling", phase="cancelling", cancel_requested=True)
             else:
                 return job
             job["updated"] = time.time()
@@ -673,6 +674,14 @@ class JobManager:
             if current["state"] == "queued":
                 terminal = self.store.update(job["id"], expected_states={"queued"}, state="failed", phase="launch_failed",
                                              error=message, finished=time.time(), can_resume=job["kind"] == "analysis")
+            elif current["state"] == "cancelled" and not current.get("cancel_requested"):
+                # Reaping a worker after a registration-write error sends
+                # SIGTERM, which that worker can record as cancellation. The
+                # cause is still launch failure; preserve actual user cancels.
+                terminal = self.store.update(job["id"], expected_states={"cancelled"},
+                                             expected_attempt=(current.get("pid"), current.get("process_stamp")),
+                                             state="failed", phase="launch_failed", error=message,
+                                             finished=time.time(), can_resume=job["kind"] == "analysis")
             else:
                 terminal = self.store.finish(job["id"], state="failed", expected_attempt=(current.get("pid"), current.get("process_stamp")),
                                              error=message, finished=time.time(), can_resume=job["kind"] == "analysis")

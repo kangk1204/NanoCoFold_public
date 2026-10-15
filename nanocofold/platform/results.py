@@ -1133,9 +1133,21 @@ class ResultReader:
         return self._coordinate_contract(payload, path=path, row=row)
 
     def residue_mapping(self):
+        from ..utils.residue_mapping import read_residue_mapping
+        numeric_fields = {"output_position", "reference_position", "source_full_position",
+                          "source_observed", "source_standard_observed", "hotspot_excluded"}
         for relative in ("01_target/residue_mapping.csv", "residue_mapping.csv", "01_target/target_mapping.csv"):
-            if self._path(relative).exists():
-                return self._csv(relative)
+            path = self._path(relative)
+            if path.exists():
+                try:
+                    # Author labels are opaque text, including negative numbers,
+                    # leading zeros and literal apostrophes. Only the explicitly
+                    # typed output-position/assessment fields are normalized.
+                    return [{key: _cell(value, key) if key in numeric_fields else value
+                             for key, value in row.items()} for row in read_residue_mapping(path)]
+                except (ValueError, csv.Error, UnicodeError, OSError) as exc:
+                    self.issues.append(f"{relative}: 읽을 수 없는 CSV ({exc})")
+                    return []
         return []
 
     def artifacts(self):

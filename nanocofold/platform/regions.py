@@ -1,13 +1,12 @@
 """Explicit construct cropping and hotspot masks with original numbering retained."""
 from __future__ import annotations
 
-import csv
 import json
 import shutil
 from pathlib import Path
 
 from ..hotspots import parse_hotspot_spec
-from ..utils.spreadsheet import csv_cell
+from ..utils.residue_mapping import write_residue_mapping, read_residue_mapping
 from .paths import sha256
 
 
@@ -52,8 +51,7 @@ def apply_regions(folder: Path, cfg: dict, review: dict, payload: dict):
     mapping_path = folder / "residue_mapping.csv"
     mapping = []
     if mapping_path.exists():
-        with mapping_path.open(encoding="utf-8-sig", newline="") as stream:
-            mapping = list(csv.DictReader(stream))
+        mapping = read_residue_mapping(mapping_path)
     # Sequence predictions refer to selected normalized chains, while the
     # coordinate export already renames the target to A.
     reference_chains = review.get("reference_chains", [])
@@ -119,10 +117,7 @@ def apply_regions(folder: Path, cfg: dict, review: dict, payload: dict):
         else:
             saved["hotspot_positions"] = [e["number"] - start + 1 for e in entries]
     if mapping:
-        with mapping_path.open("w", encoding="utf-8-sig", newline="") as stream:
-            writer = csv.DictWriter(stream, fieldnames=list(mapping[0]))
-            writer.writeheader()
-            writer.writerows({key: csv_cell(value) for key, value in row.items()} for row in mapping)
+        write_residue_mapping(mapping_path, mapping)
     (folder / "input_review.json").write_text(json.dumps(review, ensure_ascii=False, indent=2))
     records = [("A", cfg["target"]["sequence"])] + [(chr(66+i), c["sequence"]) for i, c in enumerate(cfg["target"].get("aux_chains", []))]
     (folder / "target.fasta").write_text("".join(f">{name}\n{seq}\n" for name, seq in records))

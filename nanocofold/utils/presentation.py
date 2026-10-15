@@ -106,7 +106,7 @@ def _portable(value, root, patterns, field=''):
         # PATH-like variables can start with relative entries. Windows uses
         # semicolons, so a drive colon must never be treated as a separator.
         separator = ';' if ';' in value else ':'
-        if separator in value and not (separator == ':' and re.match(r'^[A-Za-z]:[\\/]', value)):
+        if separator in value and not (separator == ':' and re.match(r'^(?:[A-Za-z]:[\\/]|\\\\)', value)):
             parts = value.split(separator)
             if any(_ABSOLUTE_START.match(part) for part in parts):
                 return separator.join(_portable_path(part, root) if _ABSOLUTE_START.match(part) else part for part in parts)

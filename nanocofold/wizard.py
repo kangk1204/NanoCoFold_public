@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import copy
-import csv
 import hashlib
 import json
 import math
@@ -22,7 +21,7 @@ import yaml
 from . import hotspots
 from .config import ASSET_ROOT, PROJECT_ROOT
 from .utils import pdb_io
-from .utils.spreadsheet import csv_cell
+from .utils.residue_mapping import write_residue_mapping
 
 MAX_REQUEST = 20 * 1024 * 1024
 BOUNDARY = (
@@ -276,10 +275,7 @@ class WizardSession:
                                     "author_chain": entry.get("author_chain", entry["original_id"]),
                                     "source_residue": residue["original_label"], "aa": residue["aa"],
                                     "output_chain": output_chain, "output_position": residue["position"]})
-            with (staging / "residue_mapping.csv").open("w", newline="", encoding="utf-8-sig") as handle:
-                writer = csv.DictWriter(handle, fieldnames=list(mapping[0]))
-                writer.writeheader()
-                writer.writerows({key: csv_cell(value) for key, value in row.items()} for row in mapping)
+            write_residue_mapping(staging / "residue_mapping.csv", mapping)
             source_file = Path(self.input["source_file"])
             source_name = "source.cif.gz" if source_file.name.endswith(".cif.gz") else "source" + source_file.suffix
             shutil.copy2(source_file, staging / source_name)

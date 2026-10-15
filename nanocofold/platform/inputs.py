@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import csv
 import hashlib
 import re
 import secrets
@@ -16,7 +15,7 @@ import yaml
 from ..config import _deep_merge, _validate, cfg_get, cfg_set, load_config, read_config_yaml
 from ..utils.seq import clean_sequence, validate_candidate_id, validate_candidate_ids, validate_fasta_controls, validate_fasta_id
 from ..wizard import WizardSession
-from ..utils.spreadsheet import csv_cell
+from ..utils.residue_mapping import write_residue_mapping
 from .paths import contained, native, sha256
 from .regions import apply_regions
 
@@ -605,10 +604,7 @@ class InputManager:
                                 "source_standard_observed": observed is not None,
                                 "source_mapping_kind": kind,
                                 "coordinate_source": "predicted", "sequence_origin": chain["sequence_origin"]})
-        with (folder / "residue_mapping.csv").open("w", newline="", encoding="utf-8-sig") as stream:
-            writer = csv.DictWriter(stream, fieldnames=list(mapping[0]))
-            writer.writeheader()
-            writer.writerows({key: csv_cell(value) for key, value in row.items()} for row in mapping)
+        write_residue_mapping(folder / "residue_mapping.csv", mapping)
         cfg = normalized_config(self.workspace, payload.get("config"))
         cfg["run"].update(name=cfg["run"].get("name", chains[0]["name"]), mock=mock)
         cfg["target"].update(name=chains[0]["name"], sequence=chains[0]["sequence"], fasta=None,

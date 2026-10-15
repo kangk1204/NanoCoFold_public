@@ -68,7 +68,7 @@ def test_entry_download_includes_exact_saved_explorer_without_changing_results(t
     assert all(p.read_bytes()==content for p,content in before.items())
 
 
-def test_cloud_result_zip_has_one_full_explorer_and_preserves_all_native_files(tmp_path):
+def test_cloud_result_zip_uses_one_separate_presentation_and_preserves_all_native_files(tmp_path):
     run, cfg = saved_run(tmp_path / "runs", count=2)
     entry = report.generate_report(run, cfg, {})
     explorer, _ = linked_explorer(entry)
@@ -78,14 +78,18 @@ def test_cloud_result_zip_has_one_full_explorer_and_preserves_all_native_files(t
     build_bundle(run, destination)
     with zipfile.ZipFile(destination / "results.zip") as archive:
         html = [name for name in archive.namelist() if name.endswith(".html") and b'id="result-data"' in archive.read(name)]
-        assert html == ["original/" + explorer.name]
-        assert archive.read("original/report.html") == entry.read_bytes()
+        assert html == []
         for path,content in before.items():
-            if path.name == "report_delivery.zip":continue
+            if path in {entry, explorer, run / "report_delivery.zip"}:continue
             assert archive.read("original/" + str(path.relative_to(run))) == content
         manifest = json.loads(archive.read("report_packaging_manifest.json"))
-        omitted = {row["path"] for row in manifest["derived_reports_omitted"]}
-        assert {"original/report_delivery.zip", "exploration/report_delivery.zip", "exploration/report_offline.html"} <= omitted
+        omitted = {row["path"]: row for row in manifest["derived_reports_omitted"]}
+        assert {"original/report.html", "original/" + explorer.name, "original/report_delivery.zip", "exploration/report_delivery.zip", "exploration/report_offline.html"} <= set(omitted)
+        from hashlib import sha256
+        for path in (entry, explorer, run / "report_delivery.zip"):
+            assert omitted["original/" + path.name]["sha256"] == sha256(before[path]).hexdigest()
+        with zipfile.ZipFile(destination / "report_delivery.zip") as delivery:
+            assert b'id="result-data"' in delivery.read("report.html")
     assert (destination / "report_offline.html").is_file()
     assert (destination / "report_delivery.zip").is_file()
     assert all(p.read_bytes()==content for p,content in before.items())

@@ -59,6 +59,7 @@ def test_relative_first_runtime_path_lists_with_custom_mounts_and_windows_drives
     assert portable["LD_LIBRARY_PATH"] == "lib:[local path]"
     assert portable["WINDOWS"] == portable["VIRTUAL_ENV"] == "[local path]"
     assert portable_metadata({"environment": {"PATH": "bin;C:\\private\\bin;D:\\tools"}})["environment"]["PATH"] == "bin;[local path];[local path]"
+    assert portable_metadata({"path": r"\\\\?\C:\private\models\weights.pt"})["path"] == "[local path]"
 
 
 def test_pae_is_losslessly_pooled_with_structure_specific_axes():
