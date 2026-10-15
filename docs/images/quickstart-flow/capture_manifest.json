@@ -1,0 +1,19 @@
+{
+  "scope": "Local UI captures during the separate environment-check and bilingual layout change. No predictions or GPU checks executed for captures. Review images show a missing receipt. Charts show a read-only copy of the previously verified rc5 four-engine barnase/barstar result. Historical captures and result files are preserved.",
+  "files": {
+    "en/01-purpose.jpg": "d64d8646b42142a96341b0542b394cc2ea9d5f5efc2b72d20330f2ee57f1d745",
+    "en/02-input.jpg": "72f0426fe43d4d8cd284f05861f20b6ce120961dc4a6c227d487532ad0a0a2ef",
+    "en/03-settings.jpg": "6f296bb9d801ec7bc5b3fce0ded766bbe62a30767cdefcb9dba2fdff1ba4928a",
+    "en/04-review.jpg": "8612eb989c98b61de60a07dcb84d176d982a474442116e3541c00cf95d647ec9",
+    "en/charts.jpg": "e0922ca18847bf69e1f11c7e02d5de6d850492d07aedb0cc13f02419b8c04782",
+    "en/environment.jpg": "e66b3e65bc0e7f854dfd1f3c3cb64c6a3c8001b1151fd5be4e319a1d13e7aee7",
+    "en/report-nav.jpg": "949619387af703ae1993d07252b7f55d18d96602077befc565f30186ffb0f338",
+    "ko/01-purpose.jpg": "43e0fc8382a61d88dbdb6f317ea4eee7aa1e6a07b4ff17b5876a74f08f2a7726",
+    "ko/02-input.jpg": "fa0c1afed7d39c7d304dd4c31ec2098700a207c8d82b89902b62e61d691b75ac",
+    "ko/03-settings.jpg": "70ab9c090299d0dc0737349e4163343cf7756ad1767d81eee0e12d25a12043ba",
+    "ko/04-review.jpg": "bbae9e3c932722252baa6e1c100c2af98c1cedef5fd5878ae82b959086470f6a",
+    "ko/charts.jpg": "63b293885f17ddfeb6d90d22f1a49eeba6fedd883ef9f174677d5b5f06453a2c",
+    "ko/environment.jpg": "4449225ef25bc743222eb00ae412faf4ef5b10869cd279b0e8611c78f51bb280",
+    "ko/report-nav.jpg": "357dfd52dc0937124cea71a663479e6dad567f2c5a305d6af7aa0b76956ea2b7"
+  }
+}

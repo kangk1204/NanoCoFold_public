@@ -24,8 +24,8 @@
     <script src="/assets/platform.js" defer></script>
   </head>
   <body data-startup="loading">
-    <header>
-      <div>
+    <header class="platform-header">
+      <div class="platform-brand">
         <strong>NanoCoFold</strong><span>단백질 복합체·나노바디 분석 · 개인 작업 공간</span>
       </div>
       <div class="language-switch"><label for="language-select">Language</label> <select id="language-select" aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div>
@@ -46,6 +46,7 @@
       </div>
       <section id="view-input">
         <h1>새 분석 시작</h1>
+        <aside class="next-step setup-entry"><strong>처음 사용하시나요?</strong><p>설치 환경은 처음 한 번 확인합니다. 그다음 입력 확인 → 분석 실행 → 결과 열기 순서로 진행하세요.</p><button id="open-environment" class="secondary">처음 한 번 환경 확인</button></aside>
         <section class="card quickstart" aria-labelledby="quickstart-title">
           <h2 id="quickstart-title">처음이라면 공개 예제로 시작하세요</h2>
           <p>예제를 불러오면 서열과 작은 실행 조건이 함께 채워집니다. 입력 검토와 계산 실행은 다음 화면에서 따로 진행합니다.</p>
@@ -63,7 +64,7 @@
           <p class="muted">실제 GPU 예측에 사용할 공개 입력입니다. 예상 구조나 점수를 정답으로 제공하지 않습니다.</p>
         </section>
         <ol class="workflow-steps" aria-label="내 입력으로 분석하는 순서">
-          <li>1. 목적과 입력</li><li>2. 실행 조건</li><li>3. 입력 검토·환경 점검</li><li>4. 분석 실행 → 결과</li>
+          <li>1. 목적과 입력</li><li>2. 실행 조건</li><li>3. 입력 확인</li><li>4. 분석 실행 → 결과</li>
         </ol>
         <p>
           입력을 검토하고 실제 적용 설정을 확인한 뒤 실행하세요. CPU 데모는 합성
@@ -288,7 +289,7 @@
                 확정한 표적·결합 부위는 고급 설정으로 덮어쓰지 않습니다.
               </p>
             </details>
-            <button id="review-input">3. 입력 검토·환경 점검</button>
+            <button id="review-input">3. 입력 확인</button>
             <div id="review-output" hidden>
               <h3>적용 설정</h3>
               <p id="input-next-step" role="status" aria-live="polite"></p>
@@ -296,7 +297,7 @@
               <div id="review-summary"></div>
               <div class="inline">
                 <button id="diagnose-input" class="secondary">
-                  이 입력의 환경 점검</button
+                  환경 확인으로 이동</button
                 ><button id="start-job" disabled>4. 분석 실행</button>
               </div>
             </div>
@@ -342,8 +343,7 @@
             <h2 id="job-title">작업 선택</h2>
             <div id="job-detail"></div>
             <div id="job-actions" class="inline"></div>
-            <h3>실시간 로그</h3>
-            <pre id="job-log" class="log" tabindex="0"></pre>
+            <details class="job-log-details"><summary>상세 실행 로그</summary><pre id="job-log" class="log" tabindex="0"></pre></details>
           </div>
         </div>
       </section>
@@ -364,12 +364,13 @@
         <p class="muted">용량은 해당 서버 결과 폴더의 측정값입니다. 공용 캐시·모델 가중치·클라우드 사본 용량은 포함하지 않습니다.</p>
       </section>
       <section id="view-results" hidden>
-<p class="muted" data-terminology="binding-site">결합 부위(hotspot)는 나노바디 설계·접촉 평가에 지정한 표적 잔기입니다. 일반 복합체의 관심 잔기는 참조 구조 비교용입니다. 두 설정 모두 실제 결합의 실험적 증거를 뜻하지 않습니다.</p>
+
         <h1>분석 결과 보고서</h1><p class="muted">NanoCoFold · 저장된 데이터로 탐색하는 독립 보고서</p><nav class="report-nav" aria-label="보고서 내 탐색"><a href="#report-input">01 입력·설정</a><a href="#result-summary">02 후보·모델 수</a><a href="#report-comparison">03 후보 비교</a><a href="#report-exclusions">04 제외·미평가</a><a href="#candidate-title">05 구조·PAE</a><a href="#report-provenance">06 출처·산출물</a></nav>
         <p>
           기존 결과 열기는 읽기 전용입니다. 예측 점수는 실제 결합·친화도
           향상·KD를 확정하지 않습니다.
         </p>
+        <details class="result-interpretation-note"><summary>결과 해석 안내</summary><p class="muted" data-terminology="binding-site">결합 부위(hotspot)는 나노바디 설계·접촉 평가에 지정한 표적 잔기입니다. 일반 복합체의 관심 잔기는 참조 구조 비교용입니다. 두 설정 모두 실제 결합의 실험적 증거를 뜻하지 않습니다.</p></details>
         <div class="card">
           <div class="inline">
             <label for="result-select">실행 선택</label
@@ -606,8 +607,8 @@
               </section>
               <section class="card">
               <h2>계면 점수 비교</h2>
-              <div class="inline">
-                <label for="plot-x">산점도 X</label
+              <div class="axis-controls">
+                <div class="axis-field"><label for="plot-x">X축</label
                 ><select id="plot-x">
                   <option>ipsae</option>
                   <option>iptm</option>
@@ -627,7 +628,7 @@
                 <option value="pdockq2_binder">pDockQ2 VHH 방향</option>
                   <option>n_clashes</option>
                   <option>dev_flags</option><option>n_hbonds</option><option>n_salt_bridges</option><option>esm_score</option></select
-                ><label for="plot-y">Y</label
+                ></div><div class="axis-field"><label for="plot-y">Y축</label
                 ><select id="plot-y">
                   <option>interface_plddt</option>
                   <option>ipsae</option>
@@ -648,7 +649,7 @@
                   <option>n_clashes</option>
                 <option>dev_flags</option><option>n_hbonds</option><option>n_salt_bridges</option><option>esm_score</option></select>
               </div>
-              <div id="scatter" class="chart"></div>
+              </div><div id="scatter" class="chart"></div>
               </section>
             </div>
 
@@ -673,6 +674,18 @@
           계산은 Linux x86_64 NVIDIA GPU 호스트에서 실행합니다. 연구자 PC는
           브라우저와 SSH 포트포워딩으로 접속합니다.
         </p>
+        <div class="card environment-check-card">
+          <h2>처음 한 번 · 실행 환경 확인</h2>
+          <p>선택한 분석에 필요한 GPU·프로그램·모델 파일을 확인합니다. 단백질 구조 예측은 시작하지 않습니다.</p>
+          <label for="environment-mode">확인할 분석</label>
+          <select id="environment-mode"><option value="complex">단백질 복합체 예측</option><option value="screen">보유 나노바디 비교</option><option value="mature">기존 나노바디 변이 평가</option><option value="design">새 나노바디 설계</option></select>
+          <p id="environment-context" class="muted"></p>
+          <div id="environment-status" class="next-step" role="status" aria-live="polite"></div>
+          <div class="inline"><button id="diagnose-environment">환경 확인 시작</button><button id="environment-continue" class="secondary">분석 준비하기</button></div>
+          <p class="muted">같은 설치·GPU·엔진을 사용하면 확인 기록을 재사용합니다. 새 엔진을 선택하거나 설치를 변경하면 다시 확인하세요. 분석마다 입력과 실행 조건은 별도로 검사합니다.</p>
+          <details><summary>환경 확인 세부 항목</summary><div id="diagnostics-output"></div></details>
+        </div>
+        <details class="card"><summary>추가 프로그램 설치 · 고급</summary>
         <div class="card">
           <h2>설치 프로필</h2>
           <p>
@@ -694,15 +707,12 @@
               <option>opendde</option>
               <option>all</option></select
             ><button id="install-profile-button">프로필 설치</button
-            ><button id="diagnose-environment" class="secondary">
-              현재 입력·모드 환경 점검
-            </button>
+            >
           </div>
           <p class="muted">
             설치·점검은 작업 탭에서 다운로드 진행과 로그를 확인합니다. 실패한
             필수 엔진이 있으면 실제 분석을 시작하지 않습니다.
           </p>
-          <div id="diagnostics-output"></div>
         </div>
         <div class="card">
           <h2>시작 안내</h2>
@@ -721,6 +731,7 @@ ssh -L 8765:127.0.0.1:8765 USER@GPU_HOST</pre
             보관됩니다.
           </p>
         </div>
+        </details>
       </section>
     </main>
     <footer>

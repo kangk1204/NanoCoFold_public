@@ -5,6 +5,7 @@ import contextlib
 import hashlib
 import json
 import mimetypes
+import os
 import re
 import secrets
 import socket
@@ -399,6 +400,25 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
     async def diagnostics(request: Request):
         payload = effective(await body(request))
         return native(await asyncio.to_thread(manager.create, payload, kind="diagnostics"))
+
+    @app.post("/api/environment/check")
+    async def environment_check(request: Request):
+        payload = effective(await body(request))
+        payload["environment_only"] = True
+        return native(await asyncio.to_thread(manager.create, payload, kind="diagnostics"))
+
+    @app.post("/api/environment/status")
+    async def environment_status(request: Request):
+        from .environment import readiness, installation_override
+        payload = effective(await body(request))
+        cfg = normalized_config(workspace, installation_override(payload.get("config")))
+        mode = payload.get("mode", cfg["run"]["mode"])
+        if mode not in {"complex", "design", "screen", "mature"}:
+            raise ValueError("지원하지 않는 분석 모드입니다.")
+        cfg["run"]["mode"] = mode
+        from .jobs import allowed_gpu
+        gpu = allowed_gpu(payload.get("gpu", os.environ.get("NANOCOFOLD_GPU", "0")))
+        return native(await asyncio.to_thread(readiness, workspace, cfg, manager.store, gpu=gpu))
 
     @app.get("/api/diagnostics")
     def diagnostic_list():

@@ -114,7 +114,19 @@ def execute(workspace: Path, identifier: str) -> int:
         with scope(lambda: store.get(identifier)["state"] in {"cancelling", "cancelled", "budget_exhausted"}):
             if job["kind"] == "diagnostics":
                 from ..diagnostics import doctor
-                diagnosis = doctor(cfg, smoke=False)
+                if job.get("environment_only"):
+                    from .environment import environment_scope
+                    before = environment_scope(workspace, cfg, gpu=job["gpu"])
+                    diagnosis = doctor(cfg, smoke=False, environment_only=True)
+                    after = environment_scope(workspace, cfg, gpu=job["gpu"])
+                    diagnosis["environment_scope"] = after
+                    if before != after:
+                        diagnosis["ok"] = False
+                        diagnosis["installation_changed_during_check"] = True
+                        diagnosis["checks"].append({"name": "installation.changed", "required": True, "ok": False,
+                                                     "detail": "Installation changed during check; check again after setup finishes."})
+                else:
+                    diagnosis = doctor(cfg, smoke=False)
                 destination = Path(job["config_path"]).parent / "diagnostics.json"
                 destination.write_text(json.dumps(diagnosis, ensure_ascii=False, indent=2))
                 extra["diagnostics"] = diagnosis

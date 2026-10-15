@@ -497,13 +497,40 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
 .language-switch { display: flex; align-items: center; gap: 8px; }
 .language-switch label { margin: 0; color: inherit; white-space: nowrap; }
 .language-switch select { width: auto; min-width: 108px; margin: 0; background: #fff; color: #1c2c38; padding: 6px 10px; }
-</style></head><body><header><strong>NanoCoFold · 오프라인 결과 탐색</strong><span>전체 후보 · 관측 · 구조 · 출처 포함</span><div class="language-switch"><label for="language-select">Language</label> <select id="language-select" aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div></header><main><div id="notice" role="status" aria-live="polite" hidden></div><section id="view-results">
-<p class="muted" data-terminology="binding-site">결합 부위(hotspot)는 나노바디 설계·접촉 평가에 지정한 표적 잔기입니다. 일반 복합체의 관심 잔기는 참조 구조 비교용입니다. 두 설정 모두 실제 결합의 실험적 증거를 뜻하지 않습니다.</p>
+
+/* Stable bilingual navigation: the header has the same two rows in each language. */
+.platform-header{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px 24px;padding:18px 28px}
+.platform-header .platform-brand{min-width:0}.platform-header .platform-brand span{font-size:14px;overflow-wrap:anywhere}
+.platform-header>nav{grid-column:1/-1;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;width:100%}
+.platform-header>nav button{padding:10px 12px;min-height:48px;font-size:16px;line-height:1.35;overflow-wrap:normal}
+.report-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:20px 0}
+.report-nav a{min-width:0;min-height:64px;padding:10px 14px;font-size:15px;line-height:1.4;overflow-wrap:normal}
+#view-results{font-size:16px;line-height:1.6}#view-results h1{font-size:28px}
+#view-results>p[data-terminology]{font-size:14px;margin:16px 0;padding:12px 16px;border-left:3px solid #a5b7ba;background:#edf2f3}
+#view-results :is(button,input,select):not(.msp-plugin *):where(:not(.modebar-btn)){min-height:48px}
+.axis-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:12px 0}
+.axis-field{min-width:0;display:flex;flex-direction:column;gap:6px}.axis-field label{margin:0;font-weight:600}
+.axis-field select{width:100%;min-width:0;max-width:100%;margin:0}
+.setup-entry{margin:16px 0}.setup-entry p{margin:4px 0 12px}.environment-check-card{max-width:900px}
+.environment-check-card>select{max-width:580px}.environment-check-card .next-step{margin:16px 0}
+.job-log-details{margin-top:20px;border-top:1px solid #d7e0e5}.job-log-details summary{cursor:pointer;padding:12px 0}
+#job-actions{padding:12px 0}#job-actions>button{min-height:48px}.job-history{margin-top:18px}.job-history summary{padding:12px 0;cursor:pointer}
+.job-next-step{padding:14px 16px;background:#edf7f6;border-left:4px solid #0f766e;margin:14px 0}
+@media(max-width:1000px){.platform-header>nav{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.platform-header{padding:16px;gap:12px}.platform-header .language-switch{flex-wrap:wrap;justify-content:flex-end}.platform-header .language-switch label{display:none}.platform-header>nav{grid-template-columns:repeat(2,minmax(0,1fr))}.report-nav{grid-template-columns:repeat(2,minmax(0,1fr))}.report-nav a{flex:none;font-size:14px}.axis-controls{gap:10px}}
+
+.result-interpretation-note{margin:12px 0 20px;color:#526269}.result-interpretation-note summary{cursor:pointer;min-height:44px;padding:8px 0}#view-results .result-interpretation-note p{font-size:14px;line-height:1.6}
+
+.offline-header{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px 24px;align-items:center}.offline-brand{min-width:0}.offline-brand strong{display:block;font-size:22px;line-height:1.4}.offline-brand span{margin-top:6px;font-size:14px;overflow-wrap:anywhere}
+@media(max-width:600px){.offline-header{grid-template-columns:1fr;gap:12px}.offline-header .language-switch{justify-self:end}.offline-brand strong{font-size:20px}}
+</style></head><body><header class="offline-header"><div class="offline-brand"><strong>NanoCoFold · 오프라인 결과 탐색</strong><span>전체 후보 · 관측 · 구조 · 출처 포함</span></div><div class="language-switch"><label for="language-select">Language</label> <select id="language-select" aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div></header><main><div id="notice" role="status" aria-live="polite" hidden></div><section id="view-results">
+
         <h1>분석 결과 보고서</h1><p class="muted">NanoCoFold · 저장된 데이터로 탐색하는 독립 보고서</p><nav class="report-nav" aria-label="보고서 내 탐색"><a href="#report-input">01 입력·설정</a><a href="#result-summary">02 후보·모델 수</a><a href="#report-comparison">03 후보 비교</a><a href="#report-exclusions">04 제외·미평가</a><a href="#candidate-title">05 구조·PAE</a><a href="#report-provenance">06 출처·산출물</a></nav>
         <p>
           기존 결과 열기는 읽기 전용입니다. 예측 점수는 실제 결합·친화도
           향상·KD를 확정하지 않습니다.
         </p>
+        <details class="result-interpretation-note"><summary>결과 해석 안내</summary><p class="muted" data-terminology="binding-site">결합 부위(hotspot)는 나노바디 설계·접촉 평가에 지정한 표적 잔기입니다. 일반 복합체의 관심 잔기는 참조 구조 비교용입니다. 두 설정 모두 실제 결합의 실험적 증거를 뜻하지 않습니다.</p></details>
         <div class="card">
           <div class="inline">
             <label for="result-select">실행 선택</label
@@ -740,8 +767,8 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
               </section>
               <section class="card">
               <h2>계면 점수 비교</h2>
-              <div class="inline">
-                <label for="plot-x">산점도 X</label
+              <div class="axis-controls">
+                <div class="axis-field"><label for="plot-x">X축</label
                 ><select id="plot-x">
                   <option>ipsae</option>
                   <option>iptm</option>
@@ -761,7 +788,7 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
                 <option value="pdockq2_binder">pDockQ2 VHH 방향</option>
                   <option>n_clashes</option>
                   <option>dev_flags</option><option>n_hbonds</option><option>n_salt_bridges</option><option>esm_score</option></select
-                ><label for="plot-y">Y</label
+                ></div><div class="axis-field"><label for="plot-y">Y축</label
                 ><select id="plot-y">
                   <option>interface_plddt</option>
                   <option>ipsae</option>
@@ -782,7 +809,7 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
                   <option>n_clashes</option>
                 <option>dev_flags</option><option>n_hbonds</option><option>n_salt_bridges</option><option>esm_score</option></select>
               </div>
-              <div id="scatter" class="chart"></div>
+              </div><div id="scatter" class="chart"></div>
               </section>
             </div>
 
@@ -1042,6 +1069,49 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "결과 해석 안내": "How to interpret these results",
+  "입력 확인 완료 · 분석 실행을 선택하세요.": "Input reviewed · Click Run analysis.",
+  "선택한 엔진의 환경 확인이 필요합니다.": "The selected engines need an environment check.",
+  "처음 사용하시나요?": "First time here?",
+  "설치 환경은 처음 한 번 확인합니다. 그다음 입력 확인 → 분석 실행 → 결과 열기 순서로 진행하세요.": "Check the installation once. Then review your input → run the analysis → open the results.",
+  "처음 한 번 환경 확인": "Check environment once",
+  "3. 입력 확인": "3. Review input",
+  "입력 확인": "Review input",
+  "환경 확인으로 이동": "Go to environment check",
+  "처음 한 번 · 실행 환경 확인": "First time · Check your environment",
+  "선택한 분석에 필요한 GPU·프로그램·모델 파일을 확인합니다. 단백질 구조 예측은 시작하지 않습니다.": "Check the GPU, software, and model files needed for your analysis. This does not start protein structure prediction.",
+  "확인할 분석": "Analysis to check",
+  "환경 확인 시작": "Check environment",
+  "환경 다시 확인": "Check again",
+  "분석 준비하기": "Prepare analysis",
+  "같은 설치·GPU·엔진을 사용하면 확인 기록을 재사용합니다. 새 엔진을 선택하거나 설치를 변경하면 다시 확인하세요. 분석마다 입력과 실행 조건은 별도로 검사합니다.": "The check is reused for the same installation, GPU, and engines. Check again after adding engines or changing the installation. Inputs and run settings are still checked for every analysis.",
+  "환경 확인 세부 항목": "Environment check details",
+  "추가 프로그램 설치 · 고급": "Install additional software · Advanced",
+  "상세 실행 로그": "Detailed execution log",
+  "X축": "X axis",
+  "Y축": "Y axis",
+  "저장된 환경 확인 기록을 확인합니다.": "Looking for a saved environment check.",
+  "입력 확인 완료 · 아래 분석 실행을 누르세요. 아직 구조 예측은 시작하지 않았습니다.": "Input reviewed · Click Run analysis below. Structure prediction has not started yet.",
+  "입력은 확인했습니다. 선택한 엔진의 환경 확인 기록이 필요합니다. 환경 확인 후 이 화면으로 돌아오세요.": "Input reviewed. The selected engines need an environment check. Complete it, then return to this input.",
+  "현재 입력에서 선택한 엔진을 확인합니다.": "Checking the engines selected for your current input.",
+  "작은 시작 설정의 기본 엔진을 확인합니다.": "Checking the default engines for the small starting configuration.",
+  "환경을 확인하고 있습니다. 이 화면에서 기다려 주세요. 구조 예측은 실행하지 않습니다.": "Checking your environment. Please wait on this page. Structure prediction is not running.",
+  "환경 확인 완료 · 분석 준비하기를 누르세요.": "Environment ready · Click Prepare analysis.",
+  "환경 확인 미충족 · 세부 항목에서 필요한 설치를 확인하세요.": "Environment check did not pass · Open the details to see what needs installing.",
+  "이 설정의 환경 확인 기록이 없습니다. 처음 한 번 환경 확인을 시작하세요.": "No environment check is saved for these settings. Run the check once to get started.",
+  "분석": "Analysis",
+  "환경 확인": "Environment check",
+  "프로그램 설치": "Software installation",
+  "환경 확인 통과": "Environment check passed",
+  "환경 확인 미충족": "Environment check did not pass",
+  "환경 확인·설치 기록": "Environment checks & installation history",
+  "이 작업은 환경 확인입니다. 단백질 구조 예측 결과는 만들지 않습니다.": "This is an environment check. It does not produce protein structure predictions.",
+  "분석 중입니다. 결과가 저장되면 여기에 결과 열기 버튼이 나타납니다.": "Analysis in progress. The Open results button will appear here when results are saved.",
+  "저장된 결과가 연결되지 않았습니다. 상세 실행 로그에서 종료 사유를 확인하세요.": "No saved result is linked to this job. Check the detailed execution log for the reason.",
+  "입력 확인을 누른 뒤 적용 조건을 읽고 분석 실행을 누르세요. 환경 확인 기록은 재사용하며, 입력 확인은 계산을 시작하지 않습니다.": "Click Review input, read the applied settings, then click Run analysis. The environment check is reused; reviewing input does not start computation.",
+  "검토·실행 · 입력 확인 후 분석 시작": "Review & run · Check your input, then start analysis",
+  "초안 입력을 복원했습니다. 구조 파일을 다시 선택하고 전송 동의와 입력을 확인하세요. 설치 환경 확인 기록은 재사용합니다.": "Draft restored. Reselect structure files, confirm transmission consent, and review your input. The installation check is reused.",
+
   "지정 부위 접촉률": "Requested hotspot contact fraction",
   "표적·파트너·서열·입력 준비 방식·hotspot과 경고를 확인했습니다.": "I have reviewed the target, partners, sequences, preparation method, hotspots, and warnings.",
   "서열 입력의 구조와 hotspot은 예측됩니다. 기본 MSA는 empty이며 외부 서버로 서열을 보내지 않습니다.": "Structure and hotspots are predicted from sequence input. The default MSA is empty and sends no sequences to an external server.",
@@ -1262,7 +1332,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "01 입력·설정": "01 Inputs & settings",
   "02 후보·모델 수": "02 Candidate & model counts",
   "03 후보 비교": "03 Compare candidates",
-  "04 제외·미평가": "04 Exclusions & unevaluated items",
+  "04 제외·미평가": "04 Excluded / unevaluated",
   "05 구조·PAE": "05 Structure & PAE",
   "06 출처·산출물": "06 Provenance & artifacts",
   "기존 결과 열기는 읽기 전용입니다. 예측 점수는 실제 결합·친화도 향상·KD를 확정하지 않습니다.": "Opening an existing result is read-only. Prediction scores do not establish binding, improved affinity, or KD.",
@@ -2077,6 +2147,10 @@ const state = {
   input: null,
   readiness: null,
   diagnostic: null,
+  environment: null,
+  environmentJob: null,
+  environmentTarget: null,
+  environmentRequest: 0,
   loaded: null,
   analyzed: null,
   jobs: [],
@@ -2291,7 +2365,7 @@ function action(id, fn) {
       } catch (e) {
         notice(e.message, true);
       } finally {
-        button.disabled = false;
+        button.disabled = id === "diagnose-environment" && Boolean(state.environmentJob);
       }
     });
 }
@@ -2807,26 +2881,70 @@ async function prepareInput() {
   }
   warnings($("review-summary"), result.review?.warnings);
   $("review-output").hidden = false;
-  I18N.text($("input-next-step"), state.readiness ? I18N.term("입력 검토 완료 · 4. 분석 실행을 누르세요. CPU 데모는 합성 결과입니다.") : I18N.term("3단계 · 이 입력의 환경을 점검 중입니다. 통과하면 아래 분석 실행 버튼이 켜집니다."));
-  if (!state.readiness) {
-    const diagnostic = await api("/api/diagnostics", {
-      input_id: result.id,
-      mode: result.config.run.mode,
-    });
-    state.diagnostic = { job: diagnostic.id, input: result.id };
-    notice(
-      "입력 환경을 비동기로 점검합니다. 필수 점검을 통과하면 분석 실행 버튼이 활성화됩니다.",
-    );
-  } else notice("CPU 데모 입력을 확인했습니다. 분석 실행을 선택하세요.");
+  if (state.readiness) {
+    renderInputReadiness();
+    notice("CPU 데모 입력을 확인했습니다. 분석 실행을 선택하세요.");
+  } else {
+    I18N.text($("input-next-step"), I18N.term("저장된 환경 확인 기록을 확인합니다."));
+    await readInputReadiness(result, revision);
+    if (revision === state.inputRevision && state.input?.id === result.id)
+      notice(state.readiness ? "입력 확인 완료 · 분석 실행을 선택하세요." : "선택한 엔진의 환경 확인이 필요합니다.");
+  }
   return result;
 }
+function renderInputReadiness() {
+  $("start-job").disabled = !state.input || !state.readiness;
+  $("diagnose-input").hidden = Boolean(state.readiness);
+  I18N.text($("input-next-step"), I18N.term(state.readiness
+    ? "입력 확인 완료 · 아래 분석 실행을 누르세요. 아직 구조 예측은 시작하지 않았습니다."
+    : "입력은 확인했습니다. 선택한 엔진의 환경 확인 기록이 필요합니다. 환경 확인 후 이 화면으로 돌아오세요."));
+}
+async function readInputReadiness(input, revision = state.inputRevision) {
+  const result = await api("/api/environment/status", {input_id: input.id, mode: input.config.run.mode});
+  if (revision !== state.inputRevision || state.input?.id !== input.id) return;
+  state.readiness = result.ready === true;
+  renderInputReadiness();
+}
+function environmentPayload() {
+  if (state.environmentTarget) return state.environmentTarget;
+  const mode = $("environment-mode").value;
+  return {mode, config: state.starter.modes[mode].native_override};
+}
+function renderEnvironmentStatus() {
+  const waiting = Boolean(state.environmentJob), ready = state.environment?.ready === true;
+  I18N.text($("environment-context"), I18N.term(state.environmentTarget ? "현재 입력에서 선택한 엔진을 확인합니다." : "작은 시작 설정의 기본 엔진을 확인합니다."));
+  I18N.text($("environment-status"), I18N.term(waiting
+    ? "환경을 확인하고 있습니다. 이 화면에서 기다려 주세요. 구조 예측은 실행하지 않습니다."
+    : ready ? "환경 확인 완료 · 분석 준비하기를 누르세요."
+    : state.environment?.reason === "check_not_passed" ? "환경 확인 미충족 · 세부 항목에서 필요한 설치를 확인하세요."
+    : "이 설정의 환경 확인 기록이 없습니다. 처음 한 번 환경 확인을 시작하세요."));
+  $("diagnose-environment").disabled = waiting;
+  I18N.text($("diagnose-environment"), I18N.term(ready ? "환경 다시 확인" : "환경 확인 시작"));
+  if (state.environment?.diagnostics) renderDiagnostics(state.environment.diagnostics);
+  else $("diagnostics-output").replaceChildren();
+}
+async function refreshEnvironmentStatus() {
+  const request = ++state.environmentRequest, payload = environmentPayload();
+  const status = await api("/api/environment/status", payload);
+  if (request !== state.environmentRequest) return;
+  state.environment = status;
+  if (["queued", "running", "cancelling"].includes(status.state)) state.environmentJob = status.job_id;
+  renderEnvironmentStatus();
+}
+async function openEnvironment(current = false) {
+  state.environmentTarget = current && state.input
+    ? {mode: state.input.config.run.mode, config: state.input.config} : null;
+  $("environment-mode").value = state.environmentTarget?.mode || $("mode").value;
+  view("environment");
+  await refreshEnvironmentStatus();
+}
 async function submitDiagnostic() {
-  const payload = state.input
-    ? { input_id: state.input.id, mode: $("mode").value }
-    : { config: inputSettings(), mode: $("mode").value };
-  const job = await api("/api/diagnostics", payload);
-  selectJob(job.id);
-  view("jobs");
+  if (state.environmentJob) return;
+  const job = await api("/api/environment/check", environmentPayload());
+  state.environmentJob = job.id;
+  state.environment = null;
+  renderEnvironmentStatus();
+  // Stay on the separate environment page. Input review never submits this job.
 }
 async function selectJob(identifier) {
   state.job = identifier;
@@ -2876,52 +2994,45 @@ async function refreshJobs() {
   state.pollingJobs = true;
   try {
     state.jobs = (await api("/api/jobs")).jobs;
-    if (state.diagnostic && state.input?.id === state.diagnostic.input) {
-      const checked = state.jobs.find((j) => j.id === state.diagnostic.job);
-      if (
-        checked &&
-        ["complete", "failed", "interrupted"].includes(checked.state)
-      ) {
-        state.readiness = Boolean(checked.diagnostics?.ok);
-        renderDiagnostics(checked.diagnostics);
-        $("start-job").disabled = !state.readiness;
-        I18N.text($("input-next-step"), state.readiness ? I18N.term("환경 점검 통과 · 4. 분석 실행을 누르세요. 아직 계산은 시작하지 않았습니다.") : I18N.term("환경 점검을 통과하지 못했습니다. 환경·설치에서 아래 미충족 항목을 먼저 확인하세요."));
-        const missing =
-          checked.diagnostics?.checks
-            ?.filter((c) => c.required && !c.ok)
-            .map((c) => c.name) || [];
-        warnings(
-          $("review-summary"),
-          state.readiness
-            ? ["현재 입력의 필수 환경 점검을 통과했습니다."]
-            : [
-                "환경 점검 미충족: " +
-                  (missing.join(", ") || checked.error || checked.state) +
-                  ". 환경·설치 탭에서 프로필 설치와 로그를 확인하세요.",
-              ],
-        );
+    if (state.environmentJob) {
+      const checked = state.jobs.find(j => j.id === state.environmentJob);
+      if (checked && !["queued", "running", "cancelling"].includes(checked.state)) {
+        state.environmentJob = null;
+        await refreshEnvironmentStatus();
+        if (state.input && !state.input.config.run.mock) await readInputReadiness(state.input);
       }
     }
-    $("job-list").replaceChildren(
-      ...state.jobs.map((job) => {
-        const button = el(
-          "button",
-          I18N.format("{0} · {1} / {2}\n{3} · {4} · {5}초", [job.name, job.kind, job.mode, (states[job.state] ? I18N.term(states[job.state]) : job.state), I18N.term(jobPhaseCaption(job)), Math.round(job.elapsed_seconds || 0)]),
-          "job-row" + (job.id === state.job ? " active" : ""),
-        );
-        button.onclick = () => selectJob(job.id);
-        return button;
-      }),
-    );
+    const jobButton = job => {
+      const type = job.kind === "analysis" ? "분석" : job.kind === "diagnostics" ? "환경 확인" : "프로그램 설치";
+      const outcome = job.kind === "diagnostics" && job.state === "complete"
+        ? job.diagnostics?.ok === true ? "환경 확인 통과" : "환경 확인 미충족"
+        : states[job.state] || job.state;
+      const button = el("button", I18N.concat([I18N.term(type), " · ", job.kind === "analysis" ? job.name : job.mode,
+        " · ", I18N.term(outcome)]), "job-row" + (job.id === state.job ? " active" : ""));
+      button.onclick = () => selectJob(job.id);
+      return button;
+    };
+    $("job-list").replaceChildren(...state.jobs.filter(j => j.kind === "analysis").map(jobButton));
+    const history = state.jobs.filter(j => j.kind !== "analysis");
+    if (history.length) {
+      const details = el("details", null, "job-history");
+      details.open = !state.jobs.some(j => j.kind === "analysis") || history.some(j => j.id === state.job);
+      details.append(el("summary", I18N.term("환경 확인·설치 기록")), ...history.map(jobButton));
+      $("job-list").append(details);
+    }
     if (!state.jobs.length)
       I18N.text($("job-list"), I18N.term("아직 작업이 없습니다. 입력 탭에서 CPU 데모를 시작해 보세요."));
+    if (!state.job && state.jobs.length) {
+      state.job = (state.jobs.find(j => j.kind === "analysis") || state.jobs[0]).id;
+      state.logOffset = 0;
+    }
     if (state.job) {
       const chosen = state.job;
       const job = await api("/api/jobs/" + chosen);
       if (state.job !== chosen) return;
       I18N.text($("job-title"), job.name);
       if (state.submissionNoticeJob === job.id && !["queued","running","cancelling"].includes(job.state)) {
-        notice(`${states[job.state] || job.state} · ${job.state==="complete"?"결과 열기로 결과를 확인하세요.":"작업 상세와 로그에서 종료 사유를 확인하세요."}`,job.state!=="complete");
+        notice(`${states[job.state] || job.state} · ${job.result_id?"결과 열기로 결과를 확인하세요.":"작업 상세와 로그에서 종료 사유를 확인하세요."}`,job.state!=="complete");
         state.submissionNoticeJob=null;
       }
       $("job-detail").replaceChildren(
@@ -2975,7 +3086,17 @@ async function refreshJobs() {
         };
         $("job-actions").append(button);
       }
-      if (job.result_id) {
+      if (job.kind === "diagnostics") {
+        $("job-detail").append(el("p", I18N.term("이 작업은 환경 확인입니다. 단백질 구조 예측 결과는 만들지 않습니다."), "job-next-step"));
+        const button = el("button", I18N.term("분석 준비하기"));
+        button.onclick = () => { view("input"); state.showInputReview?.(); };
+        $("job-actions").prepend(button);
+      } else if (job.kind === "analysis" && !job.result_id) {
+        $("job-detail").append(el("p", I18N.term(["queued", "running", "cancelling"].includes(job.state)
+          ? "분석 중입니다. 결과가 저장되면 여기에 결과 열기 버튼이 나타납니다."
+          : "저장된 결과가 연결되지 않았습니다. 상세 실행 로그에서 종료 사유를 확인하세요."), "job-next-step"));
+      }
+      if (job.kind === "analysis" && job.result_id) {
         const button = el("button", I18N.term("결과 열기"));
         button.onclick = async () => {
           view("results");
@@ -2994,22 +3115,7 @@ async function refreshJobs() {
       state.logOffset = log.next_offset;
       $("job-log").textContent += log.text;
       $("job-log").scrollTop = $("job-log").scrollHeight;
-      if (job.diagnostics) {
-        const output = $("diagnostics-output");
-        output.replaceChildren(
-          el("h3", job.diagnostics.ok ? I18N.term("실행 준비 통과") : I18N.term("실행 준비 미충족")),
-        );
-        table(
-          output.appendChild(el("div")),
-          job.diagnostics.checks.map((c) => ({
-            항목: c.name,
-            필수: c.required,
-            준비: c.ok,
-            근거: JSON.stringify(c.evidence || c.detail || c),
-          })),
-          ["항목", "필수", "준비", "근거"],
-        );
-      }
+
     }
   } catch (e) {
     notice(e.message, true);
@@ -4014,7 +4120,7 @@ async function renderStructure() {
         font: { size: 14 },
         margin: { t: 15, b: 70, l: 50, r: 10 },
         xaxis: { automargin: true, nticks: 5, tickangle: -45, title: { text: I18N.value(I18N.term("열 · 평가 잔기")), font: { size: 14 }, standoff: 12 }, type: "category" },
-        yaxis: { automargin: true, nticks: 6, type: "category", autorange: "reversed", title:{text:I18N.value(I18N.term("행 · 정렬 기준 잔기"))} },
+        yaxis: { automargin: true, nticks: 6, type: "category", autorange: "reversed", title:{text:I18N.value(I18N.term("행 · 정렬 기준 잔기")),font:{size:14},standoff:8} },
         shapes: pae ? pae.labels.flatMap((label,i)=>{
           if(!i||label.split(":")[0]===pae.labels[i-1].split(":")[0])return [];
           return [{type:"line",xref:"x",yref:"paper",x0:i-.5,x1:i-.5,y0:0,y1:1,line:{color:"#586b78",width:1}},
@@ -4605,7 +4711,18 @@ async function boot() {
     notice("CPU 데모 입력을 채웠습니다. 입력·적용 설정 확인을 누르세요.");
   });
   action("review-input", prepareInput);
-  action("diagnose-input", submitDiagnostic);
+  action("diagnose-input", () => openEnvironment(true));
+  action("open-environment", () => openEnvironment(false));
+  action("environment-continue", async () => {
+    if (state.input && !state.input.config.run.mock) await readInputReadiness(state.input);
+    if (!state.input) {
+      $("mode").value = $("environment-mode").value;
+      $("tutorial-mode").value = $("mode").value;
+      fields();
+    }
+    view("input"); state.showInputReview?.();
+  });
+  $("environment-mode").onchange = () => { state.environmentTarget = null; refreshEnvironmentStatus().catch(e => notice(e.message, true)); };
   action("diagnose-environment", submitDiagnostic);
   action("start-job", async () => {
     if (!state.input) throw Error("먼저 입력·적용 설정을 확인하세요.");
@@ -4713,6 +4830,8 @@ async function boot() {
   I18N.text($("workspace-path"), session.workspace);
   fields();
   await initNoviceFlow();
+  // Restore the last independent installation check without submitting work.
+  await refreshEnvironmentStatus();
   await refreshJobs();
   await refreshResults();
   const requested = new URLSearchParams(window.location.search).get("result");
@@ -4781,7 +4900,7 @@ async function initNoviceFlow() {
   grid.append(reviewCard);
   const reviewed=el("div");reviewed.id="novice-reviewed-summary";$("review-output").prepend(reviewed);
   const raw=el("details");raw.append(el("summary",I18N.term("전체 적용 설정 JSON · 고급")),$("resolved-config"));$("review-output").append(raw);
-  reviewCard.prepend(el("h2", I18N.term("검토·실행 · 적용 입력과 환경 확인"))); grid.append(reviewCard);
+  reviewCard.prepend(el("h2", I18N.term("검토·실행 · 입력 확인 후 분석 시작"))); grid.append(reviewCard);
   grid.classList.add("novice-grid");
   const rail = host.querySelector(".workflow-steps"); rail.replaceChildren(...state.starter.steps.map((name,i) => el("li", I18N.format("{0}. {1}", [i+1, I18N.term(name)]))));
   const heading = el("h2", "", "novice-heading"), task = el("p", "", "next-step"); heading.tabIndex=-1;task.setAttribute("role","status");host.insertBefore(heading,purposeCard);host.insertBefore(task,purposeCard);
@@ -4804,8 +4923,10 @@ async function initNoviceFlow() {
   const copies=el("div");copies.id="novice-complex-copies";complex.append(label,fasta,copies);inputCard.insertBefore(complex,$("fasta-fields"));
   const footer=el("div",null,"novice-footer"),prev=el("button",I18N.term("이전"),"secondary"),next=el("button",I18N.term("입력 확인 후 다음")),reason=el("p");prev.id="novice-previous";next.id="novice-next";reason.id="novice-blocker";reason.setAttribute("role","alert");footer.append(prev,next,reason);host.append(footer);
   let step=0,restoring=false,draftTimer,saveQueue=Promise.resolve();
-  const tasks=["목적을 고르세요. 필요한 입력과 결과를 확인하면 다음으로 이동합니다.","전체 서열·체인 순서·사본 수를 확인하세요. 오류 없는 필수 입력이면 다음으로 이동합니다.","최대 계획 모델 수·선택 엔진·MSA 전송 여부를 확인하세요.","입력을 검토하고 환경 점검을 통과한 뒤 분석 실행을 누르세요. 검토 버튼은 계산을 제출하지 않습니다."];
+  host.insertBefore(rail, task);
+  const tasks=["목적을 고르세요. 필요한 입력과 결과를 확인하면 다음으로 이동합니다.","전체 서열·체인 순서·사본 수를 확인하세요. 오류 없는 필수 입력이면 다음으로 이동합니다.","최대 계획 모델 수·선택 엔진·MSA 전송 여부를 확인하세요.","입력 확인을 누른 뒤 적용 조건을 읽고 분석 실행을 누르세요. 환경 확인 기록은 재사용하며, 입력 확인은 계산을 시작하지 않습니다."];
   function render(){
+    host.querySelector(".setup-entry").hidden = step !== 0;
     [purposeCard,inputCard,settingsCard,reviewCard].forEach((n,i)=>n.hidden=i!==step);I18N.text(heading, I18N.format("{0}/4 · {1}", [step+1, I18N.term(state.starter.steps[step])]));I18N.text(task, I18N.term(tasks[step]));prev.hidden=step===0;next.hidden=step===0||step===3;I18N.text(next, step===1 ? I18N.term("입력 확인 후 다음") : I18N.term("조건 확인 후 다음"));
     [...rail.children].forEach((n,i)=>n.setAttribute("aria-current",i===step?"step":"false"));
     const isComplex=$("mode").value==="complex";
@@ -4813,9 +4934,10 @@ async function initNoviceFlow() {
     controls.hidden=$("analysis-preset").value!=="small-four-v1";$("mock").disabled=isComplex;demoControls.hidden=isComplex;
     const simulated=$("mock").checked&&!isComplex;ml.hidden=simulated;msa.hidden=simulated;cl.hidden=simulated;demoMsaNote.hidden=!simulated;
     try {I18N.text(plan, I18N.term(noviceModelPlan(inputSettings(true),$("mode").value,$("mode").value==="screen"?noviceFasta($("vhh-fasta").value).length:0)));}catch(e){I18N.text(plan, I18N.term(e.message));}
-    I18N.text($("review-input"), I18N.term("입력 검토·환경 점검"));I18N.text($("start-job"), I18N.term("분석 실행"));
+    I18N.text($("review-input"), I18N.term("입력 확인"));I18N.text($("start-job"), I18N.term("분석 실행"));
   }
   function jump(n){step=n;I18N.text(reason, "");render();heading.focus();}
+  state.showInputReview = () => jump(state.input ? 3 : 1);
   function validateInputs(){
     if($("mode").value==="complex") return noviceComplexProteins();
     if($("input-kind").value==="fasta") {if(noviceFasta($("target-fasta").value).length!==1)throw Error("단일 분석은 표적 1개입니다. 여러 표적은 배치 분석을 사용하세요.");}
@@ -4829,7 +4951,7 @@ async function initNoviceFlow() {
   fasta.addEventListener("input",copiesReview);
   host.addEventListener("input",e=>{if(e.target!==consent)consent.checked=false;I18N.text(reason, "");render();if(restoring)return;clearTimeout(draftTimer);draftTimer=setTimeout(()=>{const fields={};for(const n of host.querySelectorAll("input[id],select[id],textarea[id]")){if(n.type!=="file"&&n.id!=="novice-consent")fields[n.id]=n.type==="checkbox"?n.checked:n.value;}fields.comparison_engines=[...controls.querySelectorAll('[data-novice-engine]:checked')].map(i=>i.value);saveQueue=saveQueue.catch(()=>{}).then(()=>api("/api/draft",{version:1,fields})).catch(e=>{I18N.text(reason, I18N.concat([I18N.term("초안 저장 실패: "), e.message]));});},500);});
   action("load-tutorial",async()=>{const revision=state.inputRevision;const example=await api("/api/tutorials/"+$("tutorial-mode").value),entry=example.payload.entries[0];if(revision!==state.inputRevision)throw Error("불러오는 동안 입력이 변경되었습니다. 현재 입력을 유지합니다.");$("mode").value=example.mode;$("input-kind").value="fasta";$("analysis-preset").value="small-four-v1";$("advanced").value="{}";$("mock").checked=false;$("candidate-limit").value="";$("design-count").value="";$("seed").value="42";$("job-name").value=example.payload.name;$("target-fasta").value=entry.content||"";$("vhh-fasta").value=entry.vhh_fasta||"";$("wt-fasta").value=entry.wt_fasta||"";fasta.value=(entry.proteins||[]).map(p=>`>${p.name}\n${p.sequence}`).join("\n");consent.checked=false;invalidateInput();copiesReview();fields();jump(1);I18N.text($("tutorial-status"), I18N.term("공개 입력을 불러왔습니다. 아직 계산은 시작하지 않았습니다."));});
-  render();const draftRevision=state.inputRevision;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=true);start.disabled=true;$("load-tutorial").disabled=true;try{const draft=await api("/api/draft");if(draftRevision!==state.inputRevision)throw Error("입력이 변경되어 저장된 초안을 덮어쓰지 않았습니다.");restoring=true;for(const [id,value]of Object.entries(draft.fields||{})){const n=$(id);if(n&&host.contains(n)&&n.type!=="file"){if(n.type==="checkbox")n.checked=value===true;else n.value=String(value);}}if(draft.fields?.comparison_engines)for(const n of controls.querySelectorAll('[data-novice-engine]'))n.checked=draft.fields.comparison_engines.includes(n.value);consent.checked=false;fields();copiesReview();if(Object.keys(draft.fields||{}).length)I18N.text(task, I18N.term("초안 입력을 복원했습니다. 구조 파일은 다시 선택하고 전송 동의·입력 검토·환경 점검을 새로 확인하세요."));}catch(e){I18N.text(reason, I18N.concat([I18N.term("초안 복원 실패: "), e.message]));}finally{restoring=false;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=false);start.disabled=false;$("load-tutorial").disabled=false;render();}
+  render();const draftRevision=state.inputRevision;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=true);start.disabled=true;$("load-tutorial").disabled=true;try{const draft=await api("/api/draft");if(draftRevision!==state.inputRevision)throw Error("입력이 변경되어 저장된 초안을 덮어쓰지 않았습니다.");restoring=true;for(const [id,value]of Object.entries(draft.fields||{})){const n=$(id);if(n&&host.contains(n)&&n.type!=="file"){if(n.type==="checkbox")n.checked=value===true;else n.value=String(value);}}if(draft.fields?.comparison_engines)for(const n of controls.querySelectorAll('[data-novice-engine]'))n.checked=draft.fields.comparison_engines.includes(n.value);consent.checked=false;fields();copiesReview();if(Object.keys(draft.fields||{}).length)I18N.text(task, I18N.term("초안 입력을 복원했습니다. 구조 파일을 다시 선택하고 전송 동의와 입력을 확인하세요. 설치 환경 확인 기록은 재사용합니다."));}catch(e){I18N.text(reason, I18N.concat([I18N.term("초안 복원 실패: "), e.message]));}finally{restoring=false;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=false);start.disabled=false;$("load-tutorial").disabled=false;render();}
 }
 I18N.init();
 document.addEventListener("nanocofold:language", () => {

@@ -8,21 +8,25 @@ Open `http://127.0.0.1:8765`. For a remote server, keep both the server terminal
 
 ## Follow the screenshots
 
+**0. Check the environment once.** Click **Check environment once** → choose the analysis → **Check environment**. Stay on this page until it passes, then click **Prepare analysis**. This check produces no protein prediction. It is reused for the same installation, GPU and engines. Adding engines or changing the installation requires another check.
+
+![Separate environment check, before it has been run](images/quickstart-flow/en/environment.jpg)
+
 **1. Choose a purpose.** Start with **Predict protein complexes · Enter input**.
 
-![Choose protein complex prediction](images/quickstart-rc5/en/01-purpose.jpg)
+![Choose protein complex prediction](images/quickstart-flow/en/01-purpose.jpg)
 
 **2. Load the public input.** Click **Load public example for this purpose**. The full sequences are filled in automatically. Check **Barnase: 110 aa**, **Barstar: 89 aa**, and **one copy of each**, then click **Review input & continue**.
 
-![Check both full sequences, chain order and copy counts](images/quickstart-rc5/en/02-input.jpg)
+![Check both full sequences, chain order and copy counts](images/quickstart-flow/en/02-input.jpg)
 
 **3. Check the settings.** Keep the small starter preset, **all four engines**, and **four planned models**. This preset uses seed **42**, **one model per engine**, **3 recycles**, and **200 diffusion steps**. Leave advanced settings unchanged for your first run. To use public MSA, give consent to send the current public sequences and click **Review settings & continue**. The screenshot shows consent **before checking the box**.
 
-![Four engines, planned model count and MSA consent](images/quickstart-rc5/en/03-settings.jpg)
+![Four engines, planned model count and MSA consent](images/quickstart-flow/en/03-settings.jpg)
 
-**4. Review before running.** Click **Review input & check environment**. Read the applied input/settings summary and confirm that the required environments pass. Then click the enabled **Run analysis** control **once**. The screenshot is **before checks**; it does not show installation success or approval to submit. Review alone does not submit prediction. If you change inputs or settings, review and confirm consent again.
+**4. Review before running.** Click **Review input**, read the applied inputs and settings, then click **Run analysis** once. A saved environment check is reused without leaving this page. If it is missing for these engines, click **Go to environment check**, complete the separate check, and click **Prepare analysis** to return to this input. The screenshot illustrates this missing-check state; no prediction was submitted. Input changes require another input review and fresh transmission consent.
 
-![Review input and check the environment before submitting](images/quickstart-rc5/en/04-review.jpg)
+![Review inputs and follow the explicit next action](images/quickstart-flow/en/04-review.jpg)
 
 **5. Read the result.** Follow **Jobs & logs → completion → Open results**. Check evaluated, failed and unevaluated counts first, then select a model. Four planned models do not guarantee four successful predictions. This screenshot shows the previously verified four-engine GPU run. **Not applicable** for VHH eligibility is normal for a general protein complex.
 
@@ -34,7 +38,7 @@ Open `http://127.0.0.1:8765`. For a remote server, keep both the server terminal
 
 ![The same model's PAE](images/quickstart-rc5/en/07-pae.jpg)
 
-Input/settings screenshots were captured from the actual local rc5 interface without submitting another calculation. Result screenshots use the preserved actual GPU result, opened read-only. [Capture scope and provenance](images/quickstart-rc5/en/README.md)
+Input/settings screenshots were refreshed from the actual local interface after the separate environment-check change, without submitting a calculation. Result screenshots use the preserved actual GPU result, opened read-only. [Capture scope and provenance](images/quickstart-rc5/en/README.md)
 
 ## Settings by purpose
 

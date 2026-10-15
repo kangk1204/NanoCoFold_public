@@ -177,8 +177,11 @@ class JobStore:
         with self.connect() as connection:
             return connection.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
 
-    def list(self, *, states=None, limit=None, before=None, before_id=None, cleanup=False) -> list[dict]:
+    def list(self, *, states=None, kind=None, limit=None, before=None, before_id=None, cleanup=False) -> list[dict]:
         clauses, values = [], []
+        if kind is not None:
+            clauses.append("json_extract(payload, '$.kind')=?")
+            values.append(kind)
         if states is not None:
             if not states:
                 return []
@@ -330,7 +333,11 @@ class JobManager:
     def _create(self, payload: dict, *, kind: str = "analysis", identifier=None, submission_hash=None) -> dict:
         identifier = identifier or uuid.uuid4().hex
         folder = self.store.root / "jobs" / identifier
-        cfg = normalized_config(self.workspace, payload.get("config"))
+        override = payload.get("config")
+        if kind == "diagnostics" and payload.get("environment_only") is True:
+            from .environment import installation_override
+            override = installation_override(override)
+        cfg = normalized_config(self.workspace, override)
         if payload.get("mode"):
             if payload["mode"] not in {"complex", "design", "screen", "mature"}:
                 raise ValueError("지원하지 않는 모드입니다.")
@@ -396,6 +403,10 @@ class JobManager:
                "pid": None, "process_stamp": None, "pgid": None, "started": None, "finished": None,
                "error": None, "can_resume": False, "history": [], "resume": False,
                "profile": payload.get("profile"), "submission_id": payload.get("submission_id"), "submission_hash": submission_hash}
+        if kind == "diagnostics" and payload.get("environment_only") is True:
+            job["environment_only"] = True
+            from .environment import environment_scope
+            job["environment_scope"] = environment_scope(self.workspace, cfg, gpu=gpu)
         if kind == "analysis":
             from .result_catalog import build_identity
             identity = build_identity(self.workspace, cfg, gpu)

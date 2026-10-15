@@ -207,7 +207,7 @@ def test_cpu_demo_review_needs_no_public_msa_consent(supplied_server):
         page.get_by_role("button",name="입력 확인 후 다음",exact=True).click()
         expect(page.locator("#novice-consent")).not_to_be_checked()
         page.get_by_role("button",name="조건 확인 후 다음",exact=True).click()
-        page.get_by_role("button",name="입력 검토·환경 점검",exact=True).click()
+        page.get_by_role("button",name="입력 확인",exact=True).click()
         expect(page.locator("#review-output")).to_be_visible(timeout=20000)
         config = json.loads(page.locator("#resolved-config").text_content())
         assert config["run"]["mock"] is True

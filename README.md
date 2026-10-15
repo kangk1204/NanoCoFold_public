@@ -69,44 +69,57 @@ ssh -L 8765:127.0.0.1:8765 USER@SERVER
 
 Then open the address above in your PC browser. Inputs and results are viewed on the PC; computation uses the GPU of the Ubuntu server where you installed NanoCoFold.
 
+### Update an existing installation
+
+When no analysis is queued or running, stop the web server with **Ctrl+C** in its terminal. In the original source folder, run:
+
+```bash
+git pull --ff-only
+bash update.sh
+bash start.sh
+```
+
+This updates the installed application while preserving the saved workspace, GPU selection, models, inputs and results. It does not run predictions or reinstall GPU engines. Reload the browser afterward. `git pull` alone does not update the installed application. For a source ZIP, use its complete updated contents in the original source folder, then run the last two commands. Existing exported HTML reports keep their captured appearance; export a new report to use the updated layout.
+
 ## 3. Try the first public example
 
 Start with **Predict protein complexes**. You do not need to create sequences or a settings file.
 
-1. Click **Predict protein complexes · Enter input** on the first screen.
+1. First, click **Check environment once**. On **Environment & setup**, select your analysis and click **Check environment**. Wait on this page for **Environment ready**, then click **Prepare analysis**. For later inputs with the same installation, GPU and engines, skip this check. Select **Predict protein complexes** for the first example.
 2. Click **Load public example for this purpose**. The barnase–barstar sequences and small-run settings are filled in.
 3. In **Prepare input**, check both protein names, full sequences, chain order, and copy counts. Click **Review input & continue**.
 4. In **Run settings**, check selected engines, the maximum planned model count, and the MSA method. If using the public MSA server, explicitly check consent to send the current sequences to `api.colabfold.com`. Click **Review settings & continue**.
-5. In **Review & run**, click **Review input & check environment**. Read the input / settings summary and environment check results. **Run analysis** is enabled after the required checks pass. Computation has not been submitted yet.
+5. In **Review & run**, click **Review input** and read the applied input and settings. The saved environment check is reused; this button starts neither another environment job nor a prediction. **Run analysis** is enabled when the matching check is available. If a check is missing for the selected engines, use **Go to environment check**, complete it, and click **Prepare analysis** to return to this reviewed input.
 6. Click **Run analysis** once. Follow progress in **Jobs & logs**. When finished, click **Open results**.
 
 For the first example, check these values. **Four planned models do not guarantee four successful predictions**; inspect the actual counts afterward. The screenshots show the current English interface; select **Language → English** to match them.
 
 | Step | Key settings to check | Screenshot |
 |---|---|---|
-| Purpose | Predict protein complexes | [1](docs/images/quickstart-rc5/en/01-purpose.jpg) |
-| Input | Barnase 110 aa + Barstar 89 aa, one copy of each | [2](docs/images/quickstart-rc5/en/02-input.jpg) |
-| Settings | Small starter preset, four engines, seed 42, one model per engine → four planned models | [3](docs/images/quickstart-rc5/en/03-settings.jpg) |
-| Review & run | Consent for the current sequences → input/environment checks pass → run once | [4 · before checks](docs/images/quickstart-rc5/en/04-review.jpg) |
+| Environment · once | Select analysis → Check environment → Prepare analysis | [0](docs/images/quickstart-flow/en/environment.jpg) |
+| Purpose | Predict protein complexes | [1](docs/images/quickstart-flow/en/01-purpose.jpg) |
+| Input | Barnase 110 aa + Barstar 89 aa, one copy of each | [2](docs/images/quickstart-flow/en/02-input.jpg) |
+| Settings | Small starter preset, four engines, seed 42, one model per engine → four planned models | [3](docs/images/quickstart-flow/en/03-settings.jpg) |
+| Review & run | Current-sequence consent → Review input → reuse environment check → Run analysis once | [4 · a check is needed](docs/images/quickstart-flow/en/04-review.jpg) |
 | Results | Completed, failed and unevaluated counts → select a model → structure and PAE | [5](docs/images/quickstart-rc5/en/05-results.jpg) · [structure](docs/images/quickstart-rc5/en/06-structure-pae.jpg) · [PAE](docs/images/quickstart-rc5/en/07-pae.jpg) |
 
 <details>
 <summary>Screenshots 1–2: choose a purpose and check the public input</summary>
 
-![Step 1: choose protein complex prediction](docs/images/quickstart-rc5/en/01-purpose.jpg)
+![Step 1: choose protein complex prediction](docs/images/quickstart-flow/en/01-purpose.jpg)
 
-![Step 2: check both full sequences and copy counts](docs/images/quickstart-rc5/en/02-input.jpg)
+![Step 2: check both full sequences and copy counts](docs/images/quickstart-flow/en/02-input.jpg)
 
 </details>
 
 <details>
 <summary>Screenshots 3–4: check settings and find the review button</summary>
 
-Leave advanced settings unchanged. Screenshot 3 shows the transmission consent box unchecked. Confirm consent for the current public example before continuing. Screenshot 4 is **before environment checks**; the actual run control becomes available after checks pass.
+Leave advanced settings unchanged. Screenshot 3 shows the transmission consent box unchecked. Confirm consent for the current public example before continuing. Screenshot 4 shows a valid input with **no environment check saved**. Complete the separate check once; the run control is then enabled. These captures did not submit predictions.
 
-![Step 3: four engines and public MSA settings](docs/images/quickstart-rc5/en/03-settings.jpg)
+![Step 3: four engines and public MSA settings](docs/images/quickstart-flow/en/03-settings.jpg)
 
-![Step 4: review inputs and check the environment](docs/images/quickstart-rc5/en/04-review.jpg)
+![Step 4: review inputs and see the next action](docs/images/quickstart-flow/en/04-review.jpg)
 
 </details>
 
@@ -119,7 +132,7 @@ This is the previously verified rc5 barnase–barstar run with four actual engin
 
 </details>
 
-After changing inputs or settings, confirm review, environment checks, and transmission consent again. Advanced settings are available in the relevant step; use defaults for the first example. If a request is slow or the connection drops, check the jobs list for an existing submission before clicking again.
+After changing inputs or settings, confirm input review and transmission consent again. Repeat the separate environment check only when the installation, GPU or selected engine configuration changes. Advanced settings are available in the relevant step; use defaults for the first example. If a request is slow or the connection drops, check the jobs list for an existing submission before clicking again.
 
 [Step-by-step buttons and result interpretation](docs/browser_quickstart.en.md) · [Example sequence sources and JSON](examples/tutorial/README.md) · [Analysis workflow and selection logic](docs/ANALYSIS_WORKFLOW.md)
 
@@ -136,11 +149,14 @@ After changing inputs or settings, confirm review, environment checks, and trans
 
 Use amino-acid sequences. FASTA is a text format with a `>name` line followed by the sequence. A VHH is the full nanobody variable domain; a CDR3 fragment alone is insufficient. DNA/RNA and FASTQ are unsupported. Give entries distinct names that do not start with `=`, `+`, `-`, or `@`. Prepared substitution or insertion variants can be compared in `screen` as **full VHH sequences**.
 
-Prepare an input using one method. Selecting a structure file disables the PDB ID alternative; entering a PDB ID disables the file alternative. Use **Change input method** to switch. Paste VHH / WT FASTA or import a file once. The populated FASTA is the actual input; no duplicate file is required. Use **Load another file** to replace it or **Restore previous FASTA** to undo the import. After restoring a draft, reselect structure files and reconfirm transmission consent, input review, and environment checks.
+Prepare an input using one method. Selecting a structure file disables the PDB ID alternative; entering a PDB ID disables the file alternative. Use **Change input method** to switch. Paste VHH / WT FASTA or import a file once. The populated FASTA is the actual input; no duplicate file is required. Use **Load another file** to replace it or **Restore previous FASTA** to undo the import. After restoring a draft, reselect structure files and reconfirm transmission consent and input review. A matching installation check is reused.
 
 For structure files, review chains, residue mappings, missing residues, and the preparation method. Public MSA transmits sequences externally. For private research inputs, check your institution's policy and choose a suitable MSA method. Consent for a public example does not carry over to your own sequences.
 
 ## 5. Read and share results
+
+An **Environment check** job is an installation check, not a prediction. To obtain results, prepare input and click **Run analysis**. Completed analysis jobs show **Open results**. The bilingual report navigation has a fixed layout, and X/Y labels stay attached to their metric selectors. [Current chart layout](docs/images/quickstart-flow/en/charts.jpg). [Report layout](docs/images/quickstart-flow/en/report-nav.jpg).
+
 
 First inspect **run status and counts of successful, failed, and unevaluated models**. Click a candidate row to open its structure and PAE.
 

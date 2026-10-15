@@ -25,7 +25,7 @@ from .startup_limits import READINESS_TIMEOUT_SECONDS
 _SCRIPTS_DIR = Path(__file__).resolve().parent / "scripts"
 
 
-def doctor(cfg: dict, smoke: bool = False) -> dict:
+def doctor(cfg: dict, smoke: bool = False, *, environment_only: bool = False) -> dict:
     """Return structured, JSON-serializable readiness diagnostics.
 
     The default path is non-mutating: it checks active mode dependencies by
@@ -33,6 +33,8 @@ def doctor(cfg: dict, smoke: bool = False) -> dict:
     when torch is installed, checking required binaries/weights, and recording
     evidence rather than installing or downloading anything.
     """
+    if environment_only and smoke:
+        raise ValueError("Installation checks do not execute prediction smoke tests")
     mode = str(cfg_get(cfg, "run.mode", "design")).lower()
     evidence: dict[str, Any] = {
         "project_root": str(PROJECT_ROOT),
@@ -43,7 +45,7 @@ def doctor(cfg: dict, smoke: bool = False) -> dict:
     checks: list[dict[str, Any]] = []
     engines: dict[str, Any] = {}
 
-    if mode != "complex":
+    if mode != "complex" or environment_only:
         from .report import viewer_asset_readiness
         viewer = viewer_asset_readiness(cfg)
         evidence["report_viewer"] = viewer
@@ -62,11 +64,11 @@ def doctor(cfg: dict, smoke: bool = False) -> dict:
     followup_engines = [engine for engine in _followup_engines(cfg, mode) if engine not in active_engines]
     evidence["followup_engines"] = followup_engines
     for engine in active_engines:
-        report = _probe_engine(cfg, engine, gpu)
+        report = _probe_engine(cfg, engine, gpu, environment_only=True) if environment_only else _probe_engine(cfg, engine, gpu)
         engines[engine] = report
         checks.extend(report["checks"])
     for engine in followup_engines:
-        report = _probe_followup_engine(cfg, engine, gpu)
+        report = _probe_followup_engine(cfg, engine, gpu, environment_only=True) if environment_only else _probe_followup_engine(cfg, engine, gpu)
         engines[engine] = report
         checks.extend(report["checks"])
 
@@ -76,7 +78,8 @@ def doctor(cfg: dict, smoke: bool = False) -> dict:
         checks.append(_check("smoke", bool(smoke_report.get("ok")), True, smoke_report.get("stage", "smoke"), smoke_report))
 
     ok = all(check.get("ok") for check in checks if check.get("required", False))
-    return _jsonable({"application_version": __version__, "ok": ok, "checks": checks, "engines": engines, "evidence": evidence})
+    return _jsonable({"application_version": __version__, "ok": ok, "checks": checks, "engines": engines, "evidence": evidence,
+                      **({"environment_only": True} if environment_only else {})})
 
 
 def runtime_provenance(cfg: dict) -> dict:
@@ -196,7 +199,7 @@ def _followup_engines(cfg: dict, mode: str) -> list[str]:
     return engines
 
 
-def _probe_engine(cfg: dict, engine: str, gpu: dict[str, Any]) -> dict[str, Any]:
+def _probe_engine(cfg: dict, engine: str, gpu: dict[str, Any], *, environment_only: bool = False) -> dict[str, Any]:
     spec = _engine_spec(cfg, engine)
     checks: list[dict[str, Any]] = []
     if not spec.get("supported", True):
@@ -234,7 +237,7 @@ def _probe_engine(cfg: dict, engine: str, gpu: dict[str, Any]) -> dict[str, Any]
         report["weights"] = weights
         checks.append(_check(f"{engine}.weights", bool(weights.get("ok")), True, "weights", weights))
 
-    if engine == "colabfold":
+    if engine == "colabfold" and not environment_only:
         msa = _colabfold_msa_check(cfg)
         report["msa"] = msa
         checks.append(_check("colabfold.msa", msa["ok"], True, msa["stage"], msa))
@@ -244,7 +247,7 @@ def _probe_engine(cfg: dict, engine: str, gpu: dict[str, Any]) -> dict[str, Any]
         report["installation_identity"] = identity
         checks.append(_check("opendde.installation_identity", identity["ok"], True, "pinned_source", identity))
 
-    if engine == "antifold":
+    if engine == "antifold" and not environment_only:
         structure = _path_check(resolve_path(cfg, cfg_get(cfg, "mature.wt_structure")))
         if not structure["ok"]:
             structure["blocker"] = "AntiFold 활성화에는 mature.wt_structure가 필요합니다. 구조를 지정하거나 AntiFold를 끄세요."
@@ -362,9 +365,9 @@ def _colabfold_msa_check(cfg):
         return {"ok": False, "stage": "precomputed_msa", "network_requests": 0, "blocker": str(exc)}
 
 
-def _probe_followup_engine(cfg: dict, engine: str, gpu: dict | None = None) -> dict[str, Any]:
+def _probe_followup_engine(cfg: dict, engine: str, gpu: dict | None = None, *, environment_only: bool = False) -> dict[str, Any]:
     """Follow-up inference uses the same full readiness gate as primary engines."""
-    report = _probe_engine(cfg, engine, gpu or {})
+    report = _probe_engine(cfg, engine, gpu or {}, environment_only=True) if environment_only else _probe_engine(cfg, engine, gpu or {})
     spec = _engine_spec(cfg, engine)
     if not spec.get("supported", True):
         evidence = {"engine": engine, "role": "followup", "blocker": spec["error"]}
