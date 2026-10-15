@@ -109,6 +109,8 @@ def execute(workspace: Path, identifier: str) -> int:
             # the file: the queue already transferred its advisory lock to us.
         from ..config import load_config
         from ..utils import shell
+        if store.get(identifier)["state"] in {"cancelling", "cancelled", "budget_exhausted"}:
+            raise KeyboardInterrupt("작업 시작 전 취소 요청")
         cfg = load_config(job["config_path"])
         scope = getattr(shell, "cancellation_scope", lambda _check: contextlib.nullcontext())
         with scope(lambda: store.get(identifier)["state"] in {"cancelling", "cancelled", "budget_exhausted"}):
@@ -204,8 +206,9 @@ def execute(workspace: Path, identifier: str) -> int:
         observed = refresh_complex_job({**job, "state": state})
         extra["progress"] = observed["progress"]
         extra["eta"] = observed["eta"]
-    terminal = store.update(identifier, state=state, phase=state, error=error, exit_code=code, finished=time.time(),
+    terminal = store.finish(identifier, state=state, error=error, exit_code=code, finished=time.time(),
                             elapsed_seconds=elapsed, can_resume=job["kind"] == "analysis" and state != "complete", **extra)
+    state, code = terminal["state"], terminal.get("exit_code", code)
     from .jobs import write_platform_status
     write_platform_status(terminal)
     if job["kind"] == "analysis" and Path(job["run_dir"]).is_dir():

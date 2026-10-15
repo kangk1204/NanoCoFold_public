@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import errno
 import hashlib
 import json
 import mimetypes
@@ -9,6 +10,7 @@ import os
 import re
 import secrets
 import socket
+import sqlite3
 import threading
 import webbrowser
 from pathlib import Path
@@ -124,6 +126,29 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
     @app.exception_handler(KeyError)
     async def unknown(_request, exc):
         return JSONResponse({"error": "저장된 항목을 찾지 못했습니다. 입력을 다시 검토하거나 작업 목록을 새로 확인하세요."}, status_code=404)
+
+    @app.exception_handler(OSError)
+    @app.exception_handler(sqlite3.OperationalError)
+    async def storage_error(request, exc):
+        import logging
+        logging.getLogger(__name__).error("storage error during %s: %s", request.url.path, exc)
+        database_code = getattr(exc, "sqlite_errorcode", 0) & 255
+        database_message = str(exc).lower() if isinstance(exc, sqlite3.OperationalError) else ""
+        if (getattr(exc, "errno", None) in {errno.ENOSPC, errno.EDQUOT}
+                or database_code == sqlite3.SQLITE_FULL or database_message == "database or disk is full"):
+            code, status = "storage_full", 507
+            message = "저장 공간이 부족해 요청을 마치지 못했습니다. 서버의 여유 공간을 확보한 뒤 작업·로그를 새로고침해 현재 상태를 확인하세요."
+        elif (getattr(exc, "errno", None) in {errno.EACCES, errno.EPERM, errno.EROFS}
+                or database_code == sqlite3.SQLITE_READONLY):
+            code, status = "storage_permission", 503
+            message = "작업 공간의 읽기·쓰기 권한을 확인할 수 없습니다. 서버의 파일 권한을 확인한 뒤 작업·로그를 새로고침해 현재 상태를 확인하세요."
+        elif database_code in {sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED} or database_message in {"database is locked", "database table is locked"}:
+            code, status = "storage_busy", 503
+            message = "다른 저장 요청을 처리 중입니다. 잠시 후 작업·로그를 새로고침해 현재 상태를 확인하세요."
+        else:
+            code, status = "storage_error", 503
+            message = "저장소 요청을 마치지 못했습니다. 서버 로그를 확인한 뒤 작업·로그를 새로고침해 현재 상태를 확인하세요."
+        return JSONResponse({"error": message, "code": code}, status_code=status)
 
     import yaml
 

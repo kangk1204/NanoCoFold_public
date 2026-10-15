@@ -122,10 +122,36 @@ class BatchManager:
         if not row:
             raise KeyError(identifier)
         batch = json.loads(row["payload"])
-        for row in batch["rows"]:
+        for number, row in enumerate(batch["rows"]):
+            if not row.get("job_id") and row["id"] in batch.get("selected", []):
+                # Job registration and submission_links commit together. A
+                # crash before the separate batch-row save must not hide that
+                # child from status, explicit retry or whole-batch cancel.
+                submission = f"batch-{identifier}-{number:03d}"
+                key = uuid.uuid5(uuid.NAMESPACE_URL, "nanocofold-sites:" + submission).hex
+                linked = self.jobs.store.submitted(key)
+                if linked:
+                    row.update(job_id=linked[1]["id"], submission_error=None)
             if row.get("job_id"):
                 row["job"] = self.jobs.store.get(row["job_id"])
+                row["job"]["result_available"] = self._result_available(row["job"])
         return batch
+
+    def _result_available(self, job):
+        if job.get("kind") != "analysis" or not job.get("run_dir"):
+            return False
+        from .results import TABLES
+        try:
+            root = contained(self.inputs.workspace, job["run_dir"], exists=True)
+            if not root.is_dir():
+                return False
+            # Match the result API's finite saved-result markers; a planned
+            # run directory alone does not imply even partial results exist.
+            markers = ("run_config.yaml", "run_state.json", "platform_status.json", "complex_results.json",
+                       "models.csv", "summary.json", "result.json", "retained/manifest.json", *TABLES)
+            return any(contained(root, name).is_file() for name in markers)
+        except (OSError, ValueError):
+            return False
 
     def list(self):
         with self.jobs.store.connect() as db:

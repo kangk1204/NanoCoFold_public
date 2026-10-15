@@ -50,6 +50,15 @@ const state = {
   structureRequest: 0,
   resultRequest: 0,
   pollingJobs: false,
+  jobsRefreshRequested: false,
+  jobSelectionVersion: 0,
+  jobOperations: {},
+  jobActionKey: null,
+  jobActionButtons: [],
+  resumeBudgetMinutes: {},
+  analysisSubmitting: false,
+  currentView: "input",
+  navigationReady: false,
   inputRevision: 0,
   inputReadinessRequest: 0,
   presets: {},
@@ -218,27 +227,34 @@ function notice(message, error = false) {
   I18N.text($("notice"), I18N.term(message));
   $("notice").className = error ? "error" : "";
 }
-async function api(path, body) {
-  const response = await fetch(path, {
-    method: body === undefined ? "GET" : "POST",
-    headers: {
-      "X-Platform-Token": window.PLATFORM_TOKEN,
-      "Content-Type": "application/json",
-    },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  });
-  if (!response.ok) {
-    let data;
-    try {
-      data = await response.json();
-    } catch {
-      data = { error: response.statusText };
+async function api(path, body, {timeoutMs = 0, readOnly = false} = {}) {
+  const controller = timeoutMs ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    const response = await fetch(path, {
+      method: body === undefined ? "GET" : "POST",
+      headers: {"X-Platform-Token": window.PLATFORM_TOKEN, "Content-Type": "application/json"},
+      ...(controller ? {signal: controller.signal} : {}),
+      ...(body === undefined ? {} : {body: JSON.stringify(body)}),
+    });
+    if (!response.ok) {
+      let data;
+      try { data = await response.json(); } catch { data = {error: response.statusText}; }
+      const error = Error(data.error || JSON.stringify(data.detail) || response.statusText);
+      error.responseRejected = true;
+      throw error;
     }
-    throw Error(
-      data.error || JSON.stringify(data.detail) || response.statusText,
-    );
+    return await response.json();
+  } catch (error) {
+    if (error.responseRejected) throw error;
+    // A missing mutation response cannot tell us whether the server accepted it.
+    // Never replay a POST here; the next request is an ordinary status read.
+    throw Error(body === undefined || readOnly
+      ? "상태 조회 연결이 끊겼거나 응답이 지연됩니다. 마지막 표시 상태이며, 연결이 복구되면 다시 확인합니다. 화면 이동은 분석을 취소하지 않습니다."
+      : "요청의 처리 여부를 확인하지 못했습니다. 작업·로그에서 새로고침으로 현재 상태를 확인한 뒤 다시 요청하세요. 자동으로 다시 요청하지 않습니다.");
+  } finally {
+    if (timer !== null) clearTimeout(timer);
   }
-  return response.json();
 }
 function action(id, fn) {
   if ($(id))
@@ -250,7 +266,8 @@ function action(id, fn) {
       } catch (e) {
         notice(e.message, true);
       } finally {
-        button.disabled = id === "diagnose-environment" && Boolean(state.environmentJob || state.environmentSubmitting || state.environmentLoading);
+        button.disabled = id === "diagnose-environment" ? Boolean(state.environmentJob || state.environmentSubmitting || state.environmentLoading)
+          : id === "start-job" ? Boolean(state.analysisSubmitting || !state.input || !state.readiness) : false;
       }
     });
 }
@@ -286,7 +303,29 @@ function table(node, rows, columns) {
   target.append(head, body);
   node.replaceChildren(target);
 }
-function view(name) {
+function rememberLocation(replace = true) {
+  if (offline || !state.navigationReady) return;
+  const url = new URL(window.location.href);
+  url.searchParams.set("view", state.currentView);
+  if (state.job) url.searchParams.set("job", state.job);
+  else url.searchParams.delete("job");
+  // Keep result deep links and section hashes; no credentials or input paths enter history.
+  if (url.href !== window.location.href)
+    window.history[replace ? "replaceState" : "pushState"](null, "", url);
+}
+async function restoreNavigation() {
+  const query = new URLSearchParams(window.location.search);
+  const selected = query.get("job");
+  if (selected && state.jobs.some(job => job.id === selected) && selected !== state.job)
+    await selectJob(selected, false);
+  const name = query.get("view") || (query.get("result") ? "results" : "input");
+  view($("view-" + name) ? name : "input", false);
+}
+function view(name, remember = true) {
+  if (!$("view-" + name)) return;
+  const changed = state.currentView !== name;
+  state.currentView = name;
+  if (remember && changed) rememberLocation(false);
   for (const section of document.querySelectorAll("main>section"))
     section.hidden = section.id !== "view-" + name;
   for (const button of document.querySelectorAll("[data-view]")) {
@@ -778,7 +817,7 @@ async function prepareInput() {
   return result;
 }
 function renderInputReadiness() {
-  $("start-job").disabled = !state.input || !state.readiness;
+  $("start-job").disabled = Boolean(state.analysisSubmitting || !state.input || !state.readiness);
   $("diagnose-input").hidden = Boolean(state.readiness);
   I18N.text($("input-next-step"), I18N.term(state.readiness
     ? "입력 확인 완료 · 아래 분석 실행을 누르세요. 아직 구조 예측은 시작하지 않았습니다."
@@ -786,7 +825,7 @@ function renderInputReadiness() {
 }
 async function readInputReadiness(input, revision = state.inputRevision) {
   const request = ++state.inputReadinessRequest;
-  const result = await api("/api/environment/status", {input_id: input.id, mode: input.config.run.mode});
+  const result = await api("/api/environment/status", {input_id: input.id, mode: input.config.run.mode}, {timeoutMs: 15000, readOnly: true});
   if (request !== state.inputReadinessRequest || revision !== state.inputRevision || state.input?.id !== input.id) return;
   state.readiness = result.ready === true;
   renderInputReadiness();
@@ -827,7 +866,7 @@ async function refreshEnvironmentStatus() {
   renderEnvironmentStatus();
   const current = () => request === state.environmentRequest && key === JSON.stringify(environmentPayload());
   try {
-    const status = await api("/api/environment/status", payload);
+    const status = await api("/api/environment/status", payload, {timeoutMs: 15000, readOnly: true});
     if (!current()) return;
     state.environment = status;
     state.environmentJob = ["queued", "running", "cancelling"].includes(status.state) ? status.job_id : null;
@@ -874,13 +913,17 @@ async function submitDiagnostic() {
   }
   // Stay on the separate environment page. Input review never submits this job.
 }
-async function selectJob(identifier) {
+async function selectJob(identifier, remember = true) {
+  state.jobSelectionVersion = (state.jobSelectionVersion || 0) + 1;
   state.job = identifier;
+  state.jobActionKey = null;
+  if (remember) rememberLocation();
   state.logOffset = 0;
   I18N.text($("job-title"), I18N.term("작업 불러오는 중"));
   $("job-detail").replaceChildren(el("p", I18N.term("작업 상태를 확인합니다.")));
   $("job-actions").replaceChildren();
   I18N.text($("job-log"), "");
+  if (state.pollingJobs) state.jobsRefreshRequested = true;
   await refreshJobs();
 }
 function jobProgressCaption(job) {
@@ -921,7 +964,7 @@ async function refreshJobs() {
   if (offline || document.hidden || !$("job-list") || state.pollingJobs) return;
   state.pollingJobs = true;
   try {
-    state.jobs = (await api("/api/jobs")).jobs;
+    state.jobs = (await api("/api/jobs", undefined, {timeoutMs: 15000})).jobs;
     if (state.environmentJob) {
       const checked = state.jobs.find(j => j.id === state.environmentJob);
       if (checked && !["queued", "running", "cancelling"].includes(checked.state)) {
@@ -956,9 +999,9 @@ async function refreshJobs() {
       state.logOffset = 0;
     }
     if (state.job) {
-      const chosen = state.job;
-      const job = await api("/api/jobs/" + chosen);
-      if (state.job !== chosen) return;
+      const chosen = state.job, selection = state.jobSelectionVersion;
+      const job = await api("/api/jobs/" + chosen, undefined, {timeoutMs: 15000});
+      if (state.job !== chosen || state.jobSelectionVersion !== selection) return;
       I18N.text($("job-title"), job.name);
       if (state.submissionNoticeJob === job.id && !["queued","running","cancelling"].includes(job.state)) {
         notice(`${states[job.state] || job.state} · ${job.result_id?"결과 열기로 결과를 확인하세요.":"작업 상세와 로그에서 종료 사유를 확인하세요."}`,job.state!=="complete");
@@ -976,7 +1019,12 @@ async function refreshJobs() {
         $("job-detail").append(el("span", I18N.term("MOCK · 합성 결과"), "badge"));
       if (job.error)
         $("job-detail").append(el("div", I18N.term(job.error), "warning error"));
-      $("job-actions").replaceChildren();
+      const actionKey = JSON.stringify([job.id, job.state, Boolean(job.can_resume), job.kind, job.result_id || null]);
+      const rebuildActions = state.jobActionKey !== actionKey;
+      if (rebuildActions) {
+        // Keep an edited budget input and its focus intact during ordinary polling.
+        $("job-actions").replaceChildren();
+        state.jobActionButtons = [];
       for (const [label, operation] of [
         ["작업 취소", "cancel"],
         ["검증 후 재개", "resume"],
@@ -993,39 +1041,62 @@ async function refreshJobs() {
             input = el("input");
           input.type = "number";
           input.min = "1";
-          input.value = "60";
+          input.value = state.resumeBudgetMinutes[job.id] ?? "60";
+          input.oninput = () => { state.resumeBudgetMinutes[job.id] = input.value; };
           I18N.attribute(input, "aria-label", I18N.term("재개 추가 시간 (분)"));
           label.append(input);
           $("job-actions").append(label);
           extension = input;
         }
         const button = el("button", I18N.term(label), "secondary");
+        button.disabled = Boolean(state.jobOperations[job.id]);
         button.onclick = async () => {
+          if (state.jobOperations[job.id]) return;
+          const body = extension ? {additional_budget_seconds: Number(extension.value) * 60} : {};
+          if (extension && (!Number.isFinite(body.additional_budget_seconds) || body.additional_budget_seconds <= 0)) {
+            notice("추가 시간은 0보다 큰 숫자로 입력하세요.", true);
+            return;
+          }
+          state.jobOperations[job.id] = operation;
+          button.disabled = true;
           try {
-            await api(
-              `/api/jobs/${job.id}/${operation}`,
-              extension
-                ? { additional_budget_seconds: Number(extension.value) * 60 }
-                : {},
-            );
-            await refreshJobs();
+            const updated = await api(`/api/jobs/${job.id}/${operation}`, body, {timeoutMs: 30000});
+            notice(operation !== "cancel"
+              ? "재개를 요청했습니다. 기록과 입력을 검증한 뒤 실행합니다. 작업 상태를 확인하세요."
+              : updated?.state === "cancelled"
+                ? "작업이 취소되었습니다. 저장된 작업과 결과는 보존합니다."
+                : updated?.state === "cancelling"
+                  ? "취소를 요청했습니다. 상태가 취소로 바뀔 때까지 종료 정리를 기다리세요. 저장된 결과는 보존합니다."
+                  : "작업이 이미 종료되었거나 상태가 변경되었습니다. 현재 작업 상태와 저장된 결과를 확인하세요.");
           } catch (e) {
             notice(e.message, true);
+          } finally {
+            delete state.jobOperations[job.id];
+            if (state.pollingJobs) state.jobsRefreshRequested = true;
+            await refreshJobs();
           }
         };
         $("job-actions").append(button);
+        state.jobActionButtons.push(button);
+      }
       }
       if (job.kind === "diagnostics") {
         $("job-detail").append(el("p", I18N.term("이 작업은 환경 확인입니다. 단백질 구조 예측 결과는 만들지 않습니다."), "job-next-step"));
-        const button = el("button", I18N.term("분석 준비하기"));
-        button.onclick = () => { view("input"); state.showInputReview?.(); };
-        $("job-actions").prepend(button);
+        if (rebuildActions) {
+          const button = el("button", I18N.term("분석 준비하기"));
+          button.onclick = () => { view("input"); state.showInputReview?.(); };
+          $("job-actions").prepend(button);
+        }
       } else if (job.kind === "analysis" && !job.result_id) {
         $("job-detail").append(el("p", I18N.term(["queued", "running", "cancelling"].includes(job.state)
-          ? "분석 중입니다. 결과가 저장되면 여기에 결과 열기 버튼이 나타납니다."
-          : "저장된 결과가 연결되지 않았습니다. 상세 실행 로그에서 종료 사유를 확인하세요."), "job-next-step"));
+          ? job.state === "cancelling"
+            ? "취소 요청 후 종료 정리 중입니다. 아직 실행이 끝난 것은 아닙니다. 취소 상태가 될 때까지 기다리세요."
+            : "분석 중입니다. 화면을 이동하거나 브라우저를 닫아도 계속 실행됩니다. 진행 표시가 오래 같아도 계산 중일 수 있으니 상세 실행 로그를 확인하세요."
+          : job.can_resume
+            ? "분석이 중단되었습니다. 저장된 작업과 결과는 보존합니다. 상세 실행 로그에서 사유를 확인하고, 문제가 해결되면 검증 후 재개를 누르세요. 자동으로 재시작하지 않습니다."
+            : "저장된 결과가 연결되지 않았습니다. 상세 실행 로그에서 종료 사유를 확인하세요."), "job-next-step"));
       }
-      if (job.kind === "analysis" && job.result_id) {
+      if (rebuildActions && job.kind === "analysis" && job.result_id) {
         const button = el("button", I18N.term("결과 열기"));
         button.onclick = async () => {
           view("results");
@@ -1037,10 +1108,13 @@ async function refreshJobs() {
         };
         $("job-actions").append(button);
       }
+      state.jobActionKey = actionKey;
+      for (const button of state.jobActionButtons)
+        button.disabled = Boolean(state.jobOperations[job.id]);
       const log = await api(
-        `/api/jobs/${job.id}/logs?offset=${state.logOffset}`,
+        `/api/jobs/${job.id}/logs?offset=${state.logOffset}`, undefined, {timeoutMs: 15000},
       );
-      if (state.job !== chosen) return;
+      if (state.job !== chosen || state.jobSelectionVersion !== selection) return;
       state.logOffset = log.next_offset;
       $("job-log").textContent += log.text;
       $("job-log").scrollTop = $("job-log").scrollHeight;
@@ -1050,6 +1124,10 @@ async function refreshJobs() {
     notice(e.message, true);
   } finally {
     state.pollingJobs = false;
+    if (state.jobsRefreshRequested) {
+      state.jobsRefreshRequested = false;
+      await refreshJobs();
+    }
   }
 }
 async function refreshResults() {
@@ -2334,17 +2412,18 @@ function renderBatch(batch) {
     check.type="checkbox";I18N.attribute(check, "aria-label", I18N.concat([row.id, I18N.term(" 실행 선택")]));check.checked=batchSelected.includes(row.id);check.disabled=batchBusy||!!batch.selected||!!row.error;
     check.onchange=()=>{batchSelected=check.checked?[...batchSelected,row.id]:batchSelected.filter(id=>id!==row.id);renderBatch(activeBatch);};choice.append(check);
     if(row.error||row.submission_error){line.style.background="#fff1ef";I18N.attribute(line, "aria-label", I18N.concat([row.id, I18N.term(" 오류")]));}
-    for(const action of row.job?.can_resume?["resume"]:row.job&&['queued','running','cancelling'].includes(row.job.state)?["cancel"]:[]){const button=el("button",action==="resume" ? I18N.term("항목 재개") : I18N.term("항목 취소"));button.disabled=batchBusy;button.onclick=()=>batchAction("항목 요청 처리 중",async()=>{await api("/api/jobs/"+row.job_id+"/"+action,{additional_budget_seconds:36000});renderBatch(await api("/api/batches/"+batch.id));});status.append(button);}
+    for(const action of row.job?.can_resume?["resume"]:row.job&&['queued','running','cancelling'].includes(row.job.state)?["cancel"]:[]){const button=el("button",action==="resume" ? I18N.term("항목 재개") : I18N.term("항목 취소"));button.disabled=batchBusy;button.onclick=()=>batchAction("항목 요청 처리 중",async()=>{await api("/api/jobs/"+row.job_id+"/"+action,{additional_budget_seconds:36000},{timeoutMs:30000});renderBatch(await api("/api/batches/"+batch.id,undefined,{timeoutMs:15000}));});status.append(button);}
     line.append(choice,el("td",row.id),el("td",(row.error ? row.error : I18N.term("검토 완료"))),status);
-    const result=el("td");if(row.job?.run_dir&&["complete","failed","partial_failure"].includes(row.job.state)){const link=el("a",I18N.term("결과 열기"));link.href="/?result="+encodeURIComponent(row.job_id);link.target="_blank";link.rel="noopener";result.append(link);}else I18N.text(result, "—");line.append(result);body.append(line);
+    const result=el("td");if(row.job?.result_available===true&&["complete","failed","partial_failure","cancelled","interrupted","budget_exhausted"].includes(row.job.state)){const partial=row.job.state!=="complete",link=el("a",I18N.term(partial?"부분 결과 열기":"결과 열기"));link.href="/?result="+encodeURIComponent(row.job_id);link.target="_blank";link.rel="noopener";result.append(link);if(partial)result.append(el("p",I18N.term("중단 전 저장된 부분 결과입니다. 전체 분석 완료를 뜻하지 않습니다.")));}else I18N.text(result, "—");line.append(result);body.append(line);
   }
   $("batch-rows").replaceChildren(target);
-  $("batch-submit").disabled=batchBusy||Boolean(batch.selected)||!batchSelected.length||batch.rows.some(r=>batchSelected.includes(r.id)&&r.error);
-  I18N.text($("batch-submit"), batch.selected ? I18N.term("이미 제출된 분석") : I18N.concat([I18N.concat([I18N.term("3. 선택한 "), batchSelected.length]), I18N.term("개 분석 실행")]));
-  I18N.text($("batch-next-step"), batch.selected ? I18N.term("4단계 · 계산을 제출했습니다. 완료된 행의 결과 열기를 누르세요. 실행 중 상태는 자동으로 갱신됩니다.") : batch.rows.some(row => row.error) ? I18N.term("2단계 · 검토 오류가 있습니다. 아래 항목별 오류를 확인하고 입력을 수정한 뒤 다시 검토하세요.") : I18N.term("3단계 · 입력 검토 완료, 계산 미제출입니다. 실행할 항목을 확인하고 선택한 분석 실행을 누르세요."));
+  const retryMissing = Boolean(batch.selected) && batch.rows.some(row => batch.selected.includes(row.id) && !row.job_id && !row.job && !row.error);
+  $("batch-submit").disabled=batchBusy||(Boolean(batch.selected)&&!retryMissing)||!batchSelected.length||batch.rows.some(r=>batchSelected.includes(r.id)&&r.error);
+  I18N.text($("batch-submit"), batch.selected ? I18N.term(retryMissing ? "미제출 항목 다시 제출" : "이미 제출된 분석") : I18N.concat([I18N.concat([I18N.term("3. 선택한 "), batchSelected.length]), I18N.term("개 분석 실행")]));
+  I18N.text($("batch-next-step"), batch.selected && retryMissing ? I18N.term("일부 항목을 제출하지 못했습니다. 항목별 오류를 확인한 뒤 미제출 항목 다시 제출을 누르세요. 이미 등록된 작업은 같은 작업으로 연결됩니다.") : batch.selected ? I18N.term("4단계 · 계산을 제출했습니다. 완료된 행의 결과 열기를 누르세요. 실행 중 상태는 자동으로 갱신됩니다.") : batch.rows.some(row => row.error) ? I18N.term("2단계 · 검토 오류가 있습니다. 아래 항목별 오류를 확인하고 입력을 수정한 뒤 다시 검토하세요.") : I18N.term("3단계 · 입력 검토 완료, 계산 미제출입니다. 실행할 항목을 확인하고 선택한 분석 실행을 누르세요."));
   $("batch-cancel").disabled=batchBusy||!batch.rows.some(r=>r.job&&!['complete','failed','cancelled','partial_failure','budget_exhausted','interrupted'].includes(r.job.state));
 }
-async function refreshBatchHistory(){const data=await api("/api/batches");const node=$("batch-history");node.replaceChildren();for(const batch of data.batches){const button=el("button",I18N.concat([batch.name+" · "+batch.rows.length, I18N.term("개")]));button.onclick=async()=>renderBatch(await api("/api/batches/"+batch.id));node.append(button);}if(!data.batches.length)I18N.text(node, I18N.term("아직 검토한 배치가 없습니다."));}
+async function refreshBatchHistory(){const data=await api("/api/batches");const node=$("batch-history");node.replaceChildren();for(const batch of data.batches){const button=el("button",I18N.concat([batch.name+" · "+batch.rows.length, I18N.term("개")]));button.onclick=async()=>renderBatch(await api("/api/batches/"+batch.id,undefined,{timeoutMs:15000}));node.append(button);}if(!data.batches.length)I18N.text(node, I18N.term("아직 검토한 배치가 없습니다."));}
 async function batchAction(message, fn) {
   if (batchBusy) return;
   batchBusy = true;
@@ -2387,9 +2466,9 @@ function initBatch(){
   };
   $("batch-example").onclick=()=>{$("batch-format").value="json";$("batch-content").value=JSON.stringify({version:1,mode:"design",name:"CPU 배치 데모",mock:true,targets_fasta:">target-1\nACDEFGHIKLMNPQRSTVWY\n>target-2\nACDEFGHIKLMNPQRSTVWY\n",config:{design:{num_designs:1},screen:{tier2_n:1},rank:{final_n:1}}},null,2);reset();};
   $("batch-review").onclick=()=>batchAction("배치 입력을 검토하고 있습니다. 계산은 시작하지 않습니다",async()=>{let payload;if($("batch-format").value==="json")payload=JSON.parse($("batch-content").value);else payload={version:1,mode:$("batch-mode").value,name:$("batch-name").value,targets_fasta:$("batch-content").value,...($("batch-mode").value==="screen"?{vhh_fasta:$("batch-library").value}:{}),...($("batch-mode").value==="mature"?{wt_fasta:$("batch-wt").value}:{}),...($("batch-mode").value==="complex"?{partners_fasta:$("batch-partners").value}:{})};if($("batch-use-config").checked){if(!state.input)throw Error("단일 분석에서 조건을 먼저 검토하세요.");payload.config=state.input.config;}payload.api_consent=$("batch-api-consent").checked;renderBatch(await api("/api/batches/review",payload));$("batch-content").removeAttribute("aria-invalid");await refreshBatchHistory();});
-  $("batch-submit").onclick=()=>batchAction("검토한 배치를 제출하고 있습니다",async()=>{if(!activeBatch)throw Error("배치를 먼저 검토하세요.");renderBatch(await api("/api/batches/"+activeBatch.id+"/submit",{review_sha256:activeBatch.review_sha256,selected:batchSelected}));});
+  $("batch-submit").onclick=()=>batchAction("검토한 배치를 제출하고 있습니다",async()=>{if(!activeBatch)throw Error("배치를 먼저 검토하세요.");renderBatch(await api("/api/batches/"+activeBatch.id+"/submit",{review_sha256:activeBatch.review_sha256,selected:activeBatch.selected||batchSelected,...(activeBatch.budget_seconds!==undefined?{budget_seconds:activeBatch.budget_seconds}:{})},{timeoutMs:30000}));});
   $("batch-refresh").onclick=async()=>{try{if(activeBatch)renderBatch(await api("/api/batches/"+activeBatch.id));await refreshBatchHistory();}catch(e){notice(e.message,true);}};
-  $("batch-cancel").onclick=()=>batchAction("미완료 작업 취소 요청 중",async()=>renderBatch(await api("/api/batches/"+activeBatch.id+"/cancel",{})));
+  $("batch-cancel").onclick=()=>batchAction("미완료 작업 취소 요청 중",async()=>renderBatch(await api("/api/batches/"+activeBatch.id+"/cancel",{},{timeoutMs:30000})));
 }
 
 function platformStartup(status, error = "") {
@@ -2658,10 +2737,13 @@ async function boot() {
   $("environment-mode").onchange = () => { state.environmentTarget = null; refreshEnvironmentStatus().catch(e => notice(e.message, true)); };
   action("diagnose-environment", submitDiagnostic);
   action("start-job", async () => {
+    if (state.analysisSubmitting) return;
     if (!state.input) throw Error("먼저 입력·적용 설정을 확인하세요.");
     if (!state.readiness)
       throw Error("현재 입력의 필수 환경 점검을 먼저 통과해야 합니다.");
     const budget = $("budget").value;
+    state.analysisSubmitting = true;
+    try {
     const job = await api("/api/jobs", {
       submission_id: state.submissionId || (state.submissionId = crypto.randomUUID().replaceAll("-", "")),
       reuse_results: !$("force-rerun").checked,
@@ -2670,11 +2752,12 @@ async function boot() {
       name: $("job-name").value,
       mock: $("mock").checked,
       ...(budget ? { budget_seconds: Number(budget) * 60 } : {}),
-    });
+    }, {timeoutMs: 30000});
     await selectJob(job.id);
     view("jobs");
     state.submissionNoticeJob=job.id;
     notice("작업을 등록했습니다. 브라우저를 닫아도 실행됩니다.");
+    } finally { state.analysisSubmitting = false; renderInputReadiness(); }
   });
   action("install-profile-button", async () => {
     const job = await api("/api/setup", {
@@ -2768,7 +2851,14 @@ async function boot() {
   await refreshJobs();
   await refreshResults();
   const requested = new URLSearchParams(window.location.search).get("result");
-  if (requested) {view("results"); await loadResult(requested);}
+  if (requested) await loadResult(requested);
+  state.navigationReady = true;
+  await restoreNavigation();
+  rememberLocation();
+  window.addEventListener("popstate", () => restoreNavigation().catch(error => notice(error.message, true)));
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshJobs(); });
+  window.addEventListener("online", refreshJobs);
+  window.addEventListener("pageshow", event => { if (event.persisted) refreshJobs(); });
   setInterval(refreshJobs, 2000);
 }
 function noviceFasta(content) {

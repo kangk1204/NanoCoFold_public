@@ -223,16 +223,44 @@ class JobStore:
             return row["submission_hash"], self.get(row["job_id"])
         return None
 
-    def update(self, identifier: str, **changes) -> dict:
+    def update(self, identifier: str, *, expected_states=None, **changes) -> dict:
         with self.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute("SELECT payload FROM jobs WHERE id=?", (identifier,)).fetchone()
             if row is None:
                 raise KeyError(identifier)
             job = json.loads(row["payload"])
+            if expected_states is not None and job["state"] not in expected_states:
+                return job
             job.update(changes, updated=time.time())
             connection.execute("UPDATE jobs SET state=?,updated=?,payload=?,needs_cleanup=? WHERE id=?",
                                (job["state"], job["updated"], json.dumps(job), int(bool(job.get("descendants"))), identifier))
+        return job
+
+    def finish(self, identifier: str, *, state: str, **changes) -> dict:
+        """Finish only the current running attempt; a persisted cancel wins.
+
+        The worker's last read and the HTTP cancellation request are independent
+        transactions. Decide both the terminal state and its metadata together
+        so a stale completion, heartbeat, or reconciliation cannot revive work.
+        """
+        if state not in TERMINAL:
+            raise ValueError("작업 종료 상태가 올바르지 않습니다.")
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute("SELECT payload FROM jobs WHERE id=?", (identifier,)).fetchone()
+            if row is None:
+                raise KeyError(identifier)
+            job = json.loads(row["payload"])
+            if job["state"] not in {"running", "cancelling"}:
+                return job
+            if job["state"] == "cancelling":
+                state = "budget_exhausted" if job.get("budget_exceeded") else "cancelled"
+                changes.update(exit_code=130, can_resume=job["kind"] == "analysis",
+                               error="실행 시간 한도에 도달했습니다." if state == "budget_exhausted" else "사용자가 작업을 취소했습니다.")
+            job.update(changes, state=state, phase=state, updated=time.time())
+            connection.execute("UPDATE jobs SET state=?,updated=?,payload=?,needs_cleanup=? WHERE id=?",
+                               (state, job["updated"], json.dumps(job), int(bool(job.get("descendants"))), identifier))
         return job
 
     def insert(self, job: dict):
@@ -445,7 +473,7 @@ class JobManager:
         allowed_gpu(job["gpu"])
         if job["kind"] != "analysis" or job["state"] not in {"interrupted", "failed", "partial_failure", "budget_exhausted", "cancelled"}:
             raise ValueError("이 작업은 재개할 수 없습니다.")
-        if identifier in self.pending_kills or (job.get("process_stamp") and process_stamp(job.get("pid")) == job["process_stamp"]):
+        if identifier in self.pending_kills or self._live_attempt_processes(job):
             raise ValueError("앞선 실행 프로세스를 정리 중입니다. 잠시 뒤 재개하세요.")
         if additional_budget_seconds is not None and (isinstance(additional_budget_seconds, bool)
                 or not isinstance(additional_budget_seconds, (int, float)) or not 0 < additional_budget_seconds <= 604800):
@@ -465,6 +493,8 @@ class JobManager:
             current = json.loads(row["payload"])
             if current["state"] not in {"interrupted", "failed", "partial_failure", "budget_exhausted", "cancelled"}:
                 raise ValueError("작업이 이미 대기 또는 실행 중입니다.")
+            if identifier in self.pending_kills or self._live_attempt_processes(current):
+                raise ValueError("앞선 실행 프로세스를 정리 중입니다. 잠시 뒤 재개하세요.")
             if current["state"] == "budget_exhausted" and additional_budget_seconds is None:
                 raise ValueError("시간 한도가 소진되었습니다. 재개할 추가 시간(분)을 입력하세요.")
             previous = {"state": current["state"], "finished": current.get("finished"), "elapsed_seconds": current.get("elapsed_seconds", 0)}
@@ -480,6 +510,11 @@ class JobManager:
             current.update(phase="resume_validation", progress={"completed": 0, "total": current.get("progress", {}).get("total")})
             connection.execute("UPDATE jobs SET state='queued',updated=?,payload=? WHERE id=?", (current["updated"], json.dumps(current), identifier))
         return current
+
+    @staticmethod
+    def _live_attempt_processes(job: dict) -> bool:
+        targets = [(job.get("pid"), job.get("process_stamp")), *job.get("descendants", [])]
+        return any(pid and stamp and process_stamp(pid) == stamp for pid, stamp in targets)
 
     def cancel(self, identifier: str) -> dict:
         # Dispatch and worker completion can happen between an API read and
@@ -530,7 +565,7 @@ class JobManager:
         try:
             allowed_gpu(job["gpu"])
         except ValueError as exc:
-            self.store.update(job["id"], state="failed", phase="gpu_policy", error=str(exc),
+            self.store.update(job["id"], expected_states={"queued"}, state="failed", phase="gpu_policy", error=str(exc),
                               finished=time.time(), can_resume=False)
             return False
         path = gpu_lock_path(job["gpu"])
@@ -541,7 +576,7 @@ class JobManager:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 if job.get("phase") != "waiting_for_gpu":
-                    self.store.update(job["id"], phase="waiting_for_gpu", waiting_for="gpu")
+                    self.store.update(job["id"], expected_states={"queued"}, phase="waiting_for_gpu", waiting_for="gpu")
                 return False
             identity = os.fstat(lock.fileno())
             with self.store.connect() as connection:
@@ -617,9 +652,16 @@ class JobManager:
     def _terminate(self, job: dict):
         identifier = job["id"]
         if identifier not in self.pending_kills:
-            targets = descendants(job["pid"])
+            owned = bool(job.get("process_stamp")) and process_stamp(job.get("pid")) == job["process_stamp"]
+            targets = descendants(job["pid"]) if owned else self.observed_descendants.get(identifier, job.get("descendants", []))
+            # Save the child birth identities before signalling their parent.
+            # A browser/server restart during the grace period must retain the
+            # authority to clean independent-session engine children.
+            current = self.store.update(identifier, expected_states={"running", "cancelling"}, descendants=targets)
+            if current["state"] not in {"running", "cancelling"}:
+                return
             self.pending_kills[identifier] = (time.monotonic(), targets)
-            if process_stamp(job["pid"]) == job.get("process_stamp"):
+            if owned and process_stamp(job["pid"]) == job["process_stamp"]:
                 with contextlib.suppress(ProcessLookupError):
                     os.kill(job["pid"], signal.SIGTERM)
         started, targets = self.pending_kills[identifier]
@@ -635,7 +677,7 @@ class JobManager:
         now = time.time()
         previous_elapsed = latest.get("history", [])[-1].get("elapsed_seconds", 0) if latest.get("history") else 0
         elapsed = previous_elapsed + now - (latest.get("started") or now)
-        terminal = self.store.update(identifier, state=state, phase=state, finished=now, elapsed_seconds=elapsed,
+        terminal = self.store.finish(identifier, state=state, finished=now, elapsed_seconds=elapsed,
                                      can_resume=job["kind"] == "analysis")
         write_platform_status(terminal)
 
@@ -689,7 +731,7 @@ class JobManager:
                     now = time.time()
                     previous_elapsed = current.get("history", [])[-1].get("elapsed_seconds", 0) if current.get("history") else 0
                     elapsed = previous_elapsed + now - (current.get("started") or now)
-                    terminal = self.store.update(identifier, state=state, phase=state, finished=now, elapsed_seconds=elapsed,
+                    terminal = self.store.finish(identifier, state=state, finished=now, elapsed_seconds=elapsed,
                                                  error="실행 프로세스가 종료되었습니다. 기록된 완료 단계만 재개할 수 있습니다.", can_resume=job["kind"] == "analysis")
                     write_platform_status(terminal)
                 # A dead worker may leave tool children; finish pending cleanup.
@@ -702,12 +744,12 @@ class JobManager:
             observed = descendants(job["pid"])
             self.observed_descendants[identifier] = observed
             if job.get("budget_seconds") and elapsed >= job["budget_seconds"]:
-                job = self.store.update(identifier, state="cancelling", phase="budget_exhausted", budget_exceeded=True)
+                job = self.store.update(identifier, expected_states={"running"}, state="cancelling", phase="budget_exhausted", budget_exceeded=True)
             if job["state"] == "cancelling":
                 self._terminate(job)
             else:
                 progress = {**self._progress(job), **msa_acquisition_status(job["run_dir"])} if job.get("run_dir") else self._progress(job)
-                self.store.update(identifier, elapsed_seconds=elapsed, descendants=observed, **progress)
+                self.store.update(identifier, expected_states={"running"}, elapsed_seconds=elapsed, descendants=observed, **progress)
         jobs = self.store.list(states=ACTIVE)
         occupied = {job["gpu"] for job in jobs if job["kind"] in {"analysis", "diagnostics"} and job["state"] in {"running", "cancelling"}}
         cpu_kinds = {job["kind"] for job in jobs if job["kind"] != "analysis" and job["state"] in {"running", "cancelling"}}
