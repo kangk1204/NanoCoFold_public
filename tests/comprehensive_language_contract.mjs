@@ -48,3 +48,18 @@ test('offline PAE view size is bounded before decompression while full compresse
  const payload={pae_arrays:{[sha]:record}},before=JSON.stringify(payload);
  await assert.rejects(c.offlinePaeValues({values_ref:sha,labels:Array(dimension).fill('A:1')},payload),/128 MiB/);assert.equal(JSON.stringify(payload),before);
 });
+
+test('raw binding-site captions retain provenance and corrupt PAE has a bilingual, PAE-specific explanation',()=>{
+ const i=i18n(),c={};vm.createContext(c);
+ vm.runInContext(source.slice(source.indexOf('const metricCaptions ='),source.indexOf('const decisionCaption ='))+'globalThis.actualMetricCaption=metricCaption;',c);
+ const rawCaption=c.actualMetricCaption('site_satisfied');
+ assert.equal(rawCaption,'지정 결합 부위 판정 (기록)');
+ const caption=i.term(rawCaption);
+ const damaged='PAE 자료가 손상되어 표시할 수 없습니다. 표와 구조는 계속 확인할 수 있습니다.';
+ const damageCaption=i.term(damaged);
+ assert.equal(i.value(caption),'Recorded binding-site decision');
+ assert.equal(i.value(damageCaption),'The PAE data is damaged and cannot be displayed. Tables and structures remain available.');
+ i.setLanguage('ko',{persist:false});assert.equal(i.value(caption),rawCaption);assert.equal(i.value(damageCaption),damaged);
+ assert.notEqual(i.value(caption),i.value(i.term('지정 결합 부위 충족')));
+ i.setLanguage('en',{persist:false});assert.equal(i.value(caption),'Recorded binding-site decision');
+});

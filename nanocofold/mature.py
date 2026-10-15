@@ -30,20 +30,24 @@ def resolve_wt_sequence(cfg: dict) -> str:
     raise ValueError("mature.wt_sequence 또는 mature.wt_fasta 로 야생형 VHH 서열을 지정하세요.")
 
 
-def validate_cdr_ranges(ranges: dict, sequence_length: int) -> dict[str, tuple[int, int]]:
-    """CDR positions are source-sequence indices, never IMGT numbers."""
+def validate_cdr_ranges(ranges: dict, sequence_length: int | None) -> dict[str, tuple[int, int]]:
+    """Validate source-sequence indices, never IMGT numbers.
+
+    ``None`` checks the schema only when there is no candidate sequence (for
+    example, every generated design was filtered). WT and nonempty candidate
+    callers must supply the actual available sequence length.
+    """
     if not isinstance(ranges, dict) or not ranges:
         raise ValueError("CDR 구간을 서열의 1-based 시작·끝 위치로 지정하세요.")
-    normalized, occupied = {}, set()
+    normalized = {}
     for name, bounds in ranges.items():
         if name not in {"CDR1", "CDR2", "CDR3"} or not isinstance(bounds, (tuple, list)) or len(bounds) != 2:
             raise ValueError("CDR 구간은 CDR1/CDR2/CDR3의 [시작, 끝] 정수 목록이어야 합니다.")
-        if any(type(value) is not int for value in bounds) or not 1 <= bounds[0] <= bounds[1] <= sequence_length:
+        if (any(type(value) is not int for value in bounds) or not 1 <= bounds[0] <= bounds[1]
+                or sequence_length is not None and bounds[1] > sequence_length):
             raise ValueError("CDR 구간은 WT 서열 범위 안의 1-based 정수 위치여야 합니다.")
-        positions = set(range(bounds[0], bounds[1] + 1))
-        if positions & occupied:
+        if any(bounds[0] <= end and start <= bounds[1] for start, end in normalized.values()):
             raise ValueError("CDR 구간은 서로 겹칠 수 없습니다.")
-        occupied.update(positions)
         normalized[name] = tuple(bounds)
     return normalized
 

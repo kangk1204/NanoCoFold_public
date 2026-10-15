@@ -1,5 +1,7 @@
 """Malformed saved coordinates must not prevent delivery of intact models."""
 import hashlib
+import base64
+import gzip
 import io
 import json
 import re
@@ -79,6 +81,53 @@ def test_corrupt_saved_model_is_unavailable_but_other_model_and_delivery_survive
         assert all(s["candidate_id"] == "ok" for s in result["structures"])
         assert any("broken" in issue and "원자 좌표" in issue for issue in result["summary"]["issues"])
         for structure in result["structures"]:
-            for key in ("content", "raw_content", "chains", "pae", "contacts", "clashes"):
+            for key in ("content", "raw_content", "chains", "contacts", "clashes"):
                 assert structure[key] == healthy[key]
+            assert {key: value for key, value in structure["pae"].items() if key != "values_ref"} == {key: value for key, value in healthy["pae"].items() if key != "values"}
+            packed = result["pae_arrays"][structure["pae"]["values_ref"]]
+            raw = gzip.decompress(base64.b64decode(packed["data"]))
+            assert raw == np.asarray(healthy["pae"]["values"], dtype="<f8").tobytes()
+            assert packed["sha256"] == hashlib.sha256(raw).hexdigest() == structure["pae"]["values_ref"]
+            assert packed["bytes"] == len(raw) and packed["dimension"] == len(matrix)
     assert all(hashlib.sha256(p.read_bytes()).hexdigest() == before for p, before in originals.items())
+
+
+@pytest.mark.parametrize("pae", [
+    {"values": [[0, 1]], "labels": ["A:1", "B:1"]},
+    {"values": [[0, -1], [1, 0]], "labels": ["A:1", "B:1"]},
+    {"values": [[0, float("nan")], [1, 0]], "labels": ["A:1", "B:1"]},
+    {"values": [[0, 1], [1, 0]], "labels": ["A:1"]},
+    {"values": [[0, 1], [1, 0]], "labels": ["B:1", "A:1"]},
+    {"values": [[0, 1], [1, 0]], "labels": ["A:1", "A:2"]},
+])
+def test_corrupt_complex_pae_keeps_coordinates_and_declares_partial_delivery(tmp_path, pae):
+    run = tmp_path / "complex"
+    run.mkdir()
+    content = mock.write_pdb(mock.build_complex_structure("A", "C", [], seed=42),
+                             run / "native.pdb").read_text()
+    (run / "run_config.yaml").write_text(yaml.safe_dump({"run": {"mode": "complex"},
+        "complex": {"proteins": [{"sequence": "A"}, {"sequence": "C"}]}}))
+    (run / "run_state.json").write_text(json.dumps({"phases": {"final": {}},
+                                                   "execution": {"state": "complete"}}))
+    (run / "complex_results.json").write_text(json.dumps({"rows": [{"candidate_id": "model-1",
+        "evaluated": True, "iptm": .8, "structure_available": True, "structure_file": "model.json"}]}))
+    (run / "model.json").write_text(json.dumps({"content": content, "format": "pdb", "pae": pae,
+        "chains": [{"id": "A", "residues": [{"label": "A:1"}]},
+                   {"id": "B", "residues": [{"label": "B:1"}]}]}))
+    originals = {p: hashlib.sha256(p.read_bytes()).hexdigest() for p in run.iterdir()}
+    live = ResultReader(run).structure("model-1")
+    assert live["content"] == content and live["pae"] is None
+    assert live["pae_status"] == "invalid" and "손상" in live["pae_error"]
+    exported = [payload(ResultReader(run).export("html")[0].decode())]
+    with zipfile.ZipFile(io.BytesIO(ResultReader(run).export("report_zip")[0])) as archive:
+        exported.append(payload(archive.read("report.html").decode()))
+    for result in exported:
+        assert len(result["candidates"]["rows"]) == 1 and result["pae_arrays"] == {}
+        assert len(result["structures"]) == 1
+        assert result["structures"][0]["content"] == content
+        assert result["structures"][0]["pae"] is None
+        assert result["structures"][0]["pae_status"] == "invalid"
+        assert result["summary"]["status"] == "partial_failure"
+        assert result["summary"]["complete"] is False
+        assert any("PAE" in issue and "손상" in issue for issue in result["summary"]["issues"])
+    assert all(hashlib.sha256(p.read_bytes()).hexdigest() == digest for p, digest in originals.items())

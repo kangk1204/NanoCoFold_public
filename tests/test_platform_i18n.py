@@ -110,16 +110,20 @@ def test_offline_toggle_preserves_structure_observation_user_id_and_numeric_arra
           observation:document.getElementById('observation-select').value,
           residues:state.viewer.selectedLabels,chains:[...document.querySelectorAll('[data-layer]')].map(e=>[e.dataset.layer,e.checked]),
           pae:document.getElementById('pae').data.map(d=>d.z),
-          distribution:document.getElementById('distribution').data.map(d=>[d.name,d.y])})'''
+          distribution:document.getElementById('distribution').data.map(d=>d.y)})'''
+        english_names=page.locator('#distribution').evaluate('(node)=>node.data.map(trace=>trace.name)')
+        assert english_names == ['engine / seed=Not evaluated / MSA=Not recorded / restraint=Not evaluated']
         before=page.evaluate(snapshot)
         page.locator('#language-select').select_option('ko')
         expect(page.locator('#structure-note')).to_contain_text('체인')
         expect(page.locator('#candidate-title')).to_have_text('완료')
         assert page.evaluate(snapshot)==before
+        assert page.locator('#distribution').evaluate('(node)=>node.data.map(trace=>trace.name)') == ['engine / seed=미평가 / MSA=미기록 / restraint=미평가']
         assert page.locator('#distribution').evaluate('(node)=>node.layout.xaxis.ticktext') == ['조건 1']
         page.locator('#language-select').select_option('en')
         expect(page.locator('#candidate-title')).to_have_text('완료')
         assert page.evaluate(snapshot)==before
+        assert page.locator('#distribution').evaluate('(node)=>node.data.map(trace=>trace.name)') == english_names
         page.locator('#candidate-table tbody tr').filter(has_text="나노바디2(A3);O'Neil").locator("button").click()
         expect(page.locator('#candidate-title')).to_have_text("나노바디2(A3);O'Neil")
         assert page.locator('#distribution').evaluate('(node)=>node.data.map(trace=>trace.y)') == [[0.9]]

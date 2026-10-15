@@ -329,13 +329,16 @@ class InputManager:
         elif cfg_get(cfg, "rank.weights.dev_flags", 0):
             source = cfg_get(cfg, "mature.cdr.source", "auto")
             env = cfg_get(cfg, "mature.anarci.env")
-            configured = cfg_get(cfg, "mature.cdr.regions", {}) or {}
-            if source == "config":
+            configured = cfg_get(cfg, "mature.cdr.regions", {})
+            missing_annotation = configured is None or isinstance(configured, dict) and not configured
+            if source == "config" and not missing_annotation:
                 from ..mature import validate_cdr_ranges
                 ends = [bounds[1] for bounds in configured.values()
                         if isinstance(bounds, (tuple, list)) and len(bounds) == 2 and type(bounds[1]) is int] if isinstance(configured, dict) else []
                 validate_cdr_ranges(configured, max(ends, default=0))
-            if cfg_get(cfg, "run.mock", False) or cfg_get(cfg, "run.dry_run", False) or (source != "config" and not (env and (Path(env) / "bin/python").is_file())):
+            if (source == "config" and missing_annotation or cfg_get(cfg, "run.mock", False)
+                    or cfg_get(cfg, "run.dry_run", False)
+                    or source != "config" and not (env and (Path(env) / "bin/python").is_file())):
                 advisories.append(
                     "CDR 개발가능성 평가가 준비되지 않으면 종합 순위와 최종 선별을 보류합니다. "
                     "실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 "

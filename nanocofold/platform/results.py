@@ -188,7 +188,8 @@ def _pack_offline_pae(structure, arrays):
     import numpy as np
     matrix = np.asarray(pae["values"], dtype="<f8")
     if (matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1] or not matrix.shape[0]
-            or len(pae.get("labels", [])) != matrix.shape[0] or not np.isfinite(matrix).all()):
+            or len(pae.get("labels", [])) != matrix.shape[0] or not np.isfinite(matrix).all()
+            or (matrix < 0).any()):
         raise ValueError("PAE는 잔기 축과 일치하는 유한한 정사각 행렬이어야 합니다.")
     binary = matrix.tobytes(order="C")
     digest = hashlib.sha256(binary).hexdigest()
@@ -898,6 +899,28 @@ class ResultReader:
             data = self._json(row["structure_file"])
             if not data or not isinstance(data.get("content"), str) or not data["content"]:
                 raise ValueError("저장된 복합체 구조가 손상되었습니다.")
+            if data.get("pae") is not None:
+                from ..score_complex import validate_pae
+                import numpy as np
+                try:
+                    pae = data["pae"]
+                    labels = pae["labels"]
+                    if not isinstance(labels, list) or not all(isinstance(label, str) for label in labels):
+                        raise ValueError("invalid_pae_axis")
+                    if data.get("chains"):
+                        coordinate_labels = [residue["label"] for chain in data["chains"]
+                                             for residue in chain["residues"]]
+                        if labels != coordinate_labels:
+                            raise ValueError("invalid_pae_coordinate_axis")
+                    validate_pae(np.asarray(pae["values"], dtype=float), len(labels))
+                except (ValueError, TypeError, KeyError, OverflowError):
+                    # A damaged error matrix cannot invalidate independently
+                    # usable saved coordinates or silently remove their export.
+                    message = "PAE 자료가 손상되어 표시할 수 없습니다. 표와 구조는 계속 확인할 수 있습니다."
+                    self.issues.append(f"{candidate_id}: {message}")
+                    data = {**data, "pae": None, "pae_status": "invalid", "pae_error": message}
+                    prior = data.get("issues") if isinstance(data.get("issues"), list) else []
+                    data["issues"] = list(dict.fromkeys([*prior, message]))
             return self._coordinate_contract({**data, "candidate_id": candidate_id, "observation_id": observation_id}, row=row)
         return self._nanobody_structure(candidate_id, observation_id)
 

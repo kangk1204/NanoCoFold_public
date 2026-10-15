@@ -1149,12 +1149,13 @@ def _finalize(
     cdr_by_id = None
     cdr_source = str(cfg_get(cfg, "mature.cdr.source", "auto")).lower()
     if not cdr_ranges and cdr_source == "config":
-        configured_ranges = cfg_get(cfg, "mature.cdr.regions", {}) or {}
-        # The same strict positional validation applies to every CLI mode.
-        # A shared range may still exceed shorter library members; those rows
-        # remain explicitly unassessed below rather than receiving guessed CDRs.
-        longest_sequence = max((len(str(value)) for value in merged[sequence_column]), default=0)
-        cdr_ranges = mature.validate_cdr_ranges(configured_ranges, longest_sequence)
+        configured_ranges = cfg_get(cfg, "mature.cdr.regions", {})
+        # Missing annotation remains unassessed; malformed provided coordinates
+        # are never truncated or accepted. A genuinely empty post-filter pool
+        # has no sequence length against which to assess valid coordinates.
+        longest_sequence = None if merged.empty else max(len(str(value)) for value in merged[sequence_column])
+        missing_annotation = configured_ranges is None or isinstance(configured_ranges, dict) and not configured_ranges
+        cdr_ranges = {} if missing_annotation else mature.validate_cdr_ranges(configured_ranges, longest_sequence)
         if not cdr_ranges:
             state.add_warnings("mature.cdr.source=config 이지만 유효한 CDR 범위가 없어 CDR 개발가능성을 미평가합니다.")
         else:

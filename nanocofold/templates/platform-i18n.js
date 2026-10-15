@@ -1534,6 +1534,8 @@ const NCF_TRANSLATIONS = Object.freeze({
   "필수 지표 미평가": "Required metrics not evaluated",
   "WT 대조군 예측 풀에서 제외": "WT control excluded from the prediction pool",
   "서열 prior 평가 한도 밖 (구조 미평가)": "Outside the sequence-prior evaluation limit (structure not evaluated)",
+  "지정 결합 부위 판정 (기록)": "Recorded binding-site decision",
+  "PAE 자료가 손상되어 표시할 수 없습니다. 표와 구조는 계속 확인할 수 있습니다.": "The PAE data is damaged and cannot be displayed. Tables and structures remain available.",
   "복합체 예측 · 처음 실행 추천": "Predict complexes · Recommended first run"
 });
 /* Explicit presentation bindings; no DOM observer, input rewriting, or API mutation. */
