@@ -43,7 +43,7 @@ def test_actual_modebar_hover_keeps_compact_light_controls(tmp_path,width,suppli
     _,url=supplied_server
     with sync_playwright() as pw:
         browser=pw.chromium.launch(args=["--enable-unsafe-swiftshader"])
-        page=browser.new_page(viewport={"width":width,"height":900});errors=[];external=[]
+        page=browser.new_page(viewport={"width":width,"height":900}); page.add_init_script("localStorage.setItem('nanocofold.language', 'ko')");errors=[];external=[]
         page.on("pageerror",lambda e:errors.append(str(e)))
         page.route("http**/*",lambda route:route.continue_() if route.request.url.startswith(url) else (external.append(route.request.url),route.abort()))
         page.goto(url)

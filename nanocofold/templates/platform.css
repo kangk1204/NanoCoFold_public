@@ -492,3 +492,8 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
 #view-results .js-plotly-plot .modebar-btn:hover { background:#edf5f7; filter:none; }
 #view-results .js-plotly-plot .modebar-btn.active path { fill:#17695f!important; }
 #view-results .js-plotly-plot .modebar-btn:focus-visible { outline:3px solid #85601e; outline-offset:-3px; background:#edf5f7; }
+
+/* Language selection stays available while inputs load and in offline reports. */
+.language-switch { display: flex; align-items: center; gap: 8px; }
+.language-switch label { margin: 0; color: inherit; white-space: nowrap; }
+.language-switch select { width: auto; min-width: 108px; margin: 0; background: #fff; color: #1c2c38; padding: 6px 10px; }

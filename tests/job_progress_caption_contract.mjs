@@ -1,10 +1,11 @@
+import {koreanContext} from './i18n_context.mjs';
 /** Processed attempts are not successful models; unknown counters are not zero. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const source=readFileSync(new URL('../nanocofold/templates/platform.js',import.meta.url),'utf8'),c={};
-vm.createContext(c);vm.runInContext(source.slice(source.indexOf('function jobProgressCaption('),source.indexOf('async function refreshJobs()')),c);
+koreanContext(c);vm.runInContext(source.slice(source.indexOf('function jobProgressCaption('),source.indexOf('async function refreshJobs()')),c);
 const cases=[
  ['known zero stage counts remain zero',{progress:{completed:0,total:0}},'진행 0/0'],
  ['known zero model outcomes remain zero',{progress:{completed:0,total:4,succeeded:0,failed:0}},'처리 0/4 · 성공 0 · 실패 0'],
@@ -19,8 +20,8 @@ const cases=[
 ];
 for(const [name,job,caption] of cases)test(name,()=>assert.equal(c.jobProgressCaption(job),caption));
 test('job detail uses the count helper and preserves the mock badge',()=>{
- assert.match(source,/\$\{jobProgressCaption\(job\)\}/);
- assert.match(source,/if \(job\.mock\)\s+\$\("job-detail"\)\.append\(el\("span", "MOCK · 합성 결과", "badge"\)\)/);
+ assert.match(source,/I18N\.term\(jobProgressCaption\(job\)\)/);
+ assert.match(source,/if \(job\.mock\)\s+\$\("job-detail"\)\.append\(el\("span", I18N\.term\("MOCK · 합성 결과"\), "badge"\)\)/);
 });
 
 /** Worker terminal stage counts must not hide authoritative final model records. */

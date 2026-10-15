@@ -132,7 +132,7 @@ def test_offline_scope_surfaces_and_svg_export(tmp_path, mode, scope, caption):
     document = _write_document(tmp_path, payload)
     with sync_playwright() as pw:
         browser = pw.chromium.launch(args=["--enable-unsafe-swiftshader"])
-        page = browser.new_page(); errors = []; external = []
+        page = browser.new_page(); page.add_init_script("localStorage.setItem('nanocofold.language', 'ko')"); errors = []; external = []
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.route("http**/*", lambda route: (external.append(route.request.url), route.abort()))
         page.goto(document.as_uri())
@@ -165,7 +165,7 @@ def test_offline_success_failure_and_unevaluated_error_cells(tmp_path):
     document = _write_document(tmp_path, payload)
     with sync_playwright() as pw:
         browser = pw.chromium.launch(args=["--enable-unsafe-swiftshader"])
-        page = browser.new_page(); page.goto(document.as_uri())
+        page = browser.new_page(); page.add_init_script("localStorage.setItem('nanocofold.language', 'ko')"); page.goto(document.as_uri())
         for name, caption in [("ok", "오류 없음"), ("blank-ok", "오류 없음"), ("failed", "평가 실패"), ("waiting", "미평가")]:
             expect(page.locator(f'#candidate-table tr[data-id="{name}"] td').last).to_have_text(caption)
         expect(page.locator("#result-summary")).to_contain_text("평가 완료 2")
@@ -198,7 +198,7 @@ def test_offline_coordinate_source_and_download_bytes(tmp_path, mode):
     document = _write_document(tmp_path, payload)
     with sync_playwright() as pw:
         browser = pw.chromium.launch(args=["--enable-unsafe-swiftshader"])
-        page = browser.new_page(); errors=[]; external=[]
+        page = browser.new_page(); page.add_init_script("localStorage.setItem('nanocofold.language', 'ko')"); errors=[]; external=[]
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.route("http**/*", lambda route:(external.append(route.request.url),route.abort()))
         page.goto(document.as_uri())

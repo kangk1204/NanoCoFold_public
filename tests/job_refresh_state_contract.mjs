@@ -1,3 +1,4 @@
+import {koreanContext} from './i18n_context.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -8,7 +9,7 @@ function fixture({hidden=false,pending=false}={}) {
  const node={replaceChildren(){},textContent:''};
  const c={offline:false,document:{hidden},state:{pollingJobs:false,diagnostic:null,job:null},
    $:()=>node,api:()=>{calls++;return pending?new Promise(resolve=>{finish=()=>resolve({jobs:[]});}):Promise.resolve({jobs:[]});},notice(){}};
- vm.createContext(c);vm.runInContext(source.slice(source.indexOf('async function refreshJobs('),source.indexOf('async function refreshResults(')),c);
+ koreanContext(c);vm.runInContext(source.slice(source.indexOf('async function refreshJobs('),source.indexOf('async function refreshResults(')),c);
  return {c,calls:()=>calls,finish:()=>finish()};
 }
 test('hidden tabs issue no job-list or detail request',async()=>{
@@ -19,7 +20,7 @@ test('visible tabs resume polling and retain the no-overlap guard',async()=>{
  const pending=f.c.refreshJobs();await f.c.refreshJobs();assert.equal(f.calls(),1);
  f.finish();await pending;assert.equal(f.c.state.pollingJobs,false);
 });
-const c={phaseLabel:p=>({complete:'완료',final:'결과·보고서 저장'})[p]||p};vm.createContext(c);
+const c={phaseLabel:p=>({complete:'완료',final:'결과·보고서 저장'})[p]||p};koreanContext(c);
 vm.runInContext(source.slice(source.indexOf('function jobPhaseCaption('),source.indexOf('function el(')),c);
 vm.runInContext(source.slice(source.indexOf('function etaText('),source.indexOf('async function prepareInput(')),c);
 for(const [state,caption] of [['running','결과·보고서 저장 중'],['cancelling','종료 정리 중'],['complete','완료']])test(state+' cannot confuse stage completion with job completion',()=>assert.equal(c.jobPhaseCaption({state,phase:'complete'}),caption));

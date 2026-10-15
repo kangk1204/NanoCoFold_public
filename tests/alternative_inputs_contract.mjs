@@ -1,3 +1,4 @@
+import {koreanContext} from './i18n_context.mjs';
 /** Execute the shipped input controls with local file fixtures; no server calls. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,7 +8,7 @@ const source=readFileSync(new URL('../nanocofold/templates/platform.js',import.m
 function fixture(){
  const nodes=new Map(),events=[];
  const c={$:id=>{if(!nodes.has(id))nodes.set(id,{value:'',files:[],hidden:false,disabled:false,checked:false,listeners:{},addEventListener(kind,fn){this.listeners[kind]=fn;},focus(){this.focused=true;},dispatchEvent(event){events.push(event);c.state.inputRevision++;c.$('novice-consent').checked=false;this.listeners[event.type]?.(event);}});return nodes.get(id);},state:{inputRevision:0},clearInputStructure(){c.state.inputRevision++;},notice(){},Event:class{constructor(type,options){this.type=type;this.bubbles=options.bubbles;}}};
- vm.createContext(c);vm.runInContext(source.slice(source.indexOf('let structureInputSource ='),source.indexOf('function invalidateInput()')),c);c.initAlternativeInputs();return {c,events};
+ koreanContext(c);vm.runInContext(source.slice(source.indexOf('let structureInputSource ='),source.indexOf('function invalidateInput()')),c);c.initAlternativeInputs();return {c,events};
 }
 test('a structure file disables PDB input and switching retains both raw drafts',()=>{
  const {c}=fixture(),file={name:'input.pdb'};c.$('structure-file').files=[file];c.$('pdb-id').value='2FLU';c.$('novice-consent').checked=true;

@@ -1,17 +1,19 @@
 # NanoCoFold
 
-단백질 복합체를 예측하고, 새 나노바디를 설계하거나 보유 후보와 변이를 비교하는 프로그램입니다. 결과는 후보 표, 3D 구조, PAE와 전달용 HTML 보고서로 확인합니다.
+**English** · [한국어](README.ko.md)
 
-## 1. 준비와 설치
+Predict protein complexes, design new nanobodies, and compare existing candidates or variants. Explore candidate tables, 3D structures, PAE, and shareable HTML reports.
 
-계산할 컴퓨터는 **Ubuntu x86_64**, glibc 2.34 이상, NVIDIA GPU와 드라이버 580 이상이 필요합니다. `nvidia-smi`가 정상적으로 GPU를 표시해야 합니다. 작은 예제의 준비 기준은 GPU 메모리 16 GB 이상, RAM 32 GB 이상, 빈 SSD 150 GiB 이상입니다. 긴 단백질이나 많은 후보는 더 많은 자원이 필요합니다. 인터넷과 `sudo` 권한도 준비하세요.
+## 1. Prepare and install
 
-Python 패키지, CUDA Toolkit, Conda, Docker를 따로 설치할 필요는 없습니다. 설치기가 분리된 Python 환경과 엔진·모델을 준비합니다. NVIDIA 드라이버는 바꾸지 않습니다.
+The compute host needs **Ubuntu x86_64**, glibc 2.34 or later, an NVIDIA GPU, and driver 580 or later. `nvidia-smi` must show the GPU correctly. For small examples, prepare at least 16 GB GPU memory, 32 GB RAM, and 150 GiB of free SSD space. Longer proteins and larger libraries may need more resources. Internet access and `sudo` are also required.
 
-1. ZIP을 받았다면 **전체를 압축 해제**합니다. Git으로 clone했다면 이미 내려받은 저장소 폴더를 사용합니다.
-2. GitHub clone은 **`NanoCoFold_public` 폴더**, **Download ZIP**은 압축을 푼 **`NanoCoFold_public-main` 폴더**를 엽니다. 태그나 별도 소스 ZIP은 폴더 이름이 다를 수 있습니다.
-3. 이 폴더 안에서 터미널을 엽니다. `README.md`, `install.sh`, `start.sh`가 보이면 맞습니다.
-4. 첫 복합체 예제의 네 엔진을 준비하려면 아래 **세 명령을 순서대로, 같은 폴더에서** 실행합니다. 한 명령이 **`[설치 완료]`**로 끝난 뒤 다음 명령을 실행하세요.
+You do not need to install Python packages, the CUDA Toolkit, Conda, or Docker separately. The installer prepares isolated Python environments, engines, and models. It does not change the NVIDIA driver.
+
+1. If you received a ZIP, **extract the entire archive**. If you cloned the repository, use the existing checkout.
+2. Open **`NanoCoFold_public`** after a Git clone, or **`NanoCoFold_public-main`** after GitHub **Download ZIP**. Tagged or separately packaged source archives may have a different folder name.
+3. Open a terminal inside that folder. You should see `README.md`, `install.sh`, and `start.sh`.
+4. To prepare all four engines for the first complex example, run these **three commands in order, in the same folder**. Wait for each command to finish with **`[설치 완료]`** (installation complete) before starting the next.
 
 ```bash
 bash install.sh --profile complex
@@ -19,7 +21,7 @@ bash install.sh --profile colabfold
 bash install.sh --profile opendde
 ```
 
-`complex`는 Boltz-2·Chai-1, 나머지 두 명령은 ColabFold·OpenDDE를 준비합니다. GPU가 한 개이면 자동으로 선택합니다. 여러 개라면 `nvidia-smi -L`에서 사용할 GPU UUID 전체를 확인해 **세 명령 모두 같은 UUID**를 넣습니다.
+`complex` prepares Boltz-2 and Chai-1; the other commands prepare ColabFold and OpenDDE. A single GPU is selected automatically. If the host has multiple GPUs, find the full UUID with `nvidia-smi -L` and use **the same UUID in all three commands**.
 
 ```bash
 bash install.sh --profile complex --gpu GPU-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
@@ -27,88 +29,84 @@ bash install.sh --profile colabfold --gpu GPU-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx
 bash install.sh --profile opendde --gpu GPU-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 ```
 
-처음에는 여러 엔진과 큰 모델 파일을 내려받으므로 오래 걸릴 수 있습니다. 터미널의 단계·다운로드 로그를 확인하고 **`[설치 완료]`**가 나올 때까지 기다리세요. 설치만으로 분석이나 입력 서열 전송이 시작되지는 않습니다. 중단된 다운로드는 같은 명령으로 다시 설치합니다. 기존 파일·부분 다운로드·실패 기록을 보존하고 파일 해시와 환경 점검을 통과해야 완료로 표시합니다.
+The first installation downloads several engines and large model files and may take time. Follow the stage and download logs until **`[설치 완료]`** appears. Installation alone does not start analysis or transmit input sequences. Resume an interrupted download by running the same command again. Existing files, partial downloads, and failure records are preserved; completion requires file hashes and environment checks to pass.
 
-처음 설치 도구 uv를 준비하는 단계에는 대기 기한이 있습니다. 시간 초과나 Ctrl-C로 중단되면 표시된 재시도 안내에 따라 같은 폴더에서 같은 명령을 실행하세요. 이 기한은 전체 엔진·모델 설치 시간의 상한이 아닙니다.
+The initial uv bootstrap has a waiting deadline. If it times out or you interrupt it with Ctrl-C, follow the retry instructions and rerun the same command in the same folder. This deadline is not a limit on the entire engine and model installation.
 
-새 나노바디 설계·보유 후보·변이 평가까지 모든 기능의 환경을 준비하려면 아래 선택 설치를 실행합니다. 옵션 없는 `bash install.sh`도 같은 `all` 설치입니다. 첫 복합체 예제에는 필요하지 않습니다.
+To prepare environments for new nanobody design, existing candidate comparison, and variant evaluation, optionally run the following. `bash install.sh` without options also uses `all`. This is not required for the first complex example.
 
 ```bash
 bash install.sh --profile all
 ```
 
-여러 GPU가 있는 컴퓨터에서는 이 선택 설치에도 위와 같은 `--gpu` UUID를 추가합니다. 설치·소프트웨어 검사·실제 예측의 확인 범위는 [검증 기록](docs/VALIDATION.md)에서 구분해 확인할 수 있습니다.
+On a multi-GPU host, add the same `--gpu` UUID to this optional installation. The [validation record](docs/VALIDATION.md) distinguishes installation, software checks, and actual prediction evidence.
 
-오류가 나면 다음 단계로 넘어가지 마세요. `Driver/library version mismatch`는 NVIDIA 드라이버와 라이브러리가 맞지 않는 상태입니다. 관리자와 재부팅 필요 여부를 확인하고 `nvidia-smi`가 정상 작동한 뒤 다시 설치합니다. Python 재설치로 해결되는 오류가 아닙니다. [설치 문제 해결](docs/installation.md)
+If an error occurs, stop before continuing. `Driver/library version mismatch` means the NVIDIA driver and libraries do not match. Ask the administrator whether a reboot is needed, and retry only after `nvidia-smi` works. Reinstalling Python does not fix this error. See [installation troubleshooting](docs/installation.md).
 
-## 2. 브라우저 열기
+## 2. Open the browser
 
-설치를 완료한 **같은 폴더**에서 실행합니다.
+Run this in the **same folder** after installation:
 
 ```bash
 bash start.sh
 ```
 
-브라우저에서 [http://127.0.0.1:8765](http://127.0.0.1:8765)를 엽니다. 이 터미널은 웹 서버이므로 명령 입력줄이 돌아오지 않는 것이 정상입니다. 사용하는 동안 열어 두세요.
-**화면을 준비하고 있습니다.**가 보이면 목적 버튼이 나타날 때까지 기다립니다.
-준비에 실패하면 표시된 오류를 읽고 **화면 다시 불러오기**를 누릅니다.
+Open [http://127.0.0.1:8765](http://127.0.0.1:8765). This terminal runs the web server, so it is normal not to see a new command prompt. Keep it open while using the platform.
 
-원격 Ubuntu 서버를 쓰면 서버에서는 `bash start.sh --no-browser`를 실행합니다. 자신의 PC의 **다른 터미널**에서는 다음 명령을 실행하고 두 터미널을 유지합니다. `USER@SERVER`는 자신의 서버 계정과 주소로 바꾸세요.
+If **Preparing the interface.** appears, wait for the purpose buttons. If preparation fails, read the error and click **Reload interface**. The interface starts in English. Use **Language → 한국어** in the header to switch; the browser remembers your choice. Switching languages preserves inputs and analysis state. Original identifiers, sequences, numerical results, logs, and configuration records are kept as recorded.
+
+For a remote Ubuntu server, run `bash start.sh --no-browser` on the server. In a **separate terminal on your own PC**, run the command below and keep both terminals open. Replace `USER@SERVER` with your server account and address.
 
 ```bash
 ssh -L 8765:127.0.0.1:8765 USER@SERVER
 ```
 
-그다음 자신의 PC 브라우저에서 위 주소를 엽니다. 입력과 결과 확인은 PC 브라우저에서 하고, 계산은 설치한 Ubuntu 서버의 GPU에서 진행됩니다.
+Then open the address above in your PC browser. Inputs and results are viewed on the PC; computation uses the GPU of the Ubuntu server where you installed NanoCoFold.
 
-## 3. 첫 공개 예제 따라 하기
+## 3. Try the first public example
 
-처음에는 **단백질 복합체 예측**을 사용하세요. 서열이나 설정 파일을 직접 만들 필요가 없습니다.
+Start with **Predict protein complexes**. You do not need to create sequences or a settings file.
 
-1. 첫 화면에서 **단백질 복합체 예측 · 입력하기**를 누릅니다.
-2. **이 목적의 공개 예제 불러오기**를 누릅니다. barnase–barstar 두 서열과 작은 예제 조건이 채워집니다.
-3. **입력 준비**에서 두 단백질의 이름·전체 서열·체인 순서·사본 수를 확인합니다. **입력 확인 후 다음**을 누릅니다.
-4. **실행 조건**에서 선택한 엔진, 최대 계획 모델 수와 MSA 방식을 확인합니다. 공용 MSA를 선택했다면 현재 서열을 `api.colabfold.com`에 보내는 동의를 직접 체크합니다. **조건 확인 후 다음**을 누릅니다.
-5. **검토·실행**에서 **입력 검토·환경 점검**을 누릅니다. 검토 후 나타난 입력·조건 요약과 환경 점검 결과를 확인합니다. 환경 점검을 통과하면 **분석 실행** 버튼이 켜집니다. 여기까지는 계산을 제출하지 않은 상태입니다.
-6. **분석 실행**을 한 번 누릅니다. **작업·로그**에서 진행 상황을 확인합니다. 완료되면 **결과 열기**를 누릅니다.
+1. Click **Predict protein complexes · Enter input** on the first screen.
+2. Click **Load public example for this purpose**. The barnase–barstar sequences and small-run settings are filled in.
+3. In **Prepare input**, check both protein names, full sequences, chain order, and copy counts. Click **Review input & continue**.
+4. In **Run settings**, check selected engines, the maximum planned model count, and the MSA method. If using the public MSA server, explicitly check consent to send the current sequences to `api.colabfold.com`. Click **Review settings & continue**.
+5. In **Review & run**, click **Review input & check environment**. Read the input / settings summary and environment check results. **Run analysis** is enabled after the required checks pass. Computation has not been submitted yet.
+6. Click **Run analysis** once. Follow progress in **Jobs & logs**. When finished, click **Open results**.
 
-입력이나 조건을 바꾸면 검토·환경 점검·전송 동의를 다시 확인합니다. 전문 설정은 해당 단계의 **고급 설정**을 펼쳐서 바꿀 수 있습니다. 첫 예제는 기본 조건으로 진행하세요. 요청 응답이 늦거나 연결이 끊겼다면 먼저 작업 목록에서 제출된 작업을 확인합니다. 같은 분석을 다시 누르지 마세요.
+After changing inputs or settings, confirm review, environment checks, and transmission consent again. Advanced settings are available in the relevant step; use defaults for the first example. If a request is slow or the connection drops, check the jobs list for an existing submission before clicking again.
 
-[단계별 버튼과 결과 읽기](docs/browser_quickstart.md) · [예제 서열 출처와 기존 JSON](examples/tutorial/README.md) · [분석 과정과 선별 논리](docs/ANALYSIS_WORKFLOW.md)
+[Step-by-step buttons and result interpretation](docs/browser_quickstart.md) · [Example sequence sources and JSON](examples/tutorial/README.md) · [Analysis workflow and selection logic](docs/ANALYSIS_WORKFLOW.md)
 
-## 4. 자신의 입력 사용하기
+## 4. Use your own input
 
-| 화면의 목적 | 필요한 입력 | 확인할 결과 |
+| Purpose | Required input | Results to inspect |
 |---|---|---|
-| 단백질 복합체 예측 (`complex`) | 함께 예측할 단백질들의 전체 서열 | 체인 쌍 점수·복합체 구조·PAE |
-| 새 나노바디 설계 (`design`) | 표적의 전체 서열 또는 구조 | 새 VHH 서열·엔진별 구조·후보 표 |
-| 보유 나노바디 비교 (`screen`) | 표적 + 후보별 전체 VHH 서열 | 후보별·엔진별 예측과 점수 |
-| 기존 나노바디 변이 평가 (`mature`) | 표적 + 원본 전체 VHH 서열 | WT·CDR 변이·같은 엔진 WT 대비 비교 |
+| Predict protein complexes (`complex`) | Full sequences of the proteins to predict together | Chain-pair metrics, complex structure, PAE |
+| Design new nanobodies (`design`) | Full target sequence or structure | New VHH sequences, engine-specific structures, candidate table |
+| Compare existing nanobodies (`screen`) | Target + full VHH sequence for each candidate | Predictions and scores per candidate and engine |
+| Evaluate nanobody variants (`mature`) | Target + full original VHH sequence | WT, CDR substitutions, comparisons with WT from the same engine |
 
-아미노산 서열을 넣습니다. FASTA는 `>이름` 줄 다음에 아미노산 서열을 적는 텍스트 형식입니다. VHH는 나노바디 전체 가변영역이며 CDR3 조각만으로 대체할 수 없습니다. DNA/RNA·FASTQ는 받지 않습니다. 각 이름을 구분되게 정하고 `=`, `+`, `-`, `@`로 시작하지 않게 하세요. 준비한 치환·삽입 변이는 `screen`에 **전체 VHH 서열**로 넣어 비교할 수 있습니다.
+Use amino-acid sequences. FASTA is a text format with a `>name` line followed by the sequence. A VHH is the full nanobody variable domain; a CDR3 fragment alone is insufficient. DNA/RNA and FASTQ are unsupported. Give entries distinct names that do not start with `=`, `+`, `-`, or `@`. Prepared substitution or insertion variants can be compared in `screen` as **full VHH sequences**.
 
-입력은 한 가지 방식으로 준비합니다. 구조 파일을 고르면 PDB ID를 추가할 필요가 없고,
-PDB ID를 넣으면 구조 파일을 추가할 필요가 없습니다. **입력 방식 바꾸기**로 전환합니다.
-VHH·WT는 FASTA를 직접 붙여 넣거나 파일을 한 번 불러옵니다. 채워진 FASTA가 실제 입력이며 파일을 중복해서 넣지 않습니다.
-바꾸려면 **다른 파일 불러오기**, 되돌리려면 **이전 FASTA 복원**을 누릅니다.
-초안을 복원한 경우 구조 파일은 다시 선택하고 전송 동의·검토·환경 점검을 새로 확인합니다.
+Prepare an input using one method. Selecting a structure file disables the PDB ID alternative; entering a PDB ID disables the file alternative. Use **Change input method** to switch. Paste VHH / WT FASTA or import a file once. The populated FASTA is the actual input; no duplicate file is required. Use **Load another file** to replace it or **Restore previous FASTA** to undo the import. After restoring a draft, reselect structure files and reconfirm transmission consent, input review, and environment checks.
 
-구조 파일은 체인·잔기 대응·누락 잔기와 구조 준비 방식을 확인합니다. 공용 MSA는 서열을 외부로 전송하는 단계입니다. 비공개 연구 입력에는 기관의 전송 정책을 확인하고 적합한 MSA 방식을 선택하세요. 공개 예제의 전송 동의를 자신의 서열에 그대로 적용하지 않습니다.
+For structure files, review chains, residue mappings, missing residues, and the preparation method. Public MSA transmits sequences externally. For private research inputs, check your institution's policy and choose a suitable MSA method. Consent for a public example does not carry over to your own sequences.
 
-## 5. 결과 읽기와 전달
+## 5. Read and share results
 
-먼저 **실행 상태와 성공·실패·미평가 수**를 봅니다. 후보 표의 행을 누르면 해당 모델의 구조와 PAE가 열립니다.
+First inspect **run status and counts of successful, failed, and unevaluated models**. Click a candidate row to open its structure and PAE.
 
-- **전체 구조 보기/맞춤**: 복합체 전체를 봅니다. **표적 선택/나노바디 선택** 또는 **기준 체인 선택/파트너 선택**: 해당 체인을 강조하고 확대합니다. **선택 해제**: 강조를 지웁니다.
-- PAE 히트맵의 셀을 누르면 두 잔기를 선택·확대하고 구조 뷰어로 이동합니다. PAE는 예측된 잔기 상대 위치의 불확실성이며 결합력 측정값이 아닙니다.
-- CSV/XLSX 표, FASTA, 좌표와 **보고서 ZIP**을 저장합니다. **선택 예측 구조 저장**은 표시 좌표를 저장합니다. **원본 엔진 좌표 다운로드**는 기록된 해시와 일치하는 원본이 보존됐을 때 사용할 수 있습니다. 출처 안내에서 원본과 표시 좌표의 관계를 확인하세요.
+- **Fit entire structure** shows the whole complex. **Select target / Select nanobody**, or **Select reference chain / Select partner**, highlights and focuses the relevant chain. **Clear selection** removes highlighting.
+- Clicking a PAE cell selects and focuses two residues and moves to the structure viewer. PAE describes uncertainty in predicted relative residue placement; it is not a binding measurement.
+- Save CSV / XLSX tables, FASTA, coordinates, and the **report ZIP**. **Save selected display coordinates** saves the coordinates shown in the viewer. **Download original engine coordinates** is available when the original file is preserved and matches its recorded hash. Check the provenance notice for the relationship between original and display coordinates.
 
-**전체 원본 ZIP · 로컬 보관용**은 서버 경로와 실행 로그를 포함하므로 개인 복구·보관에 사용합니다. 공동연구자에게는 **전달용 보고서 ZIP** 전체를 전달하세요. 받는 사람은 ZIP 전체를 풀고 **`report.html`**을 엽니다. macOS·Windows·일반 PC에서도 GPU나 프로그램 설치 없이 저장된 결과를 읽을 수 있습니다.
+The **Full original ZIP · For local archiving** includes server paths and execution logs and is for personal recovery / archiving. Send collaborators the entire **Shareable report ZIP**. Recipients extract the whole ZIP and open **`report.html`**. Saved results can be read on macOS, Windows, or other PCs without a GPU or program installation. Newly generated interactive reports also include the English / Korean selector.
 
-PyMOL 자료가 함께 제공되면 **폴더 전체**를 풀고 PyMOL의 **File → Open**에서 `.pml`을 엽니다. 스크립트와 참조 좌표의 상대 폴더 구조를 유지하세요. 일반 보고서 ZIP과 PyMOL 전용 자료는 별개입니다. [PyMOL에서 보기](docs/RESULTS.md#pymol에서-보기)
+If PyMOL materials are provided, extract the **whole folder** and open `.pml` through PyMOL **File → Open**. Keep the relative folder layout of scripts and referenced coordinates. PyMOL materials are separate from the general report ZIP. See [viewing in PyMOL](docs/RESULTS.md#pymol에서-보기).
 
-예측 완료, 선별 통과, 실제 결합 확인은 별개입니다. 미평가는 0점이 아니며, WT는 대조군입니다. 서로 다른 엔진의 점수를 합산해 하나의 순위를 만들지 않습니다. ipTM·계면 pLDDT·계면 PAE와 구조를 함께 확인하고 실제 결합·KD·발현은 실험으로 확인하세요. [지표와 결과 읽기](docs/RESULTS.md)
+Prediction completion, selection eligibility, and experimentally confirmed binding are distinct. Unevaluated is not zero; WT is a control. Scores from different engines are not summed into one ranking. Review ipTM, interface pLDDT, interface PAE, and structures together. Binding, KD, and expression require experimental validation. See [metrics and result interpretation](docs/RESULTS.md).
 
-[변경 기록](CHANGELOG.md) · [검증 기록](docs/VALIDATION.md) · [외부 엔진·모델 이용 조건](LICENSE_MANIFEST.md)
+[Changelog](CHANGELOG.md) · [Validation record](docs/VALIDATION.md) · [External engine and model terms](LICENSE_MANIFEST.md)
 
-프로젝트 자체에는 별도 공개 라이선스를 부여하지 않습니다. 외부 라이브러리·엔진·모델에는 각자의 이용 조건이 적용됩니다.
+No separate public license is granted for the project itself. External libraries, engines, and models are subject to their respective terms. Linked technical documents and original execution logs may be in Korean. See [language support](docs/LANGUAGE_SUPPORT.md).

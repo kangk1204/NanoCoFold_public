@@ -1,3 +1,4 @@
+import {koreanContext} from './i18n_context.mjs';
 /** Startup visibility must follow completed initialization; offline viewer bypasses input UI. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +9,7 @@ const html=readFileSync(new URL('../nanocofold/templates/platform.html',import.m
 function fixture({offline=false,boot}={}){
  const nodes=new Map(),buttons=[{disabled:false},{disabled:false}],notices=[];let reloads=0;
  const c={offline,boot,notice:(...args)=>notices.push(args),window:{location:{reload(){reloads++;}}},document:{body:{dataset:{}},querySelectorAll:()=>buttons},$:id=>{if(!nodes.has(id))nodes.set(id,{hidden:false,textContent:''});return nodes.get(id);}};
- vm.createContext(c);vm.runInContext(source.slice(source.indexOf('function platformStartup('),source.indexOf('\nasync function boot()')),c);
+ koreanContext(c);vm.runInContext(source.slice(source.indexOf('function platformStartup('),source.indexOf('\nasync function boot()')),c);
  return {c,buttons,notices,get reloads(){return reloads;}};
 }
 test('server HTML hides the raw input form before any deferred script executes',()=>{

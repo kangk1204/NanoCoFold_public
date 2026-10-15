@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-renderer-version="nanocofold-results-v3">
+<html lang="en" data-renderer-version="nanocofold-results-v3">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -20,6 +20,7 @@
     <script>
       window.PLATFORM_TOKEN = "__TOKEN__";
     </script>
+    <script src="/assets/platform-i18n.js" defer></script>
     <script src="/assets/platform.js" defer></script>
   </head>
   <body data-startup="loading">
@@ -27,6 +28,7 @@
       <div>
         <strong>NanoCoFold</strong><span>단백질 복합체·나노바디 분석 · 개인 작업 공간</span>
       </div>
+      <div class="language-switch"><label for="language-select">Language</label> <select id="language-select" aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div>
       <nav aria-label="주 메뉴">
         <button data-view="input" aria-current="page">입력·실행</button
         ><button data-view="batch">배치 분석</button

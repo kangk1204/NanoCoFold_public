@@ -1,10 +1,11 @@
+import {koreanContext} from './i18n_context.mjs';
 /** Recorded MSA source and MSA mode are distinct; no source is inferred from precomputed mode. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const source=readFileSync(new URL('../nanocofold/templates/platform.js',import.meta.url),'utf8'),c={};
-vm.createContext(c);vm.runInContext(source.slice(source.indexOf('function resultMsaCaption('),source.indexOf('async function loadResult(id)')),c);
+koreanContext(c);vm.runInContext(source.slice(source.indexOf('function resultMsaCaption('),source.indexOf('async function loadResult(id)')),c);
 const cases=[
  ['complex public API source survives precomputed mode',{mode:'complex',conditions:{msa:'precomputed',msa_source:'public_api',allow_public_msa_server:true},config:{complex:{msa:'precomputed',msa_source:'public_api'}}},'API에서 확보한 MSA'],
  ['complex recorded conditions source has priority over config',{mode:'complex',conditions:{msa:'precomputed',msa_source:'cache'},config:{complex:{msa_source:'public_api'}}},'로컬·캐시 MSA 실행'],

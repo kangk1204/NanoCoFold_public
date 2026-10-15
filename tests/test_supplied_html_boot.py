@@ -94,7 +94,7 @@ def test_supplied_app_four_purposes_steps_and_menus(supplied_server,mode,title):
     workspace,url = supplied_server
     with sync_playwright() as pw:
         browser=pw.chromium.launch(args=["--enable-unsafe-swiftshader"])
-        page=browser.new_page();errors=[]
+        page=browser.new_page(); page.add_init_script("localStorage.setItem(\'nanocofold.language\', \'ko\')");errors=[]
         page.on("pageerror",lambda e:errors.append(str(e)))
         page.goto(url);expect(page.locator("body")).to_have_attribute("data-startup","ready")
         expect(page.locator(".novice-purpose-choice")).to_have_count(4)
@@ -127,7 +127,7 @@ def test_public_tutorial_pending_response_blocks_empty_input_then_advances(suppl
     workspace, url = supplied_server
     with sync_playwright() as pw:
         browser = pw.chromium.launch(args=["--enable-unsafe-swiftshader"])
-        page = browser.new_page(); held = []; errors = []; compute_requests = []
+        page = browser.new_page(); page.add_init_script("localStorage.setItem(\'nanocofold.language\', \'ko\')"); held = []; errors = []; compute_requests = []
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.on("request", lambda request: compute_requests.append(request.url)
                 if request.method == "POST" and "/api/jobs" in request.url else None)
@@ -173,7 +173,7 @@ def test_supplied_offline_structure_pae_columns_and_focus(tmp_path):
     report=tmp_path/"report.html";report.write_bytes(ResultReader(run).export("html")[0])
     with sync_playwright() as pw:
         browser=pw.chromium.launch(args=["--enable-unsafe-swiftshader"])
-        page=browser.new_page(reduced_motion="reduce");errors=[];external=[]
+        page=browser.new_page(reduced_motion="reduce"); page.add_init_script("localStorage.setItem(\'nanocofold.language\', \'ko\')");errors=[];external=[]
         page.on("pageerror",lambda e:errors.append(str(e)))
         page.route("http**/*",lambda route:(external.append(route.request.url),route.abort()))
         page.goto(report.as_uri())
@@ -198,7 +198,7 @@ def test_cpu_demo_review_needs_no_public_msa_consent(supplied_server):
     _, url = supplied_server
     with sync_playwright() as pw:
         browser = pw.chromium.launch(args=["--enable-unsafe-swiftshader"])
-        page = browser.new_page(); errors=[]
+        page = browser.new_page(); page.add_init_script("localStorage.setItem(\'nanocofold.language\', \'ko\')"); errors=[]
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.goto(url); expect(page.locator("body")).to_have_attribute("data-startup","ready")
         page.get_by_role("button",name="보유 나노바디 비교 · 입력하기",exact=True).click()

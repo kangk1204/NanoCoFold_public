@@ -78,7 +78,7 @@ def test_complete_report_mode_controls_and_rotated_zoomed_camera_survive_resize(
     output = report.generate_report(run, cfg, {}, viewer_max=1)
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(args=["--enable-unsafe-swiftshader"])
-        page = browser.new_page(viewport={"width": 1400, "height": 950})
+        page = browser.new_page(viewport={"width": 1400, "height": 950}); page.add_init_script("localStorage.setItem('nanocofold.language', 'ko')")
         errors, external = [], []
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.on("request", lambda request: external.append(request.url) if request.url.startswith("http") else None)

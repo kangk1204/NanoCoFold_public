@@ -1,3 +1,4 @@
+import {koreanContext} from './i18n_context.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -6,7 +7,7 @@ import vm from 'node:vm';
 const source=readFileSync(new URL('../nanocofold/templates/platform.js',import.meta.url),'utf8');
 function noviceSettingsFixture() {
   const fields={'analysis-preset':{value:'legacy'},seed:{value:'42'},'screen-engine':{value:'boltz2'},'novice-consent':{checked:false}};
-  const context={$:id=>fields[id]};vm.createContext(context);
+  const context={$:id=>fields[id]};koreanContext(context);
   vm.runInContext(source.slice(source.indexOf('function noviceComplexSettings('),source.indexOf('function fields()')),context);
   return {context,fields};
 }
@@ -49,7 +50,7 @@ function tutorialFixture() {
     return {mode,title:mode,description:'public input',requires_api_consent:mode!=='complex',
       payload:JSON.parse(readFileSync(new URL('../examples/tutorial/'+mode+'_batch.json',import.meta.url),'utf8'))};
   };
-  vm.createContext(context);
+  koreanContext(context);
   vm.runInContext(source.slice(source.indexOf('let activeBatch ='),source.indexOf('\nasync function boot()')),context);
   return {context,elements,fields,calls};
 }
@@ -120,7 +121,7 @@ function viewerFixture() {
   };
   const context={window:{},molstar:{},ResizeObserver:class{constructor(cb){resize=cb;}observe(){}},
     requestAnimationFrame:()=>{throw Error('A layout resize must not schedule automatic refocus');},cancelAnimationFrame(){}};
-  vm.createContext(context);vm.runInContext(adapter,context);
+  koreanContext(context);vm.runInContext(adapter,context);
   const plugin={managers:{camera,interactivity:{lociSelects:{deselectAll(){},select(){}},lociHighlights:{clearHighlights(){}}},structure:{focus:{clear(){}}}},
     canvas3d:{camera:{viewport:{width:200,height:100},getSnapshot:pose}}};
   const viewer=new context.window.NanoCoFoldResultViewer({plugin,handleResize(){calls.push({resize:true});}},{chains:[]});

@@ -18,7 +18,7 @@ function refreshMetricCaptions(records, mode) {
       const value = option.value;
       if (metricCaptions[value]) {
         option.value = value;
-        option.textContent = metricCaption(value, records, mode);
+        I18N.text(option, I18N.term(metricCaption(value, records, mode)));
       }
     }
 }
@@ -183,7 +183,7 @@ function reportReasonCounts(rows, mode) {
 /* REPORT_SEMANTICS_END */
 function renderReportReasons(rows, mode) {
   const reasons = reportReasonCounts(rows, mode);
-  if (!reasons.length) $("exclusion-summary").replaceChildren(el("p", "기록된 제외·미평가 사유가 없습니다. 사유 미기록만으로 판정 통과를 추정하지 않습니다."));
+  if (!reasons.length) $("exclusion-summary").replaceChildren(el("p", I18N.term("기록된 제외·미평가 사유가 없습니다. 사유 미기록만으로 판정 통과를 추정하지 않습니다.")));
   else table($("exclusion-summary"), reasons.map(r => ({이유:r.label, 기록수:r.count, 기록코드:r.code})), ["이유", "기록수", "기록코드"]);
 }
 const phaseLabel = (phase) => ({
@@ -201,13 +201,13 @@ function jobPhaseCaption(job) {
 }
 function el(tag, text, cls) {
   const node = document.createElement(tag);
-  if (text !== undefined) node.textContent = text;
+  if (text !== undefined) I18N.text(node, text);
   if (cls) node.className = cls;
   return node;
 }
 function notice(message, error = false) {
   $("notice").hidden = false;
-  $("notice").textContent = message;
+  I18N.text($("notice"), I18N.term(message));
   $("notice").className = error ? "error" : "";
 }
 async function api(path, body) {
@@ -249,7 +249,7 @@ function action(id, fn) {
 function options(node, items, value) {
   node.replaceChildren(
     ...items.map((item) => {
-      const option = el("option", typeof item === "string" ? item : item.label);
+      const option = el("option", typeof item === "string" ? I18N.term(item) : (item.value === "" || item.value === "all" || node.id === "export-format") ? I18N.term(item.label) : item.label);
       option.value = typeof item === "string" ? item : item.value;
       return option;
     }),
@@ -258,21 +258,21 @@ function options(node, items, value) {
 }
 function warnings(node, messages) {
   node.replaceChildren(
-    ...[...new Set(messages || [])].map((text) => el("div", text, "warning")),
+    ...[...new Set(messages || [])].map((text) => el("div", I18N.term(text), "warning")),
   );
 }
 function table(node, rows, columns) {
-  if (node.classList.contains("scroll")) {node.tabIndex=0;node.setAttribute("role","region");if(!node.hasAttribute("aria-label"))node.setAttribute("aria-label","상세 표 스크롤");}
+  if (node.classList.contains("scroll")) {node.tabIndex=0;node.setAttribute("role","region");if(!node.hasAttribute("aria-label"))I18N.attribute(node, "aria-label", I18N.term("상세 표 스크롤"));}
   const target = el("table"),
     head = el("thead"),
     body = el("tbody"),
     tr = el("tr");
-  target.append(el("caption", node.getAttribute("aria-label") || columns.join(" · ")));
-  columns.forEach((key) => {const th=el("th",metricCaption(key, rows));th.scope="col";tr.append(th);});
+  target.append(el("caption", (I18N.attributeValue(node, "aria-label") || I18N.term(columns.join(" · ")))));
+  columns.forEach((key) => {const th=el("th",I18N.term(metricCaption(key, rows)));th.scope="col";tr.append(th);});
   head.append(tr);
   rows.forEach((row) => {
     const r = el("tr");
-    columns.forEach((key) => r.append(el("td", fmt(row[key]))));
+    columns.forEach((key) => r.append(el("td", row[key] == null ? I18N.term("미평가") : ["이유", "조치", "구분"].includes(key) ? I18N.term(fmt(row[key])) : fmt(row[key]))));
     body.append(r);
   });
   target.append(head, body);
@@ -297,7 +297,7 @@ async function refreshCatalog() {
   if (offline) return;
   const request = ++state.catalogRequest;
   const status = $("catalog-status");
-  status.textContent = "결과 DB를 조회하고 있습니다…";
+  I18N.text(status, I18N.term("결과 DB를 조회하고 있습니다…"));
   const params = new URLSearchParams({limit: "25", search: $("catalog-search").value,
     retention: $("catalog-retention").value, sort: state.catalogSort, descending: String(state.catalogDescending)});
   if (state.catalogCursor) params.set("cursor", state.catalogCursor);
@@ -324,14 +324,13 @@ async function refreshCatalog() {
         const link = el("a", (item.name || item.id) + (item.mock ? " · MOCK" : ""));
         link.href = "/?result=" + encodeURIComponent(item.id); link.target = "_blank"; link.rel = "noopener";
         td.append(link);
-      } else td.textContent = key === "elapsed_seconds" ? item[key] === null || item[key] === undefined ? "미기록" : Math.round(item[key]) + "초" : key === "storage_bytes" ? bytesLabel(item[key]) : key === "created" ? new Date(item[key] * 1000).toLocaleString() :
-        key === "retention" ? item[key] === "minimal" ? "핵심 보관" : "원본 보관" : key === "status" ? states[item[key]] || item[key] : fmt(item[key]);
+      } else I18N.text(td, key === "elapsed_seconds" ? item[key] === null || item[key] === undefined ? I18N.term("미기록") : I18N.concat([Math.round(item[key]), I18N.term("초")]) : key === "storage_bytes" ? I18N.term(bytesLabel(item[key])) : key === "created" ? new Date(item[key] * 1000).toLocaleString() : key === "retention" ? item[key] === "minimal" ? I18N.term("핵심 보관") : I18N.term("원본 보관") : key === "status" ? (states[item[key]] ? I18N.term(states[item[key]]) : item[key]) : fmt(item[key]));
       tr.append(td);
     }
     body.append(tr);
   }
   table.append(head, body); $("catalog-table").replaceChildren(table);
-  status.textContent = `${page.items.length}개 표시 · 용량은 색인 시점의 측정값`;
+  I18N.text(status, I18N.format("{0}개 표시 · 용량은 색인 시점의 측정값", [page.items.length]));
 }
 async function previewRetention() {
   if (!state.result || offline) return;
@@ -339,12 +338,12 @@ async function previewRetention() {
   state.retentionPlan = null;
   $("retention-consent").checked = false; $("retention-apply").disabled = true;
   $("retention-confirmation").hidden = true;
-  $("retention-plan").textContent = "최종 구조와 보존할 파일을 검증하고 용량을 계산하고 있습니다… 파일 수에 따라 시간이 걸립니다.";
+  I18N.text($("retention-plan"), I18N.term("최종 구조와 보존할 파일을 검증하고 용량을 계산하고 있습니다… 파일 수에 따라 시간이 걸립니다."));
   const plan = await api(`/api/results/${encodeURIComponent(resultId)}/retention`);
   if (state.result?.id !== resultId) return;
   state.retentionPlan = {resultId, plan};
-  const explanation = el("p", `현재 ${bytesLabel(plan.current_bytes)} → 보관 예상 ${bytesLabel(plan.kept_bytes)} · 순 절감 예상 ${bytesLabel(plan.estimated_net_reclaimed_bytes)} · 최종 구조 ${plan.preserved_model_count}개`);
-  const files = el("details"), summary = el("summary", `삭제 예정 파일 ${plan.deletable_files.length}개 · 전체 목록 확인`), listing = el("pre", plan.deletable_files.map(item => `${item.path} · ${bytesLabel(item.size)}`).join("\n"));
+  const explanation = el("p", I18N.format("현재 {0} → 보관 예상 {1} · 순 절감 예상 {2} · 최종 구조 {3}개", [I18N.term(bytesLabel(plan.current_bytes)), I18N.term(bytesLabel(plan.kept_bytes)), I18N.term(bytesLabel(plan.estimated_net_reclaimed_bytes)), plan.preserved_model_count]));
+  const files = el("details"), summary = el("summary", I18N.format("삭제 예정 파일 {0}개 · 전체 목록 확인", [plan.deletable_files.length])), listing = el("pre", plan.deletable_files.map(item => `${item.path} · ${bytesLabel(item.size)}`).join("\n"));
   files.append(summary, listing); $("retention-plan").replaceChildren(explanation, files);
   $("retention-confirmation").hidden = !plan.deletable_files.length;
 }
@@ -487,16 +486,12 @@ function syncAlternativeInputs() {
   $("structure-file").disabled = selected === "pdb";
   for (const id of ["pdb-id", "assembly-id"]) $(id).disabled = selected === "file";
   $("structure-input-choice").hidden = !selected;
-  $("structure-input-help").textContent = selected === "file"
-    ? "구조 파일을 사용합니다. PDB ID를 추가할 필요가 없습니다."
-    : "PDB ID를 사용합니다. 구조 파일을 추가할 필요가 없습니다.";
+  I18N.text($("structure-input-help"), selected === "file" ? I18N.term("구조 파일을 사용합니다. PDB ID를 추가할 필요가 없습니다.") : I18N.term("PDB ID를 사용합니다. 구조 파일을 추가할 필요가 없습니다."));
   for (const [file, text] of [["vhh-file", "vhh-fasta"], ["wt-file", "wt-fasta"]]) {
     const entered = !!$(text).value.trim(), collapsed = entered && !openFastaImports.has(file);
     $(file).hidden = collapsed; $(file).disabled = collapsed;
     $(file + "-choice").hidden = !entered && !alternativeInputDrafts.has(text);
-    $(file + "-help").textContent = entered
-      ? "아래 FASTA가 분석 입력입니다. 파일을 추가할 필요가 없습니다."
-      : "FASTA가 비어 있습니다. 직접 입력하거나 이전 FASTA를 복원하세요.";
+    I18N.text($(file + "-help"), entered ? I18N.term("아래 FASTA가 분석 입력입니다. 파일을 추가할 필요가 없습니다.") : I18N.term("FASTA가 비어 있습니다. 직접 입력하거나 이전 FASTA를 복원하세요."));
     $(file + "-change").hidden = !collapsed;
     $(file + "-restore").hidden = !alternativeInputDrafts.has(text);
   }
@@ -573,9 +568,7 @@ function predictionFields() {
 function renderInputAssessment() {
   const data = state.analyzed;
   const root = $("input-assessment");
-  root.replaceChildren(el("p", data.blockers?.length
-    ? "실험 좌표 경로에 확인할 문제가 있습니다. 전체 서열을 검토해 새 구조를 예측할 수 있습니다."
-    : "실험 좌표 경로를 사용할 수 있습니다. 관측 서열과 전체 서열의 차이를 확인하세요."));
+  root.replaceChildren(el("p", data.blockers?.length ? I18N.term("실험 좌표 경로에 확인할 문제가 있습니다. 전체 서열을 검토해 새 구조를 예측할 수 있습니다.") : I18N.term("실험 좌표 경로를 사용할 수 있습니다. 관측 서열과 전체 서열의 차이를 확인하세요.")));
   table(root.appendChild(el("div", undefined, "scroll")), data.retained_chains.map(c => ({
     체인: chainLabel(c), 관측: c.length, 전체: c.sequence_review?.full_length ?? "정보 없음",
     미관측: c.sequence_review?.missing_positions?.length ?? "대응 미확인",
@@ -596,15 +589,15 @@ function syncChainSelection() {
   }
   const partners = selectedPartners();
   $("chain-selection").replaceChildren(
-    el("span", `표적: ${target || "선택 필요"}`, "chain-target"),
+    el("span", I18N.format("표적: {0}", [(target ? target : I18N.term("선택 필요"))]), "chain-target"),
     document.createTextNode(" · "),
-    el("span", `파트너: ${partners.join(", ") || "없음"}`, "chain-partner"),
-    document.createTextNode(" · 회색 체인은 분석에서 제외"),
+    el("span", I18N.format("파트너: {0}", [(partners.join(", ") ? partners.join(", ") : I18N.term("없음"))]), "chain-partner"),
+    el("span", I18N.term(" · 회색 체인은 분석에서 제외")),
   );
   const viewer = state.inputViewer;
   viewer?.select(target, partners).catch((error) => {
     if (viewer !== state.inputViewer) return;
-    $("input-viewer-status").textContent = `구조 표시 오류: ${error.message}. 아래 목록에서 체인을 선택하세요.`;
+    I18N.text($("input-viewer-status"), I18N.format("구조 표시 오류: {0}. 아래 목록에서 체인을 선택하세요.", [error.message]));
   });
 }
 function pickInputChain(id, role) {
@@ -615,7 +608,7 @@ function pickInputChain(id, role) {
     target.value = id;
   } else {
     if (target.value === id) {
-      $("input-viewer-status").textContent = "표적 체인은 파트너로 중복 선택할 수 없습니다.";
+      I18N.text($("input-viewer-status"), I18N.term("표적 체인은 파트너로 중복 선택할 수 없습니다."));
       return;
     }
     const checkbox = [...$("partner-chains").querySelectorAll("input")].find((c) => c.value === id);
@@ -623,7 +616,7 @@ function pickInputChain(id, role) {
   }
   resetChainReview();
   syncChainSelection();
-  $("input-viewer-status").textContent = "선택한 체인으로 ‘체인·노출도 검토’를 진행하세요.";
+  I18N.text($("input-viewer-status"), I18N.term("선택한 체인으로 ‘체인·노출도 검토’를 진행하세요."));
 }
 function clearInputStructure() {
   state.inputStructureRequest++;
@@ -631,12 +624,12 @@ function clearInputStructure() {
   state.inputViewer = null;
   state.loaded = null;
   $("input-structure-view").replaceChildren();
-  $("input-chain-hover").textContent = "";
+  I18N.text($("input-chain-hover"), "");
   $("chain-review").hidden = true;
   resetChainReview();
 }
 async function showInputStructure(loaded, request) {
-  $("input-viewer-status").textContent = "MolStar 구조를 준비하고 있습니다…";
+  I18N.text($("input-viewer-status"), I18N.term("MolStar 구조를 준비하고 있습니다…"));
   try {
     const response = await fetch(`/api/inputs/${encodeURIComponent(loaded.input_id)}/structure`, {
       headers: { "X-Platform-Token": window.PLATFORM_TOKEN },
@@ -654,17 +647,15 @@ async function showInputStructure(loaded, request) {
       },
       (location) => {
         if (request !== state.inputStructureRequest) return;
-        $("input-chain-hover").textContent = location
-          ? `${chainLabel(location.chain)} · 원본 잔기 ${location.residue?.original_label || location.position} (서열 위치 ${location.position})`
-          : "";
+        I18N.text($("input-chain-hover"), location ? I18N.format("{0} · 원본 잔기 {1} (서열 위치 {2})", [chainLabel(location.chain), (location.residue?.original_label ? location.residue?.original_label : location.position), location.position]) : "");
       });
     if (request !== state.inputStructureRequest) { viewer.dispose(); return; }
     state.inputViewer = viewer;
     await viewer.select($("target-chain").value, selectedPartners());
-    $("input-viewer-status").textContent = "초록: 표적 · 파랑: 파트너 · 회색: 제외. Ctrl+클릭으로 진행할 체인을 선택하세요.";
+    I18N.text($("input-viewer-status"), I18N.term("초록: 표적 · 파랑: 파트너 · 회색: 제외. Ctrl+클릭으로 진행할 체인을 선택하세요."));
   } catch (error) {
     if (request !== state.inputStructureRequest) return;
-    $("input-viewer-status").textContent = `MolStar를 열지 못했습니다: ${error.message}. 아래 목록에서 체인을 선택할 수 있습니다.`;
+    I18N.text($("input-viewer-status"), I18N.format("MolStar를 열지 못했습니다: {0}. 아래 목록에서 체인을 선택할 수 있습니다.", [error.message]));
   }
 }
 function regionSettings() {
@@ -752,22 +743,20 @@ async function prepareInput() {
   state.readiness = Boolean(result.config.run.mock);
   state.diagnostic = null;
   $("start-job").disabled = !state.readiness;
-  $("resolved-config").textContent = JSON.stringify(result.config, null, 2);
+  I18N.text($("resolved-config"), JSON.stringify(result.config, null, 2));
   if ($("novice-reviewed-summary")) {
     const cfg=result.config, mode=cfg.run.mode, complex=mode==="complex", summary=$("novice-reviewed-summary");
     const engines=complex?cfg.complex.comparison_engines||[cfg.complex.engine]:cfg.screen.comparison?.enabled?cfg.screen.comparison.engines:[cfg.screen.engine];
     const entries=complex?result.review.proteins:[{id:"A",sequence:cfg.target.sequence}];
-    summary.replaceChildren(el("h3","이번에 실행할 입력과 조건"),
+    summary.replaceChildren(el("h3",I18N.term("이번에 실행할 입력과 조건")),
       el("p",`${mode} · ${entries.map(p=>`${p.id}: ${p.sequence.length} aa`).join(" · ")} · Seed ${cfg.run.seed}`),
-      el("p",`평가 엔진: ${engines.join(" · ")} · 엔진 점수를 합산하지 않습니다.`),
-      el("p",`MSA: ${complex?cfg.complex.msa_source||cfg.complex.msa:cfg.screen.colabfold?.msa_source||cfg.screen.msa_mode} · 공용 전송 동의: ${cfg.screen.allow_public_msa_server===true?"현재 입력에 동의":"외부 전송 없음"}`),
-      el("p",noviceModelPlan(cfg,mode,mode==="screen"?noviceFasta($("vhh-fasta").value).length:0)));
+      el("p",I18N.format("평가 엔진: {0} · 엔진 점수를 합산하지 않습니다.", [engines.join(" · ")])),
+      el("p",I18N.format("MSA: {0} · 공용 전송 동의: {1}", [complex ? (cfg.complex.msa_source ? cfg.complex.msa_source : cfg.complex.msa) : (cfg.screen.colabfold?.msa_source ? cfg.screen.colabfold?.msa_source : cfg.screen.msa_mode), cfg.screen.allow_public_msa_server===true ? I18N.term("현재 입력에 동의") : I18N.term("외부 전송 없음")])),
+      el("p",I18N.term(noviceModelPlan(cfg,mode,mode==="screen"?noviceFasta($("vhh-fasta").value).length:0))));
   }
   warnings($("review-summary"), result.review?.warnings);
   $("review-output").hidden = false;
-  $("input-next-step").textContent = state.readiness
-    ? "입력 검토 완료 · 4. 분석 실행을 누르세요. CPU 데모는 합성 결과입니다."
-    : "3단계 · 이 입력의 환경을 점검 중입니다. 통과하면 아래 분석 실행 버튼이 켜집니다.";
+  I18N.text($("input-next-step"), state.readiness ? I18N.term("입력 검토 완료 · 4. 분석 실행을 누르세요. CPU 데모는 합성 결과입니다.") : I18N.term("3단계 · 이 입력의 환경을 점검 중입니다. 통과하면 아래 분석 실행 버튼이 켜집니다."));
   if (!state.readiness) {
     const diagnostic = await api("/api/diagnostics", {
       input_id: result.id,
@@ -791,10 +780,10 @@ async function submitDiagnostic() {
 async function selectJob(identifier) {
   state.job = identifier;
   state.logOffset = 0;
-  $("job-title").textContent = "작업 불러오는 중";
-  $("job-detail").replaceChildren(el("p", "작업 상태를 확인합니다."));
+  I18N.text($("job-title"), I18N.term("작업 불러오는 중"));
+  $("job-detail").replaceChildren(el("p", I18N.term("작업 상태를 확인합니다.")));
   $("job-actions").replaceChildren();
-  $("job-log").textContent = "";
+  I18N.text($("job-log"), "");
   await refreshJobs();
 }
 function jobProgressCaption(job) {
@@ -845,9 +834,7 @@ async function refreshJobs() {
         state.readiness = Boolean(checked.diagnostics?.ok);
         renderDiagnostics(checked.diagnostics);
         $("start-job").disabled = !state.readiness;
-        $("input-next-step").textContent = state.readiness
-          ? "환경 점검 통과 · 4. 분석 실행을 누르세요. 아직 계산은 시작하지 않았습니다."
-          : "환경 점검을 통과하지 못했습니다. 환경·설치에서 아래 미충족 항목을 먼저 확인하세요.";
+        I18N.text($("input-next-step"), state.readiness ? I18N.term("환경 점검 통과 · 4. 분석 실행을 누르세요. 아직 계산은 시작하지 않았습니다.") : I18N.term("환경 점검을 통과하지 못했습니다. 환경·설치에서 아래 미충족 항목을 먼저 확인하세요."));
         const missing =
           checked.diagnostics?.checks
             ?.filter((c) => c.required && !c.ok)
@@ -868,7 +855,7 @@ async function refreshJobs() {
       ...state.jobs.map((job) => {
         const button = el(
           "button",
-          `${job.name} · ${job.kind} / ${job.mode}\n${states[job.state] || job.state} · ${jobPhaseCaption(job)} · ${Math.round(job.elapsed_seconds || 0)}초`,
+          I18N.format("{0} · {1} / {2}\n{3} · {4} · {5}초", [job.name, job.kind, job.mode, (states[job.state] ? I18N.term(states[job.state]) : job.state), I18N.term(jobPhaseCaption(job)), Math.round(job.elapsed_seconds || 0)]),
           "job-row" + (job.id === state.job ? " active" : ""),
         );
         button.onclick = () => selectJob(job.id);
@@ -876,13 +863,12 @@ async function refreshJobs() {
       }),
     );
     if (!state.jobs.length)
-      $("job-list").textContent =
-        "아직 작업이 없습니다. 입력 탭에서 CPU 데모를 시작해 보세요.";
+      I18N.text($("job-list"), I18N.term("아직 작업이 없습니다. 입력 탭에서 CPU 데모를 시작해 보세요."));
     if (state.job) {
       const chosen = state.job;
       const job = await api("/api/jobs/" + chosen);
       if (state.job !== chosen) return;
-      $("job-title").textContent = job.name;
+      I18N.text($("job-title"), job.name);
       if (state.submissionNoticeJob === job.id && !["queued","running","cancelling"].includes(job.state)) {
         notice(`${states[job.state] || job.state} · ${job.state==="complete"?"결과 열기로 결과를 확인하세요.":"작업 상세와 로그에서 종료 사유를 확인하세요."}`,job.state!=="complete");
         state.submissionNoticeJob=null;
@@ -890,15 +876,15 @@ async function refreshJobs() {
       $("job-detail").replaceChildren(
         el(
           "p",
-          `${states[job.state] || job.state} · ${jobPhaseCaption(job)} · ${jobProgressCaption(job)} · ${Math.round(job.elapsed_seconds || 0)}초`,
+          I18N.format("{0} · {1} · {2} · {3}초", [(states[job.state] ? I18N.term(states[job.state]) : job.state), I18N.term(jobPhaseCaption(job)), I18N.term(jobProgressCaption(job)), Math.round(job.elapsed_seconds || 0)]),
         ),
       );
-      if (job.reused_result_id) $("job-detail").append(el("p", `저장 결과 연결 · 새 계산 0초 · 원본 ${job.reused_result_id}${job.reuse_kind === "view_only" ? " · 핵심 보관본" : ""}. 원래 계산 시간 ${job.source_elapsed_seconds === null ? "미기록" : Math.round(job.source_elapsed_seconds || 0) + "초"}`));
-      if (etaText(job)) $("job-detail").append(el("p", etaText(job), "eta-note"));
+      if (job.reused_result_id) $("job-detail").append(el("p", I18N.format("저장 결과 연결 · 새 계산 0초 · 원본 {0}{1}. 원래 계산 시간 {2}", [job.reused_result_id, job.reuse_kind === "view_only" ? I18N.term(" · 핵심 보관본") : "", job.source_elapsed_seconds === null ? I18N.term("미기록") : I18N.concat([Math.round(job.source_elapsed_seconds || 0), I18N.term("초")])])));
+      if (etaText(job)) $("job-detail").append(el("p", I18N.term(etaText(job)), "eta-note"));
       if (job.mock)
-        $("job-detail").append(el("span", "MOCK · 합성 결과", "badge"));
+        $("job-detail").append(el("span", I18N.term("MOCK · 합성 결과"), "badge"));
       if (job.error)
-        $("job-detail").append(el("div", job.error, "warning error"));
+        $("job-detail").append(el("div", I18N.term(job.error), "warning error"));
       $("job-actions").replaceChildren();
       for (const [label, operation] of [
         ["작업 취소", "cancel"],
@@ -912,17 +898,17 @@ async function refreshJobs() {
           continue;
         let extension;
         if (operation === "resume" && job.state === "budget_exhausted") {
-          const label = el("label", "추가 시간 (분)"),
+          const label = el("label", I18N.term("추가 시간 (분)")),
             input = el("input");
           input.type = "number";
           input.min = "1";
           input.value = "60";
-          input.setAttribute("aria-label", "재개 추가 시간 (분)");
+          I18N.attribute(input, "aria-label", I18N.term("재개 추가 시간 (분)"));
           label.append(input);
           $("job-actions").append(label);
           extension = input;
         }
-        const button = el("button", label, "secondary");
+        const button = el("button", I18N.term(label), "secondary");
         button.onclick = async () => {
           try {
             await api(
@@ -939,7 +925,7 @@ async function refreshJobs() {
         $("job-actions").append(button);
       }
       if (job.result_id) {
-        const button = el("button", "결과 열기");
+        const button = el("button", I18N.term("결과 열기"));
         button.onclick = async () => {
           view("results");
           try {
@@ -960,7 +946,7 @@ async function refreshJobs() {
       if (job.diagnostics) {
         const output = $("diagnostics-output");
         output.replaceChildren(
-          el("h3", job.diagnostics.ok ? "실행 준비 통과" : "실행 준비 미충족"),
+          el("h3", job.diagnostics.ok ? I18N.term("실행 준비 통과") : I18N.term("실행 준비 미충족")),
         );
         table(
           output.appendChild(el("div")),
@@ -1068,7 +1054,7 @@ async function loadResult(id) {
     ? {target:'기준 체인', binder:'파트너 체인', context:'다른 파트너', hotspots:'관심 부위'}
     : {target:'표적', binder:'VHH', context:'파트너', hotspots:'결합 부위(hotspot)'})) {
     const checkbox = document.querySelector(`[data-layer="${layer}"]`);
-    if (checkbox) checkbox.parentElement.replaceChildren(checkbox, document.createTextNode(caption));
+    if (checkbox) checkbox.parentElement.replaceChildren(checkbox, el("span", I18N.term(caption)));
   }
   state.rows = rows.map(row => ({...row, predictor_engine: row.predictor_engine || row.engine || summary.conditions?.engine || "unknown", design_origin: row.design_origin || row.parent_engine || row.source || null}));
   syncResultModeControls();
@@ -1077,7 +1063,7 @@ async function loadResult(id) {
   if (!savedSort) {
     const defaultSort = defaultResultSort(state.rows, summary.mode);
     const select = $("sort-metric");
-    if (![...select.options].some(option => option.value === defaultSort.sort)) {const option = el("option", metricCaption(defaultSort.sort, state.rows));option.value = defaultSort.sort;select.append(option);}
+    if (![...select.options].some(option => option.value === defaultSort.sort)) {const option = el("option", I18N.term(metricCaption(defaultSort.sort, state.rows)));option.value = defaultSort.sort;select.append(option);}
     select.value = defaultSort.sort;
     $("descending").checked = defaultSort.descending;
   }
@@ -1089,59 +1075,41 @@ async function loadResult(id) {
   state.displayAliases = reportAliases(state.rows);
   const counts = reportModelCounts(state.rows, summary.mode, summary.config);
   const msaCaption = resultMsaCaption(summary);
-  $("result-input").replaceChildren(el("p", `실행: ${summary.name || summary.id || "미기록"} · 모드: ${summary.mode || "미기록"} · ${msaCaption}`));
-  $("result-input-config").textContent = JSON.stringify({conditions: summary.conditions, config: summary.config}, null, 2);
-  $("result-summary").replaceChildren(el("h2", "02 후보·모델 수"), el("p", `분석: ${summary.name || summary.id || "미기록"}`, "muted"));
-  if (summary.retention === "minimal") $("result-summary").append(el("p", "핵심 보관본 · 서열·점수·모든 최종 구조를 유지했습니다. PAE 배열·MSA·중간 파일은 용량 정리로 삭제되어, 이 상세 자료가 필요하면 전체 분석을 새로 실행해야 합니다.", "report-interpretation"));
+  $("result-input").replaceChildren(el("p", I18N.format("실행: {0} · 모드: {1} · {2}", [(summary.name || summary.id ? (summary.name ? summary.name : summary.id) : I18N.term("미기록")), (summary.mode ? summary.mode : I18N.term("미기록")), I18N.term(msaCaption)])));
+  I18N.text($("result-input-config"), JSON.stringify({conditions: summary.conditions, config: summary.config}, null, 2));
+  $("result-summary").replaceChildren(el("h2", I18N.term("02 후보·모델 수")), el("p", I18N.format("분석: {0}", [(summary.name || summary.id ? (summary.name ? summary.name : summary.id) : I18N.term("미기록"))]), "muted"));
+  if (summary.retention === "minimal") $("result-summary").append(el("p", I18N.term("핵심 보관본 · 서열·점수·모든 최종 구조를 유지했습니다. PAE 배열·MSA·중간 파일은 용량 정리로 삭제되어, 이 상세 자료가 필요하면 전체 분석을 새로 실행해야 합니다."), "report-interpretation"));
   const stats = el("div", "", "report-stats");
   for (const [caption,value] of [[generalComplex?"고유 입력 단백질 서열":"원본 후보",generalComplex?counts.unique_sequences:counts.source_candidates],["전체 모델 기록",summary.model_record_total ?? counts.model_total],["평가 완료 모델",counts.evaluated_total],["기록 적격 모델",generalComplex?"적용 안 함":counts.eligible_total]]) {
-    const stat=el("div","","report-stat");stat.append(el("span",caption),el("strong",value === null ? "미평가·미기록" : String(value)));stats.append(stat);
+    const stat=el("div","","report-stat");stat.append(el("span",I18N.term(caption)),el("strong",value === null ? I18N.term("미평가·미기록") : I18N.term(String(value))));stats.append(stat);
   }
-  $("result-summary").append(stats,el("p", generalComplex
-    ? `평가 미완료 ${counts.evaluation_missing} 모델. 일반 복합체에는 VHH 적격 판정을 적용하지 않습니다.`
-    : `고유 후보 서열 ${counts.unique_sequences === null ? "미기록" : counts.unique_sequences}종 · 평가 미완료 ${counts.evaluation_missing} · 적격 판정 미평가 ${counts.eligibility_missing} · 기록 선별 ${fmt(summary.selected_total)} 모델. 원본 후보는 source_sequence_id 및 원본 ID의 엔진 접두어로 구분합니다. 서열이 모두 기록된 경우에만 고유 서열 수를 계산합니다.`, "muted"));
+  $("result-summary").append(stats,el("p", generalComplex ? I18N.format("평가 미완료 {0} 모델. 일반 복합체에는 VHH 적격 판정을 적용하지 않습니다.", [counts.evaluation_missing]) : I18N.format("고유 후보 서열 {0}종 · 평가 미완료 {1} · 적격 판정 미평가 {2} · 기록 선별 {3} 모델. 원본 후보는 source_sequence_id 및 원본 ID의 엔진 접두어로 구분합니다. 서열이 모두 기록된 경우에만 고유 서열 수를 계산합니다.", [counts.unique_sequences === null ? I18N.term("미기록") : counts.unique_sequences, counts.evaluation_missing, counts.eligibility_missing, fmt(summary.selected_total)]), "muted"));
   if (!generalComplex && summary.quality_eligible_total !== null && summary.quality_eligible_total !== undefined)
-    $("result-summary").append(el("p", `실행 기록 요약: 기록 적격 ${fmt(summary.eligible_total)} · 품질 적격 ${fmt(summary.quality_eligible_total)} (hotspot 제외). 품질 적격은 원본 선별을 바꾸지 않는 탐색 값입니다.`, "muted"));
+    $("result-summary").append(el("p", I18N.format("실행 기록 요약: 기록 적격 {0} · 품질 적격 {1} (hotspot 제외). 품질 적격은 원본 선별을 바꾸지 않는 탐색 값입니다.", [fmt(summary.eligible_total), fmt(summary.quality_eligible_total)]), "muted"));
   const expected = summary.expected_total;
-  $("result-summary").append(el("p", `기록된 계획 모델 ${expected == null ? "미기록" : expected} · 실제 모델 기록 ${summary.model_record_total ?? counts.model_total} · 평가 완료 ${counts.evaluated_total} · 전체 후보·모델 기록 ${summary.candidate_record_total ?? counts.prepared_record_total} · 예측 전 준비·미선정 ${summary.preprediction_record_total ?? counts.preprediction_record_total}`, "muted"));
-  $("result-summary").append(el("p", "집계 범위: 저장된 전체 후보·모델 기록. 예측 전 준비·미선정은 평가 미완료 모델 수에 포함하지 않습니다.", "muted"));
+  $("result-summary").append(el("p", I18N.format("기록된 계획 모델 {0} · 실제 모델 기록 {1} · 평가 완료 {2} · 전체 후보·모델 기록 {3} · 예측 전 준비·미선정 {4}", [expected == null ? I18N.term("미기록") : expected, (summary.model_record_total != null ? summary.model_record_total : counts.model_total), counts.evaluated_total, (summary.candidate_record_total != null ? summary.candidate_record_total : counts.prepared_record_total), (summary.preprediction_record_total != null ? summary.preprediction_record_total : counts.preprediction_record_total)]), "muted"));
+  $("result-summary").append(el("p", I18N.term("집계 범위: 저장된 전체 후보·모델 기록. 예측 전 준비·미선정은 평가 미완료 모델 수에 포함하지 않습니다."), "muted"));
   if (summary.engine_provenance && Object.keys(summary.engine_provenance).length) {
-    const provenance = el("details"); provenance.append(el("summary", "예측 엔진 버전·가중치·출처"), el("pre", JSON.stringify(summary.engine_provenance, null, 2))); $("result-summary").append(provenance);
+    const provenance = el("details"); provenance.append(el("summary", I18N.term("예측 엔진 버전·가중치·출처")), el("pre", JSON.stringify(summary.engine_provenance, null, 2))); $("result-summary").append(provenance);
   }
   const engineSummary=el("div","","report-engine-summary");
   const names={colabfold:"ColabFold",boltz2:"Boltz-2",chai1:"Chai-1",opendde:"OpenDDE Preview"};
   for (const engine of [...new Set(state.rows.map(r=>r.predictor_engine))].sort()) {
     const models=state.rows.filter(r=>r.predictor_engine===engine),card=el("div"), engineCounts=reportModelCounts(models, summary.mode, summary.config);
-    card.append(el("b",names[engine]||engine),el("span",`평가 ${engineCounts.evaluated_total}/${engineCounts.model_total} · 오류 ${models.filter(r=>recordedEvaluationError(r)).length}${generalComplex?'':` · 기록 적격 ${engineCounts.eligible_total === null ? "미평가" : engineCounts.eligible_total} · 판정 미평가 ${engineCounts.eligibility_missing}`}`));engineSummary.append(card);
+    card.append(el("b",(names[engine] ? names[engine] : engine)),el("span",I18N.format("평가 {0}/{1} · 오류 {2}{3}", [engineCounts.evaluated_total, engineCounts.model_total, models.filter(r=>recordedEvaluationError(r)).length, generalComplex ? '' : I18N.format(" · 기록 적격 {0} · 판정 미평가 {1}", [engineCounts.eligible_total === null ? I18N.term("미평가") : engineCounts.eligible_total, engineCounts.eligibility_missing])])));engineSummary.append(card);
   }
-  $("result-summary").append(engineSummary,el("p","동일 후보 서열의 엔진별 재예측은 별도 관측입니다. 상대 점수의 정규화 범위는 기록된 ranking_policy를 확인하세요. 기존 부분 재평가 경로는 혼합 배치일 수 있으며, 독립 비교에서는 엔진별로 순위를 매깁니다. 결합 확률·KD로 해석하지 않습니다.","report-interpretation"));
+  $("result-summary").append(engineSummary,el("p",I18N.term("동일 후보 서열의 엔진별 재예측은 별도 관측입니다. 상대 점수의 정규화 범위는 기록된 ranking_policy를 확인하세요. 기존 부분 재평가 경로는 혼합 배치일 수 있으며, 독립 비교에서는 엔진별로 순위를 매깁니다. 결합 확률·KD로 해석하지 않습니다."),"report-interpretation"));
   renderReportReasons(state.rows, summary.mode);
-  const guide=el("details","","report-guide");guide.append(el("summary","지표 읽는 법과 평가 한계"));
+  const guide=el("details","","report-guide");guide.append(el("summary",I18N.term("지표 읽는 법과 평가 한계")));
   const list=el("ul");
-  for(const text of ["ipTM·ipSAE: 높을수록 예측 신뢰도가 높습니다. 같은 엔진·조건 안에서 비교하세요.","pLDDT: 국소 구조 신뢰도. PAE: 상대 배치 오차(Å)로 낮을수록 좋으며, 행→열의 방향별 값이 다를 수 있습니다.","pDockQ2: CA 8 Å 접촉과 방향별 PAE를 사용합니다. AlphaFold-Multimer 보정이며 Boltz·Chai·OpenDDE 값은 탐색용입니다.","적격 0건은 실행 실패와 구분합니다. 미평가 항목은 0점이나 판정 통과로 취급하지 않습니다.","현재 필터를 바꿔도 원래 적격 판정·선별 목록·전체 모델과 출처는 내보내기에 보존됩니다."])list.append(el("li",text));
+  for(const text of ["ipTM·ipSAE: 높을수록 예측 신뢰도가 높습니다. 같은 엔진·조건 안에서 비교하세요.","pLDDT: 국소 구조 신뢰도. PAE: 상대 배치 오차(Å)로 낮을수록 좋으며, 행→열의 방향별 값이 다를 수 있습니다.","pDockQ2: CA 8 Å 접촉과 방향별 PAE를 사용합니다. AlphaFold-Multimer 보정이며 Boltz·Chai·OpenDDE 값은 탐색용입니다.","적격 0건은 실행 실패와 구분합니다. 미평가 항목은 0점이나 판정 통과로 취급하지 않습니다.","현재 필터를 바꿔도 원래 적격 판정·선별 목록·전체 모델과 출처는 내보내기에 보존됩니다."])list.append(el("li",I18N.term(text)));
   guide.append(list);$("result-summary").append(guide);
   $("result-summary").append(
     el(
       "span",
-      summary.mock
-        ? "MOCK · 실제 예측 아님"
-        : summary.failed_candidates
-          ? "부분 실패 · 후보 오류 확인"
-          : summary.status &&
+      summary.mock ? I18N.term("MOCK · 실제 예측 아님") : summary.failed_candidates ? I18N.term("부분 실패 · 후보 오류 확인") : summary.status &&
               states[summary.status] &&
-              summary.status !== "complete"
-            ? states[summary.status] + " · 부분 결과"
-            : summary.complete
-              ? generalComplex
-                ? "분석 완료 · 일반 복합체 평가"
-                : counts.eligible_total === null
-                  ? "분석 완료 · 적격 판정 미평가"
-                  : summary.zero_eligible
-                ? summary.quality_eligible_total > 0
-                  ? `정상 완료 · hotspot 제외 품질 적격 ${summary.quality_eligible_total}개`
-                  : "정상 완료 · 적격 후보 0개"
-                : "분석 완료"
-              : "미완료 / 부분 결과",
+              summary.status !== "complete" ? I18N.concat([I18N.term(states[summary.status]), I18N.term(" · 부분 결과")]) : summary.complete ? generalComplex ? I18N.term("분석 완료 · 일반 복합체 평가") : counts.eligible_total === null ? I18N.term("분석 완료 · 적격 판정 미평가") : summary.zero_eligible ? summary.quality_eligible_total > 0 ? I18N.format("정상 완료 · hotspot 제외 품질 적격 {0}개", [summary.quality_eligible_total]) : I18N.term("정상 완료 · 적격 후보 0개") : I18N.term("분석 완료") : I18N.term("미완료 / 부분 결과"),
       "badge",
     ),
   );
@@ -1149,9 +1117,9 @@ async function loadResult(id) {
     ...(summary.issues || []),
     ...(summary.warnings || []).map(message => "실행 당시 기록 경고: " + message),
   ]);
-  $("result-provenance").textContent = JSON.stringify(provenance || {}, null, 2);
+  I18N.text($("result-provenance"), JSON.stringify(provenance || {}, null, 2));
   if (provenance?.status === "unavailable") notice(provenance.issue, true);
-  $("result-conditions").textContent = JSON.stringify(
+  I18N.text($("result-conditions"), JSON.stringify(
     {
       conditions: summary.conditions,
       config: summary.config,
@@ -1160,7 +1128,7 @@ async function loadResult(id) {
     },
     null,
     2,
-  );
+  ));
   renderCandidates();
   if (state.filtered.length)
     await selectCandidate(state.filtered[0].candidate_id);
@@ -1192,14 +1160,14 @@ function clearCandidate() {
   state.structure = null;
   state.structureRequest++;
   disposeResultViewer();
-  $("candidate-title").textContent = "후보 선택";
+  I18N.text($("candidate-title"), I18N.term("후보 선택"));
   $("candidate-detail").replaceChildren(
-    el("p", "현재 실행·탐색 조건에서 후보를 선택하세요."),
+    el("p", I18N.term("현재 실행·탐색 조건에서 후보를 선택하세요.")),
   );
   $("observation-select").replaceChildren();
-  $("structure-note").textContent = "선택한 구조가 없습니다.";
+  I18N.text($("structure-note"), I18N.term("선택한 구조가 없습니다."));
   $("structure-details").replaceChildren();
-  $("observation-note").textContent = "";
+  I18N.text($("observation-note"), "");
   // Purge the previous heatmap before a new run changes its dimensions.
   // Overlapping empty/nonempty Plotly.react updates can stall the renderer.
   if (window.Plotly)
@@ -1220,15 +1188,15 @@ function syncCandidateNavigation() {
   select.disabled = !rows.length;
   $("previous-candidate").disabled = index <= 0;
   $("next-candidate").disabled = !rows.length || index === rows.length - 1;
-  $("viewer-candidate-position").textContent = index < 0 ? `선택 없음 / ${rows.length}개` : `${index + 1} / ${rows.length}개`;
+  I18N.text($("viewer-candidate-position"), index < 0 ? I18N.format("선택 없음 / {0}개", [rows.length]) : I18N.format("{0} / {1}개", [index + 1, rows.length]));
   const row = state.candidate;
   if (row) {
     const eligibility = candidateEligibility(row);
     const basis = $("eligibility-basis").value === "quality" ? "품질 판정 (hotspot 제외)" : "실행 당시 기록 판정";
     const assessment = recordedEvaluationError(row) ? modelAssessmentCaption(row) : !row.evaluated ? "미평가" : state.result.mode === "complex" ? modelAssessmentCaption(row)
       : `${basis}: ${eligibility === true ? "적격" : eligibility === false ? "부적격" : "미평가"}`;
-    $("candidate-status").textContent = `${row.predictor_engine || "엔진 미기록"} · ipSAE ${fmt(row.ipsae)} · ${metricCaption("iptm", row)} ${fmt(row.iptm)} · ${assessment}`;
-  } else $("candidate-status").textContent = "현재 목록에서 후보를 선택하세요.";
+    I18N.text($("candidate-status"), I18N.format("{0} · ipSAE {1} · {2} {3} · {4}", [(row.predictor_engine ? row.predictor_engine : I18N.term("엔진 미기록")), fmt(row.ipsae), I18N.term(metricCaption("iptm", row)), fmt(row.iptm), I18N.term(assessment)]));
+  } else I18N.text($("candidate-status"), I18N.term("현재 목록에서 후보를 선택하세요."));
 }
 function stepCandidate(offset) {
   const rows = state.filtered || [];
@@ -1383,10 +1351,9 @@ function renderCandidates() {
     ) || a.position-b.position;
   });
   state.filtered = keyed.map(item=>item.row);
-  $("candidate-count").textContent =
-    `표시 ${state.filtered.length} / 전체 ${state.rows.length} 후보·모델 기록 · 미평가는 0으로 바꾸지 않습니다.`;
+  I18N.text($("candidate-count"), I18N.format("표시 {0} / 전체 {1} 후보·모델 기록 · 미평가는 0으로 바꾸지 않습니다.", [state.filtered.length, state.rows.length]));
   refreshMetricCaptions(state.filtered, state.result?.mode);
-  $("candidate-sort-note").textContent = `정렬 기준: ${metricCaption(f.sort, state.filtered, state.result?.mode)} · ${f.descending ? "높은 값부터" : "낮은 값부터"} · 미평가 마지막 · ${f.sort === "review_rank" ? "동일 범위의 후보별 검토 순위·동률 허용·1위도 보류 가능" : "탐색 순서이며 통합 순위가 아닙니다"}.`;
+  I18N.text($("candidate-sort-note"), I18N.format("정렬 기준: {0} · {1} · 미평가 마지막 · {2}.", [I18N.term(metricCaption(f.sort, state.filtered, state.result?.mode)), f.descending ? I18N.term("높은 값부터") : I18N.term("낮은 값부터"), f.sort === "review_rank" ? I18N.term("동일 범위의 후보별 검토 순위·동률 허용·1위도 보류 가능") : I18N.term("탐색 순서이며 통합 순위가 아닙니다")]));
   const columns = state.result.mode === "complex" ? ["candidate_id", "predictor_engine", "seed", "model", "iptm", "ipsae", "pdockq2", "pdockq2_target", "pdockq2_binder", "interface_pae", "n_clashes", "error"] : [
       "candidate_id",
       "predictor_engine",
@@ -1425,13 +1392,13 @@ function renderCandidates() {
   captions.iptm=metricCaption("iptm", state.filtered);
   if (state.result.mode === "complex") captions.ipsae="ipSAE · 표시 체인 쌍";
   columns.forEach(k => {
-    const th = el("th"), button = el("button", (captions[k] || k) + (f.sort === k ? (f.descending ? " ↓" : " ↑") : " ↕"), "sort-header");
+    const th = el("th"), button = el("button", I18N.concat([(captions[k] ? I18N.term(captions[k]) : k), f.sort === k ? f.descending ? " ↓" : " ↑" : " ↕"]), "sort-header");
     th.setAttribute("aria-sort", f.sort === k ? (f.descending ? "descending" : "ascending") : "none");
     th.dataset.columnKey = k;
     button.type = "button";
     button.onclick = () => {
       const select = $("sort-metric");
-      if (![...select.options].some(option => option.value === k)) {const option = el("option", captions[k] || k);option.value = k;select.append(option);}
+      if (![...select.options].some(option => option.value === k)) {const option = el("option", (captions[k] ? I18N.term(captions[k]) : k));option.value = k;select.append(option);}
       $("descending").checked = f.sort === k ? !f.descending : !["candidate_id","predictor_engine","design_origin","seed","model","hotspot_site_status","pass_hotspot","site_selection_eligible","pose_consensus_status","design_consistency_status","review_priority","candidate_review_priority","design_binder_rmsd_A","review_rank"].includes(k);
       select.value = k; renderCandidates();
     };
@@ -1449,20 +1416,20 @@ function renderCandidates() {
         const td = el("td");
         td.dataset.columnKey = key;
         if (i === 0) {
-          const button = el("button", state.displayAliases?.[row.candidate_id] || row[key]);
+          const button = el("button", (state.displayAliases?.[row.candidate_id] ? state.displayAliases?.[row.candidate_id] : row[key]));
           button.title = row.candidate_id;
           button.onclick = () => reviewCandidate(row.candidate_id);
           td.append(button);
-        } else if(["final_eligible","quality_eligible"].includes(key)) td.textContent=decisionCaption(row[key]);
-        else if(key === "error") td.textContent=evaluationErrorCaption(row);
-        else if(key === "selected") td.textContent=typeof row[key]==="boolean"?(row[key]?"선별":"미선별"):"미기록";
-        else if(key === "exclusion_reasons") td.textContent=(row[key]||[]).map(reportReasonLabel).join(" · ")||"없음";
-        else if(key === "ipsae" && state.result.mode === "complex") td.textContent = fmt(row[key]) + (row.ipsae_chain_a && row.ipsae_chain_b ? ` (${row.ipsae_chain_a}–${row.ipsae_chain_b} 체인쌍)` : " (적용 체인 미기록)");
-        else if(key === "hotspot_site_status") td.textContent = hotspotSite(row).label;
-        else if(Object.hasOwn(poseStatusLabels,key)||["site_satisfied","site_selection_eligible","candidate_review_priority"].includes(key))td.textContent=poseStatusLabel(row,key);
-        else if(key === "n_hotspots_contacted") td.textContent = hotspotSite(row).contacts;
-        else if(key === "hotspot_contact_frac") td.textContent = fmt(hotspotSite(row).contact_fraction);
-        else td.textContent = fmt(row[key]);
+        } else if(["final_eligible","quality_eligible"].includes(key)) I18N.text(td, I18N.term(decisionCaption(row[key])));
+        else if(key === "error") I18N.text(td, I18N.term(evaluationErrorCaption(row)));
+        else if(key === "selected") I18N.text(td, typeof row[key]==="boolean" ? row[key] ? I18N.term("선별") : I18N.term("미선별") : I18N.term("미기록"));
+        else if(key === "exclusion_reasons") I18N.text(td, (row[key]||[]).length ? I18N.concat(row[key].flatMap((code,index) => [index ? " · " : "", I18N.term(reportReasonLabel(code))])) : I18N.term("없음"));
+        else if(key === "ipsae" && state.result.mode === "complex") I18N.text(td, I18N.concat([fmt(row[key]), row.ipsae_chain_a && row.ipsae_chain_b ? I18N.format(" ({0}–{1} 체인쌍)", [row.ipsae_chain_a, row.ipsae_chain_b]) : I18N.term(" (적용 체인 미기록)")]));
+        else if(key === "hotspot_site_status") I18N.text(td, I18N.term(hotspotSite(row).label));
+        else if(Object.hasOwn(poseStatusLabels,key)||["site_satisfied","site_selection_eligible","candidate_review_priority"].includes(key))I18N.text(td, I18N.term(poseStatusLabel(row,key)));
+        else if(key === "n_hotspots_contacted") I18N.text(td, hotspotSite(row).contacts);
+        else if(key === "hotspot_contact_frac") I18N.text(td, fmt(hotspotSite(row).contact_fraction));
+        else I18N.text(td, row[key] == null ? I18N.term("미평가") : fmt(row[key]));
         const recorded = siteValue(row, key);
         if (typeof recorded === "number" && Number.isFinite(recorded))
           td.title = String(recorded);
@@ -1510,7 +1477,7 @@ function renderScatter() {
           ),
         },
         hovertemplate:
-          "%{text}<br>" + metricCaption(x, state.filtered, state.result?.mode) + ": %{x}<br>" + metricCaption(y, state.filtered, state.result?.mode) + ": %{y}<extra></extra>",
+          "%{text}<br>" + I18N.value(I18N.term(metricCaption(x, state.filtered, state.result?.mode))) + ": %{x}<br>" + I18N.value(I18N.term(metricCaption(y, state.filtered, state.result?.mode))) + ": %{y}<extra></extra>",
       },
     ],
     {
@@ -1518,11 +1485,11 @@ function renderScatter() {
       // Reserve space above data points so the Plotly toolbar cannot intercept
       // clicks on high-valued observations in a narrow three-panel layout.
       margin: { t: 50, l: 50, r: 10, b: 65 },
-      xaxis: { automargin: true, title: { text: metricCaption(x, state.filtered, state.result?.mode), font: { size: 14 }, standoff: 12 } },
-      yaxis: { automargin: true, title: { text: metricCaption(y, state.filtered, state.result?.mode), font: { size: 14 }, standoff: 8 } },
+      xaxis: { automargin: true, title: { text: I18N.value(I18N.term(metricCaption(x, state.filtered, state.result?.mode))), font: { size: 14 }, standoff: 12 } },
+      yaxis: { automargin: true, title: { text: I18N.value(I18N.term(metricCaption(y, state.filtered, state.result?.mode))), font: { size: 14 }, standoff: 8 } },
       annotations: rows.length
         ? []
-        : [{ text: "표시할 평가값이 없습니다", showarrow: false }],
+        : [{ text: I18N.value(I18N.term("표시할 평가값이 없습니다")), showarrow: false }],
       paper_bgcolor: "#fff",
     },
     { responsive: true, displaylogo: false, modeBarButtonsToRemove: ["sendChartToCloud", "sendDataToCloud", "editInChartStudio"] },
@@ -1536,47 +1503,41 @@ async function selectCandidate(id) {
   state.candidate = state.rows.find((r) => r.candidate_id === id);
   const row = state.candidate;
   if (!row) return;
-  $("candidate-title").textContent = state.displayAliases?.[id] || id;
+  I18N.text($("candidate-title"), (state.displayAliases?.[id] ? state.displayAliases?.[id] : id));
   syncCandidateNavigation();
   const detail = $("candidate-detail");
   detail.replaceChildren(
     el(
       "p",
-      recordedEvaluationError(row) ? modelAssessmentCaption(row) : state.result.mode === 'complex' ? modelAssessmentCaption(row) : row.evaluated
-        ? candidateEligibility(row) === true
-          ? "선택한 판정 기준 적격"
-          : candidateEligibility(row) === false
-            ? "선택한 판정 기준 부적격"
-            : "필수 지표 판정 미평가"
-        : "구조 점수 미평가",
+      recordedEvaluationError(row) ? I18N.term(modelAssessmentCaption(row)) : state.result.mode === 'complex' ? I18N.term(modelAssessmentCaption(row)) : row.evaluated ? candidateEligibility(row) === true ? I18N.term("선택한 판정 기준 적격") : candidateEligibility(row) === false ? I18N.term("선택한 판정 기준 부적격") : I18N.term("필수 지표 판정 미평가") : I18N.term("구조 점수 미평가"),
     ),
   );
   if(state.result.mode !== "complex") {
     const h=hotspotSite(row),note=el("div");note.setAttribute("role","status");
-    note.append(el("h3","결합 위치 · 신뢰도와 별도 확인"),el("p",h.label+" · "+h.contacts));
-    if(h.status==='no_contact')note.append(el("p","신뢰도 점수가 높아도 지정 hotspot에는 접촉하지 않았습니다. 지정 부위 재현 성공으로 해석하지 마세요."));
-    note.append(el("p","PAE는 참조 구조와의 실측 오차가 아니며 pDockQ2는 실측 DockQ가 아닙니다. 지정 위치 진단은 기존 점수·제외 사유를 바꾸지 않습니다.","muted"));detail.append(note);
+    note.append(el("h3",I18N.term("결합 위치 · 신뢰도와 별도 확인")),el("p",I18N.concat([I18N.term(h.label)," · ",I18N.term(h.contacts)])));
+    if(h.status==='no_contact')note.append(el("p",I18N.term("신뢰도 점수가 높아도 지정 hotspot에는 접촉하지 않았습니다. 지정 부위 재현 성공으로 해석하지 마세요.")));
+    note.append(el("p",I18N.term("PAE는 참조 구조와의 실측 오차가 아니며 pDockQ2는 실측 DockQ가 아닙니다. 지정 위치 진단은 기존 점수·제외 사유를 바꾸지 않습니다."),"muted"));detail.append(note);
   }
   if(state.result.mode!=="complex"&&hasPoseAssessment([row])) {
     const panel=el("div");panel.setAttribute("role","status");panel.className="pose-assessment";
-    panel.append(el("h3","신뢰도 · 지정 부위 · 자세 일관성"));
-    panel.append(el("p",`실행 당시 기록 적격: ${row.final_eligible===true?"적격":row.final_eligible===false?"부적격":"미평가"} · 지정 부위 포함 적격: ${poseStatusLabel(row,"site_selection_eligible")}`));
-    panel.append(el("p",`동일 후보 자세 일치: ${poseStatusLabel(row,"pose_consensus_status")} · 자세 일치 엔진 ${fmt(row.pose_supporting_engines)}개 · 기록 적격 지지 ${fmt(row.pose_quality_supporting_engines)}개`));
-    panel.append(el("p",`설계·재예측: ${poseStatusLabel(row,"design_consistency_status")} · 표적 정렬 후 VHH RMSD ${fmt(row.design_binder_rmsd_A)} Å`));
-    panel.append(el("p",`검토 순위: ${fmt(row.review_rank)} · 범위 ${fmt(row.review_rank_scope)} · 1위도 보류일 수 있으며 동률을 허용합니다.`));
-    panel.append(el("p",`후보 검토 판정: ${poseStatusLabel(row,"candidate_review_priority")} · 모델 검토 판정: ${poseStatusLabel(row,"review_priority")}`));
-    panel.append(el("p",`후보 검토 판정 이유: ${poseStatusLabel(row,"review_priority_reason")}`));
-    panel.append(el("p","검토 정책 v3는 품질·지정 부위를 충족한 엔진별 단독 유망 예측도 표시합니다. 같은 자세에서 두 엔진 이상이 충족하면 다중 엔진 지지로 구분합니다. 엔진 간 자세 차이와 설계·재예측 불일치는 별도 진단이며 자동 비결합·탈락 사유가 아닙니다.","muted"));
-    panel.append(el("p","동일 후보 서열의 표적 정렬 후 자세를 비교합니다. 엔진 점수를 평균하지 않으며, 엔진 지지 수는 독립 실험 횟수가 아닙니다. 새 VHH를 기존 VHH 자세에 맞춰 선별하지 않습니다. 탐색적 우선순위는 기존 적격·선별 기록을 바꾸지 않으며 실제 결합·KD를 입증하지 않습니다.","muted"));
-    if(row.pose_assessment&&typeof row.pose_assessment==="object") {const raw=el("details");raw.append(el("summary","자세 평가 조건·출처"),el("pre",JSON.stringify(row.pose_assessment,null,2)));panel.append(raw);}
+    panel.append(el("h3",I18N.term("신뢰도 · 지정 부위 · 자세 일관성")));
+    panel.append(el("p",I18N.format("실행 당시 기록 적격: {0} · 지정 부위 포함 적격: {1}", [row.final_eligible===true ? I18N.term("적격") : row.final_eligible===false ? I18N.term("부적격") : I18N.term("미평가"), I18N.term(poseStatusLabel(row,"site_selection_eligible"))])));
+    panel.append(el("p",I18N.format("동일 후보 자세 일치: {0} · 자세 일치 엔진 {1}개 · 기록 적격 지지 {2}개", [I18N.term(poseStatusLabel(row,"pose_consensus_status")), fmt(row.pose_supporting_engines), fmt(row.pose_quality_supporting_engines)])));
+    panel.append(el("p",I18N.format("설계·재예측: {0} · 표적 정렬 후 VHH RMSD {1} Å", [I18N.term(poseStatusLabel(row,"design_consistency_status")), fmt(row.design_binder_rmsd_A)])));
+    panel.append(el("p",I18N.format("검토 순위: {0} · 범위 {1} · 1위도 보류일 수 있으며 동률을 허용합니다.", [fmt(row.review_rank), fmt(row.review_rank_scope)])));
+    panel.append(el("p",I18N.format("후보 검토 판정: {0} · 모델 검토 판정: {1}", [I18N.term(poseStatusLabel(row,"candidate_review_priority")), I18N.term(poseStatusLabel(row,"review_priority"))])));
+    panel.append(el("p",I18N.format("후보 검토 판정 이유: {0}", [I18N.term(poseStatusLabel(row,"review_priority_reason"))])));
+    panel.append(el("p",I18N.term("검토 정책 v3는 품질·지정 부위를 충족한 엔진별 단독 유망 예측도 표시합니다. 같은 자세에서 두 엔진 이상이 충족하면 다중 엔진 지지로 구분합니다. 엔진 간 자세 차이와 설계·재예측 불일치는 별도 진단이며 자동 비결합·탈락 사유가 아닙니다."),"muted"));
+    panel.append(el("p",I18N.term("동일 후보 서열의 표적 정렬 후 자세를 비교합니다. 엔진 점수를 평균하지 않으며, 엔진 지지 수는 독립 실험 횟수가 아닙니다. 새 VHH를 기존 VHH 자세에 맞춰 선별하지 않습니다. 탐색적 우선순위는 기존 적격·선별 기록을 바꾸지 않으며 실제 결합·KD를 입증하지 않습니다."),"muted"));
+    if(row.pose_assessment&&typeof row.pose_assessment==="object") {const raw=el("details");raw.append(el("summary",I18N.term("자세 평가 조건·출처")),el("pre",JSON.stringify(row.pose_assessment,null,2)));panel.append(raw);}
     detail.append(panel);
   }
   const original = el("details");
-  original.append(el("summary", "원본 모델 ID·서열"), el("p", id, "sequence"), el("p", row.sequence || "서열 미기록", "sequence"));
+  original.append(el("summary", I18N.term("원본 모델 ID·서열")), el("p", id, "sequence"), el("p", (row.sequence ? row.sequence : I18N.term("서열 미기록")), "sequence"));
   detail.append(original);
-  if (state.result.mode !== "complex") detail.append(el("p", `품질 적격 (hotspot 제외): ${decisionCaption(row.quality_eligible)} · 실행 당시 기록 적격: ${decisionCaption(row.final_eligible)}`));
+  if (state.result.mode !== "complex") detail.append(el("p", I18N.format("품질 적격 (hotspot 제외): {0} · 실행 당시 기록 적격: {1}", [I18N.term(decisionCaption(row.quality_eligible)), I18N.term(decisionCaption(row.final_eligible))])));
   if (row.quality_eligibility_source === "hotspot_only_exclusion_removed")
-    detail.append(el("p", "실행 당시 hotspot 조건만으로 제외됐습니다. 나머지 기록 기준은 통과했으며 원본 판정·선별 목록은 보존됩니다."));
+    detail.append(el("p", I18N.term("실행 당시 hotspot 조건만으로 제외됐습니다. 나머지 기록 기준은 통과했으며 원본 판정·선별 목록은 보존됩니다.")));
   warnings(detail.appendChild(el("div")), [
     ...(row.exclusion_reasons || []).map((r) => "기록 제외 사유: " + reportReasonLabel(r) + " (" + r + ")"),
     ...(recordedEvaluationError(row) ? ["후보 평가 오류: " + recordedEvaluationError(row)] : []),
@@ -1585,39 +1546,39 @@ async function selectCandidate(id) {
       : []),
   ]);
   const dl = el("dl");
-  if (row.structure_stage === "rf2") detail.append(el("p", `RF2 설계 단계 구조 · PAE ${fmt(row.rf2_pae)} Å · pLDDT ${fmt(row.rf2_plddt)} · 설계–RF2 RMSD ${fmt(row.rmsd)} Å. 최종 복합체 재예측 지표와 구분하세요.`, "muted"));
+  if (row.structure_stage === "rf2") detail.append(el("p", I18N.format("RF2 설계 단계 구조 · PAE {0} Å · pLDDT {1} · 설계–RF2 RMSD {2} Å. 최종 복합체 재예측 지표와 구분하세요.", [fmt(row.rf2_pae), fmt(row.rf2_plddt), fmt(row.rmsd)]), "muted"));
   for (const key of metricKeys) {
-    const term = el("dt", metricCaption(key, row, state.result.mode));term.dataset.columnKey = key;
-    dl.append(term, el("dd", fmt(row[key])));
+    const term = el("dt", I18N.term(metricCaption(key, row, state.result.mode)));term.dataset.columnKey = key;
+    dl.append(term, el("dd", row[key] == null ? I18N.term("미평가") : fmt(row[key])));
   }
   detail.append(dl);
-  const confidenceScope=el("details");confidenceScope.append(el("summary","ipSAE·ipTM 적용 체인과 출처"));
-  confidenceScope.append(el("p", `ipSAE 적용 체인: ${row.ipsae_chain_a || "미기록"}–${row.ipsae_chain_b || "미기록"} · ${["selected_chain_pair","legacy_first_recorded_pair"].includes(row.ipsae_scope) ? "표시된 체인 쌍" : "범위 미기록·상세 원문 확인"}`));
-  confidenceScope.append(el("p","일반 복합체의 요약 ipSAE는 기본적으로 검토한 체인 순서의 첫 쌍이며, 체인쌍을 명시한 실행에서는 해당 쌍입니다. 전체 평균·최솟값과 구분하고 모든 체인 쌍의 결과는 상세 표·CSV에서 확인합니다. ipTM 전체 값과 선택 표적–VHH 쌍 값은 구분하며, 범위가 없으면 전체 복합체로 추정하지 않습니다.","muted"));
+  const confidenceScope=el("details");confidenceScope.append(el("summary",I18N.term("ipSAE·ipTM 적용 체인과 출처")));
+  confidenceScope.append(el("p", I18N.format("ipSAE 적용 체인: {0}–{1} · {2}", [(row.ipsae_chain_a ? row.ipsae_chain_a : I18N.term("미기록")), (row.ipsae_chain_b ? row.ipsae_chain_b : I18N.term("미기록")), ["selected_chain_pair","legacy_first_recorded_pair"].includes(row.ipsae_scope) ? I18N.term("표시된 체인 쌍") : I18N.term("범위 미기록·상세 원문 확인")])));
+  confidenceScope.append(el("p",I18N.term("일반 복합체의 요약 ipSAE는 기본적으로 검토한 체인 순서의 첫 쌍이며, 체인쌍을 명시한 실행에서는 해당 쌍입니다. 전체 평균·최솟값과 구분하고 모든 체인 쌍의 결과는 상세 표·CSV에서 확인합니다. ipTM 전체 값과 선택 표적–VHH 쌍 값은 구분하며, 범위가 없으면 전체 복합체로 추정하지 않습니다."),"muted"));
   if (state.result?.mode === "complex") {
     const selection = row.ipsae_selection === "explicit_primary_pair" ? "명시한 체인쌍" : row.ipsae_selection === "first_pair_in_reviewed_chain_order" ? "검토 순서의 첫 체인쌍" : "선택 기준 미기록";
-    confidenceScope.append(el("p", `요약 쌍 선택: ${selection} · 유한한 기록값의 최솟값 ${fmt(row.min_pair_ipsae)} / 최댓값 ${fmt(row.max_pair_ipsae)} · 평가 쌍 ${fmt(row.pair_ipsae_assessed_count)} / 전체 쌍 ${fmt(row.pair_ipsae_total_count)}. 미평가 체인쌍은 최솟값·최댓값에서 제외됩니다.`));
+    confidenceScope.append(el("p", I18N.format("요약 쌍 선택: {0} · 유한한 기록값의 최솟값 {1} / 최댓값 {2} · 평가 쌍 {3} / 전체 쌍 {4}. 미평가 체인쌍은 최솟값·최댓값에서 제외됩니다.", [selection, fmt(row.min_pair_ipsae), fmt(row.max_pair_ipsae), fmt(row.pair_ipsae_assessed_count), fmt(row.pair_ipsae_total_count)])));
   }
   confidenceScope.append(el("pre",JSON.stringify(Object.fromEntries(Object.entries(row).filter(([key])=>/^ipsae_(scope|chain|source|selection)|^iptm_(scope|source|unavailable)|^(primary_pair|(max|min)_pair_ipsae|pair_ipsae_)/.test(key))),null,2)));detail.append(confidenceScope);
   const methodReceipts = Object.entries(row.metric_provenance || {});
   if (methodReceipts.length) {
     const methods = el("details");
-    methods.append(el("summary", "pDockQ·pDockQ2 계산법과 기존 저장값"));
+    methods.append(el("summary", I18N.term("pDockQ·pDockQ2 계산법과 기존 저장값")));
     for (const [metric, receipt] of methodReceipts) {
       if (receipt.status === "not_assessed") continue;
-      methods.append(el("p", `${metric}: ${receipt.recorded_method || "계산법 미기록"}`, "sequence"));
+      methods.append(el("p", I18N.format("{0}: {1}", [metric, (receipt.recorded_method ? receipt.recorded_method : I18N.term("계산법 미기록"))]), "sequence"));
       if (receipt.caveat) methods.append(el("p", receipt.caveat));
       if (receipt.effective_method && receipt.effective_method !== receipt.recorded_method)
         methods.append(el("p", receipt.effective_method, "sequence"));
     }
     detail.append(methods);
   }
-  detail.append(el("p", "PAE는 Å 단위입니다. pDockQ2는 CA 8 Å 접촉과 방향별 PAE를 사용하며 두 체인 중 최소값을 표시합니다. AlphaFold-Multimer에서 보정됐고 Boltz·Chai·OpenDDE 값은 탐색용입니다. 예측 지표는 실제 결합이나 KD를 입증하지 않습니다.", "muted"));
-  detail.append(el("p", "종합점수는 실행 당시 배치의 상대 점수입니다. 정규화 범위는 저장된 ranking_policy를 확인하세요. 독립 비교는 엔진별로 계산하며, 일부 후보만 다른 엔진으로 재평가하는 기존 경로는 혼합 배치로 기록됩니다. 선별 순위는 적격 게이트와 다양성 제한을 추가 적용합니다. ESM·AntiFold는 서열/폴딩 prior입니다. dev_severe는 심한 5종 게이트, dev_flags는 전체 평가 위험 수 가중치입니다. N/O 근접·반대 전하 접촉·충돌의 단위는 원자쌍이며, 확인된 수소결합 수나 원소별 반데르발스 판정이 아닙니다.", "muted"));
-  detail.append(el("p", "같은 seed라도 엔진·장치 전체의 비트 단위 재현을 보장하지 않습니다. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에 한정됩니다. 생성 단계의 hotspot OFF/ON을 동일 난수 상태로 가정하지 않습니다.", "muted"));
+  detail.append(el("p", I18N.term("PAE는 Å 단위입니다. pDockQ2는 CA 8 Å 접촉과 방향별 PAE를 사용하며 두 체인 중 최소값을 표시합니다. AlphaFold-Multimer에서 보정됐고 Boltz·Chai·OpenDDE 값은 탐색용입니다. 예측 지표는 실제 결합이나 KD를 입증하지 않습니다."), "muted"));
+  detail.append(el("p", I18N.term("종합점수는 실행 당시 배치의 상대 점수입니다. 정규화 범위는 저장된 ranking_policy를 확인하세요. 독립 비교는 엔진별로 계산하며, 일부 후보만 다른 엔진으로 재평가하는 기존 경로는 혼합 배치로 기록됩니다. 선별 순위는 적격 게이트와 다양성 제한을 추가 적용합니다. ESM·AntiFold는 서열/폴딩 prior입니다. dev_severe는 심한 5종 게이트, dev_flags는 전체 평가 위험 수 가중치입니다. N/O 근접·반대 전하 접촉·충돌의 단위는 원자쌍이며, 확인된 수소결합 수나 원소별 반데르발스 판정이 아닙니다."), "muted"));
+  detail.append(el("p", I18N.term("같은 seed라도 엔진·장치 전체의 비트 단위 재현을 보장하지 않습니다. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에 한정됩니다. 생성 단계의 hotspot OFF/ON을 동일 난수 상태로 가정하지 않습니다."), "muted"));
   if (row.threshold_checks !== undefined) {
     const facts = el("details"),
-      caption = el("summary", "지표 해석·실행 당시 선별 기준");
+      caption = el("summary", I18N.term("지표 해석·실행 당시 선별 기준"));
     facts.append(caption);
     table(
       facts.appendChild(el("div", undefined, "scroll")),
@@ -1634,11 +1595,11 @@ async function selectCandidate(id) {
     facts.append(
       el(
         "p",
-        "ipSAE는 계면 PAE 기반 구조 일관성, ipTM은 상대 배치 신뢰도입니다. PAE는 Å 단위 오차입니다. 이 값은 결합 확률·KD가 아닙니다.",
+        I18N.term("ipSAE는 계면 PAE 기반 구조 일관성, ipTM은 상대 배치 신뢰도입니다. PAE는 Å 단위 오차입니다. 이 값은 결합 확률·KD가 아닙니다."),
       ),
     );
     const rawChecks=el("details");
-    rawChecks.append(el("summary","원본 판정 기록"),el("pre",JSON.stringify(row.threshold_checks,null,2)));
+    rawChecks.append(el("summary",I18N.term("원본 판정 기록")),el("pre",JSON.stringify(row.threshold_checks,null,2)));
     facts.append(rawChecks);
     detail.append(facts);
   }
@@ -1649,7 +1610,7 @@ async function selectCandidate(id) {
   if (Object.keys(cdr).length) {
     const details = el("details");
     details.append(
-      el("summary", "CDR·개발가능성·변이 상세 값"),
+      el("summary", I18N.term("CDR·개발가능성·변이 상세 값")),
       el(
         "pre",
         JSON.stringify(
@@ -1688,9 +1649,7 @@ function renderDistribution(observations) {
       groups.get(key).push(row.iptm);
     }
   }
-  $("observation-note").textContent =
-    `현재 후보 ${observations.length}개 관측. 조건별 ${metricCaption("iptm", observations)}을 따로 표시하며 서로 다른 조건을 합산하지 않습니다. ` +
-    [...groups.keys()].map((name, i) => `조건 ${i + 1}: ${name}`).join(" · ");
+  I18N.text($("observation-note"), I18N.concat([I18N.format("현재 후보 {0}개 관측. 조건별 {1}을 따로 표시하며 서로 다른 조건을 합산하지 않습니다. ", [observations.length, I18N.term(metricCaption("iptm", observations))]), I18N.concat([...groups.keys()].flatMap((name, i) => [i ? " · " : "", I18N.format("조건 {0}: {1}", [i+1, name])]))]));
   if (window.Plotly)
     Plotly.react(
       $("distribution"),
@@ -1707,11 +1666,11 @@ function renderDistribution(observations) {
         // Full condition names remain in the note and hover; short axis labels
         // keep long MSA names from extending beyond a narrow report viewport.
         xaxis: { tickmode: "array", tickvals: [...groups.keys()],
-          ticktext: [...groups.keys()].map((_, i) => `조건 ${i + 1}`) },
-        yaxis: { title: { text: metricCaption("iptm", observations) } },
+          ticktext: [...groups.keys()].map((_, i) => I18N.value(I18N.format("조건 {0}", [i+1]))) },
+        yaxis: { title: { text: I18N.value(I18N.term(metricCaption("iptm", observations))) } },
         annotations: groups.size
           ? []
-          : [{ text: "반복 관측의 ipTM 미평가", showarrow: false }],
+          : [{ text: I18N.value(I18N.term("반복 관측의 ipTM 미평가")), showarrow: false }],
       },
       { responsive: true, displaylogo: false, modeBarButtonsToRemove: ["sendChartToCloud", "sendDataToCloud", "editInChartStudio"] },
     );
@@ -1743,7 +1702,7 @@ async function loadStructure() {
     if (request !== state.structureRequest) return;
     state.structure = null;
     disposeResultViewer();
-    $("structure-note").textContent = e.message;
+    I18N.text($("structure-note"), I18N.term(e.message));
     $("structure-details").replaceChildren();
     if (window.Plotly)
       Plotly.react(
@@ -1770,7 +1729,7 @@ function disposeResultViewer() {
   $("structure-view").replaceChildren();
   syncResultChainControls();
   for (const id of ["structure-actions", "cdr-actions"]) $(id).replaceChildren();
-  $("reference-note").textContent = "";
+  I18N.text($("reference-note"), "");
   for (const id of ["residue-a", "residue-b"]) $(id).replaceChildren();
 }
 function resultLayers() {
@@ -1804,6 +1763,20 @@ function structureDataNote(data) {
   return coordinatePresentation(data).caption + " " + (metrics.length ? metrics.join(" · ") + ". " : "") +
     "신뢰도 지표와 PAE를 함께 확인하세요. 계산 완료는 구조 품질 통과나 실제 결합 확인을 뜻하지 않습니다.";
 }
+function localizedStructureDataNote(data) {
+  const metrics=[];
+  if (Number.isFinite(data.global_iptm)) metrics.push(I18N.format("전체 복합체 ipTM {0}", [data.global_iptm.toFixed(3)]));
+  if (data.pair_metrics?.length === 1) {
+    const pair=data.pair_metrics[0];
+    if (Number.isFinite(pair.interface_plddt)) metrics.push(I18N.format("계면 pLDDT {0}", [pair.interface_plddt.toFixed(1)]));
+    if (Number.isFinite(pair.interface_pae)) metrics.push(I18N.format("계면 PAE {0} Å", [pair.interface_pae.toFixed(1)]));
+  }
+  const parts=[I18N.term(coordinatePresentation(data).caption), " "];
+  metrics.forEach((metric,index)=>parts.push(index ? " · " : "",metric));
+  if(metrics.length)parts.push(". ");
+  parts.push(I18N.term("신뢰도 지표와 PAE를 함께 확인하세요. 계산 완료는 구조 품질 통과나 실제 결합 확인을 뜻하지 않습니다."));
+  return I18N.concat(parts);
+}
 function resultChain(role) {
   const data = state.structure;
   const id = role === "target" ? data?.target_chain : data?.binder_chain;
@@ -1814,9 +1787,9 @@ function syncResultChainControls() {
   for (const role of ["target", "binder"]) {
     const button = $("select-result-" + role), chain = resultChain(role);
     const label = role === "target" ? (complex ? "기준 체인" : "표적") : (complex ? "파트너" : "나노바디");
-    button.textContent = label + " 선택";
+    I18N.text(button, I18N.term(role === "target" ? (complex ? "기준 체인 선택" : "표적 선택") : (complex ? "파트너 선택" : "나노바디 선택")));
     button.disabled = !state.viewer || !chain?.residues?.length;
-    button.title = chain?.residues?.length ? `체인 ${chain.id} · ${chain.residues.length}개 잔기를 선택하고 확대합니다.` : "해당 체인의 좌표가 없습니다.";
+    I18N.attribute(button, "title", I18N.term(chain?.residues?.length ? `체인 ${chain.id} · ${chain.residues.length}개 잔기를 선택하고 확대합니다.` : "해당 체인의 좌표가 없습니다."));
   }
 }
 async function focusResultChain(role) {
@@ -1829,18 +1802,18 @@ async function focusResultChain(role) {
   if (state.structure !== data || state.viewer !== viewer) return;
   await viewer.focus(chain.residues.map(residue => residue.label));
   if (state.structure !== data || state.viewer !== viewer) return;
-  $("structure-note").textContent = `${$("select-result-" + role).textContent} · 체인 ${chain.id} · ${chain.residues.length}개 잔기`;
+  I18N.text($("structure-note"), I18N.format("{0} · 체인 {1} · {2}개 잔기", [$("select-result-" + role).textContent, chain.id, chain.residues.length]));
 }
 async function focusStructure(labels, text, reveal = false) {
   const viewer = state.viewer, data = state.structure;
   if (!viewer) throw Error("MolStar 구조가 준비될 때까지 기다리세요.");
   await viewer.focus(labels);
   if (state.viewer !== viewer || state.structure !== data) return;
-  $("structure-note").textContent = text || `선택 잔기: ${labels.join(" · ")}`;
+  I18N.text($("structure-note"), (text ? text : I18N.format("선택 잔기: {0}", [labels.join(" · ")])));
   if (reveal) $("structure-view").scrollIntoView({block: "center", behavior: "auto"});
 }
 function focusButton(label, labels, text, measurement) {
-  const button = el("button", label, "secondary");
+  const button = el("button", I18N.term(label), "secondary");
   button.onclick = async () => {
     try {
       const viewer = state.viewer, data = state.structure;
@@ -1854,31 +1827,31 @@ function focusButton(label, labels, text, measurement) {
 async function renderStructure() {
   const data = state.structure;
   if (!data) return;
-  $("structure-data-note").textContent = structureDataNote(data);
+  I18N.text($("structure-data-note"), localizedStructureDataNote(data));
   if (state.viewerData !== data) {
     disposeResultViewer();
     const request = state.viewerRequest;
     state.viewerData = data;
-    $("structure-note").textContent = "MolStar 구조·서열 준비 중";
+    I18N.text($("structure-note"), I18N.term("MolStar 구조·서열 준비 중"));
     const host = el("div", undefined, "molstar-host");
     $("structure-view").replaceChildren(host);
     state.viewerReady = NanoCoFoldResultViewer.create(host, data, location => {
       if (state.structure !== data) return;
       const original = location.mapping ? `${location.mapping.author_chain || location.mapping.source_chain}:${location.mapping.source_residue || "미관측"}` : null;
-      $("structure-note").textContent = `${location.label} · 구조 author 번호${original ? " · 입력 원본 " + original : " · 원본 대응은 아래 표 확인"}`;
+      I18N.text($("structure-note"), I18N.format("{0} · 구조 author 번호{1}", [I18N.term(location.label), original ? I18N.concat([I18N.term(" · 입력 원본 "), original]) : I18N.term(" · 원본 대응은 아래 표 확인")]));
       $("residue-a").value = location.label;
     });
     let viewer;
     try { viewer = await state.viewerReady; }
     catch (error) {
       if (request !== state.viewerRequest) return;
-      $("structure-note").textContent = "MolStar 표시 실패: " + error.message;
+      I18N.text($("structure-note"), I18N.concat([I18N.term("MolStar 표시 실패: "), error.message]));
       return;
     }
     if (request !== state.viewerRequest || state.structure !== data) { viewer.dispose(); return; }
     state.viewer = viewer;
     syncResultChainControls();
-    if ($("structure-source")) $("structure-source").textContent = `현재 모델 ${data.candidate_id} · 체인 ${data.chains.map(c=>c.id).join(", ")} · ${coordinatePresentation(data).caption}`;
+    if ($("structure-source")) I18N.text($("structure-source"), I18N.format("현재 모델 {0} · 체인 {1} · {2}", [data.candidate_id, data.chains.map(c=>c.id).join(", "), I18N.term(coordinatePresentation(data).caption)]));
     if ($("save-native-structure")) $("save-native-structure").disabled = !coordinatePresentation(data).rawAvailable;
     if ($("save-pae")) $("save-pae").disabled = !data.pae;
   } else if (!state.viewer) {
@@ -1888,8 +1861,7 @@ async function renderStructure() {
   await state.viewer.layers(resultLayers());
   await state.viewer.display(resultDisplay());
   if (state.structure !== data) return;
-  $("structure-note").textContent =
-    `MolStar · ${state.result.mode === 'complex' ? '기준 체인' : '표적'} ${data.target_chain} · ${state.result.mode === 'complex' ? '파트너' : 'VHH'} ${data.binder_chain} · 접촉 잔기쌍 ${data.contacts?.length || 0} · 충돌 잔기쌍 ${data.clashes?.length || 0}. 서열·PAE·아래 버튼에서 잔기를 선택하세요.`;
+  I18N.text($("structure-note"), I18N.format("MolStar · {0} {1} · {2} {3} · 접촉 잔기쌍 {4} · 충돌 잔기쌍 {5}. 서열·PAE·아래 버튼에서 잔기를 선택하세요.", [state.result.mode === 'complex' ? I18N.term('기준 체인') : I18N.term('표적'), data.target_chain, state.result.mode === 'complex' ? I18N.term('파트너') : 'VHH', data.binder_chain, (data.contacts?.length ? data.contacts?.length : 0), (data.clashes?.length ? data.clashes?.length : 0)]));
   const residues = (data.chains || []).flatMap(c => c.residues.map(r => ({value: r.label, label: `${r.label} ${r.name}`})));
   for (const id of ["residue-a", "residue-b"]) {
     const saved = $(id).value;
@@ -1899,15 +1871,13 @@ async function renderStructure() {
   const reference = data.reference;
   const toggle = document.querySelector('[data-layer="reference"]');
   toggle.disabled = !reference?.available;
-  $("reference-note").textContent = reference?.available
-    ? `입력 좌표 중첩: 표적 Cα ${reference.matched_ca}개 · RMSD ${reference.rmsd.toFixed(2)} Å. ${reference.note || ""}`
-    : `입력 좌표 중첩 미평가: ${reference?.reason || "보존된 참조 좌표 없음"}`;
+  I18N.text($("reference-note"), reference?.available ? I18N.format("입력 좌표 중첩: 표적 Cα {0}개 · RMSD {1} Å. {2}", [reference.matched_ca, reference.rmsd.toFixed(2), (reference.note ? reference.note : "")]) : I18N.format("입력 좌표 중첩 미평가: {0}", [I18N.term(reference?.reason || "보존된 참조 좌표 없음")]));
   const actions = $("structure-actions"); actions.replaceChildren();
   if (data.clashes?.length)
     actions.append(focusButton(`충돌 잔기쌍 · ${data.clashes.length}쌍 보기`, data.clashes.flatMap(p => [p.a, p.b])));
   if ((state.candidate.developability_details?.warnings || []).some(r => /cys/i.test(r)) && data.cysteines?.residues.length)
     actions.append(focusButton("Cys 위험 사유 · 좌표 확인", data.cysteines.residues, data.cysteines.note));
-  const cdrActions = $("cdr-actions"); cdrActions.replaceChildren(el("span", data.cdr?.note || "CDR 미평가", "muted"));
+  const cdrActions = $("cdr-actions"); cdrActions.replaceChildren(el("span", (data.cdr?.note ? data.cdr?.note : I18N.term("CDR 미평가")), "muted"));
   for (const [name, region] of Object.entries(data.cdr?.ranges || {})) {
     const button = focusButton(`${name} ${region.start}–${region.end}`, region.labels);
     cdrActions.append(button);
@@ -1915,34 +1885,34 @@ async function renderStructure() {
   const details = $("structure-details");
   details.replaceChildren();
   if (data.pair_metrics) {
-    details.append(el("h3", "체인 쌍별 지표"));
+    details.append(el("h3", I18N.term("체인 쌍별 지표")));
     table(details.appendChild(el("div")), data.pair_metrics, ["chain_a", "chain_b", "iptm_a_to_b", "iptm_b_to_a", "ipsae", "interface_pae", "n_clashes"]);
   }
   if (reference?.chains) {
-    details.append(el("h3", "기준 체인 정렬 후 참조 비교"));
+    details.append(el("h3", I18N.term("기준 체인 정렬 후 참조 비교")));
     table(details.appendChild(el("div")), reference.chains, ["chain", "matched_ca", "ca_rmsd_angstrom", "interest_ca_rmsd_angstrom"]);
-    details.append(el("p", `5 Å 접촉 회복률: ${fmt(reference.fnat_5A)} (${reference.recovered_contacts_5A}/${reference.reference_contacts_5A})`));
+    details.append(el("p", I18N.format("5 Å 접촉 회복률: {0} ({1}/{2})", [fmt(reference.fnat_5A), reference.recovered_contacts_5A, reference.reference_contacts_5A])));
   }
-  details.append(el("h3", "접촉"));
+  details.append(el("h3", I18N.term("접촉")));
   table(details.appendChild(el("div")), data.contacts || [], [
     "a",
     "b",
     "distance",
     "kind",
   ]);
-  details.append(el("h3", "충돌 잔기쌍"),el("p","표의 충돌 원자쌍 수와 아래 중복 제거된 잔기쌍 수는 집계 단위가 다릅니다. 각 잔기쌍의 가장 가까운 원자와 해당 cutoff를 표시합니다.","muted"));
+  details.append(el("h3", I18N.term("충돌 잔기쌍")),el("p",I18N.term("표의 충돌 원자쌍 수와 아래 중복 제거된 잔기쌍 수는 집계 단위가 다릅니다. 각 잔기쌍의 가장 가까운 원자와 해당 cutoff를 표시합니다."),"muted"));
   for (const pair of data.clashes || []) {
     const text = `${pair.a}:${pair.atom_a} – ${pair.b}:${pair.atom_b} · ${pair.distance.toFixed(2)} Å < ${pair.cutoff} Å (${pair.kind})`;
     details.append(focusButton(text, [pair.a, pair.b], text, [pair.a, pair.b, pair.atom_a, pair.atom_b]));
   }
-  if (state.result.mode !== "complex") details.append(el("h3", "VHH Cys SG–SG 거리"), el("p", data.cysteines?.note || "미평가"));
+  if (state.result.mode !== "complex") details.append(el("h3", I18N.term("VHH Cys SG–SG 거리")), el("p", (data.cysteines?.note ? data.cysteines?.note : I18N.term("미평가"))));
   for (const pair of data.cysteines?.pairs || []) {
     const text = `${pair.a}:SG – ${pair.b}:SG · ${pair.distance == null ? "SG 미관측" : pair.distance.toFixed(3) + " Å"}`;
     details.append(focusButton(text, [pair.a, pair.b], text, pair.distance == null ? null : [pair.a, pair.b, "SG", "SG"]));
   }
-  if (data.cysteines?.missing_sg.length) details.append(el("p", "SG 없는 Cys: " + data.cysteines.missing_sg.join(", ")));
-  if (data.target_region) details.append(el("h3", "분석 구간·Hotspot 제외 영역"), el("pre", JSON.stringify(data.target_region, null, 2)));
-  details.append(el("h3", "원본 잔기 대응"));
+  if (data.cysteines?.missing_sg.length) details.append(el("p", I18N.concat([I18N.term("SG 없는 Cys: "), data.cysteines.missing_sg.join(", ")])));
+  if (data.target_region) details.append(el("h3", I18N.term("분석 구간·Hotspot 제외 영역")), el("pre", JSON.stringify(data.target_region, null, 2)));
+  details.append(el("h3", I18N.term("원본 잔기 대응")));
   const mapping = data.residue_mapping || [];
   if (mapping.length)
     table(details.appendChild(el("div")), mapping, Object.keys(mapping[0]));
@@ -1950,7 +1920,7 @@ async function renderStructure() {
     details.append(
       el(
         "p",
-        "별도 입력 매핑 없음. 위 3D와 PAE는 구조의 author 체인·번호를 표시합니다.",
+        I18N.term("별도 입력 매핑 없음. 위 3D와 PAE는 구조의 author 체인·번호를 표시합니다."),
       ),
     );
   warnings(details.appendChild(el("div")), data.issues);
@@ -1969,21 +1939,21 @@ async function renderStructure() {
               reversescale: true,
               colorbar: { title: { text: "Å" }, thickness: 12, tickfont: { size: 12 } },
               hovertemplate:
-                "정렬 기준 (행) %{y}<br>평가 잔기 (열) %{x}<br>PAE %{z:.2f} Å<extra></extra>",
+                I18N.value(I18N.term("정렬 기준 (행) %{y}<br>평가 잔기 (열) %{x}<br>PAE %{z:.2f} Å<extra></extra>")),
             },
           ]
         : [],
       {
         font: { size: 14 },
         margin: { t: 15, b: 70, l: 50, r: 10 },
-        xaxis: { automargin: true, nticks: 5, tickangle: -45, title: { text: "열 · 평가 잔기", font: { size: 14 }, standoff: 12 }, type: "category" },
-        yaxis: { automargin: true, nticks: 6, type: "category", autorange: "reversed", title:{text:"행 · 정렬 기준 잔기"} },
+        xaxis: { automargin: true, nticks: 5, tickangle: -45, title: { text: I18N.value(I18N.term("열 · 평가 잔기")), font: { size: 14 }, standoff: 12 }, type: "category" },
+        yaxis: { automargin: true, nticks: 6, type: "category", autorange: "reversed", title:{text:I18N.value(I18N.term("행 · 정렬 기준 잔기"))} },
         shapes: pae ? pae.labels.flatMap((label,i)=>{
           if(!i||label.split(":")[0]===pae.labels[i-1].split(":")[0])return [];
           return [{type:"line",xref:"x",yref:"paper",x0:i-.5,x1:i-.5,y0:0,y1:1,line:{color:"#586b78",width:1}},
                   {type:"line",xref:"paper",yref:"y",x0:0,x1:1,y0:i-.5,y1:i-.5,line:{color:"#586b78",width:1}}];
         }) : [],
-        annotations: pae ? [] : [{ text: data.pae_status === "removed_by_retention" ? "PAE · 용량 정리로 삭제됨" : "PAE 미평가", showarrow: false }],
+        annotations: pae ? [] : [{ text: data.pae_status === "removed_by_retention" ? I18N.value(I18N.term("PAE · 용량 정리로 삭제됨")) : I18N.value(I18N.term("PAE 미평가")), showarrow: false }],
       },
       { responsive: true, displaylogo: false, displayModeBar: false },
     );
@@ -2054,7 +2024,7 @@ function renderDiagnostics(diagnosis) {
   if (!diagnosis) return;
   const output = $("diagnostics-output");
   output.replaceChildren(
-    el("h3", diagnosis.ok ? "실행 준비 통과" : "실행 준비 미충족"),
+    el("h3", diagnosis.ok ? I18N.term("실행 준비 통과") : I18N.term("실행 준비 미충족")),
   );
   const rows = diagnosis.checks.map((c) => ({
     항목: c.name,
@@ -2145,7 +2115,7 @@ function setupExplorer() {
     action("select-result-" + role, () => focusResultChain(role));
   action("clear-result-selection", async () => {
     await state.viewer?.clearSelection();
-    $("structure-note").textContent = "잔기 선택 강조를 해제했습니다.";
+    I18N.text($("structure-note"), I18N.term("잔기 선택 강조를 해제했습니다."));
   });
   action("save-result-structure", () => {
     if (!state.structure?.content) throw Error("선택 모델의 구조가 없습니다.");
@@ -2190,9 +2160,7 @@ function syncBatchFields() {
   for (const node of document.querySelectorAll("[data-batch-field]"))
     node.hidden = json || (node.dataset.batchField !== "name" && node.dataset.batchField !== mode);
   $("batch-mode").closest("label").hidden = json;
-  $("batch-format-help").textContent = json
-    ? "JSON 안의 목적·이름·서열·조건을 사용합니다. 공통 입력 칸은 필요하지 않습니다."
-    : "목적에 필요한 공통 입력만 아래에 표시됩니다. 표적마다 다른 조건은 JSON으로 지정하세요.";
+  I18N.text($("batch-format-help"), json ? I18N.term("JSON 안의 목적·이름·서열·조건을 사용합니다. 공통 입력 칸은 필요하지 않습니다.") : I18N.term("목적에 필요한 공통 입력만 아래에 표시됩니다. 표적마다 다른 조건은 JSON으로 지정하세요."));
 }
 function resetBatchReview(revokeConsent = true) {
   batchInputRevision++;
@@ -2202,10 +2170,10 @@ function resetBatchReview(revokeConsent = true) {
     $("batch-tutorial-summary").hidden = true;
   }
   $("batch-submit").disabled = true;
-  $("batch-submit").textContent = "3. 선택한 분석 실행";
+  I18N.text($("batch-submit"), I18N.term("3. 선택한 분석 실행"));
   $("batch-cancel").disabled = true;
-  $("batch-summary").textContent = "입력을 준비한 뒤 검토하세요. 아직 계산을 제출하지 않았습니다.";
-  $("batch-next-step").textContent = "2단계 · 입력이 바뀌었습니다. 필요한 MSA 동의를 확인하고 배치 입력 검토를 누르세요.";
+  I18N.text($("batch-summary"), I18N.term("입력을 준비한 뒤 검토하세요. 아직 계산을 제출하지 않았습니다."));
+  I18N.text($("batch-next-step"), I18N.term("2단계 · 입력이 바뀌었습니다. 필요한 MSA 동의를 확인하고 배치 입력 검토를 누르세요."));
   $("batch-rows").replaceChildren();
   syncBatchFields();
 }
@@ -2225,12 +2193,10 @@ async function loadTutorial(mode) {
     resetBatchReview();
     $("batch-content-details").open = false;
     const summary = $("batch-tutorial-summary");
-    summary.textContent = example.title + " · " + example.description + " · GPU 계산 미제출";
+    I18N.text(summary, I18N.concat([example.title + " · " + example.description, I18N.term(" · GPU 계산 미제출")]));
     summary.hidden = false;
-    $("batch-next-step").textContent = example.requires_api_consent
-      ? "2단계 · 공개 서열의 외부 MSA 전송 동의를 직접 체크한 뒤 배치 입력 검토를 누르세요."
-      : "2단계 · 예제 입력이 준비되었습니다. 배치 입력 검토를 누르세요. 이 예제는 외부 MSA 전송이 필요 없습니다.";
-    $("tutorial-status").textContent = "공개 예제를 불러왔습니다. 다음 화면에서 입력을 검토하세요.";
+    I18N.text($("batch-next-step"), example.requires_api_consent ? I18N.term("2단계 · 공개 서열의 외부 MSA 전송 동의를 직접 체크한 뒤 배치 입력 검토를 누르세요.") : I18N.term("2단계 · 예제 입력이 준비되었습니다. 배치 입력 검토를 누르세요. 이 예제는 외부 MSA 전송이 필요 없습니다."));
+    I18N.text($("tutorial-status"), I18N.term("공개 예제를 불러왔습니다. 다음 화면에서 입력을 검토하세요."));
     view("batch");
     (example.requires_api_consent ? $("batch-api-consent") : $("batch-review")).focus();
   });
@@ -2238,43 +2204,39 @@ async function loadTutorial(mode) {
 function renderBatch(batch) {
   if (activeBatch?.id !== batch.id) batchSelected = batch.selected || batch.rows.filter(r => !r.error).map(r => r.id);
   activeBatch = batch;
-  $("batch-summary").textContent = batch.name + " · " + batch.rows.length + "개 · 계산 완료 " + batch.rows.filter(r => r.job?.state === "complete").length;
+  I18N.text($("batch-summary"), I18N.concat([I18N.concat([batch.name + " · " + batch.rows.length, I18N.term("개 · 계산 완료 ")]), batch.rows.filter(r => r.job?.state === "complete").length]));
   const body=el("tbody"), target=el("table"), head=el("thead"), header=el("tr");
-  for(const label of ["실행 선택", "항목", "입력 검토", "계산", "결과"]) header.append(el("th",label));
+  for(const label of ["실행 선택", "항목", "입력 검토", "계산", "결과"]) header.append(el("th",I18N.term(label)));
   head.append(header); target.append(head,body);
   const labels={queued:"대기",running:"실행 중",complete:"완료",failed:"실패",partial_failure:"일부 실패",interrupted:"중단",cancelled:"취소",budget_exhausted:"시간 한도",cancelling:"취소 중"};
   for(const row of batch.rows){
-    const line=el("tr"), choice=el("td"), check=el("input"), status=el("td",row.submission_error||labels[row.job?.state]||"미제출");
-    check.type="checkbox";check.setAttribute("aria-label",row.id+" 실행 선택");check.checked=batchSelected.includes(row.id);check.disabled=batchBusy||!!batch.selected||!!row.error;
+    const line=el("tr"), choice=el("td"), check=el("input"), status=el("td",(row.submission_error||labels[row.job?.state] ? (row.submission_error ? row.submission_error : I18N.term(labels[row.job?.state])) : I18N.term("미제출")));
+    check.type="checkbox";I18N.attribute(check, "aria-label", I18N.concat([row.id, I18N.term(" 실행 선택")]));check.checked=batchSelected.includes(row.id);check.disabled=batchBusy||!!batch.selected||!!row.error;
     check.onchange=()=>{batchSelected=check.checked?[...batchSelected,row.id]:batchSelected.filter(id=>id!==row.id);renderBatch(activeBatch);};choice.append(check);
-    if(row.error||row.submission_error){line.style.background="#fff1ef";line.setAttribute("aria-label",row.id+" 오류");}
-    for(const action of row.job?.can_resume?["resume"]:row.job&&['queued','running','cancelling'].includes(row.job.state)?["cancel"]:[]){const button=el("button",action==="resume"?"항목 재개":"항목 취소");button.disabled=batchBusy;button.onclick=()=>batchAction("항목 요청 처리 중",async()=>{await api("/api/jobs/"+row.job_id+"/"+action,{additional_budget_seconds:36000});renderBatch(await api("/api/batches/"+batch.id));});status.append(button);}
-    line.append(choice,el("td",row.id),el("td",row.error||"검토 완료"),status);
-    const result=el("td");if(row.job?.run_dir&&["complete","failed","partial_failure"].includes(row.job.state)){const link=el("a","결과 열기");link.href="/?result="+encodeURIComponent(row.job_id);link.target="_blank";link.rel="noopener";result.append(link);}else result.textContent="—";line.append(result);body.append(line);
+    if(row.error||row.submission_error){line.style.background="#fff1ef";I18N.attribute(line, "aria-label", I18N.concat([row.id, I18N.term(" 오류")]));}
+    for(const action of row.job?.can_resume?["resume"]:row.job&&['queued','running','cancelling'].includes(row.job.state)?["cancel"]:[]){const button=el("button",action==="resume" ? I18N.term("항목 재개") : I18N.term("항목 취소"));button.disabled=batchBusy;button.onclick=()=>batchAction("항목 요청 처리 중",async()=>{await api("/api/jobs/"+row.job_id+"/"+action,{additional_budget_seconds:36000});renderBatch(await api("/api/batches/"+batch.id));});status.append(button);}
+    line.append(choice,el("td",row.id),el("td",(row.error ? row.error : I18N.term("검토 완료"))),status);
+    const result=el("td");if(row.job?.run_dir&&["complete","failed","partial_failure"].includes(row.job.state)){const link=el("a",I18N.term("결과 열기"));link.href="/?result="+encodeURIComponent(row.job_id);link.target="_blank";link.rel="noopener";result.append(link);}else I18N.text(result, "—");line.append(result);body.append(line);
   }
   $("batch-rows").replaceChildren(target);
   $("batch-submit").disabled=batchBusy||Boolean(batch.selected)||!batchSelected.length||batch.rows.some(r=>batchSelected.includes(r.id)&&r.error);
-  $("batch-submit").textContent=batch.selected?"이미 제출된 분석":"3. 선택한 "+batchSelected.length+"개 분석 실행";
-  $("batch-next-step").textContent = batch.selected
-    ? "4단계 · 계산을 제출했습니다. 완료된 행의 결과 열기를 누르세요. 실행 중 상태는 자동으로 갱신됩니다."
-    : batch.rows.some(row => row.error)
-      ? "2단계 · 검토 오류가 있습니다. 아래 항목별 오류를 확인하고 입력을 수정한 뒤 다시 검토하세요."
-      : "3단계 · 입력 검토 완료, 계산 미제출입니다. 실행할 항목을 확인하고 선택한 분석 실행을 누르세요.";
+  I18N.text($("batch-submit"), batch.selected ? I18N.term("이미 제출된 분석") : I18N.concat([I18N.concat([I18N.term("3. 선택한 "), batchSelected.length]), I18N.term("개 분석 실행")]));
+  I18N.text($("batch-next-step"), batch.selected ? I18N.term("4단계 · 계산을 제출했습니다. 완료된 행의 결과 열기를 누르세요. 실행 중 상태는 자동으로 갱신됩니다.") : batch.rows.some(row => row.error) ? I18N.term("2단계 · 검토 오류가 있습니다. 아래 항목별 오류를 확인하고 입력을 수정한 뒤 다시 검토하세요.") : I18N.term("3단계 · 입력 검토 완료, 계산 미제출입니다. 실행할 항목을 확인하고 선택한 분석 실행을 누르세요."));
   $("batch-cancel").disabled=batchBusy||!batch.rows.some(r=>r.job&&!['complete','failed','cancelled','partial_failure','budget_exhausted','interrupted'].includes(r.job.state));
 }
-async function refreshBatchHistory(){const data=await api("/api/batches");const node=$("batch-history");node.replaceChildren();for(const batch of data.batches){const button=el("button",batch.name+" · "+batch.rows.length+"개");button.onclick=async()=>renderBatch(await api("/api/batches/"+batch.id));node.append(button);}if(!data.batches.length)node.textContent="아직 검토한 배치가 없습니다.";}
+async function refreshBatchHistory(){const data=await api("/api/batches");const node=$("batch-history");node.replaceChildren();for(const batch of data.batches){const button=el("button",I18N.concat([batch.name+" · "+batch.rows.length, I18N.term("개")]));button.onclick=async()=>renderBatch(await api("/api/batches/"+batch.id));node.append(button);}if(!data.batches.length)I18N.text(node, I18N.term("아직 검토한 배치가 없습니다."));}
 async function batchAction(message, fn) {
   if (batchBusy) return;
   batchBusy = true;
-  const started = Date.now(), update = () => { $("batch-activity").textContent = message + " · " + Math.floor((Date.now() - started) / 1000) + "초"; };
+  const started = Date.now(), update = () => { I18N.text($("batch-activity"), I18N.concat([message + " · " + Math.floor((Date.now() - started) / 1000), I18N.term("초")])); };
   const editable = ["batch-review", "batch-file", "batch-content", "batch-mode", "batch-format", "batch-name", "batch-library", "batch-wt", "batch-partners", "batch-api-consent", "batch-use-config", "batch-example", "load-tutorial", "tutorial-mode"];
   update(); const timer = setInterval(update, 1000);
   for (const id of [...editable, "batch-submit", "batch-cancel"]) $(id).disabled = true;
   try {
-    await fn(); $("batch-activity").textContent = "요청 완료";
+    await fn(); I18N.text($("batch-activity"), I18N.term("요청 완료"));
   } catch (error) {
     notice(error.message, true);
-    $("batch-activity").textContent = "요청 실패 · " + error.message;
+    I18N.text($("batch-activity"), I18N.concat([I18N.term("요청 실패 · "), error.message]));
     $("batch-content-details").open = true;
     $("batch-content").setAttribute("aria-invalid", "true");
     $("batch-content").focus();
@@ -2286,7 +2248,7 @@ async function batchAction(message, fn) {
 }
 
 function initBatch(){
-  setInterval(async()=>{if(batchBusy||document.hidden||$("view-batch").hidden||!activeBatch)return;const id=activeBatch.id;try{const next=await api("/api/batches/"+id);if(activeBatch?.id===id&&!batchBusy)renderBatch(next);}catch(e){$("batch-activity").textContent="마지막 상태를 표시합니다. "+e.message;}},4000);
+  setInterval(async()=>{if(batchBusy||document.hidden||$("view-batch").hidden||!activeBatch)return;const id=activeBatch.id;try{const next=await api("/api/batches/"+id);if(activeBatch?.id===id&&!batchBusy)renderBatch(next);}catch(e){I18N.text($("batch-activity"), I18N.concat([I18N.term("마지막 상태를 표시합니다. "), e.message]));}},4000);
   const reset=()=>resetBatchReview();
   syncBatchFields();
   $("batch-api-consent").addEventListener("input", () => resetBatchReview(false));
@@ -2314,9 +2276,7 @@ function platformStartup(status, error = "") {
   const panel = $("platform-startup"); if (!panel) return;
   document.body.dataset.startup = status;
   panel.hidden = status === "ready";
-  $("platform-startup-message").textContent = status === "failed"
-    ? "화면을 준비하지 못했습니다. " + error
-    : "화면을 준비하고 있습니다.";
+  I18N.text($("platform-startup-message"), status === "failed" ? I18N.concat([I18N.term("화면을 준비하지 못했습니다. "), error]) : I18N.term("화면을 준비하고 있습니다."));
   const retry = $("platform-startup-retry");
   retry.hidden = status !== "failed";
   // Reload the document after a partial boot, avoiding duplicated handlers or wizard nodes.
@@ -2453,7 +2413,7 @@ async function boot() {
         input.type = "checkbox";
         input.value = c.id;
         input.addEventListener("change", () => { resetChainReview(); syncChainSelection(); });
-        label.append(input, document.createTextNode(chainLabel(c)));
+        label.append(input, el("span", I18N.term(chainLabel(c))));
         return label;
       }),
     );
@@ -2498,7 +2458,7 @@ async function boot() {
       ...(state.analyzed.patches || []).map((p) => {
         const button = el(
           "button",
-          `${p.positions.join(", ")} · ${p.reason || "추천 패치"}`,
+          I18N.format("{0} · {1}", [p.positions.join(", "), (p.reason ? p.reason : I18N.term("추천 패치"))]),
           "secondary",
         );
         button.onclick = () => {
@@ -2624,7 +2584,7 @@ async function boot() {
     node.replaceChildren(
       el(
         "p",
-        "조건이 다른 점수는 자동 합산하지 않습니다. 입력·엔진·seed·MSA·restraint를 확인하세요.",
+        I18N.term("조건이 다른 점수는 자동 합산하지 않습니다. 입력·엔진·seed·MSA·restraint를 확인하세요."),
         "warning",
       ),
     );
@@ -2635,7 +2595,7 @@ async function boot() {
         el("h3", run.name),
         el(
           "p",
-          `후보 ${run.total} · 적격 ${run.eligible_total} · ${run.mock ? "MOCK" : "실제 예측"}`,
+          I18N.format("후보 {0} · 적격 {1} · {2}", [run.total, run.eligible_total, run.mock ? "MOCK" : I18N.term("실제 예측")]),
         ),
         el("pre", JSON.stringify(run.conditions, null, 2)),
       );
@@ -2669,7 +2629,7 @@ async function boot() {
   const session = await api("/api/session");
   state.presets = session.presets || {};
   [state.starter, state.capabilities] = await Promise.all([api("/api/starter-presets"), api("/api/capabilities")]);
-  $("workspace-path").textContent = session.workspace;
+  I18N.text($("workspace-path"), session.workspace);
   fields();
   await initNoviceFlow();
   await refreshJobs();
@@ -2720,61 +2680,61 @@ async function initNoviceFlow() {
     ["mature", "기존 나노바디 변이 평가", "표적과 WT VHH로 치환 후보를 준비하고 평가합니다."],
   ]) {
     const button = el("button", null, "novice-purpose-choice");
-    button.type = "button"; button.setAttribute("aria-label", title + " · 입력하기");
-    button.append(el("strong", title), el("span", description), el("span", "입력하기"));
+    button.type = "button"; I18N.attribute(button, "aria-label", I18N.concat([I18N.term(title), I18N.term(" · 입력하기")]));
+    button.append(el("strong", I18N.term(title)), el("span", I18N.term(description)), el("span", I18N.term("입력하기")));
     button.onclick = () => { const changed = $("mode").value !== value, wasMock = $("mock").checked; $("mode").value = value; $("tutorial-mode").value = value; if (value === "complex") $("mock").checked = false; if (changed || wasMock !== $("mock").checked) invalidateInput(); fields(); jump(1); };
     purposeChoices.append(button);
   }
   purposeCard.append(purposeChoices);
   const tutorialControls = $("load-tutorial").parentElement;
   tutorialControls.querySelector('label[for="tutorial-mode"]').hidden = true;
-  $("tutorial-mode").hidden = true; $("load-tutorial").textContent = "이 목적의 공개 예제 불러오기";
+  $("tutorial-mode").hidden = true; I18N.text($("load-tutorial"), I18N.term("이 목적의 공개 예제 불러오기"));
   inputCard.prepend(tutorialControls);
   inputCard.append($("tutorial-status"));
-  const demoControls = el("details"); demoControls.append(el("summary", "GPU 없이 사용 흐름 연습 · 합성 데모"), $("mock").closest("label"), $("fill-demo")); inputCard.append(demoControls);
-  purposeCard.querySelector("h2").textContent = "어떤 분석을 시작할까요?"; purposeCard.querySelectorAll("p").forEach(node => node.hidden = true);
-  const purposeHelp = el("p", "복합체: 단백질들을 함께 예측 · 설계: 새 VHH 생성 · 비교: 보유 VHH 전체 평가 · 변이: WT와 치환 후보 평가");
+  const demoControls = el("details"); demoControls.append(el("summary", I18N.term("GPU 없이 사용 흐름 연습 · 합성 데모")), $("mock").closest("label"), $("fill-demo")); inputCard.append(demoControls);
+  I18N.text(purposeCard.querySelector("h2"), I18N.term("어떤 분석을 시작할까요?")); purposeCard.querySelectorAll("p").forEach(node => node.hidden = true);
+  const purposeHelp = el("p", I18N.term("복합체: 단백질들을 함께 예측 · 설계: 새 VHH 생성 · 비교: 보유 VHH 전체 평가 · 변이: WT와 치환 후보 평가"));
   purposeHelp.hidden = true; purposeCard.prepend(purposeHelp);
-  const start = el("button", "이 분석 시작"); start.id = "novice-start"; start.type = "button"; start.hidden = true; purposeCard.append(start);
+  const start = el("button", I18N.term("이 분석 시작")); start.id = "novice-start"; start.type = "button"; start.hidden = true; purposeCard.append(start);
   for (const n of [$("review-input"), $("review-output")]) reviewCard.append(n);
   grid.append(reviewCard);
   const reviewed=el("div");reviewed.id="novice-reviewed-summary";$("review-output").prepend(reviewed);
-  const raw=el("details");raw.append(el("summary","전체 적용 설정 JSON · 고급"),$("resolved-config"));$("review-output").append(raw);
-  reviewCard.prepend(el("h2", "검토·실행 · 적용 입력과 환경 확인")); grid.append(reviewCard);
+  const raw=el("details");raw.append(el("summary",I18N.term("전체 적용 설정 JSON · 고급")),$("resolved-config"));$("review-output").append(raw);
+  reviewCard.prepend(el("h2", I18N.term("검토·실행 · 적용 입력과 환경 확인"))); grid.append(reviewCard);
   grid.classList.add("novice-grid");
-  const rail = host.querySelector(".workflow-steps"); rail.replaceChildren(...state.starter.steps.map((name,i) => el("li", `${i+1}. ${name}`)));
+  const rail = host.querySelector(".workflow-steps"); rail.replaceChildren(...state.starter.steps.map((name,i) => el("li", I18N.format("{0}. {1}", [i+1, I18N.term(name)]))));
   const heading = el("h2", "", "novice-heading"), task = el("p", "", "next-step"); heading.tabIndex=-1;task.setAttribute("role","status");host.insertBefore(heading,purposeCard);host.insertBefore(task,purposeCard);
-  inputCard.querySelector("h2").textContent="입력 준비 · 필요한 서열 또는 파일";
-  settingsCard.querySelector("h2").textContent="실행 조건 · 작은 시작 설정";
+  I18N.text(inputCard.querySelector("h2"), I18N.term("입력 준비 · 필요한 서열 또는 파일"));
+  I18N.text(settingsCard.querySelector("h2"), I18N.term("실행 조건 · 작은 시작 설정"));
   const intro = $("analysis-preset").nextElementSibling;
-  intro.textContent="새 분석의 기본값은 Seed 42와 엔진별 모델 1개입니다. screen은 모든 입력 후보를 평가합니다. 복원한 설정은 그대로 유지합니다.";
-  const advanced = el("details"); advanced.id="novice-advanced";advanced.append(el("summary","고급 설정 · 후보 수·Seed·기존 설정 가져오기"));
+  I18N.text(intro, I18N.term("새 분석의 기본값은 Seed 42와 엔진별 모델 1개입니다. screen은 모든 입력 후보를 평가합니다. 복원한 설정은 그대로 유지합니다."));
+  const advanced = el("details"); advanced.id="novice-advanced";advanced.append(el("summary",I18N.term("고급 설정 · 후보 수·Seed·기존 설정 가져오기")));
   while (intro.nextSibling) advanced.append(intro.nextSibling);settingsCard.append(advanced);
-  const controls=el("fieldset");controls.append(el("legend","평가 엔진 · 동일 입력의 독립 결과"));
+  const controls=el("fieldset");controls.append(el("legend",I18N.term("평가 엔진 · 동일 입력의 독립 결과")));
   for (const engine of state.starter.engines) {const label=el("label", null,"check"), box=el("input");box.type="checkbox";box.checked=true;box.value=engine;box.dataset.noviceEngine="";label.append(box,document.createTextNode(({colabfold:"ColabFold",boltz2:"Boltz-2",chai1:"Chai-1",opendde:"OpenDDE Preview"})[engine]||engine));controls.append(label);}
-  const msa=el("select");msa.id="novice-msa"; for(const [v,label] of [["public_api","공용 MSA 서버 · 정확한 서열 전송 동의 필요"],["cache","검증된 MSA 캐시 재사용"],["local_mmseqs2","등록된 로컬 MSA 검색"]]) {const o=el("option",label);o.value=v;msa.append(o);}
-  const ml=el("label","MSA 준비 방식");ml.htmlFor=msa.id;controls.append(ml,msa);
-  const consent=el("input");consent.id="novice-consent";consent.type="checkbox";const cl=el("label",null,"check");cl.append(consent,document.createTextNode("이 입력의 표적·후보 서열을 api.colabfold.com으로 전송하는 데 동의합니다."));controls.append(cl);
-  const demoMsaNote=el("p","CPU 합성 데모는 MSA를 준비하거나 외부 서버로 서열을 전송하지 않습니다.","muted");controls.append(demoMsaNote);
+  const msa=el("select");msa.id="novice-msa"; for(const [v,label] of [["public_api","공용 MSA 서버 · 정확한 서열 전송 동의 필요"],["cache","검증된 MSA 캐시 재사용"],["local_mmseqs2","등록된 로컬 MSA 검색"]]) {const o=el("option",I18N.term(label));o.value=v;msa.append(o);}
+  const ml=el("label",I18N.term("MSA 준비 방식"));ml.htmlFor=msa.id;controls.append(ml,msa);
+  const consent=el("input");consent.id="novice-consent";consent.type="checkbox";const cl=el("label",null,"check");cl.append(consent,el("span", I18N.term("이 입력의 표적·후보 서열을 api.colabfold.com으로 전송하는 데 동의합니다.")));controls.append(cl);
+  const demoMsaNote=el("p",I18N.term("CPU 합성 데모는 MSA를 준비하거나 외부 서버로 서열을 전송하지 않습니다."),"muted");controls.append(demoMsaNote);
   const plan=el("p","","next-step");plan.id="novice-model-plan";settingsCard.insertBefore(controls,advanced);settingsCard.insertBefore(plan,advanced);
   settingsCard.insertBefore(cl,advanced);
   const complex=el("div");complex.id="novice-complex-fields";complex.hidden=true;
-  const label=el("label","복합체 단백질 FASTA · 위에서 아래 순서로 체인 배정");label.htmlFor="complex-fasta";const fasta=el("textarea");fasta.id="complex-fasta";fasta.rows=8;fasta.spellcheck=false;
+  const label=el("label",I18N.term("복합체 단백질 FASTA · 위에서 아래 순서로 체인 배정"));label.htmlFor="complex-fasta";const fasta=el("textarea");fasta.id="complex-fasta";fasta.rows=8;fasta.spellcheck=false;
   const copies=el("div");copies.id="novice-complex-copies";complex.append(label,fasta,copies);inputCard.insertBefore(complex,$("fasta-fields"));
-  const footer=el("div",null,"novice-footer"),prev=el("button","이전","secondary"),next=el("button","입력 확인 후 다음"),reason=el("p");prev.id="novice-previous";next.id="novice-next";reason.id="novice-blocker";reason.setAttribute("role","alert");footer.append(prev,next,reason);host.append(footer);
+  const footer=el("div",null,"novice-footer"),prev=el("button",I18N.term("이전"),"secondary"),next=el("button",I18N.term("입력 확인 후 다음")),reason=el("p");prev.id="novice-previous";next.id="novice-next";reason.id="novice-blocker";reason.setAttribute("role","alert");footer.append(prev,next,reason);host.append(footer);
   let step=0,restoring=false,draftTimer,saveQueue=Promise.resolve();
   const tasks=["목적을 고르세요. 필요한 입력과 결과를 확인하면 다음으로 이동합니다.","전체 서열·체인 순서·사본 수를 확인하세요. 오류 없는 필수 입력이면 다음으로 이동합니다.","최대 계획 모델 수·선택 엔진·MSA 전송 여부를 확인하세요.","입력을 검토하고 환경 점검을 통과한 뒤 분석 실행을 누르세요. 검토 버튼은 계산을 제출하지 않습니다."];
   function render(){
-    [purposeCard,inputCard,settingsCard,reviewCard].forEach((n,i)=>n.hidden=i!==step);heading.textContent=`${step+1}/4 · ${state.starter.steps[step]}`;task.textContent=tasks[step];prev.hidden=step===0;next.hidden=step===0||step===3;next.textContent=step===1?"입력 확인 후 다음":"조건 확인 후 다음";
+    [purposeCard,inputCard,settingsCard,reviewCard].forEach((n,i)=>n.hidden=i!==step);I18N.text(heading, I18N.format("{0}/4 · {1}", [step+1, I18N.term(state.starter.steps[step])]));I18N.text(task, I18N.term(tasks[step]));prev.hidden=step===0;next.hidden=step===0||step===3;I18N.text(next, step===1 ? I18N.term("입력 확인 후 다음") : I18N.term("조건 확인 후 다음"));
     [...rail.children].forEach((n,i)=>n.setAttribute("aria-current",i===step?"step":"false"));
     const isComplex=$("mode").value==="complex";
     complex.hidden=!isComplex||$("input-kind").value!=="fasta";$("fasta-fields").hidden=isComplex||$("input-kind").value!=="fasta";
     controls.hidden=$("analysis-preset").value!=="small-four-v1";$("mock").disabled=isComplex;demoControls.hidden=isComplex;
     const simulated=$("mock").checked&&!isComplex;ml.hidden=simulated;msa.hidden=simulated;cl.hidden=simulated;demoMsaNote.hidden=!simulated;
-    try {plan.textContent=noviceModelPlan(inputSettings(true),$("mode").value,$("mode").value==="screen"?noviceFasta($("vhh-fasta").value).length:0);}catch(e){plan.textContent=e.message;}
-    $("review-input").textContent="입력 검토·환경 점검";$("start-job").textContent="분석 실행";
+    try {I18N.text(plan, I18N.term(noviceModelPlan(inputSettings(true),$("mode").value,$("mode").value==="screen"?noviceFasta($("vhh-fasta").value).length:0)));}catch(e){I18N.text(plan, I18N.term(e.message));}
+    I18N.text($("review-input"), I18N.term("입력 검토·환경 점검"));I18N.text($("start-job"), I18N.term("분석 실행"));
   }
-  function jump(n){step=n;reason.textContent="";render();heading.focus();}
+  function jump(n){step=n;I18N.text(reason, "");render();heading.focus();}
   function validateInputs(){
     if($("mode").value==="complex") return noviceComplexProteins();
     if($("input-kind").value==="fasta") {if(noviceFasta($("target-fasta").value).length!==1)throw Error("단일 분석은 표적 1개입니다. 여러 표적은 배치 분석을 사용하세요.");}
@@ -2782,12 +2742,24 @@ async function initNoviceFlow() {
     if($("mode").value==="screen")noviceFasta($("vhh-fasta").value);
     if($("mode").value==="mature"&&noviceFasta($("wt-fasta").value).length!==1)throw Error("WT VHH 1개를 입력하세요.");
   }
-  next.onclick=()=>{try {if(step===1)validateInputs();else inputSettings();jump(step+1);}catch(e){reason.textContent=e.message;const field=step===2?consent:$("mode").value==="complex"?fasta:$("input-kind").value==="fasta"?$("target-fasta"):$("structure-file");field.focus();field.setAttribute("aria-invalid","true");}};
+  next.onclick=()=>{try {if(step===1)validateInputs();else inputSettings();jump(step+1);}catch(e){I18N.text(reason, I18N.term(e.message));const field=step===2?consent:$("mode").value==="complex"?fasta:$("input-kind").value==="fasta"?$("target-fasta"):$("structure-file");field.focus();field.setAttribute("aria-invalid","true");}};
   start.onclick=()=>{fields();jump(1);};prev.onclick=()=>jump(step-1);
-  function copiesReview(){try{const old=[...copies.querySelectorAll("input")].map(i=>i.value),rows=noviceFasta(fasta.value);copies.replaceChildren(...rows.map((r,i)=>{const l=el("label",`${String.fromCharCode(65+i)} · ${r.name} · ${r.sequence.length} aa · 사본 수`),n=el("input");n.id="complex-copies-"+i;n.type="number";n.min="1";n.max="25";n.value=old[i]||"1";l.append(n);return l;}));}catch(e){copies.textContent=e.message;}}
+  function copiesReview(){try{const old=[...copies.querySelectorAll("input")].map(i=>i.value),rows=noviceFasta(fasta.value);copies.replaceChildren(...rows.map((r,i)=>{const l=el("label",I18N.format("{0} · {1} · {2} aa · 사본 수", [String.fromCharCode(65+i), r.name, r.sequence.length])),n=el("input");n.id="complex-copies-"+i;n.type="number";n.min="1";n.max="25";n.value=old[i]||"1";l.append(n);return l;}));}catch(e){I18N.text(copies, I18N.term(e.message));}}
   fasta.addEventListener("input",copiesReview);
-  host.addEventListener("input",e=>{if(e.target!==consent)consent.checked=false;reason.textContent="";render();if(restoring)return;clearTimeout(draftTimer);draftTimer=setTimeout(()=>{const fields={};for(const n of host.querySelectorAll("input[id],select[id],textarea[id]")){if(n.type!=="file"&&n.id!=="novice-consent")fields[n.id]=n.type==="checkbox"?n.checked:n.value;}fields.comparison_engines=[...controls.querySelectorAll('[data-novice-engine]:checked')].map(i=>i.value);saveQueue=saveQueue.catch(()=>{}).then(()=>api("/api/draft",{version:1,fields})).catch(e=>{reason.textContent="초안 저장 실패: "+e.message;});},500);});
-  action("load-tutorial",async()=>{const revision=state.inputRevision;const example=await api("/api/tutorials/"+$("tutorial-mode").value),entry=example.payload.entries[0];if(revision!==state.inputRevision)throw Error("불러오는 동안 입력이 변경되었습니다. 현재 입력을 유지합니다.");$("mode").value=example.mode;$("input-kind").value="fasta";$("analysis-preset").value="small-four-v1";$("advanced").value="{}";$("mock").checked=false;$("candidate-limit").value="";$("design-count").value="";$("seed").value="42";$("job-name").value=example.payload.name;$("target-fasta").value=entry.content||"";$("vhh-fasta").value=entry.vhh_fasta||"";$("wt-fasta").value=entry.wt_fasta||"";fasta.value=(entry.proteins||[]).map(p=>`>${p.name}\n${p.sequence}`).join("\n");consent.checked=false;invalidateInput();copiesReview();fields();jump(1);$("tutorial-status").textContent="공개 입력을 불러왔습니다. 아직 계산은 시작하지 않았습니다.";});
-  render();const draftRevision=state.inputRevision;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=true);start.disabled=true;$("load-tutorial").disabled=true;try{const draft=await api("/api/draft");if(draftRevision!==state.inputRevision)throw Error("입력이 변경되어 저장된 초안을 덮어쓰지 않았습니다.");restoring=true;for(const [id,value]of Object.entries(draft.fields||{})){const n=$(id);if(n&&host.contains(n)&&n.type!=="file"){if(n.type==="checkbox")n.checked=value===true;else n.value=String(value);}}if(draft.fields?.comparison_engines)for(const n of controls.querySelectorAll('[data-novice-engine]'))n.checked=draft.fields.comparison_engines.includes(n.value);consent.checked=false;fields();copiesReview();if(Object.keys(draft.fields||{}).length)task.textContent="초안 입력을 복원했습니다. 구조 파일은 다시 선택하고 전송 동의·입력 검토·환경 점검을 새로 확인하세요.";}catch(e){reason.textContent="초안 복원 실패: "+e.message;}finally{restoring=false;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=false);start.disabled=false;$("load-tutorial").disabled=false;render();}
+  host.addEventListener("input",e=>{if(e.target!==consent)consent.checked=false;I18N.text(reason, "");render();if(restoring)return;clearTimeout(draftTimer);draftTimer=setTimeout(()=>{const fields={};for(const n of host.querySelectorAll("input[id],select[id],textarea[id]")){if(n.type!=="file"&&n.id!=="novice-consent")fields[n.id]=n.type==="checkbox"?n.checked:n.value;}fields.comparison_engines=[...controls.querySelectorAll('[data-novice-engine]:checked')].map(i=>i.value);saveQueue=saveQueue.catch(()=>{}).then(()=>api("/api/draft",{version:1,fields})).catch(e=>{I18N.text(reason, I18N.concat([I18N.term("초안 저장 실패: "), e.message]));});},500);});
+  action("load-tutorial",async()=>{const revision=state.inputRevision;const example=await api("/api/tutorials/"+$("tutorial-mode").value),entry=example.payload.entries[0];if(revision!==state.inputRevision)throw Error("불러오는 동안 입력이 변경되었습니다. 현재 입력을 유지합니다.");$("mode").value=example.mode;$("input-kind").value="fasta";$("analysis-preset").value="small-four-v1";$("advanced").value="{}";$("mock").checked=false;$("candidate-limit").value="";$("design-count").value="";$("seed").value="42";$("job-name").value=example.payload.name;$("target-fasta").value=entry.content||"";$("vhh-fasta").value=entry.vhh_fasta||"";$("wt-fasta").value=entry.wt_fasta||"";fasta.value=(entry.proteins||[]).map(p=>`>${p.name}\n${p.sequence}`).join("\n");consent.checked=false;invalidateInput();copiesReview();fields();jump(1);I18N.text($("tutorial-status"), I18N.term("공개 입력을 불러왔습니다. 아직 계산은 시작하지 않았습니다."));});
+  render();const draftRevision=state.inputRevision;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=true);start.disabled=true;$("load-tutorial").disabled=true;try{const draft=await api("/api/draft");if(draftRevision!==state.inputRevision)throw Error("입력이 변경되어 저장된 초안을 덮어쓰지 않았습니다.");restoring=true;for(const [id,value]of Object.entries(draft.fields||{})){const n=$(id);if(n&&host.contains(n)&&n.type!=="file"){if(n.type==="checkbox")n.checked=value===true;else n.value=String(value);}}if(draft.fields?.comparison_engines)for(const n of controls.querySelectorAll('[data-novice-engine]'))n.checked=draft.fields.comparison_engines.includes(n.value);consent.checked=false;fields();copiesReview();if(Object.keys(draft.fields||{}).length)I18N.text(task, I18N.term("초안 입력을 복원했습니다. 구조 파일은 다시 선택하고 전송 동의·입력 검토·환경 점검을 새로 확인하세요."));}catch(e){I18N.text(reason, I18N.concat([I18N.term("초안 복원 실패: "), e.message]));}finally{restoring=false;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=false);start.disabled=false;$("load-tutorial").disabled=false;render();}
 }
+I18N.init();
+document.addEventListener("nanocofold:language", () => {
+  if (!state.result) return;
+  renderScatter();
+  renderDistribution((state.observations || []).filter(row => row.candidate_id === state.candidate?.candidate_id));
+  const pae = $("pae");
+  if (window.Plotly && pae?.data) {
+    Plotly.relayout(pae, {"xaxis.title.text": I18N.value(I18N.term("열 · 평가 잔기")),
+      "yaxis.title.text": I18N.value(I18N.term("행 · 정렬 기준 잔기"))});
+    if (pae.data.length) Plotly.restyle(pae, {hovertemplate: I18N.value(I18N.term("정렬 기준 (행) %{y}<br>평가 잔기 (열) %{x}<br>PAE %{z:.2f} Å<extra></extra>"))});
+  }
+});
 startPlatform();

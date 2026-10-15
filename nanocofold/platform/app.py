@@ -285,12 +285,12 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
 
     @app.get("/assets/{filename}")
     def asset(filename: str):
-        if filename not in {"3dmol-min.js", "plotly.min.js", "molstar.js", "molstar.css", "input-molstar.js", "result-molstar.js", "platform.js", "platform.css"}:
+        if filename not in {"3dmol-min.js", "plotly.min.js", "molstar.js", "molstar.css", "input-molstar.js", "result-molstar.js", "platform.js", "platform-i18n.js", "platform.css"}:
             raise FileNotFoundError("없는 자산입니다.")
         # App code and workspace copies can come from different releases.
         # Always serve this installed release's JS/CSS with its HTML template.
         template_assets = Path(__file__).resolve().parents[1] / "templates"
-        if filename in {"platform.js", "platform.css", "input-molstar.js", "result-molstar.js"}:
+        if filename in {"platform.js", "platform-i18n.js", "platform.css", "input-molstar.js", "result-molstar.js"}:
             content = (template_assets / filename).read_bytes()
         else:
             from ..report import _resolve_viewer_asset

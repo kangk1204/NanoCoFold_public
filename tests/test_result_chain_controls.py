@@ -39,7 +39,7 @@ def test_chain_buttons_select_saved_chain_and_canvas_resizes(report, width, heig
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(args=["--enable-unsafe-swiftshader"])
-        page = browser.new_page(viewport={"width": width, "height": height})
+        page = browser.new_page(viewport={"width": width, "height": height}); page.add_init_script("localStorage.setItem('nanocofold.language', 'ko')")
         errors, external = [], []
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.on("request", lambda request: external.append(request.url) if request.url.startswith("http") else None)

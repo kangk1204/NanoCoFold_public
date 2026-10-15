@@ -1,3 +1,4 @@
+import {koreanContext} from './i18n_context.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -15,7 +16,7 @@ function fixture() {
   const context={state:{viewer,structure},el:()=>({}),notice:(...args)=>calls.push({notice:args}),
     $:id=>id==='residue-a'?{value:'X:1'}:id==='residue-b'?{value:'Y:2'}:notes,
     action:(name,callback)=>{context.measureDistance=callback;}};
-  vm.createContext(context);vm.runInContext(functions+measure,context);
+  koreanContext(context);vm.runInContext(functions+measure,context);
   return {context,calls,notes,replacement,finish:()=>finish()};
 }
 for(const surface of ['pair button','CA distance']) {

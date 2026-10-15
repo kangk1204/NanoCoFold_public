@@ -1,3 +1,4 @@
+import {koreanContext} from './i18n_context.mjs';
 /** Labels follow saved scope; coordinate downloads require an explicit verified receipt. */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -5,7 +6,7 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const source=readFileSync(new URL('../nanocofold/templates/platform.js',import.meta.url),'utf8');
 const c={metricCaptions:{iptm:'ipTM',ipsae:'ipSAE'},$(){return {options:[]};}};
-vm.createContext(c);
+koreanContext(c);
 vm.runInContext(source.slice(source.indexOf('function iptmCaption('),source.indexOf('const decisionCaption'))+'\nglobalThis.caption=metricCaption;',c);
 vm.runInContext(source.slice(source.indexOf('function recordedEvaluationError('),source.indexOf('function reportSourceIdentity(')),c);
 vm.runInContext(source.slice(source.indexOf('function coordinatePresentation('),source.indexOf('function resultChain(')),c);
@@ -68,4 +69,11 @@ for(const [name,data] of [
 test('native-identical metadata cannot mislabel different displayed bytes',()=>{
  const result=c.coordinatePresentation({content:'display',raw_content:'raw',coordinate_source:{schema_version:2,raw_preserved:true,verification:{status:'verified'},display_relation:'native_identical'}});
  assert.equal(result.rawAvailable,true);assert.match(result.caption,/관계는 미확인/);
+});
+
+test('localized structure note preserves global ipTM scope and the original Korean numerical content',()=>{
+ for(const pairs of [[],[{interface_plddt:85.5,interface_pae:4.2}],[{interface_plddt:85.5,interface_pae:4.2},{interface_plddt:99,interface_pae:1}]]){
+  const data={content:'display',global_iptm:.712,iptm:.99,pair_metrics:pairs};
+  assert.equal(c.I18N.value(c.localizedStructureDataNote(data)),c.structureDataNote(data));
+ }
 });
