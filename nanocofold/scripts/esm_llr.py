@@ -7,12 +7,22 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import sys
 from pathlib import Path
 
-# Engine environments execute this file directly without installing core.
-if not __package__:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+# Bind only our pure-Python package when an engine executes the installed file.
+# The parent can be another Python ABI's site-packages; it must never enter
+# sys.path and shadow the engine's own NumPy, pandas or Torch distributions.
+if not __package__ and "nanocofold" not in sys.modules:
+    package_root = Path(__file__).resolve().parents[1]
+    specification = importlib.util.spec_from_file_location(
+        "nanocofold", package_root / "__init__.py",
+        submodule_search_locations=[str(package_root)],
+    )
+    package = importlib.util.module_from_spec(specification)
+    sys.modules[specification.name] = package
+    specification.loader.exec_module(package)
 from nanocofold.utils.atomic import write_csv
 
 import pandas as pd
