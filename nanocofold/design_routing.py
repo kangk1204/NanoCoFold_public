@@ -12,6 +12,7 @@ import pandas as pd
 from .config import cfg_get
 from . import design_rfantibody, design_boltzgen
 from .utils import shell
+from .utils.atomic import write_csv
 
 
 def run_design(cfg: dict, run_dir: Path, target: dict, mock=False, dry_run=False) -> dict:
@@ -40,7 +41,7 @@ def run_design(cfg: dict, run_dir: Path, target: dict, mock=False, dry_run=False
             if not dry_run:
                 (phase / "engine_info.json").write_text(json.dumps(reports, indent=2, default=str) + "\n")
                 if generated:
-                    pd.concat(generated, ignore_index=True, sort=False).to_csv(phase / "all_generated_candidates.csv", index=False)
+                    write_csv(phase / "all_generated_candidates.csv", pd.concat(generated, ignore_index=True, sort=False))
             raise
         from .pose_integration import preserve_generation_structure
         chosen = preserve_generation_structure(result["candidates"])
@@ -69,8 +70,8 @@ def run_design(cfg: dict, run_dir: Path, target: dict, mock=False, dry_run=False
     frame = pd.concat(candidates, ignore_index=True, sort=False)
     all_frame = pd.concat(generated, ignore_index=True, sort=False)
     if not dry_run:
-        all_frame.to_csv(phase / "all_generated_candidates.csv", index=False)
-        frame.to_csv(phase / "design_candidates.csv", index=False)
+        write_csv(phase / "all_generated_candidates.csv", all_frame)
+        write_csv(phase / "design_candidates.csv", frame)
         (phase / "engine_info.json").write_text(json.dumps(reports, indent=2, default=str) + "\n")
     return {"candidates": frame, "all_candidates": all_frame, "phase_dir": phase,
             "info": {"engine": selected, "engines": reports, "num_candidates": len(frame), "num_generated_records": len(all_frame)}}

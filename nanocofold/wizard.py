@@ -25,7 +25,7 @@ from .utils import pdb_io
 
 MAX_REQUEST = 20 * 1024 * 1024
 BOUNDARY = (
-    "hotspot은 표면 특성으로 제안한 결합 유도 부위입니다. 최적 부위나 결합 성공을 보장하지 않습니다. "
+    "결합 부위(hotspot)는 표면 특성으로 제안한 표적 잔기입니다. 최적 부위나 결합 성공을 보장하지 않습니다. "
     "결손 잔기·원자를 복구하지 않으며, 절단형 특이성은 별도 입력과 검증이 필요합니다."
 )
 
@@ -189,7 +189,7 @@ class WizardSession:
                 "RF2 전체 항원 점수는 특정 사슬의 결합 증거가 아니며, 파트너를 포함한 후속 평가가 필요합니다."
             )
         if self.input.get("removed"):
-            warnings.append("단백질 이외 성분은 설계 입력에 포함되지 않습니다. 아래 제거 내역과 결합부위 영향을 확인하세요.")
+            warnings.append("단백질 이외 성분은 설계 입력에 포함되지 않습니다. 아래 제거 내역과 결합 부위 영향을 확인하세요.")
         result = {
             "selection_id": fingerprint, "target": target,
             "retained_chains": [by_id[c] for c in selected],
@@ -213,7 +213,7 @@ class WizardSession:
 
     def export(self, payload: dict) -> dict:
         if not self.selection or payload.get("selection_id") != self.selection["result"]["selection_id"]:
-            raise ValueError("선택 내용이 바뀌었습니다. 표적과 hotspot을 다시 확인하세요.")
+            raise ValueError("선택 내용이 바뀌었습니다. 표적과 결합 부위를 다시 확인하세요.")
         result = self.selection["result"]
         if result["blockers"]:
             raise ValueError("입력 문제를 먼저 해결하세요: " + "; ".join(result["blockers"]))
@@ -228,11 +228,11 @@ class WizardSession:
                 or (positions != [] if hotspot_mode == "none" else not 1 <= len(positions) <= 12)
                 or any(type(p) is not int or p not in allowed for p in positions)
                 or len(set(positions)) != len(positions)):
-            raise ValueError("현재 표적에 실제로 존재하는 hotspot을 중복 없이 1–12개 선택하세요.")
+            raise ValueError("현재 표적에 실제로 존재하는 결합 부위를 중복 없이 1–12개 선택하세요.")
         positions = sorted(positions)
         warnings = list(result["warnings"])
         if hotspot_mode == "none":
-            warnings.append("Hotspot 미지정: 결합 위치를 제한하지 않고 탐색합니다.")
+            warnings.append("결합 부위 미지정: 결합 위치를 제한하지 않고 탐색합니다.")
         for pos in positions:
             row = allowed[pos]
             if row["relative_sasa"] is None or not math.isfinite(float(row["relative_sasa"])):

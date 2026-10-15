@@ -51,6 +51,7 @@
 </style>
 </head>
 <body>
+<p data-terminology="binding-site">결합 부위(hotspot)는 나노바디 설계·접촉 평가에 지정한 표적 잔기입니다. 일반 복합체의 관심 잔기는 참조 구조 비교용입니다. 두 설정 모두 실제 결합의 실험적 증거를 뜻하지 않습니다.</p>
 <div class="wrap">
   <p role="status" aria-live="polite" class="muted">보존된 분석 결과입니다. 구조·점수·미평가 기록을 확인하고 필요한 파일을 저장하세요.</p>
   <h1>{{ title }}</h1>
@@ -99,7 +100,7 @@
   {% if population_scope == "saved_all_candidate_records" %}저장된 전체 후보 기록을 표시합니다.{% else %}보고서에 제공된 점수 기록을 표시합니다.{% endif %}
   예측 전 미선정 후보는 모델 평가 미완료 수에 합산하지 않습니다.</p>
   <h2 id="report-target">01 입력·설정</h2>
-  <p>실행 모드: {{ mode if mode else '미기록' }} · 표적: {{ target_name if target_name else '미기록' }} · 핫스팟: {{ context.hotspots|join(', ') if context.hotspots else '미기록' }}</p>
+  <p>실행 모드: {{ mode if mode else '미기록' }} · 표적: {{ target_name if target_name else '미기록' }} · 결합 부위: {{ context.hotspots|join(', ') if context.hotspots else '미기록' }}</p>
   <details><summary>입력과 실행 설정 원문</summary><p>설정 출처: <code>{{ run_settings_source }}</code>.{% if run_settings_source == 'report_generation_config' %} 실행 당시 설정이 저장되지 않아 보고서 생성 설정만 표시합니다. 과거 판정에 적용된 기준으로 추정하지 않습니다.{% endif %}</p><pre>{{ run_settings|tojson(indent=2) }}</pre></details>
   {% if context.target_qc is defined %}
   <div class="scroll" tabindex="0" role="region" aria-label="보고서 표"><table style="max-width:900px"><caption>표적 입력·구조 품질</caption>
@@ -110,11 +111,11 @@
         {% else %}
         <th scope="row">평균 pLDDT</th><td>{{ context.target_qc.mean_plddt if context.target_qc.mean_plddt is defined and context.target_qc.mean_plddt is not none else '미기록' }}</td>
         {% endif %}</tr>
-    <tr><th scope="row">핫스팟 세트</th><td>{{ context.target_qc.hotspot_set_id if context.target_qc.hotspot_set_id is defined and context.target_qc.hotspot_set_id is not none else '미기록' }}</td>
+    <tr><th scope="row">결합 부위 세트</th><td>{{ context.target_qc.hotspot_set_id if context.target_qc.hotspot_set_id is defined and context.target_qc.hotspot_set_id is not none else '미기록' }}</td>
         {% if context.target_qc.confidence_metric == 'bfactor' %}
-        <th scope="row">핫스팟 평균 B-factor</th><td>{{ context.target_qc.hotspot_mean_bfactor if context.target_qc.hotspot_mean_bfactor is defined and context.target_qc.hotspot_mean_bfactor is not none else '미기록' }}</td>
+        <th scope="row">결합 부위 평균 B-factor</th><td>{{ context.target_qc.hotspot_mean_bfactor if context.target_qc.hotspot_mean_bfactor is defined and context.target_qc.hotspot_mean_bfactor is not none else '미기록' }}</td>
         {% else %}
-        <th scope="row">핫스팟 평균 pLDDT</th><td>{{ context.target_qc.hotspot_mean_plddt if context.target_qc.hotspot_mean_plddt is defined and context.target_qc.hotspot_mean_plddt is not none else '미기록' }}</td>
+        <th scope="row">결합 부위 평균 pLDDT</th><td>{{ context.target_qc.hotspot_mean_plddt if context.target_qc.hotspot_mean_plddt is defined and context.target_qc.hotspot_mean_plddt is not none else '미기록' }}</td>
         {% endif %}</tr>
     <tr><th scope="row">표적 구조 절단</th><td colspan="3">{{ truncation_summary }}</td></tr>
     {% if context.target_qc.input_coordinate_coverage is defined %}<tr><th scope="row">입력 서열 좌표 대응률</th><td>{{ context.target_qc.input_coordinate_coverage }}</td><th scope="row">좌표 없는 입력 잔기</th><td>{{ context.target_qc.unmapped_input_residues }}</td></tr>{% endif %}
@@ -122,7 +123,7 @@
   {% endif %}
 
   {% if hotspot_rows %}
-  <h3>핫스팟 잔기 특성</h3>
+  <h3>결합 부위 잔기 특성</h3>
   <div class="scroll" tabindex="0" role="region" aria-label="보고서 표"><table><caption>관심 잔기와 점수</caption>
     <tr>{% for key, label in hotspot_columns %}<th scope="col">{{ label }}</th>{% endfor %}</tr>
     {% for row in hotspot_rows %}<tr>{% for key, label in hotspot_columns %}<td>{{ row.get(key) if row.get(key) is not none else '미평가' }}</td>{% endfor %}</tr>{% endfor %}
@@ -131,20 +132,20 @@
 
   {% if automatic_hotspots or hotspot_set_rows %}
   {% if automatic_hotspots %}
-  <h3>자동 제안 핫스팟 세트 · 탐색적 표면 후보</h3>
+  <h3>자동 제안 결합 부위 세트 · 탐색적 표면 후보</h3>
   <p class="muted">표면 특성으로 제안한 후보입니다. 기능적 에피토프나 실제 결합 부위 재현은 검증되지 않았습니다.</p>
   {% else %}
-  <h3>사용자 지정 핫스팟 세트</h3>
+  <h3>사용자 지정 결합 부위 세트</h3>
   <p class="muted">입력에서 지정한 잔기입니다. 실제 접촉 여부와 기능적 결합 부위는 별도로 검토하세요.</p>
   {% endif %}
   {% if hotspot_set_rows %}
-  <div class="scroll" tabindex="0" role="region" aria-label="보고서 표"><table><caption>관심 부위 세트</caption>
+  <div class="scroll" tabindex="0" role="region" aria-label="보고서 표"><table><caption>관심 잔기 세트</caption>
     <tr><th scope="col">세트</th><th scope="col">잔기</th><th scope="col">점수</th></tr>
     {% set ns = namespace(seen=[]) %}
     {% for row in hotspot_set_rows %}<tr><td>{{ row.set_id }}</td><td>{{ row.residue }}</td><td>{{ row.score if row.score is defined and row.score is not none else '미평가' }}</td></tr>{% endfor %}
   </table></div>
   {% else %}
-  <p class="muted">자동 제안 핫스팟 세트가 기록되지 않았습니다.</p>
+  <p class="muted">자동 제안 결합 부위 세트가 기록되지 않았습니다.</p>
   {% endif %}
   {% endif %}
 
@@ -173,7 +174,7 @@
   {% macro candidate_table(rows, expanded=false) %}
   {% set compact = ["selection_rank", "predictor_engine", "final_eligible", "ipsae", "iptm", "interface_plddt", "interface_pae", "n_clashes", "exclusion_reason"] %}
   <div class="scroll" tabindex="0" role="region" aria-label="보고서 표"><table><caption>후보·모델의 기록 점수</caption>
-    <thead><tr><th scope="col" data-column-key="display_alias">후보 별칭</th>{% if mode != "complex" %}<th scope="col">hotspot 접촉 수</th><th scope="col">지정 위치 충족</th>{% endif %}{% for key, label in scored_columns if expanded or key in compact %}<th scope="col" data-column-key="{{ key }}">{{ metric_caption(key, label, rows) }}</th>{% endfor %}</tr></thead>
+    <thead><tr><th scope="col" data-column-key="display_alias">후보 별칭</th>{% if mode != "complex" %}<th scope="col">결합 부위 접촉 수</th><th scope="col">지정 결합 부위 충족</th>{% endif %}{% for key, label in scored_columns if expanded or key in compact %}<th scope="col" data-column-key="{{ key }}">{{ metric_caption(key, label, rows) }}</th>{% endfor %}</tr></thead>
     <tbody>{% for row in rows %}<tr>
       {% set original_id = display_identity(row) %}
       <td>{{ display_aliases.get(original_id|string, '미기록') }}</td>{% if mode != 'complex' %}{% set site = hotspot_assessment(row) %}<td>{{ (site.contacted|string ~ '/' ~ site.requested|string ~ '개') if site.status not in ['not_assessed', 'not_requested', 'mapping_failed'] else '—' }}</td><td>{{ site.label }}</td>{% endif %}
@@ -185,15 +186,15 @@
   {% endmacro %}
 
   <h2 id="report-models">03 후보 비교 · 표시 {{ scored_rows|length }} / 전체 {{ scored_total }} 후보·모델 기록</h2>
-  <p>예측 신뢰도와 지정 결합 위치 충족은 별개입니다. hotspot 미접촉·미지정·미평가를 구분합니다. PAE는 참조 구조와의 실측 거리 오차가 아니며 pDockQ2는 실측 DockQ가 아닙니다. 지정 위치 진단은 기존 점수와 선별 기록을 바꾸지 않습니다.</p>
+  <p>예측 신뢰도와 지정 결합 부위 충족은 별개입니다. 결합 부위 미접촉·미지정·미평가를 구분합니다. PAE는 참조 구조와의 실측 거리 오차가 아니며 pDockQ2는 실측 DockQ가 아닙니다. 지정 결합 부위 진단은 기존 점수와 선별 기록을 바꾸지 않습니다.</p>
   <p>일반 복합체의 요약 ipSAE는 기본적으로 검토한 체인 순서의 첫 쌍이며, 체인쌍을 명시한 실행에서는 해당 쌍입니다. 전체 평균·최솟값과 구분합니다. 적용 체인·범위 출처와 모든 체인 쌍의 표·CSV를 함께 확인합니다.</p>
   <p>엔진별 표의 순위와 종합점수는 기록된 엔진 안에서만 비교합니다. 엔진 간 점수를 합산하거나 통합 순위를 만들지 않습니다. RF·BG 별칭은 후보를 찾기 위한 표시명이며 원본 ID와 수치는 보존됩니다.</p>
   {% if pose_assessments_available %}
-  <div class="interpretation" id="pose-assessment-guide"><h3>세 가지 별도 확인</h3><p><b>예측 신뢰도</b>는 ipTM·ipSAE 및 실행 당시 기록 적격, <b>지정 부위 충족</b>은 hotspot 접촉, <b>자세 일관성</b>은 동일 후보의 엔진별 자세와 설계·재예측 일치를 뜻합니다. 탐색적 검토 우선순위는 이 기록을 함께 확인하는 값이며 기존 적격·선별 기록을 변경하지 않습니다.</p><p>검토 순위는 표적·조건·실행 범위 안의 후보 순서이며 동률을 허용합니다. 1위도 보류일 수 있으므로 검토 판정과 이유를 함께 읽으세요. 표적만 정렬하여 같은 후보 서열의 자세를 비교합니다. 엔진 지지 수는 독립 실험 횟수가 아니며 점수를 평균하지 않습니다. 새 VHH를 기존 VHH의 자세에 맞춰 선별하지 않습니다. 설계 구조가 없거나 대응이 불가능하면 미평가로 남습니다. 우선 검토는 실제 결합·KD의 입증이 아닙니다.</p><p>검토 정책 v2는 품질·지정 부위를 충족한 엔진별 단독 유망 예측과 같은 자세의 다중 엔진 지지를 구분합니다. 한 엔진만 유망해도 합의 부족을 실패로 간주하지 않습니다. 엔진 간 자세 차이와 설계·재예측 불일치는 별도 진단이며 자동 비결합·탈락 사유가 아닙니다. 이전 정책의 판정은 기록된 버전과 함께 읽으세요.</p></div>
+  <div class="interpretation" id="pose-assessment-guide"><h3>세 가지 별도 확인</h3><p><b>예측 신뢰도</b>는 ipTM·ipSAE 및 실행 당시 기록 적격, <b>지정 결합 부위 충족</b>은 결합 부위 접촉, <b>자세 일관성</b>은 동일 후보의 엔진별 자세와 설계·재예측 일치를 뜻합니다. 탐색적 검토 우선순위는 이 기록을 함께 확인하는 값이며 기존 적격·선별 기록을 변경하지 않습니다.</p><p>검토 순위는 표적·조건·실행 범위 안의 후보 순서이며 동률을 허용합니다. 1위도 보류일 수 있으므로 검토 판정과 이유를 함께 읽으세요. 표적만 정렬하여 같은 후보 서열의 자세를 비교합니다. 엔진 지지 수는 독립 실험 횟수가 아니며 점수를 평균하지 않습니다. 새 VHH를 기존 VHH의 자세에 맞춰 선별하지 않습니다. 설계 구조가 없거나 대응이 불가능하면 미평가로 남습니다. 우선 검토는 실제 결합·KD의 입증이 아닙니다.</p><p>검토 정책 v2는 품질·지정 결합 부위를 충족한 엔진별 단독 유망 예측과 같은 자세의 다중 엔진 지지를 구분합니다. 한 엔진만 유망해도 합의 부족을 실패로 간주하지 않습니다. 엔진 간 자세 차이와 설계·재예측 불일치는 별도 진단이며 자동 비결합·탈락 사유가 아닙니다. 이전 정책의 판정은 기록된 버전과 함께 읽으세요.</p></div>
   {% endif %}
   <p class="muted">지표 순위·종합점수 순위·기록 선별 순위는 다릅니다. 선별은 적격 게이트와 CDR3 다양성 제한을 적용하므로 높은 ipSAE 후보도 제외될 수 있습니다. ESM·AntiFold는 서열/폴딩 prior이며 친화도 예측값이 아닙니다. 심한 위험 수(dev_severe)는 5종 게이트, 전체 위험 수(dev_flags)는 종합점수 가중치입니다.</p>
   <p class="muted">충돌·N/O 근접·반대 전하 접촉은 원자쌍 수입니다. N/O 근접은 각도를 확인한 수소결합이 아니며, 고정 거리 충돌은 원소별 반데르발스 판정이 아닙니다.</p>
-  <p class="muted">같은 seed라도 모든 엔진·장치에서 비트 단위 재현을 보장하지 않습니다. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에 한정됩니다. RFantibody·BoltzGen 생성 단계의 난수 통제는 제한적이므로 hotspot OFF/ON의 동일 난수 상태나 인과효과를 가정하지 않습니다.</p>
+  <p class="muted">같은 seed라도 모든 엔진·장치에서 비트 단위 재현을 보장하지 않습니다. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에 한정됩니다. RFantibody·BoltzGen 생성 단계의 난수 통제는 제한적이므로 결합 부위 OFF/ON의 동일 난수 상태나 인과효과를 가정하지 않습니다.</p>
   {% for group in scored_groups %}<h3>{{ group.engine }}</h3>{{ candidate_table(group.rows) }}<details><summary>상세 지표·원본 기록 펼치기</summary>{{ candidate_table(group.rows, true) }}</details>{% else %}<p class="muted">평가 모델 기록이 없습니다.</p>{% endfor %}
   <p class="muted">보고서의 표는 설정한 표시 범위입니다. 전체 평가 기록은 산출물의 CSV에서 확인하세요.</p>
   {% if metric_method_rows %}
@@ -219,7 +220,7 @@
   <h2 id="report-structure">05 구조·PAE</h2>
   {% if interactive_report_href %}
   <p><a id="complete-result-explorer" href="{{ interactive_report_href }}">전체 모델·구조·PAE 결과 탐색 열기</a></p>
-  <p class="muted">별도 탐색 파일에는 저장된 전체 후보·관측·모델과 보존된 전체 PAE가 포함됩니다. 후보를 선택하면 MolStar 뷰어에서 {{ "체인·접촉·충돌 표시" if mode == "complex" else "체인·접촉·충돌·핫스팟·CDR 표시" }}, 잔기 선택과 거리 측정을 사용할 수 있습니다. 구조·PAE가 없으면 미평가로 남으며 원본 점수·선별 기록을 다시 계산하지 않습니다. 오프라인으로 옮길 때는 이 보고서와 연결된 탐색 HTML 파일을 같은 폴더에 보관하거나 전달 ZIP을 사용하세요.</p>
+  <p class="muted">별도 탐색 파일에는 저장된 전체 후보·관측·모델과 보존된 전체 PAE가 포함됩니다. 후보를 선택하면 MolStar 뷰어에서 {{ "체인·접촉·충돌 표시" if mode == "complex" else "체인·접촉·충돌·결합 부위·CDR 표시" }}, 잔기 선택과 거리 측정을 사용할 수 있습니다. 구조·PAE가 없으면 미평가로 남으며 원본 점수·선별 기록을 다시 계산하지 않습니다. 오프라인으로 옮길 때는 이 보고서와 연결된 탐색 HTML 파일을 같은 폴더에 보관하거나 전달 ZIP을 사용하세요.</p>
   {% elif viewer_enabled %}
   <p class="muted">저장 결과 탐색 원본이 없는 진단·부분 기록은 대표 구조 최대 {{ viewer_limit }}개를 표시합니다. 표의 전체 기록 수와 뷰어의 표시 한도는 별개입니다. 회색은 선택한 두 체인 이외의 보조 체인입니다. PAE 원본 파일과 방향별 계면 PAE 값은 평가표 및 산출물에서 확인하세요. 구조·PAE가 없으면 미평가로 남습니다.</p>
   {% else %}
@@ -275,7 +276,7 @@
       <li><b>계면 pLDDT</b>와 계면 PAE를 함께 확인합니다. 보고서 생성 시 바꾼 설정으로 기존 적격 판정을 다시 계산하지 않습니다.</li>
       <li>VHH 점수의 ipTM은 선택 표적–VHH 쌍의 native 방향값 최솟값입니다. 정확히 두 체인일 때만 native 전체 ipTM을 대신 사용할 수 있습니다. 3체인 이상에서 쌍 값이나 검증된 체인 축이 없으면 미평가입니다. 일반 복합체 요약 ipTM은 전체 값이며 체인 쌍 상세와 구분합니다.</li>
       <li>clash는 선택 표적뿐 아니라 유지한 파트너와 VHH 사이의 충돌도 포함합니다. CSV의 n_target_clashes와 n_context_clashes에서 구분할 수 있습니다. 항원끼리의 충돌은 이 값에 포함하지 않습니다.</li>
-      <li><b>핫스팟 접촉률</b>은 지정 잔기에 예측상 접촉하는 비율입니다. 알려진 전체 에피토프·같은 자세·실제 결합의 검증은 아닙니다.</li>
+      <li><b>결합 부위 접촉률</b>은 지정 잔기에 예측상 접촉하는 비율입니다. 알려진 전체 에피토프·같은 자세·실제 결합의 검증은 아닙니다.</li>
       <li><b>clash</b> 0은 현재 거리 기준에서 충돌이 없다는 뜻이며 실험 성공을 보장하지 않습니다. H-bond/염다리 수는 거리 기반 근사치입니다.</li>
       <li><b>개발가능성 경고</b>(dev_severe): free Cys, N-글리코실화 서열, CDR 탈아미드/이성화, CDR 소수성 패치.</li>
       <li>구조 기반 지표는 상대 순위용입니다. <b>최종 판단은 SPR/BLI 실험</b>으로 수행하세요.</li>

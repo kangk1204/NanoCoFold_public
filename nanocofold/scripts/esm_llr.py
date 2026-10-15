@@ -7,6 +7,13 @@
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
+
+# Engine environments execute this file directly without installing core.
+if not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from nanocofold.utils.atomic import write_csv
 
 import pandas as pd
 import torch
@@ -52,7 +59,7 @@ def run_variants(args, model, alphabet, device) -> int:
             continue
         values.append(float(log_probs[position, alphabet.tok_to_idx[mut_aa]] - log_probs[position, alphabet.tok_to_idx[wt_aa]]))
     frame["esm_llr"] = values
-    frame.to_csv(args.output, index=False)
+    write_csv(args.output, frame)
     print(f"[esm] {len(frame)} variants scored ({args.model}, {device})")
     return 0
 
@@ -75,7 +82,7 @@ def run_sequences(args, model, alphabet, device) -> int:
     # masked PLL 이 아니라 unmasked 평균 로그확률이므로 이름을 정확히 표기한다(F14).
     output["esm_mean_logprob"] = plls
     output["esm_delta"] = deltas
-    output.to_csv(args.output, index=False)
+    write_csv(args.output, output)
     print(f"[esm] {len(frame)} sequences scored (mean log-prob; {args.model}, {device})")
     return 0
 

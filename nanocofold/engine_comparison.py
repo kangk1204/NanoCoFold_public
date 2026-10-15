@@ -17,6 +17,7 @@ import pandas as pd
 from . import provenance
 from .config import cfg_get, cfg_seed, dump_resolved, resolve_path
 from .utils import seq, shell
+from .utils.atomic import write_csv
 
 LEGACY_ENGINES = ("colabfold", "boltz2", "chai1")
 ENGINES = (*LEGACY_ENGINES, "opendde")
@@ -426,8 +427,8 @@ def run(cfg, run_dir, state, target, candidates, cdr_ranges=None, *, predict, fi
                     row["msa_requested"], row["msa"], row["final_evaluated"] = row["msa"], "not_evaluated", False
                     all_rows.append(row)
                     frame = pd.DataFrame(all_rows)
-                    frame.to_csv(root / "comparison_candidates.csv", index=False)
-                    _predictions_manifest_frame(frame, Path(run_dir)).to_csv(root / "predictions.csv", index=False)
+                    write_csv(root / "comparison_candidates.csv", frame)
+                    write_csv(root / "predictions.csv", _predictions_manifest_frame(frame, Path(run_dir)))
                     snapshot["status"] = "failed"
                     snapshot["rows"].append({"id": identifier, "source_sequence_id": source_id, "engine": engine,
                                              "status": "failed", "error": row["prediction_error"]})
@@ -446,9 +447,9 @@ def run(cfg, run_dir, state, target, candidates, cdr_ranges=None, *, predict, fi
             snapshot["rows"].append({"id": identifier, "source_sequence_id": source_id, "engine": engine,
                                      "status": row["prediction_status"], "elapsed_seconds": row["elapsed_seconds"]})
             frame = pd.DataFrame(all_rows)
-            frame.to_csv(root / "comparison_candidates.csv", index=False)
+            write_csv(root / "comparison_candidates.csv", frame)
             # This manifest is intentionally complete across engines, including failures.
-            _predictions_manifest_frame(frame, Path(run_dir)).to_csv(root / "predictions.csv", index=False)
+            write_csv(root / "predictions.csv", _predictions_manifest_frame(frame, Path(run_dir)))
             _save(root / "comparison_status.json", snapshot)
     snapshot["status"] = "partial_failure" if any(row["prediction_status"] == "failed" for row in all_rows) else "complete"
     _save(root / "comparison_status.json", snapshot)
@@ -498,7 +499,7 @@ def write_synthesis_by_engine(selected, cfg, final_dir, sequence_column="sequenc
     for engine, frame in selected.groupby("predictor_engine", sort=False):
         directory = Path(final_dir) / ("engine_" + engine)
         directory.mkdir(parents=True, exist_ok=True)
-        frame.to_csv(directory / "selected_candidates.csv", index=False)
+        write_csv(directory / "selected_candidates.csv", frame)
         outputs[engine] = handoff.write_synthesis_sheet(frame, cfg, directory, sequence_column, metadata_columns=metadata)
     # Independent engine rankings do not decide a combined synthesis order.
     empty = selected.iloc[:0]

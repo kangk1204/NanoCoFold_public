@@ -13,6 +13,7 @@ from .config import cfg_get, resolve_path
 from .utils import pdb_io, shell
 
 from .runtime_policy import runtime_policy
+from .utils.atomic import write_csv
 
 # Only the synthetic CPU design fallback uses this distribution fixture.
 FALLBACK_FRAMEWORK_SEQ = runtime_policy()["mock_framework_sequence"]
@@ -152,12 +153,12 @@ def run_design(cfg: dict, run_dir: Path, target_info: dict, mock: bool = False, 
         all_candidates["structure_stage"] = "mock"
         all_candidates["cif_path"] = all_candidates["pred_dir"].map(
             lambda directory: str(next(Path(directory).glob("pred.model_idx_*.cif"))))
-        all_candidates.to_csv(phase_dir / "all_generated_candidates.csv", index=False)
+        write_csv(phase_dir / "all_generated_candidates.csv", all_candidates)
     else:
         candidates, info = _run_rfantibody(cfg, phase_dir, target_info, framework, hotspots, num_designs, dry_run)
 
     if not dry_run:
-        candidates.to_csv(phase_dir / "design_candidates.csv", index=False)
+        write_csv(phase_dir / "design_candidates.csv", candidates)
     info["num_candidates"] = len(candidates)
     info.setdefault("requested_run_seed", cfg_get(cfg, "run.seed"))
     info.setdefault("seed_control", "not_executed_mock" if mock else "no_explicit_seed_argument_in_pinned_stage_clis")
@@ -383,7 +384,7 @@ def _run_rfantibody(
         display["cif_path"] = display["pred_dir"]
         display["structure_stage"] = "rf2"
         display["exclusion_reason"] = display["design_screening_reason"]
-        display.to_csv(phase_dir / "all_generated_candidates.csv", index=False)
+        write_csv(phase_dir / "all_generated_candidates.csv", display)
         if extraction_warnings:
             (phase_dir / "generation_failure.json").write_text(json.dumps({
                 "status": "failed", "stage": "rf2_extraction", "errors": extraction_warnings,

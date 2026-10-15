@@ -15,6 +15,7 @@ from .utils import msa as msa_utils
 from .utils import pdb_io, seq as seq_utils, shell
 from .utils.misc import to_native
 from .utils.tool_args import BOLTZ_MANAGED, CHAI_MANAGED, validate_extra_args
+from .utils.atomic import write_csv
 
 
 def chai_target_settings(cfg: dict) -> dict:
@@ -190,12 +191,12 @@ def _prepare_target_impl(
     cfg: dict, run_dir: Path, mock: bool = False, dry_run: bool = False,
     *, predicted_raw_receipt: dict | None = None,
 ) -> dict:
-    """타깃 구조 확보 → 핫스팟 결정/검증 → truncation → 준비된 PDB/QC 생성.
+    """타깃 구조 확보 → 결합 부위 결정/검증 → truncation → 준비된 PDB/QC 생성.
 
-    핫스팟 번호 체계(canonical):
+    결합 부위 번호 체계(canonical):
       - hotspot_labels / hotspot_pdb_labels: 구조 PDB 잔기번호 라벨 (설계·truncation·QC용)
       - hotspot_seq_positions / hotspot_seq_labels: 1-based 서열 인덱스 (restraint·pocket·스코어링용)
-    구조가 있으면 숫자 핫스팟은 PDB 번호로, 구조가 없으면 서열 위치로 해석한다.
+    구조가 있으면 숫자 결합 부위는 PDB 번호로, 구조가 없으면 서열 위치로 해석한다.
     'pdb142'/'seq135' 접두사로 항상 명시할 수 있다.
     """
     verified_raw = (_verified_raw_prediction(cfg, predicted_raw_receipt, mock=mock)
@@ -244,7 +245,7 @@ def _prepare_target_impl(
     no_hotspots = isinstance(hotspot_spec, list) and not hotspot_spec
     explicit_entries = hotspots_mod.parse_hotspot_spec(hotspot_spec, chain_id)
     if no_hotspots and bool(cfg_get(cfg, "truncate.enabled", False)):
-        raise ValueError("Hotspot 미지정 실행은 hotspot 중심 truncation을 사용할 수 없습니다.")
+        raise ValueError("결합 부위 미지정 실행은 hotspot 중심 truncation을 사용할 수 없습니다.")
     if sequence_only:
         return _prepare_sequence_only(
             cfg, phase_dir, sequence, chain_id, warnings, aux_chains, dry_run, explicit_entries, target_msa
@@ -279,7 +280,7 @@ def _prepare_target_impl(
             conservation = msa_utils.column_conservation(target_msa, sequence)
             if len(conservation) != len(sequence):
                 conservation = None
-                warnings.append("MSA 보존도 길이가 서열과 맞지 않아 자동 핫스팟에서 제외합니다.")
+                warnings.append("MSA 보존도 길이가 서열과 맞지 않아 자동 결합 부위에서 제외합니다.")
         except Exception as exc:  # noqa: BLE001
             warnings.append(f"MSA 보존도 계산 실패 → 보존도 없이 진행: {exc}")
 
@@ -294,13 +295,13 @@ def _prepare_target_impl(
         seq_positions=seq_positions_map,
         confidence_kind=confidence_metric,
     )
-    table.to_csv(phase_dir / "hotspot_table.csv", index=False)
+    write_csv(phase_dir / "hotspot_table.csv", table)
 
     auto_sets: list[dict] = []
     if no_hotspots:
         pdb_labels, seq_positions, seq_labels = [], [], []
         hotspot_sets = [{"set_id": "none", "residues": [], "residues_seq": [], "score": None}]
-        warnings.append("Hotspot을 지정하지 않았습니다. 결합 위치를 제한하지 않고 탐색합니다.")
+        warnings.append("결합 부위를 지정하지 않았습니다. 결합 위치를 제한하지 않고 탐색합니다.")
     elif explicit_entries:
         pdb_labels, seq_positions, seq_labels, resolve_warnings = _resolve_explicit_hotspots(
             explicit_entries, chain_id, sequence, label_to_seq, seq_to_label
@@ -310,7 +311,7 @@ def _prepare_target_impl(
     else:
         auto_sets = hotspots_mod.auto_hotspot_sets(table, cfg_get(cfg, "hotspots.auto", {}) or {}, raw_structure, chain_id)
         if not auto_sets:
-            raise ValueError("자동 핫스팟 후보를 찾지 못했습니다. target.hotspots 를 직접 지정하세요.")
+            raise ValueError("자동 결합 부위 후보를 찾지 못했습니다. target.hotspots 를 직접 지정하세요.")
         preferred = cfg_get(cfg, "target.hotspot_set")
         if preferred:
             chosen = next((s for s in auto_sets if s["set_id"] == preferred), None)
@@ -344,7 +345,7 @@ def _prepare_target_impl(
         prepared = phase_dir / "target_prepared.pdb"
         truncate_info = {"enabled": True}
         truncate_info.update(_run_truncate(cfg, raw_structure, chain_id, pdb_labels, prepared))
-        warnings.extend(f"truncation: 핫스팟 {label} 누락" for label in truncate_info.get("missing_hotspots", []))
+        warnings.extend(f"truncation: 결합 부위 {label} 누락" for label in truncate_info.get("missing_hotspots", []))
     else:
         prepared = _to_pdb_from_file(Path(raw_structure), phase_dir / "target_prepared.pdb")
 
@@ -384,7 +385,7 @@ def _prepare_target_impl(
         for index, residue in enumerate(entry_labels):
             position = entry_positions[index] if index < len(entry_positions) else None
             hotspot_rows.append({"set_id": entry["set_id"], "residue": residue, "seq_position": position, "score": entry.get("score")})
-    pd.DataFrame(hotspot_rows, columns=["set_id", "residue", "seq_position", "score"]).to_csv(phase_dir / "hotspot_sets.csv", index=False)
+    write_csv(phase_dir / "hotspot_sets.csv", pd.DataFrame(hotspot_rows, columns=["set_id", "residue", "seq_position", "score"]))
     (phase_dir / "target_qc.json").write_text(
         json.dumps(to_native(qc), ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -528,17 +529,17 @@ def _resolve_explicit_hotspots(
         kind = entry["kind"]
         number = int(entry["number"])
         if kind is None and not warnings:
-            warnings.append("접두사 없는 핫스팟 번호는 제공 구조의 PDB 잔기 번호로 해석했습니다. "
+            warnings.append("접두사 없는 결합 부위 번호는 제공 구조의 PDB 잔기 번호로 해석했습니다. "
                             "번호 체계를 고정하려면 pdbN 또는 seqN으로 입력하세요.")
         if chain != chain_id:
-            raise ValueError(f"핫스팟 체인 '{chain}' 이 타깃 체인 '{chain_id}' 과 다릅니다.")
+            raise ValueError(f"결합 부위 체인 '{chain}' 이 타깃 체인 '{chain_id}' 과 다릅니다.")
         if kind == "seq":
             position = number
             if not 1 <= position <= len(sequence):
-                raise ValueError(f"핫스팟 서열 위치 {position} 이 서열 범위(1-{len(sequence)})를 벗어났습니다.")
+                raise ValueError(f"결합 부위 서열 위치 {position} 이 서열 범위(1-{len(sequence)})를 벗어났습니다.")
             if position not in seq_to_label:
                 raise ValueError(
-                    f"핫스팟 서열 위치 {position} 이 제공 구조에 존재하지 않습니다 "
+                    f"결합 부위 서열 위치 {position} 이 제공 구조에 존재하지 않습니다 "
                     "(구조에 없는 잔기를 라벨로 합성하지 않습니다, F09)."
                 )
             label = seq_to_label[position]
@@ -546,7 +547,7 @@ def _resolve_explicit_hotspots(
             label = f"{chain_id}:{number}"
             if label not in label_to_seq:
                 raise ValueError(
-                    f"핫스팟 PDB 잔기 {label} 이 구조에 없습니다. 서열 위치로 지정하려면 'seq{number}' 접두사를 사용하세요."
+                    f"결합 부위 PDB 잔기 {label} 이 구조에 없습니다. 서열 위치로 지정하려면 'seq{number}' 접두사를 사용하세요."
                 )
             position = label_to_seq[label]
         pdb_labels.append(label)
@@ -573,26 +574,26 @@ def _prepare_sequence_only(
     no_hotspots = isinstance(hotspot_spec, list) and not hotspot_spec
     if hotspots_mod.requests_automatic_hotspots(hotspot_spec, chain_id):
         raise ValueError(
-            "타깃 구조가 없어 자동 핫스팟을 계산할 수 없습니다. target.hotspots 에 잔기 번호를 지정하거나 "
+            "타깃 구조가 없어 자동 결합 부위를 계산할 수 없습니다. target.hotspots 에 잔기 번호를 지정하거나 "
             "target.pdb / structure.provider(boltz2|chai1)를 설정하세요."
         )
     seq_positions: list[int] = []
     if any(entry["kind"] is None for entry in explicit_entries):
-        warnings.append("구조가 없어 접두사 없는 핫스팟 번호는 1-based 서열 위치로 해석했습니다. "
+        warnings.append("구조가 없어 접두사 없는 결합 부위 번호는 1-based 서열 위치로 해석했습니다. "
                         "번호 체계를 고정하려면 seqN으로 입력하세요.")
     for entry in explicit_entries:
         chain = entry["chain"]
         kind = entry["kind"]
         number = int(entry["number"])
         if chain != chain_id:
-            raise ValueError(f"핫스팟 체인 '{chain}' 이 타깃 체인 '{chain_id}' 과 다릅니다.")
+            raise ValueError(f"결합 부위 체인 '{chain}' 이 타깃 체인 '{chain_id}' 과 다릅니다.")
         if kind == "pdb":
-            raise ValueError("구조가 없어 PDB 번호 핫스팟을 해석할 수 없습니다. 서열 위치('seqN')로 지정하세요.")
+            raise ValueError("구조가 없어 PDB 번호 결합 부위를 해석할 수 없습니다. 서열 위치('seqN')로 지정하세요.")
         if not 1 <= number <= len(sequence):
-            raise ValueError(f"핫스팟이 타깃 서열 범위(1-{len(sequence)})를 벗어났습니다: {number}")
+            raise ValueError(f"결합 부위가 타깃 서열 범위(1-{len(sequence)})를 벗어났습니다: {number}")
         seq_positions.append(number)
     seq_labels = [f"{chain_id}:{position}" for position in seq_positions]
-    warnings.append(f"구조 없이 서열 전용 모드로 진행합니다 (핫스팟 {len(seq_positions)}개, 구조 QC 생략).")
+    warnings.append(f"구조 없이 서열 전용 모드로 진행합니다 (결합 부위 {len(seq_positions)}개, 구조 QC 생략).")
 
     if target_msa is None:
         target_msa, msa_warnings = msa_utils.ensure_a3m(
@@ -602,10 +603,10 @@ def _prepare_sequence_only(
     target_msa = _snapshot_target_msa(target_msa, phase_dir, dry_run)
 
     set_id = "none" if no_hotspots else "user"
-    pd.DataFrame([
+    write_csv(phase_dir / "hotspot_sets.csv", pd.DataFrame([
         {"set_id": "user", "residue": label, "seq_position": position, "score": None}
         for label, position in zip(seq_labels, seq_positions)
-    ], columns=["set_id", "residue", "seq_position", "score"]).to_csv(phase_dir / "hotspot_sets.csv", index=False)
+    ], columns=["set_id", "residue", "seq_position", "score"]))
     (phase_dir / "target_sequence.fasta").write_text(f">{cfg_get(cfg, 'target.name', 'target')}\n{sequence}\n", encoding="utf-8")
     qc = {
         "sequence_length": len(sequence),

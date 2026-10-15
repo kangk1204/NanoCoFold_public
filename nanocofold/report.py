@@ -39,8 +39,8 @@ CANDIDATE_COLUMNS = [
     ("ranking_scope", "순위 범위"),
     ("final_evaluated", "최종 평가 기록"),
     ("final_eligible", "기록 적격"),
-    ("site_satisfied", "지정 부위 충족"),
-    ("site_selection_eligible", "지정 부위 포함 적격"),
+    ("site_satisfied", "지정 결합 부위 충족"),
+    ("site_selection_eligible", "지정 결합 부위 포함 적격"),
     ("pose_consensus_status", "동일 후보 자세 일치"),
     ("pose_supporting_engines", "자세 일치 엔진 수"),
     ("pose_quality_supporting_engines", "기록 적격·자세 일치 엔진 수"),
@@ -79,7 +79,7 @@ CANDIDATE_COLUMNS = [
     ("n_hbonds", "N/O 근접 원자쌍"),
     ("n_salt_bridges", "반대 전하 원자쌍"),
     ("n_clashes", "거리 기준 충돌 원자쌍"),
-    ("hotspot_contact_frac", "핫스팟 접촉률"),
+    ("hotspot_contact_frac", "결합 부위 접촉률"),
     ("esm_score", "ESM 서열 prior (친화도 아님)"),
     ("esm_llr", "ESM ΔLLR"),
     ("esm_mean_logprob", "ESM mean log-prob"),
@@ -102,7 +102,7 @@ REASON_LABELS = {
     "iptm": "ipTM 기준 미통과",
     "iptm_unassessed": "쌍 ipTM 미평가",
     "interface_plddt": "계면 pLDDT 기준 미통과",
-    "hotspot": "핫스팟 접촉 기준 미통과",
+    "hotspot": "결합 부위 접촉 기준 미통과",
     "developability": "개발가능성 경고 기준 미통과",
     "developability_unassessed": "CDR 개발가능성 미평가",
     "scoring_error": "구조 점수 계산 오류",
@@ -134,8 +134,8 @@ POSE_STATUS_LABELS = {
     },
     "review_priority": {
         "multi_engine_supported": "다중 엔진 지지·탐색용", "single_engine_promising": "엔진별 단독 유망·탐색용",
-        "prioritized": "우선 검토·탐색용", "site_unmet": "지정 부위 미충족·보류",
-        "site_not_assessed": "지정 부위 미평가·보류", "confidence_gate_unmet": "기록 적격 미통과·보류",
+        "prioritized": "우선 검토·탐색용", "site_unmet": "지정 결합 부위 미충족·보류",
+        "site_not_assessed": "지정 결합 부위 미평가·보류", "confidence_gate_unmet": "기록 적격 미통과·보류",
         "confidence_not_assessed": "기록 적격 미평가·보류", "geometry_not_assessed": "자세 미평가·보류",
         "design_inconsistent": "설계 자세 미재현·보류", "design_not_assessed": "설계 일치 미평가·보류",
         "consensus_insufficient": "자세 일치 지지 부족·보류", "identity_not_assessed": "후보 대응 미평가·보류", "disabled": "평가 비활성",
@@ -355,7 +355,7 @@ def _truncation_summary(info) -> str:
         value = info.get(key)
         if type(value) is int and value >= 0:
             parts.append(f"{label} {value}개")
-    for key, label in (("kept_ranges", "유지 구간"), ("missing_hotspots", "누락 핫스팟")):
+    for key, label in (("kept_ranges", "유지 구간"), ("missing_hotspots", "누락 결합 부위")):
         values = info.get(key)
         if isinstance(values, list) and values:
             # Labels/ranges are recorded residue identifiers, never file names.
@@ -459,11 +459,11 @@ def generate_report(
     if automatic_hotspots and hotspots_df.empty:
         table_path = run_dir / "01_target/hotspot_table.csv"
         if not table_path.is_file():
-            warnings.append("자동 핫스팟을 요청했지만 hotspot_table.csv 기록 파일이 없습니다. "
+            warnings.append("자동 결합 부위를 요청했지만 hotspot_table.csv 기록 파일이 없습니다. "
                             "평가 결과가 0개라는 뜻으로 해석하지 말고 표적 단계의 원본 산출물을 확인하세요.")
         elif not any("hotspot_table.csv을 읽지 못했습니다" in issue for issue in warnings):
             warnings.append("hotspot_table.csv 파일은 있으나 평가 표가 0행입니다(헤더만 보존). "
-                            "자동 핫스팟의 평가 완료나 결합 부위 없음으로 해석하지 않습니다.")
+                            "자동 결합 부위의 평가 완료나 결합 부위 없음으로 해석하지 않습니다.")
     engine_provenance = saved_reader.engine_provenance() if saved_reader else []
     comparison = saved_reader._json("02_comparison/comparison_status.json") if saved_reader else {}
     expected_models = comparison.get("expected_rows") if isinstance(comparison, dict) else None
@@ -590,7 +590,7 @@ def _safe_read_csv(path: Path, issues: list[str] | None = None) -> pd.DataFrame:
             return pd.read_csv(path)
         except (OSError, ValueError, UnicodeError, csv.Error, StopIteration) as exc:
             if issues is not None:
-                issues.append(f"{path.name}을 읽지 못했습니다 ({type(exc).__name__}). 해당 핫스팟 표는 미평가이며 원본 파일 복구가 필요합니다.")
+                issues.append(f"{path.name}을 읽지 못했습니다 ({type(exc).__name__}). 해당 결합 부위 표는 미평가이며 원본 파일 복구가 필요합니다.")
             return pd.DataFrame()
     return pd.DataFrame()
 

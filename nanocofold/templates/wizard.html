@@ -161,7 +161,7 @@
 <main>
   <header class="intro">
     <h1>NanoCoFold 입력 마법사</h1>
-    <p class="note">PDB ID 또는 로컬 구조에서 표적, 함께 유지할 단백질, 결합 유도 부위를 확인하고 실행 설정만 저장합니다. GPU 작업은 여기서 시작하지 않습니다.</p>
+    <p class="note">PDB ID 또는 로컬 구조에서 표적, 함께 유지할 단백질, 결합 부위를 확인하고 실행 설정만 저장합니다. GPU 작업은 여기서 시작하지 않습니다.</p>
   </header>
 
   <div id="live" class="sr-only" aria-live="polite"></div>
@@ -214,19 +214,19 @@
         </fieldset>
       </div>
       <div class="actions">
-        <button id="analyze" disabled>Hotspot 후보 계산</button>
+        <button id="analyze" disabled>결합 부위 후보 계산</button>
         <span id="selectionHint" class="note">표적을 선택하면 계산할 수 있습니다.</span>
       </div>
       <p id="analyzeStatus" class="status"></p>
     </section>
 
     <section class="panel" aria-labelledby="step3">
-      <h2 id="step3">3. Hotspot 확인</h2>
+      <h2 id="step3">3. 결합 부위 확인</h2>
       <p class="note">자동 후보는 표면 노출, 주변 환경, 당질 거리 등을 이용한 휴리스틱입니다. 최적 결합부위나 검증된 결합을 뜻하지 않습니다. PDB B열 원값은 pLDDT나 신뢰도 퍼센트가 아닙니다.</p>
       <div class="grid">
         <div>
           <div id="viewer" class="viewer" role="img" aria-label="3D 구조 뷰어"></div>
-          <p class="note">3D에서 표적 원자를 클릭하거나 오른쪽 잔기 목록을 키보드로 선택하세요. 표적은 청록색, 파트너는 회색, 선택 hotspot은 주황색입니다.</p>
+          <p class="note">3D에서 표적 원자를 클릭하거나 오른쪽 잔기 목록을 키보드로 선택하세요. 표적은 청록색, 파트너는 회색, 선택 결합 부위는 주황색입니다.</p>
         </div>
         <div>
           <h3>자동 후보</h3>
@@ -520,7 +520,7 @@
   async function analyze() {
     invalidate(2);
     const gen = ++state.analyzeGen;
-    setStatus("analyzeStatus", "선택한 표적과 문맥으로 hotspot 후보를 계산하는 중입니다.", "");
+    setStatus("analyzeStatus", "선택한 표적과 문맥으로 결합 부위 후보를 계산하는 중입니다.", "");
     try {
       const data = await api("/api/analyze", {input_id: state.input.input_id, target: state.target, context: state.context});
       if (gen !== state.analyzeGen) return;
@@ -585,8 +585,8 @@
     const buried = selected.map(residueByPosition).filter(isBuried);
     const issues = [];
     if (state.selection && state.selection.blockers && state.selection.blockers.length) issues.push("입력 QC 차단 항목이 남아 있습니다.");
-    if (!selected.length) issues.push("hotspot을 1개 이상 선택하세요.");
-    if (selected.length > 12) issues.push("hotspot은 최대 12개까지 내보낼 수 있습니다.");
+    if (!selected.length) issues.push("결합 부위를 1개 이상 선택하세요.");
+    if (selected.length > 12) issues.push("결합 부위는 최대 12개까지 내보낼 수 있습니다.");
     if (buried.length) issues.push("상대 SASA 0.15 미만의 매몰 잔기는 내보낼 수 없습니다.");
     if (!el.ack.checked) issues.push("한계 확인란을 선택하세요.");
     return issues;
@@ -599,7 +599,7 @@
       return false;
     }
     if (nextChecked && !state.hotspots.has(pos) && state.hotspots.size >= 12) {
-      setStatus("hotspotStatus", "hotspot은 최대 12개까지 선택할 수 있습니다.", "warning");
+      setStatus("hotspotStatus", "결합 부위는 최대 12개까지 선택할 수 있습니다.", "warning");
       return false;
     }
     nextChecked ? state.hotspots.add(pos) : state.hotspots.delete(pos);
@@ -654,7 +654,7 @@
     markExportStale(); el.ack.checked = false;
     updateResidueChecks(); renderReview(state.selection); updateViewerHotspots();
     const issues = exportIssues();
-    setStatus("hotspotStatus", issues.length ? issues.join(" ") : `선택된 hotspot ${state.hotspots.size}개`, issues.length ? "warning" : "ok");
+    setStatus("hotspotStatus", issues.length ? issues.join(" ") : `선택된 결합 부위 ${state.hotspots.size}개`, issues.length ? "warning" : "ok");
     updateExportButton();
   }
   function addManual() {
@@ -685,7 +685,7 @@
       $("review").append(text("p", `표면 분석에 유지한 별도 비단백질 체인: ${data.retained_nonprotein_chains.join(", ")}. 단백질과의 소속 관계는 자동 추정하지 않으며 설계·평가 좌표에는 포함하지 않습니다.`, "warning"));
     }
     const selected = Array.from(state.hotspots).sort((a, b) => a - b);
-    $("review").append(text("p", `선택 hotspot: ${selected.length}개`));
+    $("review").append(text("p", `선택 결합 부위: ${selected.length}개`));
     for (const pos of selected) {
       const r = residueByPosition(pos);
       if (r) $("review").append(text("span", residueLabel(r), "pill"));

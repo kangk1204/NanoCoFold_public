@@ -13,6 +13,7 @@ from . import cascade, mature, provenance
 from .config import cfg_get, dump_resolved, resolve_path
 from .utils import pdb_io
 from .utils.shell import ToolError
+from .utils.atomic import write_csv
 
 SCHEMA_VERSION = 1
 ENGINES = ("rfantibody", "boltzgen")
@@ -229,7 +230,7 @@ def _choose_parents(frame, cfg, phase, opts):
             seen.add(row["sequence"])
             count += 1
     audit_frame = pd.DataFrame(audit)
-    audit_frame.to_csv(phase / "parent_audit.csv", index=False)
+    write_csv(phase / "parent_audit.csv", audit_frame)
     missing = {engine: opts["parents_per_engine"] - sum(row["parent_engine"] == engine for row in selected)
                for engine in opts["engines"]}
     if any(missing.values()):
@@ -311,9 +312,9 @@ def build_library(cfg, run_dir, result):
     provenance.archive_existing([phase / name for name in ("parents.csv", "parent_audit.csv", "library.csv", "failure.json")], phase)
     try:
         parents, audit = _choose_parents(frame, cfg, phase, opts)
-        parents.to_csv(phase / "parents.csv", index=False)
+        write_csv(phase / "parents.csv", parents)
         library = _library(parents, opts)
-        library.to_csv(phase / "library.csv", index=False)
+        write_csv(phase / "library.csv", library)
     except (ValueError, ToolError) as exc:
         (phase / "failure.json").write_text(json.dumps({"schema_version": SCHEMA_VERSION, "fingerprint": fingerprint,
                                                        "settings": opts, "error": str(exc)}, ensure_ascii=False, indent=2) + "\n")
@@ -349,7 +350,7 @@ def run(cfg, run_dir, state, target, result, *, predict, score, finalize):
     dump_resolved(cfg, Path(run_dir) / "run_config.yaml")
     stage = Path(run_dir) / "02_screen"
     stage.mkdir(parents=True, exist_ok=True)
-    library.to_csv(stage / "candidates.csv", index=False)
+    write_csv(stage / "candidates.csv", library)
     state.set_phase("design_refinement", summary)
     print(f"[design refinement] 부모 {summary['parent_controls']}종 → CDR 라이브러리 {len(library)}종 → Boltz-2 {summary['final_count']}종")
     return cascade.run(cfg, Path(run_dir), state, target, library, None, predict=predict, score=score, finalize=finalize)

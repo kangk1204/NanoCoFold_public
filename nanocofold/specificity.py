@@ -92,7 +92,7 @@ def resolve_definition(cfg: dict) -> dict:
     positions = sorted(set(_position(p, "hotspots_full") for p in positions))
     start, end = (1, cut) if retain == "N" else (cut + 1, len(full))
     if any(not start <= p <= end for p in positions):
-        raise ValueError("모든 hotspot은 보존된 절단 조각 안에 있어야 합니다.")
+        raise ValueError("모든 결합 부위는 보존된 절단 조각 안에 있어야 합니다.")
     neo_full = cut if retain == "N" else cut + 1
     if mode in {"terminal", "both"} and neo_full not in positions:
         raise ValueError("말단 인식 평가에는 새 말단 잔기를 hotspots_full 에 포함하세요.")

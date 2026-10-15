@@ -38,3 +38,20 @@ test('coordinate provenance captions translate in both directions without Korean
   const value=i.term(ko);assert.doesNotMatch(i.value(value),/[가-힣]/);i.setLanguage('ko',{persist:false});assert.equal(i.value(value),ko);i.setLanguage('en',{persist:false});
  }
 });
+test('legacy hotspot wording displays canonical terms without rewriting raw data or IDs',()=>{
+ const i=fixture(),raw={candidate_id:'hotspot 미평가',label:'핫스팟 접촉 기준 미통과'};
+ const saved=JSON.stringify(raw),node={textContent:'',isConnected:true};
+ const label=i.term(raw.label);assert.equal(i.value(label),'Below hotspot contact threshold');
+ i.setLanguage('ko',{persist:false});assert.equal(i.value(label),'결합 부위 접촉 기준 미통과');
+ i.text(node,raw.candidate_id);i.setLanguage('en',{persist:false});i.setLanguage('ko',{persist:false});
+ assert.equal(node.textContent,raw.candidate_id);assert.equal(JSON.stringify(raw),saved);
+ assert.equal(i.value(i.term('toString')),'toString');
+ const message=i.format('실행 당시 기록 적격: {0} · 지정 부위 포함 적격: {1}',[raw.candidate_id,'미평가']);
+ assert.equal(i.value(message),'실행 당시 기록 적격: hotspot 미평가 · 지정 결합 부위 포함 적격: 미평가');
+});
+test('binding sites and general-complex residues of interest have separate bilingual labels',()=>{
+ const i=fixture();for(const key of ['결합 부위(hotspot)','관심 잔기','관심 잔기 접촉률']){
+  const value=i.term(key);assert.doesNotMatch(i.value(value),/[가-힣]/);
+  i.setLanguage('ko',{persist:false});assert.equal(i.value(value),key);i.setLanguage('en',{persist:false});
+ }
+});

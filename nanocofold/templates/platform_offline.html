@@ -498,6 +498,7 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
 .language-switch label { margin: 0; color: inherit; white-space: nowrap; }
 .language-switch select { width: auto; min-width: 108px; margin: 0; background: #fff; color: #1c2c38; padding: 6px 10px; }
 </style></head><body><header><strong>NanoCoFold · 오프라인 결과 탐색</strong><span>전체 후보 · 관측 · 구조 · 출처 포함</span><div class="language-switch"><label for="language-select">Language</label> <select id="language-select" aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div></header><main><div id="notice" role="status" aria-live="polite" hidden></div><section id="view-results">
+<p class="muted" data-terminology="binding-site">결합 부위(hotspot)는 나노바디 설계·접촉 평가에 지정한 표적 잔기입니다. 일반 복합체의 관심 잔기는 참조 구조 비교용입니다. 두 설정 모두 실제 결합의 실험적 증거를 뜻하지 않습니다.</p>
         <h1>분석 결과 보고서</h1><p class="muted">NanoCoFold · 저장된 데이터로 탐색하는 독립 보고서</p><nav class="report-nav" aria-label="보고서 내 탐색"><a href="#report-input">01 입력·설정</a><a href="#result-summary">02 후보·모델 수</a><a href="#report-comparison">03 후보 비교</a><a href="#report-exclusions">04 제외·미평가</a><a href="#candidate-title">05 구조·PAE</a><a href="#report-provenance">06 출처·산출물</a></nav>
         <p>
           기존 결과 열기는 읽기 전용입니다. 예측 점수는 실제 결합·친화도
@@ -541,7 +542,7 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
         <div id="explorer" hidden>
           <div class="card">
             <h2 id="report-comparison">03 후보 비교</h2>
-            <p class="muted" data-vhh-results>예측 신뢰도와 지정 위치 충족은 별개입니다. hotspot 접촉 수와 판정을 함께 확인하세요. 동일 엔진·실행 조건 안에서 지표를 비교하세요. 정렬은 탐색 순서이며 엔진을 합친 최종 순위가 아닙니다.</p>
+            <p class="muted" data-vhh-results>예측 신뢰도와 지정 결합 부위 충족은 별개입니다. 결합 부위 접촉 수와 판정을 함께 확인하세요. 동일 엔진·실행 조건 안에서 지표를 비교하세요. 정렬은 탐색 순서이며 엔진을 합친 최종 순위가 아닙니다.</p>
             <div class="inline">
               <label for="candidate-search">후보 검색</label
               ><input
@@ -550,7 +551,7 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
                 placeholder="ID, 서열, 제외 사유"
               ><label for="eligibility-basis">적격 판정</label
               ><select id="eligibility-basis">
-                <option value="quality">품질 적격 · hotspot 제외</option>
+                <option value="quality">품질 적격 · 결합 부위 제외</option>
                 <option value="recorded">실행 당시 기록 적격</option></select
               ><label for="eligibility">적격 여부</label
               ><select id="eligibility">
@@ -595,7 +596,7 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
               <input id="hotspot-min" type="number" min="0" max="100" step="1" value="50" disabled >
             </div>
             <p class="muted" data-vhh-results>결합 부위(hotspot) 후필터는 기본 해제입니다. 켜면 미지정·접촉률 미평가·번호 대응 실패·기록 불일치 후보는 표시하지 않습니다. 접촉률만 저장된 이전 결과는 기록된 비율로 필터하며 상세 접촉 수·판정은 미평가로 남습니다.
-              기존 결과의 적격 판정과 선별 목록은 보존하며, 품질 적격은 기록된 판정에서 hotspot만 제외한 탐색 값입니다.</p>
+              기존 결과의 적격 판정과 선별 목록은 보존하며, 품질 적격은 기록된 판정에서 결합 부위만 제외한 탐색 값입니다.</p>
             <label class="check"><input id="candidate-extra-columns" type="checkbox">상세 지표 열 펼치기</label>
             <p id="candidate-count"></p><p id="candidate-sort-note" class="muted" role="status"></p>
           </div>
@@ -997,10 +998,96 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
 };
 </script><script>/* UI catalog: Korean source keys, English translations. Research records are never rewritten. */
 "use strict";
+const NCF_LEGACY_TERMS = Object.freeze({
+  "지정 부위 접촉률": "지정 결합 부위 접촉률",
+  "표적·파트너·서열·입력 준비 방식·hotspot과 경고를 확인했습니다.": "표적·파트너·서열·입력 준비 방식·결합 부위와 경고를 확인했습니다.",
+  "서열 입력의 구조와 hotspot은 예측됩니다. 기본 MSA는 empty이며 외부 서버로 서열을 보내지 않습니다.": "서열 입력의 구조와 결합 부위는 예측됩니다. 기본 MSA는 empty이며 외부 서버로 서열을 보내지 않습니다.",
+  "연구자 탐색은 RF2·ESM 사전 탈락을 해제하고 hotspot restraint·랭킹 가중치를 끕니다. design은 1,000개 백본을 생성하고 최대 500개 복합체를 평가합니다. mature는 최대 500개와 WT 대조군을 평가합니다. screen은 입력 라이브러리 전체를 평가합니다. 품질 판정·충돌·개발가능성 경고를 유지하며 결과는 전체 후보를 표시합니다. design 구조 생성은 선택한 hotspot에 조건화됩니다. 후보 수가 늘면 계산 시간도 늘어납니다.": "연구자 탐색은 RF2·ESM 사전 탈락을 해제하고 결합 부위 restraint·랭킹 가중치를 끕니다. design은 1,000개 백본을 생성하고 최대 500개 복합체를 평가합니다. mature는 최대 500개와 WT 대조군을 평가합니다. screen은 입력 라이브러리 전체를 평가합니다. 품질 판정·충돌·개발가능성 경고를 유지하며 결과는 전체 후보를 표시합니다. design 구조 생성은 선택한 결합 부위에 조건화됩니다. 후보 수가 늘면 계산 시간도 늘어납니다.",
+  "서로 다른 조건의 점수는 비교 시 개별로 표시합니다. 입력 검토가 확정한 표적·hotspot은 고급 설정으로 덮어쓰지 않습니다.": "서로 다른 조건의 점수는 비교 시 개별로 표시합니다. 입력 검토가 확정한 표적·결합 부위는 고급 설정으로 덮어쓰지 않습니다.",
+  "예측 신뢰도와 지정 위치 충족은 별개입니다. hotspot 접촉 수와 판정을 함께 확인하세요. 동일 엔진·실행 조건 안에서 지표를 비교하세요. 정렬은 탐색 순서이며 엔진을 합친 최종 순위가 아닙니다.": "예측 신뢰도와 지정 결합 부위 충족은 별개입니다. 결합 부위 접촉 수와 판정을 함께 확인하세요. 동일 엔진·실행 조건 안에서 지표를 비교하세요. 정렬은 탐색 순서이며 엔진을 합친 최종 순위가 아닙니다.",
+  "품질 적격 · hotspot 제외": "품질 적격 · 결합 부위 제외",
+  "결합 부위(hotspot) 후필터는 기본 해제입니다. 켜면 미지정·접촉률 미평가·번호 대응 실패·기록 불일치 후보는 표시하지 않습니다. 접촉률만 저장된 이전 결과는 기록된 비율로 필터하며 상세 접촉 수·판정은 미평가로 남습니다. 기존 결과의 적격 판정과 선별 목록은 보존하며, 품질 적격은 기록된 판정에서 hotspot만 제외한 탐색 값입니다.": "결합 부위(hotspot) 후필터는 기본 해제입니다. 켜면 미지정·접촉률 미평가·번호 대응 실패·기록 불일치 후보는 표시하지 않습니다. 접촉률만 저장된 이전 결과는 기록된 비율로 필터하며 상세 접촉 수·판정은 미평가로 남습니다. 기존 결과의 적격 판정과 선별 목록은 보존하며, 품질 적격은 기록된 판정에서 결합 부위만 제외한 탐색 값입니다.",
+  "지정 부위 충족": "지정 결합 부위 충족",
+  "지정 부위 포함 적격": "지정 결합 부위 포함 적격",
+  "핫스팟 접촉 기준 미통과": "결합 부위 접촉 기준 미통과",
+  "Hotspot 제외 구간은 한 줄에 시작-끝 이름으로 입력하세요.": "결합 부위 제외 구간은 한 줄에 시작-끝 이름으로 입력하세요.",
+  "검토한 체인·hotspot과 경고를 확인해 주세요.": "검토한 체인·결합 부위와 경고를 확인해 주세요.",
+  "Hotspot에는 정수 위치를 입력하세요.": "결합 부위에는 정수 위치를 입력하세요.",
+  "관심 부위": "관심 잔기",
+  "실행 기록 요약: 기록 적격 {0} · 품질 적격 {1} (hotspot 제외). 품질 적격은 원본 선별을 바꾸지 않는 탐색 값입니다.": "실행 기록 요약: 기록 적격 {0} · 품질 적격 {1} (결합 부위 제외). 품질 적격은 원본 선별을 바꾸지 않는 탐색 값입니다.",
+  "정상 완료 · hotspot 제외 품질 적격 {0}개": "정상 완료 · 결합 부위 제외 품질 적격 {0}개",
+  "품질 판정 (hotspot 제외)": "품질 판정 (결합 부위 제외)",
+  "hotspot 미평가": "결합 부위 미평가",
+  "hotspot 번호 대응 실패": "결합 부위 번호 대응 실패",
+  "hotspot 기록 불일치": "결합 부위 기록 불일치",
+  "hotspot 미지정": "결합 부위 미지정",
+  "지정 hotspot 미접촉": "지정 결합 부위 미접촉",
+  "hotspot 접촉 기준 충족": "결합 부위 접촉 기준 충족",
+  "hotspot 접촉 기준 미달": "결합 부위 접촉 기준 미달",
+  "hotspot 판정 미기록": "결합 부위 판정 미기록",
+  "지정 부위 미충족·보류": "지정 결합 부위 미충족·보류",
+  "지정 부위 미평가·보류": "지정 결합 부위 미평가·보류",
+  "최소 hotspot 접촉률은 0–100% 사이로 입력하세요.": "최소 결합 부위 접촉률은 0–100% 사이로 입력하세요.",
+  "품질 적격 (hotspot 제외)": "품질 적격 (결합 부위 제외)",
+  "hotspot 접촉 수": "결합 부위 접촉 수",
+  "지정 위치 충족": "지정 결합 부위 충족",
+  "신뢰도 점수가 높아도 지정 hotspot에는 접촉하지 않았습니다. 지정 부위 재현 성공으로 해석하지 마세요.": "신뢰도 점수가 높아도 지정 결합 부위에는 접촉하지 않았습니다. 지정 결합 부위 재현 성공으로 해석하지 마세요.",
+  "PAE는 참조 구조와의 실측 오차가 아니며 pDockQ2는 실측 DockQ가 아닙니다. 지정 위치 진단은 기존 점수·제외 사유를 바꾸지 않습니다.": "PAE는 참조 구조와의 실측 오차가 아니며 pDockQ2는 실측 DockQ가 아닙니다. 지정 결합 부위 진단은 기존 점수·제외 사유를 바꾸지 않습니다.",
+  "신뢰도 · 지정 부위 · 자세 일관성": "신뢰도 · 지정 결합 부위 · 자세 일관성",
+  "실행 당시 기록 적격: {0} · 지정 부위 포함 적격: {1}": "실행 당시 기록 적격: {0} · 지정 결합 부위 포함 적격: {1}",
+  "검토 정책 v3는 품질·지정 부위를 충족한 엔진별 단독 유망 예측도 표시합니다. 같은 자세에서 두 엔진 이상이 충족하면 다중 엔진 지지로 구분합니다. 엔진 간 자세 차이와 설계·재예측 불일치는 별도 진단이며 자동 비결합·탈락 사유가 아닙니다.": "검토 정책 v3는 품질·지정 결합 부위를 충족한 엔진별 단독 유망 예측도 표시합니다. 같은 자세에서 두 엔진 이상이 충족하면 다중 엔진 지지로 구분합니다. 엔진 간 자세 차이와 설계·재예측 불일치는 별도 진단이며 자동 비결합·탈락 사유가 아닙니다.",
+  "품질 적격 (hotspot 제외): {0} · 실행 당시 기록 적격: {1}": "품질 적격 (결합 부위 제외): {0} · 실행 당시 기록 적격: {1}",
+  "실행 당시 hotspot 조건만으로 제외됐습니다. 나머지 기록 기준은 통과했으며 원본 판정·선별 목록은 보존됩니다.": "실행 당시 결합 부위 조건만으로 제외됐습니다. 나머지 기록 기준은 통과했으며 원본 판정·선별 목록은 보존됩니다.",
+  "같은 seed라도 엔진·장치 전체의 비트 단위 재현을 보장하지 않습니다. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에 한정됩니다. 생성 단계의 hotspot OFF/ON을 동일 난수 상태로 가정하지 않습니다.": "같은 seed라도 엔진·장치 전체의 비트 단위 재현을 보장하지 않습니다. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에 한정됩니다. 생성 단계의 결합 부위 OFF/ON을 동일 난수 상태로 가정하지 않습니다.",
+  "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
+});
 const NCF_TRANSLATIONS = Object.freeze({
+  "지정 부위 접촉률": "Requested hotspot contact fraction",
+  "표적·파트너·서열·입력 준비 방식·hotspot과 경고를 확인했습니다.": "I have reviewed the target, partners, sequences, preparation method, hotspots, and warnings.",
+  "서열 입력의 구조와 hotspot은 예측됩니다. 기본 MSA는 empty이며 외부 서버로 서열을 보내지 않습니다.": "Structure and hotspots are predicted from sequence input. The default MSA is empty and sends no sequences to an external server.",
+  "연구자 탐색은 RF2·ESM 사전 탈락을 해제하고 hotspot restraint·랭킹 가중치를 끕니다. design은 1,000개 백본을 생성하고 최대 500개 복합체를 평가합니다. mature는 최대 500개와 WT 대조군을 평가합니다. screen은 입력 라이브러리 전체를 평가합니다. 품질 판정·충돌·개발가능성 경고를 유지하며 결과는 전체 후보를 표시합니다. design 구조 생성은 선택한 hotspot에 조건화됩니다. 후보 수가 늘면 계산 시간도 늘어납니다.": "Researcher exploration disables RF2/ESM prefilter rejection, hotspot restraints, and ranking weights. Design generates 1,000 backbones and evaluates up to 500 complexes. Mature evaluates up to 500 variants plus a WT control. Screen evaluates the entire input library. Quality criteria, clash checks, and developability warnings are retained, and all candidates are displayed. Design generation is conditioned on selected hotspots. More candidates require more computation time.",
+  "서로 다른 조건의 점수는 비교 시 개별로 표시합니다. 입력 검토가 확정한 표적·hotspot은 고급 설정으로 덮어쓰지 않습니다.": "Scores from different conditions are displayed separately. Advanced settings cannot override the target or hotspots established by input review.",
+  "예측 신뢰도와 지정 위치 충족은 별개입니다. hotspot 접촉 수와 판정을 함께 확인하세요. 동일 엔진·실행 조건 안에서 지표를 비교하세요. 정렬은 탐색 순서이며 엔진을 합친 최종 순위가 아닙니다.": "Prediction confidence and contact with the requested hotspots are separate. Check hotspot contact counts and assessments together. Compare metrics within the same engine and run conditions. Sorting is an exploration order, not a combined ranking across engines.",
+  "품질 적격 · hotspot 제외": "Quality eligibility · Excluding hotspots",
+  "결합 부위(hotspot) 후필터는 기본 해제입니다. 켜면 미지정·접촉률 미평가·번호 대응 실패·기록 불일치 후보는 표시하지 않습니다. 접촉률만 저장된 이전 결과는 기록된 비율로 필터하며 상세 접촉 수·판정은 미평가로 남습니다. 기존 결과의 적격 판정과 선별 목록은 보존하며, 품질 적격은 기록된 판정에서 hotspot만 제외한 탐색 값입니다.": "The hotspot filter is off by default. When enabled, it hides candidates with no requested hotspots, unevaluated contact fractions, failed position mappings, or inconsistent records. Older results storing only a fraction are filtered by that recorded fraction; detailed counts and assessments remain unevaluated. Original eligibility and selection records are preserved. Quality eligibility is an exploration value derived by excluding only hotspots from the recorded criteria.",
+  "지정 부위 충족": "Requested hotspot satisfied",
+  "지정 부위 포함 적격": "Eligibility including requested hotspots",
+  "핫스팟 접촉 기준 미통과": "Below hotspot contact threshold",
+  "Hotspot 제외 구간은 한 줄에 시작-끝 이름으로 입력하세요.": "Enter one hotspot exclusion region per line as start-end name.",
+  "검토한 체인·hotspot과 경고를 확인해 주세요.": "Confirm the reviewed chains, hotspots, and warnings.",
+  "Hotspot에는 정수 위치를 입력하세요.": "Enter integer positions for hotspots.",
+  "관심 부위": "Residues of interest",
+  "실행 기록 요약: 기록 적격 {0} · 품질 적격 {1} (hotspot 제외). 품질 적격은 원본 선별을 바꾸지 않는 탐색 값입니다.": "Run-record summary: {0} recorded-eligible · {1} quality-eligible (excluding hotspots). Quality eligibility is an exploration value that does not change the original selection.",
+  "정상 완료 · hotspot 제외 품질 적격 {0}개": "Completed successfully · {0} quality-eligible (excluding hotspots)",
+  "품질 판정 (hotspot 제외)": "Quality assessment (excluding hotspots)",
+  "hotspot 미평가": "Hotspots not evaluated",
+  "hotspot 번호 대응 실패": "결합 부위 position mapping failed",
+  "hotspot 기록 불일치": "Inconsistent hotspot records",
+  "hotspot 미지정": "No hotspots specified",
+  "지정 hotspot 미접촉": "Requested hotspots not contacted",
+  "hotspot 접촉 기준 충족": "결합 부위 contact criterion met",
+  "hotspot 접촉 기준 미달": "Below hotspot contact criterion",
+  "hotspot 판정 미기록": "결합 부위 assessment not recorded",
+  "지정 부위 미충족·보류": "Requested hotspot unmet · Held",
+  "지정 부위 미평가·보류": "Requested hotspot unevaluated · Held",
+  "최소 hotspot 접촉률은 0–100% 사이로 입력하세요.": "Enter a minimum hotspot contact fraction between 0 and 100%.",
+  "품질 적격 (hotspot 제외)": "Quality-eligible (excluding hotspots)",
+  "hotspot 접촉 수": "결합 부위 contacts",
+  "지정 위치 충족": "Requested position satisfied",
+  "신뢰도 점수가 높아도 지정 hotspot에는 접촉하지 않았습니다. 지정 부위 재현 성공으로 해석하지 마세요.": "The requested hotspots were not contacted despite high confidence. Do not interpret this as successful reproduction of the requested hotspots.",
+  "PAE는 참조 구조와의 실측 오차가 아니며 pDockQ2는 실측 DockQ가 아닙니다. 지정 위치 진단은 기존 점수·제외 사유를 바꾸지 않습니다.": "PAE is not measured error against a reference structure; pDockQ2 is not measured DockQ. Site diagnostics do not alter the existing scores or exclusion reasons.",
+  "신뢰도 · 지정 부위 · 자세 일관성": "Confidence · Requested hotspot · Pose consistency",
+  "실행 당시 기록 적격: {0} · 지정 부위 포함 적격: {1}": "Recorded eligibility at execution: {0} · Eligibility including requested hotspots: {1}",
+  "검토 정책 v3는 품질·지정 부위를 충족한 엔진별 단독 유망 예측도 표시합니다. 같은 자세에서 두 엔진 이상이 충족하면 다중 엔진 지지로 구분합니다. 엔진 간 자세 차이와 설계·재예측 불일치는 별도 진단이며 자동 비결합·탈락 사유가 아닙니다.": "Review policy v3 also shows predictions meeting quality and site criteria within individual engines. Support from at least two engines with the same pose is distinguished as multiple-engine support. Pose differences across engines and design / reprediction disagreement are separate diagnostics, not automatic evidence of non-binding or rejection.",
+  "품질 적격 (hotspot 제외): {0} · 실행 당시 기록 적격: {1}": "Quality eligibility (excluding hotspots): {0} · Eligibility recorded at execution: {1}",
+  "실행 당시 hotspot 조건만으로 제외됐습니다. 나머지 기록 기준은 통과했으며 원본 판정·선별 목록은 보존됩니다.": "Excluded solely by the hotspot condition at execution. Other recorded criteria passed; original assessment and selection records are preserved.",
+  "같은 seed라도 엔진·장치 전체의 비트 단위 재현을 보장하지 않습니다. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에 한정됩니다. 생성 단계의 hotspot OFF/ON을 동일 난수 상태로 가정하지 않습니다.": "Identical seeds do not guarantee bitwise reproduction across all engines and devices. Strict CUDA determinism and same-environment repeat verification apply only to the Chai path. Do not assume identical random states for hotspot OFF/ON generation.",
+  "분석 구간·Hotspot 제외 영역": "Analysis region & hotspot exclusions",
+  "결합 부위(hotspot)는 나노바디 설계·접촉 평가에 지정한 표적 잔기입니다. 일반 복합체의 관심 잔기는 참조 구조 비교용입니다. 두 설정 모두 실제 결합의 실험적 증거를 뜻하지 않습니다.": "Hotspots are target residues specified for nanobody design and contact assessment. Residues of interest are used for reference comparisons of general complexes. Neither setting establishes experimental binding.",
+  "관심 잔기 접촉률": "Residues-of-interest contact fraction",
   "대표 체인쌍에 접촉이 없지만 다른 체인쌍에는 접촉이 있습니다. complex.primary_pair를 확인하세요.": "The primary pair has no contacts, while another chain pair does. Check complex.primary_pair.",
   "입력 방식": "Input method",
-  "지정 부위 접촉률": "Specified-site contact fraction",
+  "지정 결합 부위 접촉률": "Requested hotspot contact fraction",
   "현재 입력의 단백질 서열 전송 동의가 필요합니다.": "Consent is required to transmit the protein sequences in this input.",
   "이 입력의 단백질 서열을 api.colabfold.com으로 전송하는 데 동의합니다.": "I consent to sending the protein sequences in this input to api.colabfold.com.",
   "요약 ipSAE는 명시한 체인쌍 또는 검토 순서의 첫 쌍입니다. 전체 평균·최솟값과 구분하고 모든 체인쌍의 결과는 상세 표·CSV에서 확인하세요. ipTM은 기록된 적용 범위로 해석하며, 범위가 없으면 전체 복합체 값으로 추정하지 않습니다.": "Summary ipSAE uses the explicit chain pair or the first pair in reviewed order. Distinguish it from the overall mean and minimum; inspect every pair in the detail table or CSV. Interpret ipTM using its recorded scope; do not infer a whole-complex value when scope is missing.",
@@ -1065,19 +1152,19 @@ const NCF_TRANSLATIONS = Object.freeze({
   "새 표적 구조 예측 엔진": "Engine for the new target structure",
   "전체 단백질 FASTA · 선택한 체인 ID를 이름으로 사용": "Full protein FASTA · Use the selected chain IDs as names",
   "파일에 기록된 전체 서열을 자동으로 채웁니다. X 등 불명확한 위치와 실제 construct를 확인하세요. 정보가 없는 체인은 확인한 전체 서열을 입력하세요. 알려진 잔기의 변경이나 모호한 대응은 차단합니다.": "Full sequences recorded in the file are filled automatically. Review ambiguous positions such as X and the actual construct. Supply a verified full sequence for any chain without sequence information. Changes to known residues and ambiguous mappings are blocked.",
-  "결합 부위(hotspot) 처리": "Hotspot handling",
+  "결합 부위(hotspot) 처리": "결합 부위 handling",
   "예측한 구조에서 자동 추천": "Suggest hotspots on the predicted structure",
   "아래 선택한 부위를 전체 서열 위치로 대응": "Map selected hotspots to full-sequence positions",
   "원본 좌표는 참조로 보존합니다. 새 예측은 단백질 서열 모델이며 수정 잔기·chromophore·당질·리간드·핵산·막 환경을 재현하지 않습니다.": "Original coordinates remain as a reference. A new prediction models protein sequences and does not reproduce modified residues, chromophores, glycans, ligands, nucleic acids, or a membrane environment.",
   "원본 좌표에서 결합 부위(hotspot) 검토": "Review hotspots in the original coordinates",
-  "결합 부위(hotspot) 위치 (표적 서열의 1-based 위치)": "Hotspot positions (1-based positions in the target sequence)",
+  "결합 부위(hotspot) 위치 (표적 서열의 1-based 위치)": "결합 부위 positions (1-based positions in the target sequence)",
   "예: 34, 67, 88": "e.g. 34, 67, 88",
   "원본 번호·노출도 대응표": "Original residue numbers & exposure mapping",
   "상세 표 스크롤": "Scroll detailed table",
-  "표적·파트너·서열·입력 준비 방식·hotspot과 경고를 확인했습니다.": "I have reviewed the target, partners, sequences, preparation method, hotspots, and warnings.",
+  "표적·파트너·서열·입력 준비 방식·결합 부위와 경고를 확인했습니다.": "I have reviewed the target, partners, sequences, preparation method, hotspots, and warnings.",
   "표적 FASTA": "Target FASTA",
   "표적 구조 예측 엔진": "Target structure prediction engine",
-  "서열 입력의 구조와 hotspot은 예측됩니다. 기본 MSA는 empty이며 외부 서버로 서열을 보내지 않습니다.": "Structure and hotspots are predicted from sequence input. The default MSA is empty and sends no sequences to an external server.",
+  "서열 입력의 구조와 결합 부위는 예측됩니다. 기본 MSA는 empty이며 외부 서버로 서열을 보내지 않습니다.": "Structure and hotspots are predicted from sequence input. The default MSA is empty and sends no sequences to an external server.",
   "표적 분석 구간 · 결합 부위(hotspot) 제외 영역": "Target region & hotspot exclusion regions",
   "비워 두면 전체 표적을 분석합니다. 좌표 사용은 관측 서열, 새 구조 예측·FASTA는 검토한 전체 서열의 1-based 위치입니다.": "Leave blank to analyze the entire target. Positions are 1-based in the observed sequence for coordinate input, or the reviewed full sequence for new structure prediction and FASTA input.",
   "분석 시작": "Region start",
@@ -1101,7 +1188,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "작은 시작 설정 · 네 엔진 비교 (새 분석 기본)": "Small starting preset · Four-engine comparison (new analysis default)",
   "연구자 탐색 · 후보 폭넓게 평가 (기본)": "Researcher exploration · Evaluate more candidates (default)",
   "기존 기본 설정 · 사전 필터 적용": "Legacy default · Apply prefilters",
-  "연구자 탐색은 RF2·ESM 사전 탈락을 해제하고 hotspot restraint·랭킹 가중치를 끕니다. design은 1,000개 백본을 생성하고 최대 500개 복합체를 평가합니다. mature는 최대 500개와 WT 대조군을 평가합니다. screen은 입력 라이브러리 전체를 평가합니다. 품질 판정·충돌·개발가능성 경고를 유지하며 결과는 전체 후보를 표시합니다. design 구조 생성은 선택한 hotspot에 조건화됩니다. 후보 수가 늘면 계산 시간도 늘어납니다.": "Researcher exploration disables RF2/ESM prefilter rejection, hotspot restraints, and ranking weights. Design generates 1,000 backbones and evaluates up to 500 complexes. Mature evaluates up to 500 variants plus a WT control. Screen evaluates the entire input library. Quality criteria, clash checks, and developability warnings are retained, and all candidates are displayed. Design generation is conditioned on selected hotspots. More candidates require more computation time.",
+  "연구자 탐색은 RF2·ESM 사전 탈락을 해제하고 결합 부위 restraint·랭킹 가중치를 끕니다. design은 1,000개 백본을 생성하고 최대 500개 복합체를 평가합니다. mature는 최대 500개와 WT 대조군을 평가합니다. screen은 입력 라이브러리 전체를 평가합니다. 품질 판정·충돌·개발가능성 경고를 유지하며 결과는 전체 후보를 표시합니다. design 구조 생성은 선택한 결합 부위에 조건화됩니다. 후보 수가 늘면 계산 시간도 늘어납니다.": "Researcher exploration disables RF2/ESM prefilter rejection, hotspot restraints, and ranking weights. Design generates 1,000 backbones and evaluates up to 500 complexes. Mature evaluates up to 500 variants plus a WT control. Screen evaluates the entire input library. Quality criteria, clash checks, and developability warnings are retained, and all candidates are displayed. Design generation is conditioned on selected hotspots. More candidates require more computation time.",
   "복합체 평가 후보 상한 · design/mature (WT는 별도 추가 가능)": "Complex evaluation candidate limit · design/mature (WT may be added separately)",
   "기본 500 · 비우면 설정값 사용": "Default 500 · Leave blank to use the configuration",
   "생성할 백본 수 · design": "Backbones to generate · design",
@@ -1114,7 +1201,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "고급 설정 · YAML 가져오기": "Advanced settings · Import YAML",
   "기존 YAML 가져오기": "Import existing YAML",
   "고급 설정 JSON (기본 흐름에서는 불필요)": "Advanced settings JSON (not needed for the basic workflow)",
-  "서로 다른 조건의 점수는 비교 시 개별로 표시합니다. 입력 검토가 확정한 표적·hotspot은 고급 설정으로 덮어쓰지 않습니다.": "Scores from different conditions are displayed separately. Advanced settings cannot override the target or hotspots established by input review.",
+  "서로 다른 조건의 점수는 비교 시 개별로 표시합니다. 입력 검토가 확정한 표적·결합 부위는 고급 설정으로 덮어쓰지 않습니다.": "Scores from different conditions are displayed separately. Advanced settings cannot override the target or hotspots established by input review.",
   "적용 설정": "Applied settings",
   "이 입력의 환경 점검": "Environment check for this input",
   "4. 분석 실행": "4. Run analysis",
@@ -1191,11 +1278,11 @@ const NCF_TRANSLATIONS = Object.freeze({
   "확인한 중간 파일 삭제": "Delete the reviewed intermediate files",
   "비교 실행": "Comparison run",
   "조건·결과 나란히 비교": "Compare settings & results side by side",
-  "예측 신뢰도와 지정 위치 충족은 별개입니다. hotspot 접촉 수와 판정을 함께 확인하세요. 동일 엔진·실행 조건 안에서 지표를 비교하세요. 정렬은 탐색 순서이며 엔진을 합친 최종 순위가 아닙니다.": "Prediction confidence and contact with the requested site are separate. Check hotspot contact counts and assessments together. Compare metrics within the same engine and run conditions. Sorting is an exploration order, not a combined ranking across engines.",
+  "예측 신뢰도와 지정 결합 부위 충족은 별개입니다. 결합 부위 접촉 수와 판정을 함께 확인하세요. 동일 엔진·실행 조건 안에서 지표를 비교하세요. 정렬은 탐색 순서이며 엔진을 합친 최종 순위가 아닙니다.": "Prediction confidence and contact with the requested hotspots are separate. Check hotspot contact counts and assessments together. Compare metrics within the same engine and run conditions. Sorting is an exploration order, not a combined ranking across engines.",
   "후보 검색": "Search candidates",
   "ID, 서열, 제외 사유": "ID, sequence, or exclusion reason",
   "적격 판정": "Eligibility basis",
-  "품질 적격 · hotspot 제외": "Quality eligibility · Excluding hotspots",
+  "품질 적격 · 결합 부위 제외": "Quality eligibility · Excluding hotspots",
   "실행 당시 기록 적격": "Eligibility recorded at execution",
   "적격 여부": "Eligibility",
   "전체": "All",
@@ -1210,7 +1297,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "내림차순": "Descending",
   "결합 부위(hotspot) 접촉률로 후필터": "Apply hotspot contact fraction filter",
   "최소 접촉률 (%)": "Minimum contact fraction (%)",
-  "결합 부위(hotspot) 후필터는 기본 해제입니다. 켜면 미지정·접촉률 미평가·번호 대응 실패·기록 불일치 후보는 표시하지 않습니다. 접촉률만 저장된 이전 결과는 기록된 비율로 필터하며 상세 접촉 수·판정은 미평가로 남습니다. 기존 결과의 적격 판정과 선별 목록은 보존하며, 품질 적격은 기록된 판정에서 hotspot만 제외한 탐색 값입니다.": "The hotspot filter is off by default. When enabled, it hides candidates with no requested site, unevaluated contact fractions, failed position mappings, or inconsistent records. Older results storing only a fraction are filtered by that recorded fraction; detailed counts and assessments remain unevaluated. Original eligibility and selection records are preserved. Quality eligibility is an exploration value derived by excluding only hotspots from the recorded criteria.",
+  "결합 부위(hotspot) 후필터는 기본 해제입니다. 켜면 미지정·접촉률 미평가·번호 대응 실패·기록 불일치 후보는 표시하지 않습니다. 접촉률만 저장된 이전 결과는 기록된 비율로 필터하며 상세 접촉 수·판정은 미평가로 남습니다. 기존 결과의 적격 판정과 선별 목록은 보존하며, 품질 적격은 기록된 판정에서 결합 부위만 제외한 탐색 값입니다.": "The hotspot filter is off by default. When enabled, it hides candidates with no requested hotspots, unevaluated contact fractions, failed position mappings, or inconsistent records. Older results storing only a fraction are filtered by that recorded fraction; detailed counts and assessments remain unevaluated. Original eligibility and selection records are preserved. Quality eligibility is an exploration value derived by excluding only hotspots from the recorded criteria.",
   "상세 지표 열 펼치기": "Expand detailed metric columns",
   "후보 목록 · 클릭해서 구조 비교": "Candidate list · Click to compare structures",
   "후보 비교 표": "Candidate comparison table",
@@ -1289,7 +1376,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "후보": "Candidate",
   "계면 pLDDT": "Interface pLDDT",
   "계면 PAE (Å)": "Interface PAE (Å)",
-  "결합 부위 접촉률": "Hotspot contact fraction",
+  "결합 부위 접촉률": "결합 부위 contact fraction",
   "모델": "Model",
   "평가 오류": "Evaluation error",
   "체인 1": "Chain 1",
@@ -1305,8 +1392,8 @@ const NCF_TRANSLATIONS = Object.freeze({
   "ESM 서열 prior (친화도 아님)": "ESM sequence prior (not affinity)",
   "배치 상대 종합점수": "Batch-relative composite score",
   "충돌 원자쌍": "Clashing atom pairs",
-  "지정 부위 충족": "Requested site satisfied",
-  "지정 부위 포함 적격": "Eligibility including requested site",
+  "지정 결합 부위 충족": "Requested hotspot satisfied",
+  "지정 결합 부위 포함 적격": "Eligibility including requested hotspots",
   "동일 후보 자세 일치": "Pose agreement for the same candidate",
   "자세 일치 엔진 수": "Pose-supporting engines",
   "기록 적격·자세 일치 엔진 수": "Recorded-eligible pose-supporting engines",
@@ -1344,7 +1431,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "ipSAE 기준 미통과": "Below ipSAE threshold",
   "ipTM 기준 미통과": "Below ipTM threshold",
   "계면 pLDDT 기준 미통과": "Below interface pLDDT threshold",
-  "핫스팟 접촉 기준 미통과": "Below hotspot contact threshold",
+  "결합 부위 접촉 기준 미통과": "Below hotspot contact threshold",
   "개발가능성 경고 기준 미통과": "Developability warning threshold not met",
   "CDR 개발가능성 미평가": "CDR developability not evaluated",
   "구조 점수 계산 오류": "Structure scoring error",
@@ -1446,7 +1533,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "초록: 표적 · 파랑: 파트너 · 회색: 제외. Ctrl+클릭으로 진행할 체인을 선택하세요.": "Green: target · Blue: partner · Gray: excluded. Ctrl+click to select chains to analyze.",
   "MolStar를 열지 못했습니다: {0}. 아래 목록에서 체인을 선택할 수 있습니다.": "Could not open MolStar: {0}. You can select chains from the list below.",
   "분석 구간은 1 이상의 정수여야 합니다.": "Analysis region positions must be integers of at least 1.",
-  "Hotspot 제외 구간은 한 줄에 시작-끝 이름으로 입력하세요.": "Enter one hotspot exclusion region per line as start-end name.",
+  "결합 부위 제외 구간은 한 줄에 시작-끝 이름으로 입력하세요.": "Enter one hotspot exclusion region per line as start-end name.",
   "사용자 제외 구간": "User-specified exclusion region",
   "복합체 예측 시간: 후보 목록이 확정되면 실측을 시작합니다.": "Complex prediction timing starts when the candidate list is finalized.",
   "예측 단계 {0}/{1} 처리 완료 · 작업은 실행 중이며 결과 저장·후처리는 남아 있을 수 있습니다.": "Prediction stage: {0}/{1} processed · The job is running; saving and postprocessing may remain.",
@@ -1455,8 +1542,8 @@ const NCF_TRANSLATIONS = Object.freeze({
   "복합체 예측 {0}/{1} · 남은 예상 {2}–{3}분 · 같은 실행의 {4}개 실측값 ({5}초/후보). 준비·후처리·대기는 제외한 참고 범위입니다.": "Complex prediction: {0}/{1} · Estimated remaining {2}–{3} min · {4} measurements in this run ({5} s/candidate). This reference range excludes preparation, postprocessing, and queueing.",
   "현재 서버는 일반 복합체 네 엔진 비교를 지원하지 않습니다. 새 기능 패키지로 업데이트하세요.": "This server does not support general four-engine complex comparison. Update the feature package.",
   "구조를 불러오고 체인·노출도를 검토하세요.": "Load the structure and review chains & exposure.",
-  "검토한 체인·hotspot과 경고를 확인해 주세요.": "Confirm the reviewed chains, hotspots, and warnings.",
-  "Hotspot에는 정수 위치를 입력하세요.": "Enter integer positions for hotspots.",
+  "검토한 체인·결합 부위와 경고를 확인해 주세요.": "Confirm the reviewed chains, hotspots, and warnings.",
+  "결합 부위에는 정수 위치를 입력하세요.": "Enter integer positions for hotspots.",
   "검토 중 입력이 변경되었습니다. 적용 설정을 다시 확인하세요.": "The input changed during review. Check the applied settings again.",
   "이번에 실행할 입력과 조건": "Inputs and conditions for this run",
   "평가 엔진: {0} · 엔진 점수를 합산하지 않습니다.": "Evaluation engines: {0} · Engine scores are not summed.",
@@ -1508,7 +1595,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "기준 체인": "Reference chain",
   "파트너 체인": "Partner chain",
   "다른 파트너": "Other partners",
-  "관심 부위": "Region of interest",
+  "관심 잔기": "Residues of interest",
   "실행: {0} · 모드: {1} · {2}": "Run: {0} · Mode: {1} · {2}",
   "분석: {0}": "Analysis: {0}",
   "핵심 보관본 · 서열·점수·모든 최종 구조를 유지했습니다. PAE 배열·MSA·중간 파일은 용량 정리로 삭제되어, 이 상세 자료가 필요하면 전체 분석을 새로 실행해야 합니다.": "Core-retained copy · Sequences, scores, and all final structures were retained. PAE arrays, MSAs, and intermediate files were removed to free storage. Run the full analysis again if these details are needed.",
@@ -1521,7 +1608,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "미평가·미기록": "Unevaluated / unrecorded",
   "평가 미완료 {0} 모델. 일반 복합체에는 VHH 적격 판정을 적용하지 않습니다.": "{0} models with incomplete evaluation. VHH eligibility criteria do not apply to general complexes.",
   "고유 후보 서열 {0}종 · 평가 미완료 {1} · 적격 판정 미평가 {2} · 기록 선별 {3} 모델. 원본 후보는 source_sequence_id 및 원본 ID의 엔진 접두어로 구분합니다. 서열이 모두 기록된 경우에만 고유 서열 수를 계산합니다.": "{0} unique candidate sequences · {1} incompletely evaluated · {2} eligibility unevaluated · {3} recorded-selected models. Original candidates are distinguished by source_sequence_id and engine prefixes in the original IDs. Unique sequence counts are computed only when all sequences are recorded.",
-  "실행 기록 요약: 기록 적격 {0} · 품질 적격 {1} (hotspot 제외). 품질 적격은 원본 선별을 바꾸지 않는 탐색 값입니다.": "Run-record summary: {0} recorded-eligible · {1} quality-eligible (excluding hotspots). Quality eligibility is an exploration value that does not change the original selection.",
+  "실행 기록 요약: 기록 적격 {0} · 품질 적격 {1} (결합 부위 제외). 품질 적격은 원본 선별을 바꾸지 않는 탐색 값입니다.": "Run-record summary: {0} recorded-eligible · {1} quality-eligible (excluding hotspots). Quality eligibility is an exploration value that does not change the original selection.",
   "기록된 계획 모델 {0} · 실제 모델 기록 {1} · 평가 완료 {2} · 전체 후보·모델 기록 {3} · 예측 전 준비·미선정 {4}": "{0} recorded planned models · {1} actual model records · {2} evaluated · {3} total candidate / model records · {4} preparation / non-selection before prediction",
   "집계 범위: 저장된 전체 후보·모델 기록. 예측 전 준비·미선정은 평가 미완료 모델 수에 포함하지 않습니다.": "Counts cover all saved candidate / model records. Preparation and non-selection before prediction are excluded from the count of incompletely evaluated models.",
   "예측 엔진 버전·가중치·출처": "Prediction engine versions, weights & provenance",
@@ -1539,7 +1626,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   " · 부분 결과": " · Partial results",
   "분석 완료 · 일반 복합체 평가": "Analysis complete · General complex evaluation",
   "분석 완료 · 적격 판정 미평가": "Analysis complete · Eligibility not evaluated",
-  "정상 완료 · hotspot 제외 품질 적격 {0}개": "Completed successfully · {0} quality-eligible (excluding hotspots)",
+  "정상 완료 · 결합 부위 제외 품질 적격 {0}개": "Completed successfully · {0} quality-eligible (excluding hotspots)",
   "정상 완료 · 적격 후보 0개": "Completed successfully · 0 eligible candidates",
   "분석 완료": "Analysis complete",
   "미완료 / 부분 결과": "Incomplete / partial results",
@@ -1550,17 +1637,17 @@ const NCF_TRANSLATIONS = Object.freeze({
   "엔진 미기록": "Engine not recorded",
   "선택 없음 / {0}개": "No selection / {0}",
   "{0} / {1}개": "{0} / {1}",
-  "품질 판정 (hotspot 제외)": "Quality assessment (excluding hotspots)",
+  "품질 판정 (결합 부위 제외)": "Quality assessment (excluding hotspots)",
   "실행 당시 기록 판정": "Assessment recorded at execution",
   "현재 목록에서 후보를 선택하세요.": "Select a candidate from the current list.",
-  "hotspot 미평가": "Hotspots not evaluated",
-  "hotspot 번호 대응 실패": "Hotspot position mapping failed",
-  "hotspot 기록 불일치": "Inconsistent hotspot records",
-  "hotspot 미지정": "No hotspots specified",
-  "지정 hotspot 미접촉": "Requested hotspots not contacted",
-  "hotspot 접촉 기준 충족": "Hotspot contact criterion met",
-  "hotspot 접촉 기준 미달": "Below hotspot contact criterion",
-  "hotspot 판정 미기록": "Hotspot assessment not recorded",
+  "결합 부위 미평가": "Hotspots not evaluated",
+  "결합 부위 번호 대응 실패": "결합 부위 position mapping failed",
+  "결합 부위 기록 불일치": "Inconsistent hotspot records",
+  "결합 부위 미지정": "No hotspots specified",
+  "지정 결합 부위 미접촉": "Requested hotspots not contacted",
+  "결합 부위 접촉 기준 충족": "결합 부위 contact criterion met",
+  "결합 부위 접촉 기준 미달": "Below hotspot contact criterion",
+  "결합 부위 판정 미기록": "결합 부위 assessment not recorded",
   "{0}/{1}개": "{0}/{1}",
   "다중 엔진 지지·탐색용": "Multiple-engine support · Exploratory",
   "엔진별 단독 유망·탐색용": "Promising in an individual engine · Exploratory",
@@ -1571,8 +1658,8 @@ const NCF_TRANSLATIONS = Object.freeze({
   "평가 비활성": "Evaluation disabled",
   "설계·재예측 불일치": "Design / reprediction disagreement",
   "우선 검토·탐색용": "Review first · Exploratory",
-  "지정 부위 미충족·보류": "Requested site unmet · Held",
-  "지정 부위 미평가·보류": "Requested site unevaluated · Held",
+  "지정 결합 부위 미충족·보류": "Requested hotspot unmet · Held",
+  "지정 결합 부위 미평가·보류": "Requested hotspot unevaluated · Held",
   "기록 적격 미통과·보류": "Recorded eligibility not passed · Held",
   "기록 적격 미평가·보류": "Recorded eligibility unevaluated · Held",
   "자세 미평가·보류": "Pose unevaluated · Held",
@@ -1582,19 +1669,19 @@ const NCF_TRANSLATIONS = Object.freeze({
   "후보 대응 미평가·보류": "Candidate mapping unevaluated · Held",
   "충족": "Met",
   "미충족": "Not met",
-  "최소 hotspot 접촉률은 0–100% 사이로 입력하세요.": "Enter a minimum hotspot contact fraction between 0 and 100%.",
+  "최소 결합 부위 접촉률은 0–100% 사이로 입력하세요.": "Enter a minimum hotspot contact fraction between 0 and 100%.",
   "표시 {0} / 전체 {1} 후보·모델 기록 · 미평가는 0으로 바꾸지 않습니다.": "Showing {0} / {1} total candidate / model records · Unevaluated values are not replaced by zero.",
   "정렬 기준: {0} · {1} · 미평가 마지막 · {2}.": "Sort: {0} · {1} · Unevaluated last · {2}.",
   "높은 값부터": "Highest first",
   "낮은 값부터": "Lowest first",
   "동일 범위의 후보별 검토 순위·동률 허용·1위도 보류 가능": "Candidate review ranks within the same scope · Ties allowed · Rank 1 may still be held",
   "탐색 순서이며 통합 순위가 아닙니다": "Exploration order, not a combined ranking",
-  "품질 적격 (hotspot 제외)": "Quality-eligible (excluding hotspots)",
+  "품질 적격 (결합 부위 제외)": "Quality-eligible (excluding hotspots)",
   "기록 적격": "Recorded-eligible",
   "기록 선별": "Recorded-selected",
   "기록 제외 사유": "Recorded exclusion reasons",
-  "hotspot 접촉 수": "Hotspot contacts",
-  "지정 위치 충족": "Requested position satisfied",
+  "결합 부위 접촉 수": "결합 부위 contacts",
+  "지정 결합 부위 충족": "Requested position satisfied",
   "생성 엔진": "Generation engine",
   "ipSAE · 표시 체인 쌍": "ipSAE · Displayed chain pair",
   "선별": "Selected",
@@ -1606,22 +1693,22 @@ const NCF_TRANSLATIONS = Object.freeze({
   "선택한 판정 기준 부적격": "Ineligible under the selected assessment",
   "필수 지표 판정 미평가": "Required metric assessment not evaluated",
   "결합 위치 · 신뢰도와 별도 확인": "Binding site · Check separately from confidence",
-  "신뢰도 점수가 높아도 지정 hotspot에는 접촉하지 않았습니다. 지정 부위 재현 성공으로 해석하지 마세요.": "The requested hotspots were not contacted despite high confidence. Do not interpret this as successful reproduction of the requested site.",
-  "PAE는 참조 구조와의 실측 오차가 아니며 pDockQ2는 실측 DockQ가 아닙니다. 지정 위치 진단은 기존 점수·제외 사유를 바꾸지 않습니다.": "PAE is not measured error against a reference structure; pDockQ2 is not measured DockQ. Site diagnostics do not alter the existing scores or exclusion reasons.",
-  "신뢰도 · 지정 부위 · 자세 일관성": "Confidence · Requested site · Pose consistency",
-  "실행 당시 기록 적격: {0} · 지정 부위 포함 적격: {1}": "Recorded eligibility at execution: {0} · Eligibility including requested site: {1}",
+  "신뢰도 점수가 높아도 지정 결합 부위에는 접촉하지 않았습니다. 지정 결합 부위 재현 성공으로 해석하지 마세요.": "The requested hotspots were not contacted despite high confidence. Do not interpret this as successful reproduction of the requested hotspots.",
+  "PAE는 참조 구조와의 실측 오차가 아니며 pDockQ2는 실측 DockQ가 아닙니다. 지정 결합 부위 진단은 기존 점수·제외 사유를 바꾸지 않습니다.": "PAE is not measured error against a reference structure; pDockQ2 is not measured DockQ. Site diagnostics do not alter the existing scores or exclusion reasons.",
+  "신뢰도 · 지정 결합 부위 · 자세 일관성": "Confidence · Requested hotspot · Pose consistency",
+  "실행 당시 기록 적격: {0} · 지정 결합 부위 포함 적격: {1}": "Recorded eligibility at execution: {0} · Eligibility including requested hotspots: {1}",
   "동일 후보 자세 일치: {0} · 자세 일치 엔진 {1}개 · 기록 적격 지지 {2}개": "Same-candidate pose agreement: {0} · {1} pose-supporting engines · {2} recorded-eligible supporters",
   "설계·재예측: {0} · 표적 정렬 후 VHH RMSD {1} Å": "Design / reprediction: {0} · VHH RMSD after target alignment {1} Å",
   "검토 순위: {0} · 범위 {1} · 1위도 보류일 수 있으며 동률을 허용합니다.": "Review rank: {0} · Scope {1} · Rank 1 may be held; ties are allowed.",
   "후보 검토 판정: {0} · 모델 검토 판정: {1}": "Candidate review: {0} · Model review: {1}",
   "후보 검토 판정 이유: {0}": "Candidate review reason: {0}",
-  "검토 정책 v3는 품질·지정 부위를 충족한 엔진별 단독 유망 예측도 표시합니다. 같은 자세에서 두 엔진 이상이 충족하면 다중 엔진 지지로 구분합니다. 엔진 간 자세 차이와 설계·재예측 불일치는 별도 진단이며 자동 비결합·탈락 사유가 아닙니다.": "Review policy v3 also shows predictions meeting quality and site criteria within individual engines. Support from at least two engines with the same pose is distinguished as multiple-engine support. Pose differences across engines and design / reprediction disagreement are separate diagnostics, not automatic evidence of non-binding or rejection.",
+  "검토 정책 v3는 품질·지정 결합 부위를 충족한 엔진별 단독 유망 예측도 표시합니다. 같은 자세에서 두 엔진 이상이 충족하면 다중 엔진 지지로 구분합니다. 엔진 간 자세 차이와 설계·재예측 불일치는 별도 진단이며 자동 비결합·탈락 사유가 아닙니다.": "Review policy v3 also shows predictions meeting quality and site criteria within individual engines. Support from at least two engines with the same pose is distinguished as multiple-engine support. Pose differences across engines and design / reprediction disagreement are separate diagnostics, not automatic evidence of non-binding or rejection.",
   "동일 후보 서열의 표적 정렬 후 자세를 비교합니다. 엔진 점수를 평균하지 않으며, 엔진 지지 수는 독립 실험 횟수가 아닙니다. 새 VHH를 기존 VHH 자세에 맞춰 선별하지 않습니다. 탐색적 우선순위는 기존 적격·선별 기록을 바꾸지 않으며 실제 결합·KD를 입증하지 않습니다.": "Compare poses of the same candidate sequence after target alignment. Engine scores are not averaged, and engine support counts are not independent experimental replications. New VHHs are not selected by matching an existing VHH pose. Exploratory priorities do not change original eligibility or selection records and do not establish binding or KD.",
   "자세 평가 조건·출처": "Pose evaluation conditions & provenance",
   "원본 모델 ID·서열": "Original model ID & sequence",
   "서열 미기록": "Sequence not recorded",
-  "품질 적격 (hotspot 제외): {0} · 실행 당시 기록 적격: {1}": "Quality eligibility (excluding hotspots): {0} · Eligibility recorded at execution: {1}",
-  "실행 당시 hotspot 조건만으로 제외됐습니다. 나머지 기록 기준은 통과했으며 원본 판정·선별 목록은 보존됩니다.": "Excluded solely by the hotspot condition at execution. Other recorded criteria passed; original assessment and selection records are preserved.",
+  "품질 적격 (결합 부위 제외): {0} · 실행 당시 기록 적격: {1}": "Quality eligibility (excluding hotspots): {0} · Eligibility recorded at execution: {1}",
+  "실행 당시 결합 부위 조건만으로 제외됐습니다. 나머지 기록 기준은 통과했으며 원본 판정·선별 목록은 보존됩니다.": "Excluded solely by the hotspot condition at execution. Other recorded criteria passed; original assessment and selection records are preserved.",
   "기록 제외 사유: ": "Recorded exclusion reasons: ",
   "후보 평가 오류: ": "Candidate evaluation error: ",
   "미평가 지표: ": "Unevaluated metrics: ",
@@ -1639,7 +1726,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "계산법 미기록": "Method not recorded",
   "PAE는 Å 단위입니다. pDockQ2는 CA 8 Å 접촉과 방향별 PAE를 사용하며 두 체인 중 최소값을 표시합니다. AlphaFold-Multimer에서 보정됐고 Boltz·Chai·OpenDDE 값은 탐색용입니다. 예측 지표는 실제 결합이나 KD를 입증하지 않습니다.": "PAE is in Å. pDockQ2 uses CA contacts within 8 Å and directional PAE, displaying the minimum of the two chains. It is calibrated for AlphaFold-Multimer; Boltz, Chai, and OpenDDE values are exploratory. Prediction metrics do not establish binding or KD.",
   "종합점수는 실행 당시 배치의 상대 점수입니다. 정규화 범위는 저장된 ranking_policy를 확인하세요. 독립 비교는 엔진별로 계산하며, 일부 후보만 다른 엔진으로 재평가하는 기존 경로는 혼합 배치로 기록됩니다. 선별 순위는 적격 게이트와 다양성 제한을 추가 적용합니다. ESM·AntiFold는 서열/폴딩 prior입니다. dev_severe는 심한 5종 게이트, dev_flags는 전체 평가 위험 수 가중치입니다. N/O 근접·반대 전하 접촉·충돌의 단위는 원자쌍이며, 확인된 수소결합 수나 원소별 반데르발스 판정이 아닙니다.": "Composite scores are relative to the batch at execution. Check saved ranking_policy for the normalization scope. Independent comparisons are computed within each engine; the legacy path reevaluating only some candidates with another engine is recorded as a mixed batch. Selection ranks also apply eligibility gates and diversity limits. ESM / AntiFold are sequence / folding priors. dev_severe is a five-type severe-risk gate; dev_flags weights all assessed risks. Nearby N/O contacts, opposite-charge contacts, and clashes count atom pairs, not confirmed hydrogen bonds or element-specific van der Waals assessments.",
-  "같은 seed라도 엔진·장치 전체의 비트 단위 재현을 보장하지 않습니다. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에 한정됩니다. 생성 단계의 hotspot OFF/ON을 동일 난수 상태로 가정하지 않습니다.": "Identical seeds do not guarantee bitwise reproduction across all engines and devices. Strict CUDA determinism and same-environment repeat verification apply only to the Chai path. Do not assume identical random states for hotspot OFF/ON generation.",
+  "같은 seed라도 엔진·장치 전체의 비트 단위 재현을 보장하지 않습니다. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에 한정됩니다. 생성 단계의 결합 부위 OFF/ON을 동일 난수 상태로 가정하지 않습니다.": "Identical seeds do not guarantee bitwise reproduction across all engines and devices. Strict CUDA determinism and same-environment repeat verification apply only to the Chai path. Do not assume identical random states for hotspot OFF/ON generation.",
   "지표 해석·실행 당시 선별 기준": "Metric interpretation & selection criteria at execution",
   "통과": "Passed",
   "미통과": "Not passed",
@@ -1706,7 +1793,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "VHH Cys SG–SG 거리": "VHH Cys SG–SG distance",
   "SG 미관측": "SG unobserved",
   "SG 없는 Cys: ": "Cys without SG: ",
-  "분석 구간·Hotspot 제외 영역": "Analysis region & hotspot exclusions",
+  "분석 구간·결합 부위 제외 영역": "Analysis region & hotspot exclusions",
   "원본 잔기 대응": "Original residue mapping",
   "별도 입력 매핑 없음. 위 3D와 PAE는 구조의 author 체인·번호를 표시합니다.": "No separate input mapping. The 3D viewer and PAE above use the structure's author chain IDs and residue numbering.",
   "정렬 기준 (행) %{y}<br>평가 잔기 (열) %{x}<br>PAE %{z:.2f} Å<extra></extra>": "Aligned reference (row) %{y}<br>Evaluated residue (column) %{x}<br>PAE %{z:.2f} Å<extra></extra>",
@@ -1887,10 +1974,11 @@ globalThis.I18N = (() => {
   }
   const message = (ko,en) => Object.freeze({[tag]:true,ko:String(ko??''),en:String(en??'')});
   const at = (value,lang) => value?.[tag] ? value[lang] : String(value??'');
-  const term = raw => raw?.[tag] ? raw : message(raw,translate(raw));
+  const korean = raw => Object.hasOwn(NCF_LEGACY_TERMS,raw) ? NCF_LEGACY_TERMS[raw] : raw;
+  const term = raw => raw?.[tag] ? raw : message(korean(raw),translate(raw));
   function format(key,args){
     const interpolate=(template,lang)=>template.replace(/\{(\d+)\}/g,(_,i)=>at(args[Number(i)],lang));
-    return message(interpolate(key,'ko'),interpolate(NCF_TRANSLATIONS[key]||key,'en'));
+    return message(interpolate(korean(key),'ko'),interpolate(NCF_TRANSLATIONS[key]||key,'en'));
   }
   const concat = values => message(values.map(v=>at(v,'ko')).join(''),values.map(v=>at(v,'en')).join(''));
   function bind(node,field,value){
@@ -1961,7 +2049,7 @@ globalThis.I18N = (() => {
 </script><script>/* Shared browser/offline explorer. Data is displayed with textContent, not HTML injection. */
 "use strict";
 const $ = (id) => document.getElementById(id);
-const metricCaptions = Object.freeze({ptm:"pTM",pdockq:"pDockQ",pdockq2:"pDockQ2 (최소)",interface_pae_ab:"PAE 행 표적·열 VHH (Å)",interface_pae_ba:"PAE 행 VHH·열 표적 (Å)",interface_pae_median:"계면 PAE 중앙값 (Å)",interface_pae_p90:"계면 PAE 90백분위 (Å)",target_plddt:"표적 pLDDT",binder_plddt:"VHH pLDDT",complex_plddt:"전체 복합체 pLDDT",n_hotspots_requested:"지정 결합 부위 잔기 수",n_hotspots_contacted:"접촉한 지정 잔기 수",n_target_clashes:"표적–VHH 충돌 원자쌍",n_context_clashes:"파트너–VHH 충돌 원자쌍",candidate_id:"후보",ipsae:"ipSAE",iptm:"ipTM",interface_plddt:"계면 pLDDT",interface_pae:"계면 PAE (Å)",hotspot_contact_frac:"결합 부위 접촉률",seed:"Seed",model:"모델",error:"평가 오류",chain_a:"체인 1",chain_b:"체인 2",iptm_a_to_b:"체인 1→2 ipTM",iptm_b_to_a:"체인 2→1 ipTM",a:"잔기 1",b:"잔기 2",distance:"거리 (Å)",kind:"구분",pdockq2_target:"pDockQ2 표적 방향",pdockq2_binder:"pDockQ2 VHH 방향",dev_flags:"전체 평가 위험 수",dev_severe:"심한 위험 수 (5종)",n_hbonds:"N/O 근접 원자쌍",n_salt_bridges:"반대 전하 원자쌍",esm_score:"ESM 서열 prior (친화도 아님)",composite_score:"배치 상대 종합점수",n_clashes:"충돌 원자쌍",site_satisfied:"지정 부위 충족",site_selection_eligible:"지정 부위 포함 적격",pose_consensus_status:"동일 후보 자세 일치",pose_supporting_engines:"자세 일치 엔진 수",pose_quality_supporting_engines:"기록 적격·자세 일치 엔진 수",design_consistency_status:"설계·재예측 일치",design_binder_rmsd_A:"설계·재예측 VHH RMSD (Å)",review_rank:"검토 순위 (동률 허용)",review_rank_scope:"검토 순위 범위",review_priority_reason:"검토 판정 이유",candidate_review_priority:"후보 검토 판정",review_priority:"모델 검토 판정"});
+const metricCaptions = Object.freeze({ptm:"pTM",pdockq:"pDockQ",pdockq2:"pDockQ2 (최소)",interface_pae_ab:"PAE 행 표적·열 VHH (Å)",interface_pae_ba:"PAE 행 VHH·열 표적 (Å)",interface_pae_median:"계면 PAE 중앙값 (Å)",interface_pae_p90:"계면 PAE 90백분위 (Å)",target_plddt:"표적 pLDDT",binder_plddt:"VHH pLDDT",complex_plddt:"전체 복합체 pLDDT",n_hotspots_requested:"지정 결합 부위 잔기 수",n_hotspots_contacted:"접촉한 지정 잔기 수",n_target_clashes:"표적–VHH 충돌 원자쌍",n_context_clashes:"파트너–VHH 충돌 원자쌍",candidate_id:"후보",ipsae:"ipSAE",iptm:"ipTM",interface_plddt:"계면 pLDDT",interface_pae:"계면 PAE (Å)",hotspot_contact_frac:"결합 부위 접촉률",seed:"Seed",model:"모델",error:"평가 오류",chain_a:"체인 1",chain_b:"체인 2",iptm_a_to_b:"체인 1→2 ipTM",iptm_b_to_a:"체인 2→1 ipTM",a:"잔기 1",b:"잔기 2",distance:"거리 (Å)",kind:"구분",pdockq2_target:"pDockQ2 표적 방향",pdockq2_binder:"pDockQ2 VHH 방향",dev_flags:"전체 평가 위험 수",dev_severe:"심한 위험 수 (5종)",n_hbonds:"N/O 근접 원자쌍",n_salt_bridges:"반대 전하 원자쌍",esm_score:"ESM 서열 prior (친화도 아님)",composite_score:"배치 상대 종합점수",n_clashes:"충돌 원자쌍",site_satisfied:"지정 결합 부위 충족",site_selection_eligible:"지정 결합 부위 포함 적격",pose_consensus_status:"동일 후보 자세 일치",pose_supporting_engines:"자세 일치 엔진 수",pose_quality_supporting_engines:"기록 적격·자세 일치 엔진 수",design_consistency_status:"설계·재예측 일치",design_binder_rmsd_A:"설계·재예측 VHH RMSD (Å)",review_rank:"검토 순위 (동률 허용)",review_rank_scope:"검토 순위 범위",review_priority_reason:"검토 판정 이유",candidate_review_priority:"후보 검토 판정",review_priority:"모델 검토 판정"});
 function iptmCaption(records) {
   const rows = Array.isArray(records) ? records : records && typeof records === "object" ? [records] : [];
   const scopes = new Set(rows.map(row => ["whole_complex", "selected_target_binder_pair"].includes(row?.iptm_scope) ? row.iptm_scope : "unrecorded"));
@@ -1970,7 +2058,7 @@ function iptmCaption(records) {
   if (scopes.has("selected_target_binder_pair")) return "표적–VHH ipTM";
   return "ipTM · 적용 범위 미기록";
 }
-const complexMetricCaptions = Object.freeze({hotspot_contact_frac:"지정 부위 접촉률",interface_pae_ab:"PAE 행 기준 체인·열 파트너 (Å)",interface_pae_ba:"PAE 행 파트너·열 기준 체인 (Å)",target_plddt:"기준 체인 pLDDT",binder_plddt:"파트너 pLDDT",pdockq2_target:"pDockQ2 기준 체인 방향",pdockq2_binder:"pDockQ2 파트너 방향"});
+const complexMetricCaptions = Object.freeze({hotspot_contact_frac:"관심 잔기 접촉률",interface_pae_ab:"PAE 행 기준 체인·열 파트너 (Å)",interface_pae_ba:"PAE 행 파트너·열 기준 체인 (Å)",target_plddt:"기준 체인 pLDDT",binder_plddt:"파트너 pLDDT",pdockq2_target:"pDockQ2 기준 체인 방향",pdockq2_binder:"pDockQ2 파트너 방향"});
 const metricCaption = (key, records, mode) => key === "iptm" ? iptmCaption(records) : (mode === "complex" ? complexMetricCaptions[key] : null) || metricCaptions[key] || key;
 function refreshMetricCaptions(records, mode) {
   for (const id of ["sort-metric", "plot-x", "plot-y"])
@@ -2125,7 +2213,7 @@ function reportAliases(rows) {
   return aliases;
 }
 function reportReasonLabel(code) {
-  const labels = {clash:"거리 기준 충돌", ipsae:"ipSAE 기준 미통과", iptm:"ipTM 기준 미통과", interface_plddt:"계면 pLDDT 기준 미통과", hotspot:"핫스팟 접촉 기준 미통과", developability:"개발가능성 경고 기준 미통과", developability_unassessed:"CDR 개발가능성 미평가", scoring_error:"구조 점수 계산 오류", not_scored:"구조 점수 미평가", eligibility_unassessed:"적격 판정 미기록·미평가", parent_control:"원본 후보 대조군", wt_control:"야생형 대조군", prediction_error:"예측 오류",prefilter_not_selected:"예측 전 준비·미선정",cross_binding_risk:"전장형 교차 결합 위험",incomplete_comparison:"비교 미완료",first_stage_only:"1차 평가만 완료",boltz_failed_or_incomplete:"Boltz 최종 평가 실패·미완료"};
+  const labels = {clash:"거리 기준 충돌", ipsae:"ipSAE 기준 미통과", iptm:"ipTM 기준 미통과", interface_plddt:"계면 pLDDT 기준 미통과", hotspot:"결합 부위 접촉 기준 미통과", developability:"개발가능성 경고 기준 미통과", developability_unassessed:"CDR 개발가능성 미평가", scoring_error:"구조 점수 계산 오류", not_scored:"구조 점수 미평가", eligibility_unassessed:"적격 판정 미기록·미평가", parent_control:"원본 후보 대조군", wt_control:"야생형 대조군", prediction_error:"예측 오류",prefilter_not_selected:"예측 전 준비·미선정",cross_binding_risk:"전장형 교차 결합 위험",incomplete_comparison:"비교 미완료",first_stage_only:"1차 평가만 완료",boltz_failed_or_incomplete:"Boltz 최종 평가 실패·미완료"};
   return Object.hasOwn(labels, code) ? labels[code] : "기록된 제외·미평가 사유";
 }
 function reportReasonCounts(rows, mode) {
@@ -2630,7 +2718,7 @@ function regionSettings() {
   }
   const exclusions = $("hotspot-exclusions").value.split(/\n/).filter(line => line.trim()).map(line => {
     const match = line.trim().match(/^(\d+)\s*[-–:]\s*(\d+)\s*(.*)$/);
-    if (!match) throw Error("Hotspot 제외 구간은 한 줄에 시작-끝 이름으로 입력하세요.");
+    if (!match) throw Error("결합 부위 제외 구간은 한 줄에 시작-끝 이름으로 입력하세요.");
     return {start: Number(match[1]), end: Number(match[2]), label: match[3] || "사용자 제외 구간"};
   });
   return {target_region: region, hotspot_exclusions: exclusions};
@@ -2679,14 +2767,14 @@ async function prepareInput() {
     if (!state.analyzed)
       throw Error("구조를 불러오고 체인·노출도를 검토하세요.");
     if (!$("acknowledge").checked)
-      throw Error("검토한 체인·hotspot과 경고를 확인해 주세요.");
+      throw Error("검토한 체인·결합 부위와 경고를 확인해 주세요.");
     const useReference = $("input-preparation").value === "coordinates" || $("prediction-hotspots").value === "reference";
     const hotspots = useReference ? $("hotspots")
       .value.split(/[ ,;]+/)
       .filter(Boolean)
       .map(Number) : [];
     if (hotspots.some((v) => !Number.isInteger(v)))
-      throw Error("Hotspot에는 정수 위치를 입력하세요.");
+      throw Error("결합 부위에는 정수 위치를 입력하세요.");
     result = await api("/api/inputs/review", {
       ...payload,
       selection_id: state.analyzed.selection_id,
@@ -3013,7 +3101,7 @@ async function loadResult(id) {
     $("hotspot-filter").checked = false;
   }
   for (const [layer, caption] of Object.entries(generalComplex
-    ? {target:'기준 체인', binder:'파트너 체인', context:'다른 파트너', hotspots:'관심 부위'}
+    ? {target:'기준 체인', binder:'파트너 체인', context:'다른 파트너', hotspots:'관심 잔기'}
     : {target:'표적', binder:'VHH', context:'파트너', hotspots:'결합 부위(hotspot)'})) {
     const checkbox = document.querySelector(`[data-layer="${layer}"]`);
     if (checkbox) checkbox.parentElement.replaceChildren(checkbox, el("span", I18N.term(caption)));
@@ -3047,7 +3135,7 @@ async function loadResult(id) {
   }
   $("result-summary").append(stats,el("p", generalComplex ? I18N.format("평가 미완료 {0} 모델. 일반 복합체에는 VHH 적격 판정을 적용하지 않습니다.", [counts.evaluation_missing]) : I18N.format("고유 후보 서열 {0}종 · 평가 미완료 {1} · 적격 판정 미평가 {2} · 기록 선별 {3} 모델. 원본 후보는 source_sequence_id 및 원본 ID의 엔진 접두어로 구분합니다. 서열이 모두 기록된 경우에만 고유 서열 수를 계산합니다.", [counts.unique_sequences === null ? I18N.term("미기록") : counts.unique_sequences, counts.evaluation_missing, counts.eligibility_missing, fmt(summary.selected_total)]), "muted"));
   if (!generalComplex && summary.quality_eligible_total !== null && summary.quality_eligible_total !== undefined)
-    $("result-summary").append(el("p", I18N.format("실행 기록 요약: 기록 적격 {0} · 품질 적격 {1} (hotspot 제외). 품질 적격은 원본 선별을 바꾸지 않는 탐색 값입니다.", [fmt(summary.eligible_total), fmt(summary.quality_eligible_total)]), "muted"));
+    $("result-summary").append(el("p", I18N.format("실행 기록 요약: 기록 적격 {0} · 품질 적격 {1} (결합 부위 제외). 품질 적격은 원본 선별을 바꾸지 않는 탐색 값입니다.", [fmt(summary.eligible_total), fmt(summary.quality_eligible_total)]), "muted"));
   const expected = summary.expected_total;
   $("result-summary").append(el("p", I18N.format("기록된 계획 모델 {0} · 실제 모델 기록 {1} · 평가 완료 {2} · 전체 후보·모델 기록 {3} · 예측 전 준비·미선정 {4}", [expected == null ? I18N.term("미기록") : expected, (summary.model_record_total != null ? summary.model_record_total : counts.model_total), counts.evaluated_total, (summary.candidate_record_total != null ? summary.candidate_record_total : counts.prepared_record_total), (summary.preprediction_record_total != null ? summary.preprediction_record_total : counts.preprediction_record_total)]), "muted"));
   $("result-summary").append(el("p", I18N.term("집계 범위: 저장된 전체 후보·모델 기록. 예측 전 준비·미선정은 평가 미완료 모델 수에 포함하지 않습니다."), "muted"));
@@ -3071,7 +3159,7 @@ async function loadResult(id) {
       "span",
       summary.mock ? I18N.term("MOCK · 실제 예측 아님") : summary.failed_candidates ? I18N.term("부분 실패 · 후보 오류 확인") : summary.status &&
               states[summary.status] &&
-              summary.status !== "complete" ? I18N.concat([I18N.term(states[summary.status]), I18N.term(" · 부분 결과")]) : summary.complete ? generalComplex ? I18N.term("분석 완료 · 일반 복합체 평가") : counts.eligible_total === null ? I18N.term("분석 완료 · 적격 판정 미평가") : summary.zero_eligible ? summary.quality_eligible_total > 0 ? I18N.format("정상 완료 · hotspot 제외 품질 적격 {0}개", [summary.quality_eligible_total]) : I18N.term("정상 완료 · 적격 후보 0개") : I18N.term("분석 완료") : I18N.term("미완료 / 부분 결과"),
+              summary.status !== "complete" ? I18N.concat([I18N.term(states[summary.status]), I18N.term(" · 부분 결과")]) : summary.complete ? generalComplex ? I18N.term("분석 완료 · 일반 복합체 평가") : counts.eligible_total === null ? I18N.term("분석 완료 · 적격 판정 미평가") : summary.zero_eligible ? summary.quality_eligible_total > 0 ? I18N.format("정상 완료 · 결합 부위 제외 품질 적격 {0}개", [summary.quality_eligible_total]) : I18N.term("정상 완료 · 적격 후보 0개") : I18N.term("분석 완료") : I18N.term("미완료 / 부분 결과"),
       "badge",
     ),
   );
@@ -3154,7 +3242,7 @@ function syncCandidateNavigation() {
   const row = state.candidate;
   if (row) {
     const eligibility = candidateEligibility(row);
-    const basis = $("eligibility-basis").value === "quality" ? "품질 판정 (hotspot 제외)" : "실행 당시 기록 판정";
+    const basis = $("eligibility-basis").value === "quality" ? "품질 판정 (결합 부위 제외)" : "실행 당시 기록 판정";
     const assessment = recordedEvaluationError(row) ? modelAssessmentCaption(row) : !row.evaluated ? "미평가" : state.result.mode === "complex" ? modelAssessmentCaption(row)
       : `${basis}: ${eligibility === true ? "적격" : eligibility === false ? "부적격" : "미평가"}`;
     I18N.text($("candidate-status"), I18N.format("{0} · ipSAE {1} · {2} {3} · {4}", [(row.predictor_engine ? row.predictor_engine : I18N.term("엔진 미기록")), fmt(row.ipsae), I18N.term(metricCaption("iptm", row)), fmt(row.iptm), I18N.term(assessment)]));
@@ -3191,15 +3279,15 @@ function hotspotSite(row) {
  const inconsistent=(requested!==null&&contacted!==null&&contacted>requested)||
   (requested!==null&&requested>0&&contacted!==null&&validFraction&&Math.abs(fraction-contacted/requested)>0.0005+1e-12)||
   (rowPassed!==null&&checkPassed!==null&&rowPassed!==checkPassed);
- let status='not_assessed',label='hotspot 미평가';
- if(row.hotspot_mapping_failed===true){status='mapping_failed';label='hotspot 번호 대응 실패';}
- else if(inconsistent){label='hotspot 기록 불일치';}
- else if(requested===0){status='not_requested';label='hotspot 미지정';}
+ let status='not_assessed',label='결합 부위 미평가';
+ if(row.hotspot_mapping_failed===true){status='mapping_failed';label='결합 부위 번호 대응 실패';}
+ else if(inconsistent){label='결합 부위 기록 불일치';}
+ else if(requested===0){status='not_requested';label='결합 부위 미지정';}
  else if(requested!==null&&contacted!==null&&contacted<=requested&&validFraction){
-  if(contacted===0){status='no_contact';label='지정 hotspot 미접촉';}
-  else if(passed===true){status='threshold_met';label='hotspot 접촉 기준 충족';}
-  else if(passed===false){status='threshold_unmet';label='hotspot 접촉 기준 미달';}
-  else{status='threshold_unrecorded';label='hotspot 판정 미기록';}
+  if(contacted===0){status='no_contact';label='지정 결합 부위 미접촉';}
+  else if(passed===true){status='threshold_met';label='결합 부위 접촉 기준 충족';}
+  else if(passed===false){status='threshold_unmet';label='결합 부위 접촉 기준 미달';}
+  else{status='threshold_unrecorded';label='결합 부위 판정 미기록';}
  }
  const assessed=!['mapping_failed','not_assessed','not_requested'].includes(status);
  return {status,label,requested,contacted,contacts:assessed?`${contacted}/${requested}개`:'—',
@@ -3209,7 +3297,7 @@ function hotspotSite(row) {
 const poseStatusLabels = Object.freeze({
  pose_consensus_status:{multi_engine_supported:"다중 엔진 지지·탐색용",single_engine_promising:"엔진별 단독 유망·탐색용",supported:"여러 엔진 자세 일치",quality_support_insufficient:"자세 일치·기록 적격 지지 부족",single_engine:"단일 엔진·비교 부족",discordant:"엔진 간 자세 불일치",not_assessed:"미평가",disabled:"평가 비활성"},
  design_consistency_status:{consistent:"설계·재예측 일치",inconsistent:"설계·재예측 불일치",not_assessed:"미평가",not_applicable:"적용 안 함",disabled:"평가 비활성"},
- review_priority:{multi_engine_supported:"다중 엔진 지지·탐색용",single_engine_promising:"엔진별 단독 유망·탐색용",prioritized:"우선 검토·탐색용",site_unmet:"지정 부위 미충족·보류",site_not_assessed:"지정 부위 미평가·보류",confidence_gate_unmet:"기록 적격 미통과·보류",confidence_not_assessed:"기록 적격 미평가·보류",geometry_not_assessed:"자세 미평가·보류",design_inconsistent:"설계 자세 미재현·보류",design_not_assessed:"설계 일치 미평가·보류",consensus_insufficient:"자세 일치 지지 부족·보류",identity_not_assessed:"후보 대응 미평가·보류",disabled:"평가 비활성"}
+ review_priority:{multi_engine_supported:"다중 엔진 지지·탐색용",single_engine_promising:"엔진별 단독 유망·탐색용",prioritized:"우선 검토·탐색용",site_unmet:"지정 결합 부위 미충족·보류",site_not_assessed:"지정 결합 부위 미평가·보류",confidence_gate_unmet:"기록 적격 미통과·보류",confidence_not_assessed:"기록 적격 미평가·보류",geometry_not_assessed:"자세 미평가·보류",design_inconsistent:"설계 자세 미재현·보류",design_not_assessed:"설계 일치 미평가·보류",consensus_insufficient:"자세 일치 지지 부족·보류",identity_not_assessed:"후보 대응 미평가·보류",disabled:"평가 비활성"}
 });
 function poseStatusLabel(row,key) {
  const value=row[key];
@@ -3286,7 +3374,7 @@ function renderCandidates() {
     status = $("eligibility").value;
   $("hotspot-min").disabled = !$("hotspot-filter").checked;
   if (f.hotspot_min !== null && (!Number.isFinite(f.hotspot_min) || f.hotspot_min < 0 || f.hotspot_min > 1)) {
-    notice("최소 hotspot 접촉률은 0–100% 사이로 입력하세요.", true);
+    notice("최소 결합 부위 접촉률은 0–100% 사이로 입력하세요.", true);
     return;
   }
   state.filtered = state.rows.filter(
@@ -3345,8 +3433,8 @@ function renderCandidates() {
       : ["candidate_id","predictor_engine","final_eligible","selected","ipsae","iptm","interface_plddt","interface_pae","hotspot_site_status","n_clashes","exclusion_reasons"];
     columns.splice(0,columns.length,...core);
   }
-  const captions = {quality_eligible: "품질 적격 (hotspot 제외)", final_eligible: "기록 적격", selected: "기록 선별", exclusion_reasons: "기록 제외 사유"};
-  captions.n_hotspots_contacted = "hotspot 접촉 수"; captions.hotspot_site_status = "지정 위치 충족";
+  const captions = {quality_eligible: "품질 적격 (결합 부위 제외)", final_eligible: "기록 적격", selected: "기록 선별", exclusion_reasons: "기록 제외 사유"};
+  captions.n_hotspots_contacted = "결합 부위 접촉 수"; captions.hotspot_site_status = "지정 결합 부위 충족";
   captions.predictor_engine = "예측 엔진"; captions.design_origin = "생성 엔진";
   captions.n_clashes = "충돌 원자쌍";
   Object.assign(captions, metricCaptions);
@@ -3477,19 +3565,19 @@ async function selectCandidate(id) {
   if(state.result.mode !== "complex") {
     const h=hotspotSite(row),note=el("div");note.setAttribute("role","status");
     note.append(el("h3",I18N.term("결합 위치 · 신뢰도와 별도 확인")),el("p",I18N.concat([I18N.term(h.label)," · ",I18N.term(h.contacts)])));
-    if(h.status==='no_contact')note.append(el("p",I18N.term("신뢰도 점수가 높아도 지정 hotspot에는 접촉하지 않았습니다. 지정 부위 재현 성공으로 해석하지 마세요.")));
-    note.append(el("p",I18N.term("PAE는 참조 구조와의 실측 오차가 아니며 pDockQ2는 실측 DockQ가 아닙니다. 지정 위치 진단은 기존 점수·제외 사유를 바꾸지 않습니다."),"muted"));detail.append(note);
+    if(h.status==='no_contact')note.append(el("p",I18N.term("신뢰도 점수가 높아도 지정 결합 부위에는 접촉하지 않았습니다. 지정 결합 부위 재현 성공으로 해석하지 마세요.")));
+    note.append(el("p",I18N.term("PAE는 참조 구조와의 실측 오차가 아니며 pDockQ2는 실측 DockQ가 아닙니다. 지정 결합 부위 진단은 기존 점수·제외 사유를 바꾸지 않습니다."),"muted"));detail.append(note);
   }
   if(state.result.mode!=="complex"&&hasPoseAssessment([row])) {
     const panel=el("div");panel.setAttribute("role","status");panel.className="pose-assessment";
-    panel.append(el("h3",I18N.term("신뢰도 · 지정 부위 · 자세 일관성")));
-    panel.append(el("p",I18N.format("실행 당시 기록 적격: {0} · 지정 부위 포함 적격: {1}", [row.final_eligible===true ? I18N.term("적격") : row.final_eligible===false ? I18N.term("부적격") : I18N.term("미평가"), I18N.term(poseStatusLabel(row,"site_selection_eligible"))])));
+    panel.append(el("h3",I18N.term("신뢰도 · 지정 결합 부위 · 자세 일관성")));
+    panel.append(el("p",I18N.format("실행 당시 기록 적격: {0} · 지정 결합 부위 포함 적격: {1}", [row.final_eligible===true ? I18N.term("적격") : row.final_eligible===false ? I18N.term("부적격") : I18N.term("미평가"), I18N.term(poseStatusLabel(row,"site_selection_eligible"))])));
     panel.append(el("p",I18N.format("동일 후보 자세 일치: {0} · 자세 일치 엔진 {1}개 · 기록 적격 지지 {2}개", [I18N.term(poseStatusLabel(row,"pose_consensus_status")), fmt(row.pose_supporting_engines), fmt(row.pose_quality_supporting_engines)])));
     panel.append(el("p",I18N.format("설계·재예측: {0} · 표적 정렬 후 VHH RMSD {1} Å", [I18N.term(poseStatusLabel(row,"design_consistency_status")), fmt(row.design_binder_rmsd_A)])));
     panel.append(el("p",I18N.format("검토 순위: {0} · 범위 {1} · 1위도 보류일 수 있으며 동률을 허용합니다.", [fmt(row.review_rank), fmt(row.review_rank_scope)])));
     panel.append(el("p",I18N.format("후보 검토 판정: {0} · 모델 검토 판정: {1}", [I18N.term(poseStatusLabel(row,"candidate_review_priority")), I18N.term(poseStatusLabel(row,"review_priority"))])));
     panel.append(el("p",I18N.format("후보 검토 판정 이유: {0}", [I18N.term(poseStatusLabel(row,"review_priority_reason"))])));
-    panel.append(el("p",I18N.term("검토 정책 v3는 품질·지정 부위를 충족한 엔진별 단독 유망 예측도 표시합니다. 같은 자세에서 두 엔진 이상이 충족하면 다중 엔진 지지로 구분합니다. 엔진 간 자세 차이와 설계·재예측 불일치는 별도 진단이며 자동 비결합·탈락 사유가 아닙니다."),"muted"));
+    panel.append(el("p",I18N.term("검토 정책 v3는 품질·지정 결합 부위를 충족한 엔진별 단독 유망 예측도 표시합니다. 같은 자세에서 두 엔진 이상이 충족하면 다중 엔진 지지로 구분합니다. 엔진 간 자세 차이와 설계·재예측 불일치는 별도 진단이며 자동 비결합·탈락 사유가 아닙니다."),"muted"));
     panel.append(el("p",I18N.term("동일 후보 서열의 표적 정렬 후 자세를 비교합니다. 엔진 점수를 평균하지 않으며, 엔진 지지 수는 독립 실험 횟수가 아닙니다. 새 VHH를 기존 VHH 자세에 맞춰 선별하지 않습니다. 탐색적 우선순위는 기존 적격·선별 기록을 바꾸지 않으며 실제 결합·KD를 입증하지 않습니다."),"muted"));
     if(row.pose_assessment&&typeof row.pose_assessment==="object") {const raw=el("details");raw.append(el("summary",I18N.term("자세 평가 조건·출처")),el("pre",JSON.stringify(row.pose_assessment,null,2)));panel.append(raw);}
     detail.append(panel);
@@ -3497,9 +3585,9 @@ async function selectCandidate(id) {
   const original = el("details");
   original.append(el("summary", I18N.term("원본 모델 ID·서열")), el("p", id, "sequence"), el("p", (row.sequence ? row.sequence : I18N.term("서열 미기록")), "sequence"));
   detail.append(original);
-  if (state.result.mode !== "complex") detail.append(el("p", I18N.format("품질 적격 (hotspot 제외): {0} · 실행 당시 기록 적격: {1}", [I18N.term(decisionCaption(row.quality_eligible)), I18N.term(decisionCaption(row.final_eligible))])));
+  if (state.result.mode !== "complex") detail.append(el("p", I18N.format("품질 적격 (결합 부위 제외): {0} · 실행 당시 기록 적격: {1}", [I18N.term(decisionCaption(row.quality_eligible)), I18N.term(decisionCaption(row.final_eligible))])));
   if (row.quality_eligibility_source === "hotspot_only_exclusion_removed")
-    detail.append(el("p", I18N.term("실행 당시 hotspot 조건만으로 제외됐습니다. 나머지 기록 기준은 통과했으며 원본 판정·선별 목록은 보존됩니다.")));
+    detail.append(el("p", I18N.term("실행 당시 결합 부위 조건만으로 제외됐습니다. 나머지 기록 기준은 통과했으며 원본 판정·선별 목록은 보존됩니다.")));
   warnings(detail.appendChild(el("div")), [
     ...(row.primary_pair_warning ? [row.primary_pair_warning] : []),
     ...(row.exclusion_reasons || []).map((r) => "기록 제외 사유: " + reportReasonLabel(r) + " (" + r + ")"),
@@ -3538,7 +3626,7 @@ async function selectCandidate(id) {
   }
   detail.append(el("p", I18N.term("PAE는 Å 단위입니다. pDockQ2는 CA 8 Å 접촉과 방향별 PAE를 사용하며 두 체인 중 최소값을 표시합니다. AlphaFold-Multimer에서 보정됐고 Boltz·Chai·OpenDDE 값은 탐색용입니다. 예측 지표는 실제 결합이나 KD를 입증하지 않습니다."), "muted"));
   detail.append(el("p", I18N.term("종합점수는 실행 당시 배치의 상대 점수입니다. 정규화 범위는 저장된 ranking_policy를 확인하세요. 독립 비교는 엔진별로 계산하며, 일부 후보만 다른 엔진으로 재평가하는 기존 경로는 혼합 배치로 기록됩니다. 선별 순위는 적격 게이트와 다양성 제한을 추가 적용합니다. ESM·AntiFold는 서열/폴딩 prior입니다. dev_severe는 심한 5종 게이트, dev_flags는 전체 평가 위험 수 가중치입니다. N/O 근접·반대 전하 접촉·충돌의 단위는 원자쌍이며, 확인된 수소결합 수나 원소별 반데르발스 판정이 아닙니다."), "muted"));
-  detail.append(el("p", I18N.term("같은 seed라도 엔진·장치 전체의 비트 단위 재현을 보장하지 않습니다. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에 한정됩니다. 생성 단계의 hotspot OFF/ON을 동일 난수 상태로 가정하지 않습니다."), "muted"));
+  detail.append(el("p", I18N.term("같은 seed라도 엔진·장치 전체의 비트 단위 재현을 보장하지 않습니다. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에 한정됩니다. 생성 단계의 결합 부위 OFF/ON을 동일 난수 상태로 가정하지 않습니다."), "muted"));
   if (row.threshold_checks !== undefined) {
     const facts = el("details"),
       caption = el("summary", I18N.term("지표 해석·실행 당시 선별 기준"));
@@ -3889,7 +3977,7 @@ async function renderStructure() {
     details.append(focusButton(text, [pair.a, pair.b], text, pair.distance == null ? null : [pair.a, pair.b, "SG", "SG"]));
   }
   if (data.cysteines?.missing_sg.length) details.append(el("p", I18N.concat([I18N.term("SG 없는 Cys: "), data.cysteines.missing_sg.join(", ")])));
-  if (data.target_region) details.append(el("h3", I18N.term("분석 구간·Hotspot 제외 영역")), el("pre", JSON.stringify(data.target_region, null, 2)));
+  if (data.target_region) details.append(el("h3", I18N.term("분석 구간·결합 부위 제외 영역")), el("pre", JSON.stringify(data.target_region, null, 2)));
   details.append(el("h3", I18N.term("원본 잔기 대응")));
   const mapping = data.residue_mapping || [];
   if (mapping.length)

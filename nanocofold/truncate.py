@@ -20,9 +20,9 @@ def truncate_target(
     keep_hetatm: bool = False,
     keep_other_chains: bool = False,
 ) -> dict:
-    """핫스팟 주변만 남긴 타깃 구조를 생성한다 (RFantibody 권장: 이차구조 보존, ≥10Å 마진).
+    """결합 부위 주변만 남긴 타깃 구조를 생성한다 (RFantibody 권장: 이차구조 보존, ≥10Å 마진).
 
-    keep_other_chains: 다른 단백질 파트너 체인도 핫스팟 근처 잔기만 남겨 유지.
+    keep_other_chains: 다른 단백질 파트너 체인도 결합 부위 근처 잔기만 남겨 유지.
     단일 사슬만으로는 접힘이 불안정한 타깃(코일드코일 등)에서 구조 맥락을 보존한다.
     """
     structure = pdb_io.load_structure(structure_path)
@@ -35,7 +35,7 @@ def truncate_target(
             if coord is not None:
                 hotspot_coords.append(coord)
     if not hotspot_coords:
-        raise ValueError(f"지정한 핫스팟이 타깃 체인 {chain_id}에서 발견되지 않았습니다: {hotspot_labels}")
+        raise ValueError(f"지정한 결합 부위가 타깃 체인 {chain_id}에서 발견되지 않았습니다: {hotspot_labels}")
     hotspot_coords = np.vstack(hotspot_coords)
 
     residues = list(pdb_io.iter_residues(chain))
@@ -69,7 +69,7 @@ def truncate_target(
         )
     if missing_hotspots:
         raise ValueError(
-            f"truncation 후 지정 핫스팟이 사라졌습니다: {missing_hotspots}. "
+            f"truncation 후 지정 결합 부위가 사라졌습니다: {missing_hotspots}. "
             + boundary_hint + " (빈 구조 저장 방지)."
         )
 

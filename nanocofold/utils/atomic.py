@@ -72,12 +72,20 @@ def write_json(path: Path, payload, **kwargs) -> None:
 
 
 def write_csv(path: Path, frame, *, encoding="utf-8", **kwargs) -> None:
+    """Publish formula-safe text without mutating the caller's scientific frame.
+
+    Input IDs must already satisfy the input contract. Text escaping is a final
+    output defense, not an ID alias or a transformation of numerical scores.
+    """
     from .spreadsheet import csv_cell
+    from pandas import CategoricalDtype
     from pandas.api.types import is_string_dtype
     safe = frame.copy()
     for column in safe.columns:
-        if safe[column].dtype == object or is_string_dtype(safe[column].dtype):
+        if (safe[column].dtype == object or is_string_dtype(safe[column].dtype)
+                or isinstance(safe[column].dtype, CategoricalDtype)):
             safe[column] = safe[column].map(csv_cell)
+    safe.rename(columns=csv_cell, inplace=True)
     # pandas streams into a binary handle; avoid materializing large CSV strings.
     with atomic_writer(path, **kwargs) as handle:
         safe.to_csv(handle, index=False, encoding=encoding)

@@ -67,7 +67,7 @@ def _fresh_computation_origin(run_dir: Path, state: RunState, args, new: bool, h
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="nanocofold",
-        description="타깃+핫스팟 조건 나노바디 설계/스크리닝/성숙 파이프라인 (상업용 라이선스 전용)",
+        description="타깃+결합 부위 조건 나노바디 설계/스크리닝/성숙 파이프라인 (상업용 라이선스 전용)",
     )
     parser.add_argument("--version", action="version", version=f"NanoCoFold {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -133,7 +133,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_complex = sub.add_parser("complex", help="일반 단백질 복합체 예측·체인 쌍 평가")
     add_common(p_complex)
 
-    p_prep = sub.add_parser("prepare", help="타깃 구조 확보/핫스팟/truncation")
+    p_prep = sub.add_parser("prepare", help="타깃 구조 확보/결합 부위/truncation")
     add_common(p_prep)
 
     p_design = sub.add_parser("design", help="RFantibody de novo 설계")
@@ -736,7 +736,7 @@ def _target_phase(cfg: dict, run_dir: Path, state: RunState, mock: bool, dry_run
         if not same_inputs:
             if not dry_run:
                 state.add_warnings(
-                    "타깃 설정/서열/핫스팟이 이전 실행과 달라 target 캐시와 모델 출력을 무효화하고 다시 계산합니다."
+                    "타깃 설정/서열/결합 부위가 이전 실행과 달라 target 캐시와 모델 출력을 무효화하고 다시 계산합니다."
                 )
                 phase_dir = run_dir / "01_target"
                 provenance.archive_existing(
@@ -875,7 +875,7 @@ def _prediction_hotspot_labels(prediction_path: Path, target_chain: str, target:
         if legacy_labels and all(str(label).split(":", 1)[0] == target_chain for label in legacy_labels if ":" in str(label)):
             return legacy_labels
         raise ValueError(
-            "핫스팟 서열 위치를 예측 구조 라벨로 매핑하려면 target.sequence 가 필요합니다."
+            "결합 부위 서열 위치를 예측 구조 라벨로 매핑하려면 target.sequence 가 필요합니다."
         )
     structure = pdb_io.load_structure(prediction_path)
     chain = pdb_io.get_chain(structure, target_chain)
@@ -916,7 +916,7 @@ def _prediction_hotspot_labels(prediction_path: Path, target_chain: str, target:
     for position in positions:
         if not 1 <= position <= len(labels):
             raise ValueError(
-                f"핫스팟 서열 위치 {position} 이 예측 타깃 체인 {target_chain} 범위(1-{len(labels)})를 벗어났습니다."
+                f"결합 부위 서열 위치 {position} 이 예측 타깃 체인 {target_chain} 범위(1-{len(labels)})를 벗어났습니다."
             )
         mapped.append(labels[position - 1])
     return mapped
@@ -1002,7 +1002,7 @@ def _prepared_hotspot_positions(
     if original_positions and len(original_positions) != len(native_labels):
         raise ValueError(
             "target.hotspot_pdb_labels 와 hotspot_seq_positions 개수가 다릅니다. "
-            "동일한 순서로 대응하는 원래 핫스팟 정보를 확인하세요."
+            "동일한 순서로 대응하는 원래 결합 부위 정보를 확인하세요."
         )
     native_indices = {
         pdb_io.residue_label(residue, chain_id): index
@@ -1012,7 +1012,7 @@ def _prepared_hotspot_positions(
     for index, label in enumerate(native_labels):
         if label not in native_indices:
             raise ValueError(
-                f"원래 핫스팟 {label} 이 준비 구조 체인 {chain_id} 에 없습니다. "
+                f"원래 결합 부위 {label} 이 준비 구조 체인 {chain_id} 에 없습니다. "
                 "target.hotspot_pdb_labels 와 준비 구조의 체인/잔기 ID를 확인하세요."
             )
         prepared_index = native_indices[label]
@@ -1021,11 +1021,11 @@ def _prepared_hotspot_positions(
             if not 1 <= position <= len(declared_sequence):
                 raise ValueError(
                     f"hotspot_seq_positions 의 {position} 이 target.sequence 범위(1-{len(declared_sequence)})를 "
-                    "벗어났습니다. 원래 핫스팟 서열 위치를 확인하세요."
+                    "벗어났습니다. 원래 결합 부위 서열 위치를 확인하세요."
                 )
             if prepared_sequence[prepared_index] != declared_sequence[position - 1]:
                 raise ValueError(
-                    f"원래 핫스팟 {label} 의 아미노산 {prepared_sequence[prepared_index]} 이 "
+                    f"원래 결합 부위 {label} 의 아미노산 {prepared_sequence[prepared_index]} 이 "
                     f"target.sequence 위치 {position} 의 {declared_sequence[position - 1]} 와 다릅니다. "
                     "원래 서열 위치와 준비 구조의 잔기 변형 여부를 확인하세요."
                 )
@@ -1045,7 +1045,7 @@ def _target_hotspot_seq_positions(target: dict) -> list[int]:
         try:
             positions.append(int(text.split(":", 1)[1] if ":" in text else text))
         except (TypeError, ValueError, IndexError) as exc:
-            raise ValueError(f"핫스팟 서열 라벨을 해석할 수 없습니다: {label}") from exc
+            raise ValueError(f"결합 부위 서열 라벨을 해석할 수 없습니다: {label}") from exc
     return positions
 
 
@@ -1525,7 +1525,7 @@ def _tier2_and_finalize(
         # Contact restraints can bias the contact metric for any candidate.
         # A restraint-induced contact cannot establish biological binding.
         state.add_warnings(
-            "screen.restraint.enabled=true 이므로 hotspot 접촉률이 restraint 로 유도된 값입니다. "
+            "screen.restraint.enabled=true 이므로 결합 부위 접촉률이 restraint 로 유도된 값입니다. "
             "decoy 에서도 함께 오르므로 결합자/비결합자 판별 근거로 쓰지 마세요. "
             "판별이 목적이면 restraint 를 끄고 비교하거나(specificity 캠페인 기본) Boltz-2 재평가를 사용하세요."
         )
@@ -1570,7 +1570,7 @@ def cmd_prepare(args) -> int:
     run_dir, state = _open_run(cfg, args)
     target = _target_phase(cfg, run_dir, state, _is_mock(cfg), _is_dry_run(cfg))
     print(f"[prepare] 타깃 구조: {target['structure']}")
-    print(f"[prepare] 핫스팟: {', '.join(target['hotspot_labels'])}")
+    print(f"[prepare] 결합 부위: {', '.join(target['hotspot_labels'])}")
     for warning in state.warnings:
         print(f"  [경고] {warning}")
     return 0
@@ -1596,7 +1596,7 @@ def cmd_design(args) -> int:
         return 0
     tier1 = _score_candidates(cfg, result["candidates"], target) if not result["candidates"].empty else pd.DataFrame()
     if not tier1.empty:
-        tier1.to_csv(run_dir / "02_design" / "tier1_metrics.csv", index=False)
+        write_csv(run_dir / "02_design" / "tier1_metrics.csv", tier1)
     _tier2_and_finalize(cfg, run_dir, state, result["candidates"], target, None, "design_id", "sequence", tier1)
     return 0
 
@@ -1645,7 +1645,7 @@ def cmd_screen(args) -> int:
     print(f"[screen] 후보 {len(candidates)}종")
     (run_dir / "02_screen").mkdir(parents=True, exist_ok=True)
     if not dry_run:
-        candidates.to_csv(run_dir / "02_screen" / "candidates.csv", index=False)
+        write_csv(run_dir / "02_screen" / "candidates.csv", candidates)
     return _screen_flow(cfg, run_dir, state, target, candidates)
 
 
@@ -2087,7 +2087,7 @@ def cmd_run(args) -> int:
         if not _design_refinement_flow(cfg, run_dir, state, target, result):
             tier1 = _score_candidates(cfg, candidates, target) if not candidates.empty else pd.DataFrame()
             if not tier1.empty:
-                tier1.to_csv(run_dir / "02_design" / "tier1_metrics.csv", index=False)
+                write_csv(run_dir / "02_design" / "tier1_metrics.csv", tier1)
             _tier2_and_finalize(cfg, run_dir, state, candidates, target, None, "design_id", "sequence", tier1)
 
     elif mode == "screen":
@@ -2096,7 +2096,7 @@ def cmd_run(args) -> int:
             candidates = _mock_vhh_library()
             (run_dir / "02_screen").mkdir(parents=True, exist_ok=True)
             if not dry_run:
-                candidates.to_csv(run_dir / "02_screen" / "candidates.csv", index=False)
+                write_csv(run_dir / "02_screen" / "candidates.csv", candidates)
         else:
             fasta_path = resolve_path(cfg, vhh_fasta)
             if fasta_path is None or not fasta_path.exists():
@@ -2107,7 +2107,7 @@ def cmd_run(args) -> int:
             candidates = screen.fasta_to_candidates(fasta_path)
             (run_dir / "02_screen").mkdir(parents=True, exist_ok=True)
             if not dry_run:
-                candidates.to_csv(run_dir / "02_screen" / "candidates.csv", index=False)
+                write_csv(run_dir / "02_screen" / "candidates.csv", candidates)
         _screen_flow(cfg, run_dir, state, target, candidates)
 
     elif mode == "mature":

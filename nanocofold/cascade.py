@@ -675,7 +675,7 @@ def run(cfg, run_dir, state, target, candidates, cdr_ranges, *, predict, score, 
     if str(cfg_get(cfg, "screen.engine", "")).lower() != "colabfold":
         raise ValueError("cascade는 screen.engine=colabfold가 필요합니다.")
     if cfg_get(cfg, "screen.restraint.enabled", False):
-        raise ValueError("ColabFold cascade에는 screen.restraint.enabled=false가 필요합니다. hotspot 접촉은 결과에서 검토하세요.")
+        raise ValueError("ColabFold cascade에는 screen.restraint.enabled=false가 필요합니다. 결합 부위 접촉은 결과에서 검토하세요.")
     if cfg_get(cfg, "run.mode") not in {"screen", "mature"} and not (
         cfg_get(cfg, "run.mode") == "design" and cfg_get(cfg, "design.refinement.enabled", False)):
         raise ValueError("cascade는 screen/mature 또는 design.refinement 모드만 지원합니다.")

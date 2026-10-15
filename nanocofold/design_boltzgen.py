@@ -18,6 +18,7 @@ from Bio.PDB.Structure import Structure
 from . import provenance
 from .config import cfg_get, resolve_path
 from .utils import pdb_io, shell
+from .utils.atomic import write_csv
 
 VERSION = "0.3.2"
 SOURCE_COMMIT = "31d9d9b9c72245b4ed6fe8742d6fbf4e1a3552a0"
@@ -369,8 +370,8 @@ def run_design(cfg: dict, run_dir: Path, target: dict, mock=False, dry_run=False
                  "target_chain": "T", "binder_chain": "H", "is_mock": True, "pred_dir": str(model_path), "cif_path": str(model_path)})
         frame = pd.DataFrame(rows, columns=BASE_COLUMNS + ["is_mock"])
         if not dry_run:
-            frame.to_csv(phase / "all_generated_candidates.csv", index=False)
-            frame.to_csv(phase / "design_candidates.csv", index=False)
+            write_csv(phase / "all_generated_candidates.csv", frame)
+            write_csv(phase / "design_candidates.csv", frame)
         return {"candidates": frame, "all_candidates": frame, "phase_dir": phase,
                 "info": {"engine": "mock", "parent_engine": "boltzgen", "num_requested": cfg_get(cfg, "design.num_designs", 2), "num_candidates": len(frame), "is_mock": True}}
     if dry_run:
@@ -430,8 +431,8 @@ def run_design(cfg: dict, run_dir: Path, target: dict, mock=False, dry_run=False
             "num_generated_records": len(all_candidates), "num_candidates": len(candidates), "hotspot_mode": contract["hotspot_mode"],
             "seed_control": "not_supported_by_upstream_cli", "requested_run_seed": cfg_get(cfg, "run.seed"), "argv": argv,
             "generation_error": str(error) if error else None, "all_candidates_path": str(phase / "all_generated_candidates.csv")}
-    all_candidates.to_csv(phase / "all_generated_candidates.csv", index=False)
-    candidates.to_csv(phase / "design_candidates.csv", index=False)
+    write_csv(phase / "all_generated_candidates.csv", all_candidates)
+    write_csv(phase / "design_candidates.csv", candidates)
     if error:
         (phase / "generation_error.json").write_text(json.dumps(info, indent=2) + "\n")
         raise error

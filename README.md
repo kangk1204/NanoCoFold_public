@@ -2,7 +2,7 @@
 
 **English** · [한국어](README.ko.md)
 
-**Build: 0.4.8rc3**
+**Build: 0.4.8rc4**
 
 Predict protein complexes, design new nanobodies, and compare existing candidates or variants. Explore candidate tables, 3D structures, PAE, and shareable HTML reports.
 

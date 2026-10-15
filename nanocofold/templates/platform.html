@@ -173,7 +173,7 @@
                     ><input
                       id="acknowledge"
                       type="checkbox"
-                    />표적·파트너·서열·입력 준비 방식·hotspot과 경고를 확인했습니다.</label
+                    />표적·파트너·서열·입력 준비 방식·결합 부위와 경고를 확인했습니다.</label
                   >
                 </div>
               </div>
@@ -192,7 +192,7 @@
                 <option value="chai1">Chai-1</option>
               </select>
               <p class="muted">
-                서열 입력의 구조와 hotspot은 예측됩니다. 기본 MSA는 empty이며
+                서열 입력의 구조와 결합 부위는 예측됩니다. 기본 MSA는 empty이며
                 외부 서버로 서열을 보내지 않습니다.
               </p>
             </div>
@@ -256,11 +256,11 @@
               <option value="researcher_exploration">연구자 탐색 · 후보 폭넓게 평가 (기본)</option>
               <option value="standard">기존 기본 설정 · 사전 필터 적용</option>
             </select>
-            <p class="muted">연구자 탐색은 RF2·ESM 사전 탈락을 해제하고 hotspot restraint·랭킹 가중치를 끕니다.
+            <p class="muted">연구자 탐색은 RF2·ESM 사전 탈락을 해제하고 결합 부위 restraint·랭킹 가중치를 끕니다.
               design은 1,000개 백본을 생성하고 최대 500개 복합체를 평가합니다.
               mature는 최대 500개와 WT 대조군을 평가합니다. screen은 입력 라이브러리 전체를 평가합니다.
               품질 판정·충돌·개발가능성 경고를 유지하며 결과는 전체 후보를 표시합니다.
-              design 구조 생성은 선택한 hotspot에 조건화됩니다. 후보 수가 늘면 계산 시간도 늘어납니다.</p>
+              design 구조 생성은 선택한 결합 부위에 조건화됩니다. 후보 수가 늘면 계산 시간도 늘어납니다.</p>
             <label for="candidate-limit">복합체 평가 후보 상한 · design/mature (WT는 별도 추가 가능)</label>
             <input id="candidate-limit" type="number" min="1" step="1" placeholder="기본 500 · 비우면 설정값 사용" />
             <label for="design-count">생성할 백본 수 · design</label>
@@ -285,7 +285,7 @@
               ><textarea id="advanced" rows="9" spellcheck="false">{}</textarea>
               <p class="muted">
                 서로 다른 조건의 점수는 비교 시 개별로 표시합니다. 입력 검토가
-                확정한 표적·hotspot은 고급 설정으로 덮어쓰지 않습니다.
+                확정한 표적·결합 부위는 고급 설정으로 덮어쓰지 않습니다.
               </p>
             </details>
             <button id="review-input">3. 입력 검토·환경 점검</button>
@@ -364,6 +364,7 @@
         <p class="muted">용량은 해당 서버 결과 폴더의 측정값입니다. 공용 캐시·모델 가중치·클라우드 사본 용량은 포함하지 않습니다.</p>
       </section>
       <section id="view-results" hidden>
+<p class="muted" data-terminology="binding-site">결합 부위(hotspot)는 나노바디 설계·접촉 평가에 지정한 표적 잔기입니다. 일반 복합체의 관심 잔기는 참조 구조 비교용입니다. 두 설정 모두 실제 결합의 실험적 증거를 뜻하지 않습니다.</p>
         <h1>분석 결과 보고서</h1><p class="muted">NanoCoFold · 저장된 데이터로 탐색하는 독립 보고서</p><nav class="report-nav" aria-label="보고서 내 탐색"><a href="#report-input">01 입력·설정</a><a href="#result-summary">02 후보·모델 수</a><a href="#report-comparison">03 후보 비교</a><a href="#report-exclusions">04 제외·미평가</a><a href="#candidate-title">05 구조·PAE</a><a href="#report-provenance">06 출처·산출물</a></nav>
         <p>
           기존 결과 열기는 읽기 전용입니다. 예측 점수는 실제 결합·친화도
@@ -407,7 +408,7 @@
         <div id="explorer" hidden>
           <div class="card">
             <h2 id="report-comparison">03 후보 비교</h2>
-            <p class="muted" data-vhh-results>예측 신뢰도와 지정 위치 충족은 별개입니다. hotspot 접촉 수와 판정을 함께 확인하세요. 동일 엔진·실행 조건 안에서 지표를 비교하세요. 정렬은 탐색 순서이며 엔진을 합친 최종 순위가 아닙니다.</p>
+            <p class="muted" data-vhh-results>예측 신뢰도와 지정 결합 부위 충족은 별개입니다. 결합 부위 접촉 수와 판정을 함께 확인하세요. 동일 엔진·실행 조건 안에서 지표를 비교하세요. 정렬은 탐색 순서이며 엔진을 합친 최종 순위가 아닙니다.</p>
             <div class="inline">
               <label for="candidate-search">후보 검색</label
               ><input
@@ -416,7 +417,7 @@
                 placeholder="ID, 서열, 제외 사유"
               ><label for="eligibility-basis">적격 판정</label
               ><select id="eligibility-basis">
-                <option value="quality">품질 적격 · hotspot 제외</option>
+                <option value="quality">품질 적격 · 결합 부위 제외</option>
                 <option value="recorded">실행 당시 기록 적격</option></select
               ><label for="eligibility">적격 여부</label
               ><select id="eligibility">
@@ -461,7 +462,7 @@
               <input id="hotspot-min" type="number" min="0" max="100" step="1" value="50" disabled >
             </div>
             <p class="muted" data-vhh-results>결합 부위(hotspot) 후필터는 기본 해제입니다. 켜면 미지정·접촉률 미평가·번호 대응 실패·기록 불일치 후보는 표시하지 않습니다. 접촉률만 저장된 이전 결과는 기록된 비율로 필터하며 상세 접촉 수·판정은 미평가로 남습니다.
-              기존 결과의 적격 판정과 선별 목록은 보존하며, 품질 적격은 기록된 판정에서 hotspot만 제외한 탐색 값입니다.</p>
+              기존 결과의 적격 판정과 선별 목록은 보존하며, 품질 적격은 기록된 판정에서 결합 부위만 제외한 탐색 값입니다.</p>
             <label class="check"><input id="candidate-extra-columns" type="checkbox">상세 지표 열 펼치기</label>
             <p id="candidate-count"></p><p id="candidate-sort-note" class="muted" role="status"></p>
           </div>

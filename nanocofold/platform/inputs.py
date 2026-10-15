@@ -500,14 +500,14 @@ class InputManager:
             if (not isinstance(positions, list) or not 1 <= len(positions) <= 12
                     or any(type(p) is not int or str(p) not in allowed for p in positions)
                     or len(set(positions)) != len(positions)):
-                raise ValueError("선택한 Hotspot의 원본·전체 서열 대응이 불명확합니다. 예측 구조 자동 hotspot을 사용하거나 대응을 확인하세요.")
+                raise ValueError("선택한 결합 부위의 원본·전체 서열 대응이 불명확합니다. 예측 구조 자동 결합 부위를 사용하거나 대응을 확인하세요.")
             hotspots = [f"A:seq{allowed[str(p)]}" for p in sorted(positions)]
         elif prediction_hotspots == "none":
             if payload.get("hotspots", []) != []:
-                raise ValueError("Hotspot 미지정 실행의 hotspot 목록은 비어 있어야 합니다.")
+                raise ValueError("결합 부위 미지정 실행의 hotspot 목록은 비어 있어야 합니다.")
             hotspots = []
         elif prediction_hotspots != "auto":
-            raise ValueError("예측 hotspot은 auto, reference 또는 none을 선택하세요.")
+            raise ValueError("예측 결합 부위는 auto, reference 또는 none을 선택하세요.")
         identifier = "sequence-" + secrets.token_hex(8)
         folder = self.root / identifier
         folder.mkdir()
@@ -520,13 +520,13 @@ class InputManager:
         warnings.extend([
             "전체 서열로 새 단백질 구조를 예측합니다. 원본 좌표는 참조로만 보존하며 미관측 좌표를 채운 실험 구조로 표시하지 않습니다.",
             "원본의 수정 잔기·chromophore·당질·리간드·핵산·막 환경은 이 단백질 서열 예측에 재현되지 않습니다.",
-            "Hotspot은 예측 구조에서 다시 계산합니다." if hotspots == "auto" else
-            "Hotspot 미지정: 결합 위치를 제한하지 않고 탐색합니다." if hotspots == [] else
-            "선택한 원본 hotspot을 전체 서열 위치로 대응했습니다. 노출도와 접촉은 예측 구조에서 다시 평가합니다.",
+            "결합 부위는 예측 구조에서 다시 계산합니다." if hotspots == "auto" else
+            "결합 부위 미지정: 결합 위치를 제한하지 않고 탐색합니다." if hotspots == [] else
+            "선택한 원본 결합 부위를 전체 서열 위치로 대응했습니다. 노출도와 접촉은 예측 구조에서 다시 평가합니다.",
         ])
         for original, chain in zip(selected, chains):
             if len(chain["observed_to_full"]) < len(original["sequence"]):
-                warnings.append(f"체인 {original['original_id']}: 일부 관측 잔기의 전체 서열 위치가 불명확합니다. 원본 번호·hotspot을 임의 대응하지 않았습니다.")
+                warnings.append(f"체인 {original['original_id']}: 일부 관측 잔기의 전체 서열 위치가 불명확합니다. 원본 번호·결합 부위를 임의 대응하지 않았습니다.")
         for chain in selected:
             if chain.get("blockers"):
                 warnings.append(f"체인 {chain['original_id']}: 원본 좌표 경로의 문제: " + "; ".join(chain["blockers"]))
@@ -630,7 +630,7 @@ class InputManager:
         self._sequences(folder, cfg, payload)
         raw_paste = not any(line.strip().lstrip("\ufeff").startswith(">") for line in payload.get("content", "").splitlines())
         from ..utils.seq import nucleotide_ambiguity_hint
-        sequence_warnings = ["서열 입력의 구조와 hotspot은 예측됩니다. 실험 구조 확인과 구분하세요."]
+        sequence_warnings = ["서열 입력의 구조와 결합 부위는 예측됩니다. 실험 구조 확인과 구분하세요."]
         if raw_paste:
             sequence_warnings.append("FASTA 제목 없는 아미노산 붙여넣기입니다. 저장할 서열 이름을 sequence로 지정했습니다.")
         nucleotide_hint = nucleotide_ambiguity_hint(sequence)

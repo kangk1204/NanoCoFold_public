@@ -116,7 +116,7 @@ def test_report_uses_saved_thresholds_and_reports_corrupt_hotspot_table(tmp_path
     assert "&gt;= 0.6" in document
     assert "0.95" not in document
     assert "hotspot_table.csv을 읽지 못했습니다" in document
-    assert "해당 핫스팟 표는 미평가" in document
+    assert "해당 결합 부위 표는 미평가" in document
     pd.testing.assert_frame_equal(frame, original)
     assert saved == yaml.safe_load((tmp_path / "run_config.yaml").read_text())
 

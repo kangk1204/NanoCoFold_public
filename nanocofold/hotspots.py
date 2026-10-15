@@ -19,7 +19,7 @@ GLYCAN_RESIDUES = {"NAG", "MAN", "BMA", "FUC", "GAL", "GLC", "SIA", "NDG"}
 
 
 def parse_hotspot_spec(spec, default_chain: str = "A") -> list[dict]:
-    """핫스팟 지정을 [{'chain','kind','number'}] 로 정규화한다.
+    """결합 부위 지정을 [{'chain','kind','number'}] 로 정규화한다.
 
     kind: 'pdb' | 'seq' | None(문맥에 따라 결정). 접두사로 명시 가능:
       "A:pdb142" (PDB 번호) · "A:seq135" (서열 인덱스) · "A142" · "142"
@@ -40,10 +40,10 @@ def parse_hotspot_spec(spec, default_chain: str = "A") -> list[dict]:
                 chain, rest = _split_chain_prefix(token, default_chain)
             chain = chain.strip()
             if not chain or any(ch.isspace() for ch in chain):
-                raise ValueError(f"핫스팟 체인이 유효하지 않습니다: '{token}'")
+                raise ValueError(f"결합 부위 체인이 유효하지 않습니다: '{token}'")
             match = re.match(r"(?i)^(pdb|seq)?[:_]?\s*(\d+)$", rest.strip())
             if not match:
-                raise ValueError(f"핫스팟 형식을 해석할 수 없습니다: '{token}'")
+                raise ValueError(f"결합 부위 형식을 해석할 수 없습니다: '{token}'")
             kind = (match.group(1) or "").lower() or None
             entries.append({"chain": chain, "kind": kind, "number": int(match.group(2))})
     return entries
@@ -284,7 +284,7 @@ def validate_hotspots(
     hydrophobic_count = sum(1 for rec in records if rec.get("kyte_doolittle", 0) and rec["kyte_doolittle"] > 0)
     if len(records) >= 3 and hydrophobic_count < 3:
         warnings.append(
-            f"소수성 잔기가 {hydrophobic_count}개입니다. 자동 핫스팟의 소수성 패치 기준(≥3)은 "
+            f"소수성 잔기가 {hydrophobic_count}개입니다. 자동 결합 부위의 소수성 패치 기준(≥3)은 "
             "탐색용 휴리스틱이며, 실제 결합이나 설계 성공을 보장하지 않습니다."
         )
     return {"records": records, "warnings": warnings, "hydrophobic_count": hydrophobic_count}

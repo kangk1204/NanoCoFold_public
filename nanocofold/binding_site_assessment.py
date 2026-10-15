@@ -33,21 +33,21 @@ def hotspot_assessment(row: dict) -> dict:
             # The native scorer records fractions rounded to three decimals.
             contradictory = contradictory or abs(fraction - contacted / requested) > .0005 + 1e-12
     if row.get("hotspot_mapping_failed") is True:
-        status, label = "mapping_failed", "hotspot 번호 대응 실패"
+        status, label = "mapping_failed", "결합 부위 번호 대응 실패"
     elif contradictory:
-        status, label = "not_assessed", "hotspot 기록 불일치"
+        status, label = "not_assessed", "결합 부위 기록 불일치"
     elif requested == 0:
-        status, label = "not_requested", "hotspot 미지정"
+        status, label = "not_requested", "결합 부위 미지정"
     elif requested is None or contacted is None or contacted > requested or not valid_fraction:
-        status, label = "not_assessed", "hotspot 미평가"
+        status, label = "not_assessed", "결합 부위 미평가"
     elif contacted == 0:
-        status, label = "no_contact", "지정 hotspot 미접촉"
+        status, label = "no_contact", "지정 결합 부위 미접촉"
     elif passed is True:
-        status, label = "threshold_met", "hotspot 접촉 기준 충족"
+        status, label = "threshold_met", "결합 부위 접촉 기준 충족"
     elif passed is False:
-        status, label = "threshold_unmet", "hotspot 접촉 기준 미달"
+        status, label = "threshold_unmet", "결합 부위 접촉 기준 미달"
     else:
-        status, label = "threshold_unrecorded", "hotspot 판정 미기록"
+        status, label = "threshold_unrecorded", "결합 부위 판정 미기록"
     return {"status": status, "label": label, "requested": requested, "contacted": contacted,
             "contact_fraction": fraction if valid_fraction and status not in {"mapping_failed", "not_assessed", "not_requested"} else None,
             "threshold": threshold, "passed": passed if type(passed) is bool and status not in {"mapping_failed", "not_assessed", "not_requested"} else None}

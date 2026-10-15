@@ -317,7 +317,7 @@ class Agent:
                     entry=values[0];sequence=''.join(entry.get('sequence','').split()).upper();start=entry.get('start',1);end=entry.get('end',len(sequence))
                     if not sequence or set(sequence)-AA or type(start) is not int or type(end) is not int or not 1<=start<=end<=len(sequence):raise ValueError('표적 서열 또는 분석 구간 오류')
                     if mode=='design':
-                        if any(not start<=pos<=end for pos in hotspot_positions):raise ValueError('Hotspot은 선택한 표적 분석 구간 안에 있어야 합니다.')
+                        if any(not start<=pos<=end for pos in hotspot_positions):raise ValueError('결합 부위는 선택한 표적 분석 구간 안에 있어야 합니다.')
                         hotspots=[f'A:seq{pos-start+1}' for pos in hotspot_positions]
                         hotspot_mapping=[{'source_chain':'sequence','source_residue':pos,'engine_chain':'A','engine_position':pos-start+1,'numbering':'sequence'} for pos in hotspot_positions]
                         override['target']['hotspots']=hotspots
@@ -362,15 +362,15 @@ class Agent:
     @staticmethod
     def design_hotspots(p):
         mode=p.get('hotspot_mode','none')
-        if mode not in ('none','specified'):raise ValueError('Hotspot은 none 또는 specified를 선택하세요.')
+        if mode not in ('none','specified'):raise ValueError('결합 부위는 none 또는 specified를 선택하세요.')
         if mode=='none':return mode,[]
         raw=p.get('hotspot_positions','')
         if isinstance(raw,str):
-            if len(raw)>512 or not re.fullmatch(r'\s*-?\d+(?:\s*,\s*-?\d+)*\s*',raw):raise ValueError('Hotspot은 원본 잔기 번호를 쉼표로 구분하세요(예: 45,46,47).')
+            if len(raw)>512 or not re.fullmatch(r'\s*-?\d+(?:\s*,\s*-?\d+)*\s*',raw):raise ValueError('결합 부위는 원본 잔기 번호를 쉼표로 구분하세요(예: 45,46,47).')
             positions=[int(part.strip()) for part in raw.split(',')]
         elif isinstance(raw,list):positions=raw
-        else:raise ValueError('Hotspot 번호 형식 오류')
-        if not 1<=len(positions)<=12 or any(type(pos) is not int or not -999999<=pos<=999999 for pos in positions) or len(set(positions))!=len(positions):raise ValueError('Hotspot은 중복 없는 원본 잔기 번호 1–12개입니다.')
+        else:raise ValueError('결합 부위 번호 형식 오류')
+        if not 1<=len(positions)<=12 or any(type(pos) is not int or not -999999<=pos<=999999 for pos in positions) or len(set(positions))!=len(positions):raise ValueError('결합 부위는 중복 없는 원본 잔기 번호 1–12개입니다.')
         return mode,sorted(positions)
     @staticmethod
     def structure_hotspots(info,target,positions):
@@ -379,15 +379,15 @@ class Agent:
         mapped=[];review=[]
         for pos in positions:
             matches=[row for row in selected['residues'] if row['original_label'].rsplit(':',1)[-1]==str(pos)]
-            if len(matches)!=1:raise ValueError(f'원본 Hotspot {pos}: 누락·삽입 번호 또는 중복 대응을 확인하세요.')
+            if len(matches)!=1:raise ValueError(f'원본 결합 부위 {pos}: 누락·삽입 번호 또는 중복 대응을 확인하세요.')
             row=matches[0]
             # An insertion-coded residue sharing this numeric author position is ambiguous.
             labels=[r['original_label'].rsplit(':',1)[-1] for r in selected['residues']]
-            if any(re.fullmatch(re.escape(str(pos))+r'[A-Za-z]+',label) for label in labels):raise ValueError(f'원본 Hotspot {pos}: 삽입 잔기 번호 대응이 모호합니다.')
+            if any(re.fullmatch(re.escape(str(pos))+r'[A-Za-z]+',label) for label in labels):raise ValueError(f'원본 결합 부위 {pos}: 삽입 잔기 번호 대응이 모호합니다.')
             mapped.append(row['position'])
             review.append({'source_chain':selected.get('original_id',target),'source_residue':row['original_label'],'engine_chain':'A','engine_position':row['position'],'numbering':'pdb',
                            **({'author_chain':selected['author_chain']} if selected.get('author_chain') else {})})
-        if len(set(mapped))!=len(mapped):raise ValueError('Hotspot의 원본·엔진 번호 대응이 모호합니다.')
+        if len(set(mapped))!=len(mapped):raise ValueError('결합 부위의 원본·엔진 번호 대응이 모호합니다.')
         return mapped,review
     def settings(self,mode,p):
         # Construct a bounded configuration; cloud requests never supply paths, env or commands.

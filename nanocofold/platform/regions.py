@@ -32,7 +32,7 @@ def apply_regions(folder: Path, cfg: dict, review: dict, payload: dict):
     start, end = _range(payload.get("target_region", {}), length)
     exclusions = payload.get("hotspot_exclusions", [])
     if not isinstance(exclusions, list) or len(exclusions) > 100:
-        raise ValueError("Hotspot 제외 구간은 100개 이하 목록이어야 합니다.")
+        raise ValueError("결합 부위 제외 구간은 100개 이하 목록이어야 합니다.")
     ranges, excluded = [], set()
     for entry in exclusions:
         a, b = _range(entry, length)
@@ -45,7 +45,7 @@ def apply_regions(folder: Path, cfg: dict, review: dict, payload: dict):
         raise ValueError("선택한 표적 전체를 hotspot에서 제외할 수 없습니다.")
     entries = parse_hotspot_spec(cfg["target"].get("hotspots"), "A")
     if any(e["chain"] != "A" or not start <= e["number"] <= end or e["number"] in excluded for e in entries):
-        raise ValueError("선택한 Hotspot이 분석 구간 밖이거나 제외 구간에 포함됩니다. 부위를 다시 검토하세요.")
+        raise ValueError("선택한 결합 부위가 분석 구간 밖이거나 제외 구간에 포함됩니다. 부위를 다시 검토하세요.")
     cropped = start != 1 or end != length
     predicted = review.get("preparation") == "sequence_prediction"
     mapping_path = folder / "residue_mapping.csv"
@@ -106,9 +106,9 @@ def apply_regions(folder: Path, cfg: dict, review: dict, payload: dict):
     review["target_region"] = region
     review["target_sequence"] = cfg["target"]["sequence"]
     if cropped:
-        review.setdefault("warnings", []).append(f"표적 구간 {start}–{end}/{length}만 분석합니다. 원본·번호 대응은 보존하며 절단으로 구조와 결합부위가 달라질 수 있습니다.")
+        review.setdefault("warnings", []).append(f"표적 구간 {start}–{end}/{length}만 분석합니다. 원본·번호 대응은 보존하며 절단으로 구조와 결합 부위가 달라질 수 있습니다.")
     if mask:
-        review.setdefault("warnings", []).append(f"Hotspot 추천에서 사용자 지정 {len(mask)}잔기를 제외합니다. 파트너 및 실제 접촉 평가는 유지합니다.")
+        review.setdefault("warnings", []).append(f"결합 부위 추천에서 사용자 지정 {len(mask)}잔기를 제외합니다. 파트너 및 실제 접촉 평가는 유지합니다.")
     if cfg.get("input_review"):
         saved = cfg["input_review"]
         saved.update(target_sequence=cfg["target"]["sequence"], target_region=region, hotspot_excluded_positions=mask)

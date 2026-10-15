@@ -502,7 +502,7 @@ def buried_sasa(structure, chain_a: str, chain_b: str, n_contacts: int = 0,
 
 
 def _normalize_hotspot_requests(hotspots, target_chain: str) -> list[str]:
-    """요청 핫스팟을 필터링 없이 라벨로 정규화한다(G06)."""
+    """요청 결합 부위를 필터링 없이 라벨로 정규화한다(G06)."""
     labels: list[str] = []
     for item in hotspots or []:
         text = str(item).strip()

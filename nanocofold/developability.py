@@ -7,6 +7,7 @@ import pandas as pd
 
 from .config import cfg_get, cfg_seed, resolve_path
 from .utils import seq as seq_utils, shell
+from .utils.atomic import write_csv
 
 SCRIPTS_DIR = Path(__file__).resolve().parent / "scripts"
 
@@ -143,7 +144,7 @@ def run_esm_sequence_scores(
     frame = pd.DataFrame({"design_id": list(sequences.keys()), "sequence": list(sequences.values())})
     input_csv = out_dir / "sequences_in.csv"
     output_csv = out_dir / "sequences_esm.csv"
-    frame.to_csv(input_csv, index=False)
+    write_csv(input_csv, frame)
 
     if mock or dry_run:
         rng = np.random.default_rng(cfg_seed(cfg, "run.seed") + 7)

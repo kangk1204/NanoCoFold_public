@@ -56,7 +56,7 @@ def _build_chain(chain_id: str, sequence: str, origin: np.ndarray, step: float =
 
 
 def build_complex_structure(target_seq: str, binder_seq: str, hotpots: list[int], jitter: float = 0.0, seed: int = 0, pull_closer: float = 0.0) -> Structure:
-    """타깃(A)–나노바디(B) 합성 복합체. CDR 부위가 핫스팟과 접촉하도록 배치."""
+    """타깃(A)–나노바디(B) 합성 복합체. CDR 부위가 결합 부위와 접촉하도록 배치."""
     rng = np.random.default_rng(seed)
     structure = Structure.Structure("mock")
     structure.add(Model(0))

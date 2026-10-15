@@ -387,7 +387,7 @@ def test_automatic_hotspot_missing_empty_and_unreadable_records_are_distinct(tmp
 def test_manual_hotspots_do_not_claim_a_missing_automatic_assessment(tmp_path):
     cfg = {"run": {"mode": "screen"}, "target": {"hotspots": ["A:1"]}, "report": {"viewer": "none"}}
     document = report.generate_report(tmp_path, cfg, {}, scored=pd.DataFrame()).read_text()
-    assert "자동 핫스팟을 요청했지만" not in document
+    assert "자동 결합 부위을 요청했지만" not in document
 
 
 def test_backtracking_author_number_rejection_explains_the_actual_boundary_without_mutation(tmp_path):

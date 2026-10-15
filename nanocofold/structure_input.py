@@ -212,7 +212,7 @@ def inspect_structure(path: Path, output_dir: Path, source: dict | None = None, 
                 labels = ", ".join(_residue_original_label(res) for res in hetatm_standard[:5])
                 chain_info["blockers"].append(
                     f"체인 {original_chain.id}: HETATM 으로 기록된 표준 아미노산 {len(hetatm_standard)}개({labels})를 "
-                    "단백질 체인에서 제외했습니다. 잔기 번호가 밀리므로 원본 번호로 핫스팟을 다시 지정하세요."
+                    "단백질 체인에서 제외했습니다. 잔기 번호가 밀리므로 원본 번호로 결합 부위를 다시 지정하세요."
                 )
             normalized_chain = _normalized_chain(canonical_id, standard_residues)
             normalized_model.add(normalized_chain)

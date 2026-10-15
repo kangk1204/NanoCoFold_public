@@ -14,6 +14,7 @@ from . import provenance
 from .config import cfg_get, resolve_path
 from .utils import pdb_io, seq, shell
 from .utils.tool_args import validate_colabfold_extra_args
+from .utils.atomic import write_csv
 
 
 def _save(path: Path, value: dict) -> None:
@@ -192,7 +193,7 @@ def predict(cfg, work_dir, target, candidates, *, mock=False, dry_run=False,
             return
         _save(work_dir / "prediction_progress.json", progress)
         frame = pd.DataFrame([records[x] for x in identifiers])
-        _predictions_manifest_frame(frame, work_dir.parent.resolve()).to_csv(work_dir / "predictions.csv", index=False)
+        write_csv(work_dir / "predictions.csv", _predictions_manifest_frame(frame, work_dir.parent.resolve()))
     publish()
     if mock:
         from .mock import make_mock_chai_output
@@ -215,7 +216,7 @@ def predict(cfg, work_dir, target, candidates, *, mock=False, dry_run=False,
                 item["a3mpath"] = str(path.resolve())
                 _save(work_dir / identifier / "colabfold_msa.json", query_msa.identity)
             query_rows.append(item)
-        pd.DataFrame(query_rows).to_csv(query, index=False)
+        write_csv(query, pd.DataFrame(query_rows))
         _save(batch / "query_id_aliases.json", {"schema_version": 1,
             "original_to_alias": {identifier: aliases[identifier] for identifier, *_ in chunk},
             "alias_to_original": {aliases[identifier]: identifier for identifier, *_ in chunk}})

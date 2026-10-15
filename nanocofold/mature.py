@@ -10,6 +10,7 @@ import pandas as pd
 
 from .config import cfg_get, cfg_seed, resolve_path
 from .utils import seq as seq_utils, shell
+from .utils.atomic import write_csv
 
 AMINO_ACIDS = list("ACDEFGHIKLMNPQRSTVWY")
 SCRIPTS_DIR = Path(__file__).resolve().parent / "scripts"
@@ -468,7 +469,7 @@ def run_prefilter(
         env = resolve_path(cfg, esm_cfg.get("env"))
         script = SCRIPTS_DIR / "esm_llr.py"
         variants_csv = phase_dir / "variants_in.csv"
-        frame[["variant_id", "position", "wt_aa", "mut_aa"]].to_csv(variants_csv, index=False)
+        write_csv(variants_csv, frame[["variant_id", "position", "wt_aa", "mut_aa"]])
         output_csv = phase_dir / "variants_esm.csv"
         argv = [
             str(shell.env_python(env)), str(script),
@@ -512,8 +513,8 @@ def run_prefilter(
         wt_rows = frame[frame["variant_id"] == "WT"]
         if not wt_rows.empty and "WT" not in set(passed["variant_id"]):
             passed = pd.concat([wt_rows, passed], ignore_index=True)
-    passed.to_csv(phase_dir / "prefiltered_candidates.csv", index=False)
-    frame.to_csv(phase_dir / "esm2_scored_library.csv", index=False)
+    write_csv(phase_dir / "prefiltered_candidates.csv", passed)
+    write_csv(phase_dir / "esm2_scored_library.csv", frame)
 
     info.update({
         "total_variants": len(frame),

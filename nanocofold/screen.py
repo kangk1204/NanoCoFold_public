@@ -23,6 +23,7 @@ from .utils.tool_args import BOLTZ_MANAGED, CHAI_MANAGED, validate_extra_args
 SCRIPTS_DIR = Path(__file__).resolve().parent / "scripts"
 CLIENT_SCRIPT = SCRIPTS_DIR / "chai_fold.py"
 from .utils.misc import to_native
+from .utils.atomic import write_csv
 
 
 def write_chai_fasta(records: dict[str, str], path: Path) -> Path:
@@ -68,7 +69,7 @@ def write_restraints_csv(
     ]
     for index, position in enumerate(hotspot_positions):
         if isinstance(position, (bool, np.bool_)) or not isinstance(position, (int, np.integer)) or not 1 <= position <= len(target_sequence):
-            raise ValueError("Hotspot restraint 위치는 표적 서열 범위 안의 1-based 정수여야 합니다.")
+            raise ValueError("결합 부위 restraint 위치는 표적 서열 범위 안의 1-based 정수여야 합니다.")
         aa = target_sequence[position - 1]
         rows.append(
             f"restraint{index},{binder_name},,{target_name},{aa}{position},pocket,"
@@ -160,7 +161,7 @@ def predict_complexes(
     hotspot_positions = target_info.get("hotspot_seq_positions")
     if hotspot_positions is None and target_info.get("hotspot_labels"):
         raise ValueError(
-            "핫스팟 서열 위치 정보가 없습니다. target_prep 이 생성한 hotspot_seq_positions 를 사용해야 합니다 "
+            "결합 부위 서열 위치 정보가 없습니다. target_prep 이 생성한 hotspot_seq_positions 를 사용해야 합니다 "
             "(PDB 번호와 서열 인덱스 혼용 방지)."
         )
     hotspot_positions = [int(value) for value in (hotspot_positions or [])]
@@ -174,7 +175,7 @@ def predict_complexes(
     for _, row in candidates.iterrows():
         if records and not dry_run:
             # Preserve validated preceding queries even when the next tool fails.
-            _predictions_manifest_frame(pd.DataFrame(records), run_root).to_csv(work_dir / "predictions.csv", index=False)
+            write_csv(work_dir / "predictions.csv", _predictions_manifest_frame(pd.DataFrame(records), run_root))
         candidate_id = seq_utils.validate_candidate_id(str(row[id_column]))
         sequence = str(row[sequence_column])
         candidate_dir = work_dir / candidate_id
@@ -255,7 +256,7 @@ def predict_complexes(
 
     predictions = pd.DataFrame(records)
     if not predictions.empty and not dry_run:
-        _predictions_manifest_frame(predictions, run_root).to_csv(work_dir / "predictions.csv", index=False)
+        write_csv(work_dir / "predictions.csv", _predictions_manifest_frame(predictions, run_root))
     return predictions
 
 

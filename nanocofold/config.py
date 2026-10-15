@@ -255,7 +255,7 @@ def _validate(cfg: dict, *, historical: bool = False) -> None:
     if mode == "design" and hotspot_mode == "specified":
         hotspots = cfg_get(cfg, "target.hotspots")
         if not isinstance(hotspots, list) or not hotspots:
-            raise ValueError("지정 부위 설계에는 비어 있지 않은 target.hotspots 목록이 필요합니다.")
+            raise ValueError("지정 결합 부위 설계에는 비어 있지 않은 target.hotspots 목록이 필요합니다.")
     refinement = cfg_get(cfg, "design.refinement", {})
     if not isinstance(refinement, dict) or type(refinement.get("enabled", False)) is not bool:
         raise ValueError("design.refinement.enabled는 true/false여야 합니다.")

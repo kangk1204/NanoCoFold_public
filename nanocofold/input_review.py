@@ -50,7 +50,7 @@ def validate_reviewed_input(cfg: dict, *, design: bool = False) -> None:
     if design and review.get("design_blockers"):
         raise ValueError("이 입력의 자동 설계는 지원하지 않습니다: " + "; ".join(review["design_blockers"]))
     if "hotspot_excluded_positions" in review and cfg_get(cfg, "hotspots.auto.exclude_positions", []) != review["hotspot_excluded_positions"]:
-        raise ValueError(error + " (Hotspot 제외 구간 불일치)")
+        raise ValueError(error + " (결합 부위 제외 구간 불일치)")
     if not predicted and review.get("reference_structure_path"):
         path = resolve_path(cfg, review["reference_structure_path"])
         if not path or not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != review.get("reference_structure_sha256"):

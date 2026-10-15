@@ -23,6 +23,7 @@ from .platform.paths import native
 from .utils import seq
 from .utils.shell import ExecutionCancelled, ToolError
 from .utils.atomic import write_bytes
+from .utils.atomic import write_csv
 
 
 def _atomic(path, content):
@@ -162,7 +163,7 @@ def _commit(stage, manifest, state, identifiers, id_column):
     for name, key in (("predictions.csv", "predictions"), ("compact_scores.csv", "metrics")):
         rows = [state[key][identifier] for identifier in identifiers if identifier in state[key]]
         frame = pd.DataFrame(rows) if rows else pd.DataFrame(columns=[id_column])
-        _atomic(snapshot / name, frame.to_csv(index=False))
+        write_csv(snapshot / name, frame)
     _json(snapshot / "state.json", state)
     receipt = {"fingerprint": manifest["fingerprint"], "commit": commit, "sequence": len(state["batches"]),
                "input_sequences_sha256": manifest["inputs"]["input_sequences_sha256"],
