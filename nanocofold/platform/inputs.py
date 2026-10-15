@@ -16,6 +16,7 @@ import yaml
 from ..config import _deep_merge, _validate, cfg_get, cfg_set, load_config, read_config_yaml
 from ..utils.seq import clean_sequence, validate_candidate_id, validate_candidate_ids, validate_fasta_controls, validate_fasta_id
 from ..wizard import WizardSession
+from ..utils.spreadsheet import csv_cell
 from .paths import contained, native, sha256
 from .regions import apply_regions
 
@@ -320,6 +321,28 @@ class InputManager:
         hint = nucleotide_ambiguity_hint(cfg.get("mature", {}).get("wt_sequence") or "")
         if hint:
             advisories.append("WT VHH: " + hint)
+        if cfg.get("run", {}).get("mode") == "complex":
+            from ..complex import proteins
+            for entry in proteins(cfg.get("complex", {}).get("proteins")):
+                hint = nucleotide_ambiguity_hint(entry["sequence"])
+                if hint:
+                    advisories.append(entry["name"] + ": " + hint)
+        elif cfg_get(cfg, "rank.weights.dev_flags", 0):
+            source = cfg_get(cfg, "mature.cdr.source", "auto")
+            env = cfg_get(cfg, "mature.anarci.env")
+            configured = cfg_get(cfg, "mature.cdr.regions", {}) or {}
+            if source == "config":
+                from ..mature import validate_cdr_ranges
+                ends = [bounds[1] for bounds in configured.values()
+                        if isinstance(bounds, (tuple, list)) and len(bounds) == 2 and type(bounds[1]) is int] if isinstance(configured, dict) else []
+                validate_cdr_ranges(configured, max(ends, default=0))
+            if cfg_get(cfg, "run.mock", False) or cfg_get(cfg, "run.dry_run", False) or (source != "config" and not (env and (Path(env) / "bin/python").is_file())):
+                advisories.append(
+                    "CDR 개발가능성 평가가 준비되지 않으면 종합 순위와 최종 선별을 보류합니다. "
+                    "실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 "
+                    "mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. "
+                    "mock/dry-run은 실제 CDR 평가를 수행하지 않으며 미평가를 위험 없음으로 처리하지 않습니다."
+                )
         if advisories:
             review["warnings"] = list(dict.fromkeys([*review.get("warnings", []), *advisories]))
         (folder / "config.yaml").write_text(yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False))
@@ -364,12 +387,12 @@ class InputManager:
             from ..structure_input import inspect_structure
             source = folder / ("wt_source" + suffix)
             source.write_text(content)
-            info = inspect_structure(source, folder / "wt_normalized", source={"kind": "upload", "filename": filename})
+            info = inspect_structure(source, folder / "wt_normalized", source={"kind": "upload", "filename": filename}, model_index=upload.get("model_index"))
             if info.get("blockers"):
                 raise ValueError("WT 구조 입력 문제: " + "; ".join(info["blockers"]))
             cfg["mature"]["wt_structure"] = info["structure_path"]
             cfg["mature"]["wt_structure_review"] = {"chains": info["chains"], "sha256": sha256(Path(info["structure_path"])),
-                                                       "warnings": info.get("warnings", []), "source": filename}
+                                                       "warnings": info.get("warnings", []), "source": filename, "model_selection": info["source"]}
             (folder / "wt_structure_review.json").write_text(json.dumps(native(info), ensure_ascii=False, indent=2))
         if mode == "screen" and not cfg["screen"].get("vhh_fasta") and not cfg["run"].get("mock"):
             raise ValueError("screen 모드에는 VHH 라이브러리 FASTA가 필요합니다.")
@@ -386,11 +409,19 @@ class InputManager:
         settings = validate_settings(payload.get("settings", {}))
         if settings.get("primary_pair") and not set(settings["primary_pair"]) <= {p["id"] for p in entries}:
             raise ValueError("primary_pair가 실제 분석 체인에 없습니다.")
+        anchor = payload.get("anchor_chain", "A")
+        interest = payload.get("interest_positions", [])
+        if not isinstance(anchor, str) or anchor not in {entry["id"] for entry in entries}:
+            raise ValueError("anchor_chain은 실제 분석 체인 ID여야 합니다.")
+        positions = {position for entry in entries for position in entry["original_positions"]}
+        if (not isinstance(interest, list) or any(type(position) is not int or position not in positions for position in interest)
+                or len(set(interest)) != len(interest)):
+            raise ValueError("interest_positions는 실제 분석 구간의 중복 없는 원본 잔기 번호 정수 목록이어야 합니다.")
         folder = self.root / secrets.token_hex(16)
         folder.mkdir()
         cfg = {"run": {"mode": "complex", "mock": mock}, "target": {"sequence": entries[0]["sequence"], "fasta": None, "pdb": None},
                "complex": {**settings, "proteins": payload["proteins"], "reference_path": None,
-                           "anchor_chain": payload.get("anchor_chain", "A"), "interest_positions": payload.get("interest_positions", [])}}
+                           "anchor_chain": anchor, "interest_positions": interest}}
         from ..complex_comparison import configure
         configure(cfg, settings)
         upload = payload.get("reference")
@@ -405,10 +436,26 @@ class InputManager:
             source = folder / ("reference"+suffix)
             source.write_text(upload["content"])
             from ..structure_input import inspect_structure
-            inspected = inspect_structure(source, folder / "reference_review", source={"kind": "upload"})
+            inspected = inspect_structure(source, folder / "reference_review", source={"kind": "upload"}, model_index=upload.get("model_index"))
             if inspected.get("blockers") or not inspected.get("chains"):
                 raise ValueError("비교 구조의 원자·잔기·체인을 확인하세요: " + "; ".join(inspected.get("blockers", [])))
-            cfg["complex"]["reference_path"] = str(source)
+            reference = source
+            if upload.get("model_index") is not None:
+                # Keep the original upload and author chain/residue IDs. The
+                # normalized inspection PDB renames chains and cannot replace
+                # a complex reference with explicit reference_chains mappings.
+                from Bio.PDB import MMCIFIO
+                from Bio.PDB.Structure import Structure
+                from ..utils import pdb_io
+                raw = pdb_io.load_structure(source)
+                selected = Structure("selected_reference")
+                selected.add(list(raw.get_models())[upload["model_index"] - 1].copy())
+                reference = folder / "reference_selected.cif"
+                writer = MMCIFIO()
+                writer.set_structure(selected)
+                writer.save(str(reference))
+            cfg["complex"]["reference_path"] = str(reference)
+            cfg["complex"]["reference_model_selection"] = inspected["source"]
         return self._save(folder, cfg, {"mode": "complex", "mock": mock, "proteins": entries, "settings": settings, "source": "researcher_review"})
 
     def load(self, payload: dict):
@@ -561,7 +608,7 @@ class InputManager:
         with (folder / "residue_mapping.csv").open("w", newline="", encoding="utf-8-sig") as stream:
             writer = csv.DictWriter(stream, fieldnames=list(mapping[0]))
             writer.writeheader()
-            writer.writerows(mapping)
+            writer.writerows({key: csv_cell(value) for key, value in row.items()} for row in mapping)
         cfg = normalized_config(self.workspace, payload.get("config"))
         cfg["run"].update(name=cfg["run"].get("name", chains[0]["name"]), mock=mock)
         cfg["target"].update(name=chains[0]["name"], sequence=chains[0]["sequence"], fasta=None,

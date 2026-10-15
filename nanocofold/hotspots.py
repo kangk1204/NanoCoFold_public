@@ -115,7 +115,7 @@ def hotspot_table(
             "conservation": cons,
             "plddt": confidence.get(label, float("nan")),
             "confidence_kind": confidence_kind,
-            "dist_to_glycan": round(glycan_dist, 1) if not math.isnan(glycan_dist) else float("nan"),
+            "dist_to_glycan": glycan_dist,
         })
     return pd.DataFrame(rows)
 
@@ -132,6 +132,11 @@ def auto_hotspot_sets(
     min_rel_sasa = float(auto_cfg.get("min_relative_sasa", 0.25))
     patch_radius = float(auto_cfg.get("patch_radius", 12.0))
     residues_range = auto_cfg.get("residues_per_set", [3, 6])
+    if (not isinstance(residues_range, (list, tuple)) or len(residues_range) != 2
+            or any(type(value) is not int for value in residues_range)
+            or not 1 <= residues_range[0] <= residues_range[1]):
+        raise ValueError("hotspots.auto.residues_per_set는 1 ≤ 최소 ≤ 최대 정수 두 개여야 합니다.")
+    min_res, max_res = residues_range
     num_sets = int(auto_cfg.get("num_sets", 3))
     exclude_terminal = int(auto_cfg.get("exclude_terminal", 2))
 
@@ -193,7 +198,6 @@ def auto_hotspot_sets(
         if not available:
             continue
         cluster_scores = info.loc[available, "score"].sort_values(ascending=False, kind="stable")
-        min_res, max_res = int(residues_range[0]), int(residues_range[1])
         selected = list(cluster_scores.index[: min(max_res, len(cluster_scores))])
         if len(selected) < min_res:
             continue

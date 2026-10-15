@@ -150,7 +150,7 @@ def test_none_viewer_preserves_old_explorers_without_publishing_another(tmp_path
     assert explorer.read_bytes()
 
 
-def test_cloud_bundle_keeps_main_relative_link_and_prefers_separate_offline_export(tmp_path):
+def test_cloud_bundle_records_equivalent_view_omissions_and_preserves_originals(tmp_path):
     from nanocofold.platform.cloud_results import build_bundle
 
     run, cfg = saved_run(tmp_path, count=2)
@@ -162,8 +162,14 @@ def test_cloud_bundle_keeps_main_relative_link_and_prefers_separate_offline_expo
     assert "report_offline.html" in metadata["exports"]
     assert explorer.name not in metadata["exports"]
     with zipfile.ZipFile(destination / "results.zip") as archive:
-        assert archive.read("original/" + entry.name) == entry.read_bytes()
-        assert archive.read("original/" + unquote(href)) == explorer.read_bytes()
+        receipt = json.loads(archive.read("report_packaging_manifest.json"))
+        omitted = {row["path"]: row for row in receipt["derived_reports_omitted"]}
+        for path in (entry, explorer):
+            member = "original/" + path.name
+            assert member not in archive.namelist()
+            assert omitted[member]["sha256"] == sha256(path.read_bytes()).hexdigest()
+            assert omitted[member]["separate_download"] == "report_delivery.zip"
+        assert archive.read("original/03_score/scored_candidates.csv") == before[run / "03_score/scored_candidates.csv"]
     assert all(path.read_bytes() == content for path, content in before.items())
 
 

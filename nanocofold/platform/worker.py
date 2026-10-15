@@ -223,6 +223,8 @@ def execute(workspace: Path, identifier: str) -> int:
                     identity = {**identity, "reusable": False,
                                 "reasons": identity.get("reasons", []) + ["Runtime or inputs changed during execution"]}
             catalog.register(identifier, job["run_dir"], identity, state=state)
+            store.update(identifier, expected_states={state}, expected_attempt=(job.get("pid"), job.get("process_stamp")),
+                         catalog_pending=False, catalog_error=None)
         except Exception as exc:
             # Index maintenance cannot reclassify completed scientific outputs.
             with contextlib.suppress(Exception):

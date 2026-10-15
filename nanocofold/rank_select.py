@@ -12,14 +12,17 @@ from .config import cfg_get
 
 _AA_PATTERN = "ACDEFGHIKLMNPQRSTVWY"
 _CDR3_PATTERN = re.compile(rf"C([{_AA_PATTERN}]{{5,30}}?)WG[{_AA_PATTERN}]{{1,2}}G")
-_ANCHORED_CDR3_PATTERN = re.compile(rf"[YF]{{2}}C([{_AA_PATTERN}]{{5,}}?)WG[{_AA_PATTERN}]{{1,2}}G")
-_LONG_CDR3_PATTERN = re.compile(rf"C([{_AA_PATTERN}]{{5,}}?)WG[{_AA_PATTERN}]{{1,2}}G")
+_ANCHORED_CDR3_PATTERN = re.compile(rf"[YF]{{2}}C([{_AA_PATTERN}]{{5,60}}?)WG[{_AA_PATTERN}]{{1,2}}G")
+_LONG_CDR3_PATTERN = re.compile(rf"C([{_AA_PATTERN}]{{5,60}}?)WG[{_AA_PATTERN}]{{1,2}}G")
 
 
 def guess_cdr3(sequence: str, fallback_length: int = 15) -> str:
     """VHH CDR3 근사 추출: C...WGxG 모티프 기반. ANARCI 없이 클러스터링에 사용."""
     # Non-overlapping matches keep an internal CDR3 cysteine inside the loop.
     # The usual FR3 YYC/YFC anchor also handles insertions beyond 30 residues.
+    # These motif-only guesses stop at 60 residues to avoid spanning FR2/FR3.
+    # Explicit, validated cdr3_sequence/ranges remain unrestricted by this
+    # heuristic bound and take precedence in cluster_cdr3.
     for pattern in (_ANCHORED_CDR3_PATTERN, _CDR3_PATTERN, _LONG_CDR3_PATTERN):
         matches = list(pattern.finditer(sequence))
         if matches:

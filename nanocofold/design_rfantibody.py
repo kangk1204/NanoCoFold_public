@@ -294,7 +294,7 @@ def _run_rfantibody(
     scores, filter_info = apply_design_filters(generated_scores, cfg)
     top_n = int(cfg_get(cfg, "design.filters.top_n_to_score", 300))
     if not scores.empty:
-        scores = scores.sort_values("rf2_pae", ascending=True).head(top_n)
+        scores = _top_scoring_designs(scores, top_n)
     tags = list(scores["design_id"]) if not scores.empty else []
     selected_tags = set(tags)
     # Full generation and expensive final prediction are separate decisions.
@@ -416,6 +416,11 @@ def _run_rfantibody(
         "all_generated_candidates": len(generated),
         "final_prediction_requested": len(candidates),
     }
+
+
+def _top_scoring_designs(scores: pd.DataFrame, count: int) -> pd.DataFrame:
+    """Resolve RF2 PAE ties by saved candidate identity before the cutoff."""
+    return scores.sort_values(["rf2_pae", "design_id"], ascending=[True, True], kind="stable").head(count)
 
 
 def apply_design_filters(scores: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame, dict]:

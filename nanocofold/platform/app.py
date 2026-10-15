@@ -480,15 +480,19 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
     @app.post("/api/results/open")
     async def results_open(request: Request):
         payload = await body(request)
-        path = result_directory(payload.get("path", ""))
-        summary = await asyncio.to_thread(lambda: ResultReader(path).summary())
-        identifier = path.name if path.parent == workspace / "runs" else "import-" + hashlib.sha256(str(path).encode()).hexdigest()[:16]
-        with manager.store.connect() as db:
-            db.execute("INSERT INTO result_paths VALUES(?,?) ON CONFLICT(id) DO UPDATE SET path=excluded.path", (identifier, str(path)))
-        manager.catalog.register(identifier, path, state=summary.get("status", "incomplete"),
-                                 retention="minimal" if summary.get("retention") == "minimal" else "full")
-        summary["id"] = identifier
-        return native(summary)
+        def open_result():
+            path = result_directory(payload.get("path", ""))
+            summary = ResultReader(path).summary()
+            identifier = path.name if path.parent == workspace / "runs" else "import-" + hashlib.sha256(str(path).encode()).hexdigest()[:16]
+            with manager.store.connect() as db:
+                db.execute("INSERT INTO result_paths VALUES(?,?) ON CONFLICT(id) DO UPDATE SET path=excluded.path", (identifier, str(path)))
+            manager.catalog.register(identifier, path, state=summary.get("status", "incomplete"),
+                                     retention="minimal" if summary.get("retention") == "minimal" else "full")
+            summary["id"] = identifier
+            return native(summary)
+        # Catalog registration hashes artifacts and walks the result tree. Keep
+        # all result I/O off the event loop so status and cancellation stay live.
+        return await asyncio.to_thread(open_result)
 
     @app.get("/api/results/{identifier}")
     def result_summary(identifier: str):
@@ -505,16 +509,18 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
     async def retention_apply(identifier: str, request: Request):
         from .retention import RetentionManager
         payload = await body(request)
-        root = reader(identifier).root
-        original_id = root.name  # Compact the canonical run, never an alias.
-        identity = None
-        with contextlib.suppress(KeyError):
-            identity = manager.catalog.get(original_id).get("identity")
-        result = await asyncio.to_thread(RetentionManager(workspace).apply, root, payload.get("plan_digest"), payload.get("confirmation"))
-        # A verified compact snapshot is already authoritative even if bounded
-        # file cleanup needs a retry. Report those states independently.
-        manager.catalog.register(original_id, root, identity, state=reader(original_id).summary().get("status", "incomplete"), retention="minimal")
-        return native(result)
+        def apply_retention():
+            root = reader(identifier).root
+            original_id = root.name  # Compact the canonical run, never an alias.
+            identity = None
+            with contextlib.suppress(KeyError):
+                identity = manager.catalog.get(original_id).get("identity")
+            result = RetentionManager(workspace).apply(root, payload.get("plan_digest"), payload.get("confirmation"))
+            # A verified compact snapshot is already authoritative even if bounded
+            # file cleanup needs a retry. Report those states independently.
+            manager.catalog.register(original_id, root, identity, state=reader(original_id).summary().get("status", "incomplete"), retention="minimal")
+            return native(result)
+        return await asyncio.to_thread(apply_retention)
 
     @app.get("/api/results/{identifier}/candidates")
     def candidates(identifier: str, search: str = "", sort: str = "composite_score", descending: bool = True,

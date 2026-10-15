@@ -93,7 +93,7 @@ def public_error_data(value):
     if isinstance(value, dict):
         result = {}
         for key, item in value.items():
-            if isinstance(key, str) and (key == "error" or key.endswith("_error")) and isinstance(item, str) and item:
+            if isinstance(key, str) and (key in {"error", "reason"} or key.endswith("_error")) and isinstance(item, str) and item:
                 # Safe recorded failure labels remain exact in result exports.
                 # Apply exception abstraction when the stored diagnostic carries
                 # server paths or parser/traceback internals.

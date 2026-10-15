@@ -2032,6 +2032,533 @@ const NCF_TRANSLATIONS = Object.freeze({
   "유효하지 않은 좌표(NaN/Inf)가 있습니다. 원본 구조 파일의 좌표를 확인하고 다시 불러오세요.": "Invalid coordinates (NaN/Inf). Check coordinates in the original structure file and reload it.",
   "공용 MSA 서버로 현재 서열을 보내는 동의가 필요합니다. 실행 조건에서 전송 동의를 확인하거나 등록된 로컬 MSA·캐시 방식을 선택하세요.": "Consent is required to send the current sequences to the public MSA server. Confirm consent in Run settings or choose a registered local MSA / cache method.",
   "숫자 입력 형식이 올바르지 않습니다. 잔기 번호·모델 수·설정값을 확인하세요.": "Invalid number format. Check residue positions, model counts, and setting values.",
+  "CDR3 교체 구간은 기준 VHH 전체 서열의 1-based 시작·끝 번호입니다.": "The CDR3 replacement interval uses 1-based start/end positions in the full reference VHH sequence.",
+  "CDR3 라이브러리는 screen에서 전체 VHH 라이브러리 대신 사용하세요.": "Use a CDR3 library in screen mode instead of a full VHH library.",
+  "CDR3 접목 후 전체 VHH 라이브러리는 20MB 이하여야 합니다.": "The full VHH library after CDR3 grafting must be at most 20 MB.",
+  "CDR3는 fasta/scaffold_fasta/start/end 객체로 입력하세요.": "Provide CDR3 as an object with fasta, scaffold_fasta, start, and end.",
+  "CSV 열 개수 불일치": "The CSV row has the wrong number of columns.",
+  "ColabFold MSA는 cache 또는 public_mmseqs2입니다.": "ColabFold MSA must use cache or public_mmseqs2.",
+  "ColabFold workflow의 최종 엔진은 Boltz-2입니다.": "The final engine of the ColabFold workflow must be Boltz-2.",
+  "ColabFold→Boltz-2 workflow는 screen/mature만 지원합니다.": "The ColabFold→Boltz-2 workflow supports only screen and mature modes.",
+  "FASTA 서열을 입력하세요.": "Enter FASTA sequences.",
+  "FASTA 입력은 kind=fasta로 지정하세요. 구조 파일은 /api/inputs/load를 사용하세요.": "Set kind=fasta for FASTA input. Use /api/inputs/load for structure files.",
+  "FASTA 첫 서열 앞에 >ID 헤더가 필요합니다. 제목 없는 붙여넣기와 FASTA를 섞지 마세요.": "Each FASTA sequence needs a >ID header. Do not mix headerless pasted sequences with FASTA records.",
+  "FASTA는 20MB 이하여야 합니다.": "FASTA input must be at most 20 MB.",
+  "GPU는 0 이상의 번호 또는 전체 GPU UUID여야 합니다.": "GPU must be a nonnegative device number or a complete GPU UUID.",
+  "Host 헤더는 하나여야 합니다.": "Exactly one Host header is required.",
+  "JSON 객체가 필요합니다.": "A JSON object is required.",
+  "JSON 입력을 읽지 못했습니다.": "Could not read the JSON input.",
+  "MSA 요청 기록을 읽지 못했습니다.": "Could not read the MSA request record.",
+  "MSA 요청 수 형식 오류": "Invalid MSA request count format.",
+  "PAE는 비어 있지 않은 정사각 행렬이어야 합니다.": "PAE must be a nonempty square matrix.",
+  "Sites 응답의 agent ID가 현재 서버와 다릅니다.": "The agent ID in the Sites response does not match this server.",
+  "UniProt accession 형식 오류": "Invalid UniProt accession format.",
+  "VHH 라이브러리 FASTA가 필요합니다.": "A VHH library FASTA is required.",
+  "WT VHH 서열이 필요합니다.": "A WT VHH sequence is required.",
+  "WT 구조는 PDB/mmCIF 파일이어야 합니다.": "The WT structure must be a PDB/mmCIF file.",
+  "WT 구조는 filename/content 객체여야 합니다.": "Provide the WT structure as a filename/content object.",
+  "WT 구조는 비어 있지 않은 20MB 이하 파일이어야 합니다.": "The WT structure must be a nonempty file of at most 20 MB.",
+  "WT 구조의 filename은 문자열이어야 합니다.": "The WT structure filename must be a string.",
+  "YAML 설정 구문을 읽지 못했습니다. 들여쓰기·키와 값 형식을 확인하세요.": "Could not parse the YAML settings. Check indentation, keys, and value formats.",
+  "YAML 설정 내용을 입력하세요.": "Enter YAML settings.",
+  "YAML 설정은 객체여야 합니다.": "YAML settings must be an object.",
+  "YAML 설정을 읽지 못했습니다.": "Could not read the YAML settings.",
+  "agent ID 파일은 심볼릭 링크일 수 없습니다.": "The agent ID file cannot be a symbolic link.",
+  "allow_public_msa_server는 true/false입니다.": "allow_public_msa_server must be true or false.",
+  "antifold는 true/false입니다.": "antifold must be true or false.",
+  "comparison_engines는 독립 엔진 비교에서만 지정하세요.": "Specify comparison_engines only for independent engine comparisons.",
+  "comparison_engines는 중복 없는 지원 예측 엔진 목록이어야 합니다.": "comparison_engines must list supported prediction engines without duplicates.",
+  "config_path에는 폴더가 아닌 YAML 설정 파일을 지정하세요.": "config_path must name a YAML settings file, not a directory.",
+  "config는 JSON 객체여야 합니다.": "config must be a JSON object.",
+  "entries와 targets_fasta 중 한 가지 입력 형식을 선택하세요.": "Choose one input format: entries or targets_fasta.",
+  "env_vars 설정은 환경변수 이름과 단순 값의 객체여야 합니다.": "env_vars must map environment variable names to simple values.",
+  "hotspot 최소 접촉률은 0–1 사이의 유한한 숫자여야 합니다.": "The minimum hotspot contact fraction must be a finite number between 0 and 1.",
+  "loopback 주소 또는 SSH 포트포워딩으로 접속하세요.": "Connect through a loopback address or SSH port forwarding.",
+  "mature 모드에는 WT VHH 서열이 필요합니다.": "Mature mode requires a WT VHH sequence.",
+  "mock는 true/false여야 합니다.": "mock must be true or false.",
+  "mock는 true/false입니다.": "mock must be true or false.",
+  "primary_pair가 실제 분석 체인에 없습니다.": "primary_pair contains a chain outside the analyzed complex.",
+  "prune_unselected는 true/false입니다.": "prune_unselected must be true or false.",
+  "public_api는 표적·생성 서열을 외부 서버로 전송합니다. allow_public_msa_server=true 동의가 필요합니다.": "public_api sends target and generated sequences to an external server. Consent with allow_public_msa_server=true is required.",
+  "reuse_results는 true/false여야 합니다.": "reuse_results must be true or false.",
+  "screen 모드에는 VHH 라이브러리 FASTA가 필요합니다.": "Screen mode requires a VHH library FASTA.",
+  "seed는 0–2147483647 정수입니다.": "seed must be an integer between 0 and 2147483647.",
+  "같은 작업 공간의 설치 또는 분석이 이미 실행·대기 중입니다.": "Installation or analysis is already queued or running in this workspace.",
+  "같은 제출 ID의 입력 또는 조건이 변경되었습니다.": "The input or settings changed for the same submission ID.",
+  "개별 입력 서열은 2,000잔기 이하여야 합니다. 전체 VHH 또는 WT 서열과 입력 종류를 확인하세요.": "Each input sequence must contain at most 2,000 residues. Check the full VHH/WT sequence and input type.",
+  "개인 플랫폼은 loopback에 바인딩합니다. 원격 접속은 SSH 포트포워딩을 사용하세요.": "The personal platform binds to loopback. Use SSH port forwarding for remote access.",
+  "거리 선택 탐색 조건 형식 오류": "Invalid distance-selection exploration settings.",
+  "검증된 최소 보존 결과가 없습니다.": "No verified minimal-retention result is available.",
+  "검토 후 참조 입력 파일이 변경됐습니다. 다시 검토하세요.": "The reference input changed after review. Review it again.",
+  "검토 후 파일이 변경됐습니다. 다시 검토하세요.": "The file changed after review. Review it again.",
+  "검토 후 파일이 변경됐습니다. 삭제를 중단합니다.": "The file changed after review. Deletion was stopped.",
+  "검토한 run 설정은 객체여야 합니다. 입력을 다시 검토하세요.": "The reviewed run settings must be an object. Review the input again.",
+  "검토한 구조·입력 보존 파일의 해시가 변경되었습니다.": "The hash of the reviewed structure or preserved input changed.",
+  "검토한 배치 원본이 변경되었습니다.": "The reviewed batch source changed.",
+  "검토한 배치와 제출 내용이 다릅니다. 다시 확인하세요.": "The submission differs from the reviewed batch. Review it again.",
+  "검토한 입력 파일은 심볼릭 링크일 수 없습니다.": "A reviewed input file cannot be a symbolic link.",
+  "검토한 입력 파일은 절대 경로여야 합니다.": "A reviewed input file must use an absolute path.",
+  "검토한 입력과 실행 조건이 달라졌습니다. 변경한 조건으로 입력을 다시 검토하세요.": "The input or run settings changed after review. Review the current settings again.",
+  "검토한 정리 계획과 다릅니다. 다시 확인하세요.": "The cleanup plan differs from the reviewed plan. Review it again.",
+  "검토한 최소 보존 내용이 변경되었습니다.": "The reviewed minimal-retention contents changed.",
+  "검토한 파일 삭제에 대한 명시적 확인이 필요합니다.": "Explicit confirmation is required to delete the reviewed files.",
+  "검토한 표적 구조 또는 FASTA가 필요합니다.": "A reviewed target structure or FASTA is required.",
+  "검토한 항목 ID를 중복 없이 선택하세요.": "Select reviewed entry IDs without duplicates.",
+  "결과 ID는 작업 디렉터리의 단일 이름이어야 합니다.": "The result ID must be a single directory name.",
+  "결과 검색 조건 형식이 잘못되었습니다.": "Invalid result search settings.",
+  "결과 디렉터리가 없습니다.": "The result directory does not exist.",
+  "결과 보존 방식은 full/minimal 중 하나여야 합니다.": "Result retention must be full or minimal.",
+  "결과 사본은 빈 새 디렉터리에서 생성해야 합니다.": "Create the result copy in a new, empty directory.",
+  "결과 사본은 원본 작업 디렉터리와 별도 위치에 생성해야 합니다.": "Create the result copy outside the original run directory.",
+  "결과 재사용 identity가 없거나 손상되었습니다.": "The result-reuse identity is missing or damaged.",
+  "결과 정렬 조건 형식이 잘못되었습니다.": "Invalid result sorting settings.",
+  "결과가 없습니다.": "No result is available.",
+  "결합 부위 미지정 실행의 hotspot 목록은 비어 있어야 합니다.": "The hotspot list must be empty when no binding site is specified.",
+  "결합 부위 번호 형식 오류": "Invalid binding-site residue numbering.",
+  "결합 부위 제외 구간은 100개 이하 목록이어야 합니다.": "Binding-site exclusions must be a list of at most 100 intervals.",
+  "결합 부위는 none 또는 specified를 선택하세요.": "Choose none or specified for the binding site.",
+  "결합 부위는 선택한 표적 분석 구간 안에 있어야 합니다.": "Binding-site residues must lie within the selected target interval.",
+  "결합 부위는 원본 잔기 번호를 쉼표로 구분하세요(예: 45,46,47).": "Separate original binding-site residue numbers with commas, for example 45,46,47.",
+  "결합 부위는 중복 없는 원본 잔기 번호 1–12개입니다.": "Specify 1–12 distinct original binding-site residue numbers.",
+  "결합 부위의 원본·엔진 번호 대응이 모호합니다.": "The mapping between original and engine binding-site residue numbers is ambiguous.",
+  "계산 agent ID 형식 오류": "Invalid compute agent ID format.",
+  "계산 코드가 업데이트되었습니다. 현재 입력을 다시 검토하고 환경을 점검하세요.": "The compute code was updated. Review the current input and check the environment again.",
+  "공개 예제 파일 이름이 예상과 다릅니다.": "The public example filename is unexpected.",
+  "공개 예제는 complex, screen, mature, design 중에서 선택하세요.": "Choose complex, screen, mature, or design for the public example.",
+  "관측이 없습니다.": "No observation is available.",
+  "구간 이름은 200자 이하 문자열이어야 합니다.": "The interval name must be a string of at most 200 characters.",
+  "구조 경로가 없습니다.": "No structure path is available.",
+  "구조 레이어 탐색 조건 형식 오류": "Invalid structure-layer exploration settings.",
+  "구조 삭제 실행은 다양성·상위 밖 대조 수를 0으로 설정하세요.": "Set diversity and out-of-top control counts to 0 when deleting structures.",
+  "구조 입력이 변경되었습니다. 구조를 다시 불러오세요.": "The structure input changed. Load the structure again.",
+  "구조 출력 경로는 선택한 결과 디렉터리 내부의 상대경로여야 합니다.": "The structure output must be a relative path inside the selected result directory.",
+  "구조 표시 탐색 조건 형식 오류": "Invalid structure-display exploration settings.",
+  "기록된 실행 입력 identity가 없거나 손상되었습니다.": "The recorded execution-input identity is missing or damaged.",
+  "기록된 실행 입력 identity를 읽을 수 없습니다.": "Could not read the recorded execution-input identity.",
+  "기록된 실행 입력 해시 형식이 잘못되었습니다.": "The recorded execution-input hash has an invalid format.",
+  "기존 작업 공간의 agent ID를 변경할 수 없습니다. 새 계산 서버는 새 작업 공간을 사용하세요.": "The agent ID of an existing workspace cannot change. Use a new workspace for a new compute server.",
+  "내보내기 형식은 report_zip/csv/xlsx/fasta/html/zip 중 하나입니다.": "Export format must be report_zip, csv, xlsx, fasta, html, or zip.",
+  "다른 계산 서버의 요청을 실행할 수 없습니다.": "A request belonging to another compute server cannot run here.",
+  "다른 사용자의 작업은 정리할 수 없습니다.": "Another user's job cannot be cleaned up.",
+  "다른 정리 보관본이 생겼습니다. 다시 검토하세요.": "A different retention archive was created. Review it again.",
+  "다중 치환에서는 AntiFold 사전 평가를 끄세요.": "Disable AntiFold prescoring for multiple substitutions.",
+  "단계·실행 상태 필드 형식 오류": "Invalid stage/execution-state fields.",
+  "단일 분석에는 표적 한 개만 입력하세요. 여러 표적은 배치 분석을 사용하세요.": "Enter one target for a single analysis. Use batch analysis for multiple targets.",
+  "동시에 다른 agent ID가 등록되었습니다.": "A different agent ID was registered concurrently.",
+  "동일 서열 엔진 비교는 screen/mature에서 사용하세요.": "Use screen or mature mode to compare engines on identical sequences.",
+  "라이브러리 입력은 합계 2,000,000잔기까지 지원합니다. 여러 분석으로 나누어 입력하세요.": "The library supports at most 2,000,000 residues in total. Split it across analyses.",
+  "로컬 서열 배치는 content와 config를 사용하세요. proteins/settings/reference는 복합체 입력입니다.": "Use content and config for a local sequence batch. proteins/settings/reference are complex inputs.",
+  "무작위 다중 치환은 mature/design의 ColabFold workflow에서 지원합니다.": "Random multiple-substitution libraries are supported in the ColabFold workflow for mature/design.",
+  "무작위 라이브러리는 WT 포함 2개 이상입니다.": "A random library must contain at least 2 sequences, including WT.",
+  "배치 ID 오류": "Invalid batch ID.",
+  "배치는 version: 1과 분석 mode가 필요합니다.": "A batch requires version: 1 and an analysis mode.",
+  "백본 CDR 탐색에서는 추가 대조·다양성 수를 0으로 설정하세요. 부모 대조는 최종 평가 수에 포함됩니다.": "For backbone CDR exploration, set extra-control and diversity counts to 0. Parent controls count toward final evaluation.",
+  "백본 CDR 탐색은 무작위 치환 라이브러리를 사용합니다.": "Backbone CDR exploration uses a random substitution library.",
+  "보고서 발행 스냅숏은 HTML 형식에만 적용합니다.": "A report-publication snapshot applies only to HTML exports.",
+  "보관 좌표 경로가 잘못되었습니다.": "Invalid retained coordinate path.",
+  "보관 좌표 해시가 일치하지 않습니다.": "The retained coordinate hash does not match.",
+  "보관된 구조가 없습니다.": "No retained structure is available.",
+  "보관된 정리 계획의 해시·경로가 일치하지 않습니다.": "The retained cleanup plan has a mismatched hash or path.",
+  "보존 내용을 준비하는 동안 원본 결과가 변경됐습니다.": "The original result changed while retention contents were being prepared.",
+  "보존 작업은 실제 디렉터리에만 적용할 수 있습니다.": "Retention applies only to a real directory.",
+  "보존된 좌표가 없습니다. FASTA 입력에는 실험 좌표가 제공되지 않습니다.": "No preserved coordinates are available. FASTA input does not provide experimental coordinates.",
+  "복합체 비교 요청에는 단일 engine 필드를 함께 보내지 마세요.": "Do not send a single engine field with a complex-comparison request.",
+  "복합체 설정은 complex 입력에서 검토하세요.": "Review complex settings through complex input.",
+  "분석 결과 파일이 없는 폴더입니다. 개별 분석 결과 폴더를 선택하세요.": "This folder has no analysis result files. Select an individual analysis result folder.",
+  "분석 모드 오류": "Invalid analysis mode.",
+  "분석 설정은 객체여야 합니다.": "Analysis settings must be an object.",
+  "비교 구조는 20MB 이하 PDB/mmCIF이어야 합니다.": "The comparison structure must be a PDB/mmCIF file of at most 20 MB.",
+  "비교 구조는 filename/content 객체여야 합니다.": "Provide the comparison structure as a filename/content object.",
+  "비교 구조의 filename은 문자열이어야 합니다.": "The comparison structure filename must be a string.",
+  "비교 실행의 표적 구조 준비 엔진은 Boltz-2입니다.": "Comparison runs use Boltz-2 to prepare the target structure.",
+  "삭제 감사 기록 형식이 잘못되었습니다.": "The deletion audit record has an invalid format.",
+  "삭제 감사 기록에 중복 파일이 있습니다.": "The deletion audit record contains duplicate files.",
+  "삭제 감사 기록을 확인할 수 없습니다.": "Could not verify the deletion audit record.",
+  "삭제 감사 기록이 검토한 계획과 다릅니다.": "The deletion audit record differs from the reviewed plan.",
+  "삭제 대상 파일 정체성이 변경되었습니다.": "The identity of a file selected for deletion changed.",
+  "삭제 직전 파일이 변경되었습니다. 정리를 중단합니다.": "A file changed immediately before deletion. Cleanup was stopped.",
+  "산출물 파일이 없습니다.": "The artifact file does not exist.",
+  "삽입 잔기 번호가 모호합니다. 서열·번호를 직접 확인하세요.": "Insertion residue numbering is ambiguous. Check the sequence and numbering manually.",
+  "상대 파일 경로가 잘못되었습니다.": "Invalid relative file path.",
+  "상태 필드 형식 오류": "Invalid state field format.",
+  "서버 GPU 잠금 경로는 절대 경로여야 합니다.": "The server GPU lock directory must be an absolute path.",
+  "서버 인증 파일 권한은 0600이어야 합니다.": "The server authentication file must have permissions 0600.",
+  "서버의 허용 GPU 설정이 비어 있거나 손상되었습니다.": "The server's allowed-GPU settings are empty or damaged.",
+  "서열 이름과 표준 아미노산 20종으로 구성된 서열을 확인하세요.": "Check sequence names and use only the 20 standard amino acids.",
+  "서열 입력은 Boltz-2 또는 Chai-1로 표적 구조를 먼저 예측해야 합니다.": "Sequence input requires target prediction with Boltz-2 or Chai-1 first.",
+  "선택 내용이 바뀌었습니다. 표적과 서열을 다시 확인하세요.": "The selection changed. Check the target and sequences again.",
+  "선택 잔기 탐색 조건 형식 오류": "Invalid selected-residue exploration settings.",
+  "선택한 결합 부위가 분석 구간 밖이거나 제외 구간에 포함됩니다. 부위를 다시 검토하세요.": "A selected binding-site residue lies outside the analysis interval or within an exclusion. Review the site again.",
+  "선택한 결합 부위의 원본·전체 서열 대응이 불명확합니다. 예측 구조 자동 결합 부위를 사용하거나 대응을 확인하세요.": "The original-to-full-sequence binding-site mapping is unclear. Use automatic sites on the predicted structure or verify the mapping.",
+  "선택한 표적 전체를 hotspot에서 제외할 수 없습니다.": "The entire selected target cannot be excluded from hotspots.",
+  "선택한 표적 체인이 없습니다.": "The selected target chain does not exist.",
+  "설정 파일은 YAML 객체여야 합니다.": "The settings file must be a YAML object.",
+  "설정 필드 형식 오류": "Invalid settings field format.",
+  "설정은 JSON 객체여야 합니다.": "Settings must be a JSON object.",
+  "설정은 객체여야 합니다.": "Settings must be an object.",
+  "설치 또는 업데이트 중입니다. 완료 후 다시 시도하세요. / Installation or update is in progress; retry when it finishes.": "Installation or update is in progress. Retry when it finishes.",
+  "설치 잠금 파일의 소유자 또는 형식이 올바르지 않습니다. / Invalid installation lock.": "Invalid installation lock owner or file type.",
+  "설치 파일이 환경 확인 범위를 초과합니다. 실행 환경과 모델 경로를 확인하세요.": "Installation files exceed the environment-check scope. Check the execution environment and model paths.",
+  "세부 설정 필드 형식 오류": "Invalid detailed-settings field format.",
+  "세션이 만료되었습니다. 화면을 다시 여세요.": "The session expired. Reopen the page.",
+  "소유 작업 프로세스가 아직 실행 중입니다.": "An owned job process is still running.",
+  "승인된 HTTPS Sites 주소가 필요합니다.": "An approved HTTPS Sites address is required.",
+  "시간 한도가 소진되었습니다. 재개할 추가 시간(분)을 입력하세요.": "The time budget is exhausted. Enter additional minutes to resume.",
+  "신규 나노바디 설계·엔진 비교는 design에서 사용하세요.": "Use design mode for new-nanobody design with engine comparison.",
+  "신뢰도 데이터는 JSON 객체여야 합니다.": "Confidence data must be a JSON object.",
+  "실행 identity가 없습니다.": "No execution identity is available.",
+  "실행 identity가 필요합니다.": "An execution identity is required.",
+  "실행 설정 사본의 해시가 바뀌었습니다.": "The saved execution settings hash changed.",
+  "실행 설정을 확인할 수 없습니다.": "Could not verify the execution settings.",
+  "실행 시간 한도는 0초 초과, 7일 이하여야 합니다.": "The run time budget must be greater than 0 seconds and at most 7 days.",
+  "실행 입력 identity를 확인하는 동안 카탈로그가 변경됐습니다.": "The catalog changed while verifying execution-input identity.",
+  "실행 입력 사본의 해시가 바뀌었습니다.": "The saved execution-input hash changed.",
+  "실행 프로세스 기록을 확인할 수 없습니다.": "Could not verify the execution-process record.",
+  "실행 환경변수는 서버 관리자가 등록한 값만 사용할 수 있습니다. 작업 공간 environment.yaml에 등록한 설정을 선택하세요.": "Use only environment values registered by the server administrator. Select settings from workspace environment.yaml.",
+  "앞선 실행 프로세스를 정리 중입니다. 잠시 뒤 재개하세요.": "Processes from the previous attempt are being cleaned up. Resume again shortly.",
+  "업데이트 상태를 확인할 수 없습니다. bash update.sh를 다시 실행하세요. / Cannot verify update state; rerun bash update.sh.": "Cannot verify update state. Rerun bash update.sh.",
+  "업데이트가 완료되지 않았습니다. bash update.sh를 다시 실행하세요. / Update is incomplete; rerun bash update.sh.": "The update is incomplete. Rerun bash update.sh.",
+  "없는 자산입니다.": "The asset does not exist.",
+  "엔진 비교 MSA는 cache, local_mmseqs2 또는 public_api를 사용하세요.": "Engine comparison MSA must use cache, local_mmseqs2, or public_api.",
+  "엔진 비교 진행 상태 형식 오류": "Invalid engine-comparison progress format.",
+  "엔진 비교 진행 상태는 객체여야 합니다.": "Engine-comparison progress must be an object.",
+  "엔진 오류": "Engine error.",
+  "엔진별 부모 수는 1–10이며 초기 백본 수 이하여야 합니다.": "The parent count per engine must be 1–10 and cannot exceed the initial backbone count.",
+  "엔진별 초기 백본 수는 1–50 정수입니다.": "The initial backbone count per engine must be an integer between 1 and 50.",
+  "예제 모드 또는 API 동의 기본값이 예상과 다릅니다.": "The example mode or API-consent default is unexpected.",
+  "예측 결합 부위는 auto, reference 또는 none을 선택하세요.": "Choose auto, reference, or none for predicted binding sites.",
+  "완료 결과의 설정·상태 형식을 확인할 수 없습니다.": "Could not verify the completed result's settings/state format.",
+  "완료 단계 목록 형식 오류": "Invalid completed-stage list format.",
+  "완료·검증된 결과만 정리할 수 있습니다. 실행 또는 불명확한 상태입니다.": "Only completed, verified results can be cleaned up. This result is running or its state is unclear.",
+  "요청 인자 형식이 올바르지 않습니다. 숫자·범위·필수 항목을 확인하고 다시 시도하세요.": "Invalid request arguments. Check numbers, ranges, and required fields, then retry.",
+  "요청은 20MB 이하여야 합니다.": "The request must be at most 20 MB.",
+  "요청한 입력 또는 결과 파일을 찾지 못했습니다. 작업 목록에서 항목을 다시 선택하세요.": "The requested input or result file was not found. Select the entry again from Jobs & logs.",
+  "원본 결과가 다른 조건으로 재개되었습니다. 결과를 다시 확인한 후 제출하세요.": "The original result resumed with different settings. Review it again before submitting.",
+  "원본 참조 스냅샷 경로/해시 불일치": "The original reference snapshot has a mismatched path or hash.",
+  "원본 참조 좌표 해시 불일치": "The original reference coordinate hash does not match.",
+  "원본과 예측의 명확한 비공선 Cα 대응이 3개 미만입니다.": "Fewer than 3 unambiguous, noncollinear Cα correspondences link the original and prediction.",
+  "이 GPU는 현재 계산 서버에서 허용되지 않았습니다.": "This GPU is not allowed on the current compute server.",
+  "이 결과에 보존된 원본 참조 좌표가 없습니다.": "This result has no preserved original reference coordinates.",
+  "이 모델의 구조가 없습니다.": "No structure is available for this model.",
+  "이 배치의 표적과 후보 서열을 외부 MSA 서비스로 보내는 데 동의하세요.": "Consent to sending this batch's target and candidate sequences to the external MSA service.",
+  "이 작업 공간의 runs 직속 결과만 정리할 수 있습니다.": "Cleanup applies only to direct children of this workspace's runs directory.",
+  "이 작업은 재개할 수 없습니다.": "This job cannot be resumed.",
+  "이 후보의 구조 파일이 없습니다.": "The structure file for this candidate does not exist.",
+  "이 후보의 구조를 표시할 수 없습니다: 구조 파일에 원자 좌표가 없습니다.": "Cannot display this candidate's structure: the file has no atom coordinates.",
+  "인증된 Sites 요청의 리다이렉트는 허용하지 않습니다.": "Redirects are forbidden for authenticated Sites requests.",
+  "입력 스냅샷이 없거나 변경되었습니다. 새 작업을 생성하세요.": "The input snapshot is missing or changed. Create a new job.",
+  "입력 파일 내용과 보존 해시가 일치하지 않습니다.": "Input contents do not match the preserved hash.",
+  "입력 파일 내용과 크기가 일치하지 않습니다.": "Input contents do not match the recorded size.",
+  "입력 파일은 소유 작업 공간 또는 CLI 프로젝트 안에 있어야 합니다. 원본 입력을 먼저 보존하세요.": "Input files must lie within the owned workspace or CLI project. Preserve the original input first.",
+  "입력 파일을 읽는 동안 내용이 변경되었습니다.": "Input contents changed while being read.",
+  "작업 DB의 경로를 확인할 수 없습니다.": "Could not verify the job database path.",
+  "작업 공간 environment.yaml은 객체여야 합니다.": "Workspace environment.yaml must be an object.",
+  "작업 공간·설치·입력 폴더는 결과가 아닙니다. 개별 분석 결과 폴더를 선택하세요.": "Workspace, installation, and input folders are not results. Select an individual analysis result folder.",
+  "작업 등록에 필요한 프로세스 시작 식별자를 확인하지 못했습니다.": "Could not obtain the process birth identity required to register the job.",
+  "작업 소유권 또는 실행 상태가 바뀌어 외부 명령을 시작하지 않았습니다.": "Job ownership or execution state changed. The external command was not started.",
+  "작업 시작 전 취소 요청": "Cancellation requested before job start.",
+  "작업 종료 상태가 올바르지 않습니다.": "Invalid terminal job state.",
+  "작업 취소 요청": "Job cancellation requested.",
+  "작업 페이지 크기는 1–1,000이어야 합니다.": "Job page size must be between 1 and 1,000.",
+  "작업이 없습니다.": "The job does not exist.",
+  "작업이 이미 대기 또는 실행 중입니다.": "The job is already queued or running.",
+  "잘못된 결과 ID입니다.": "Invalid result ID.",
+  "잘못된 결과 보존 방식입니다.": "Invalid result retention mode.",
+  "잘못된 분석 모드입니다.": "Invalid analysis mode.",
+  "잘못된 입력 ID입니다.": "Invalid input ID.",
+  "잘못된 제출 ID입니다.": "Invalid submission ID.",
+  "저장된 복합체 구조가 손상되었습니다.": "The saved complex structure is damaged.",
+  "저장된 실행 설정이 바뀌었습니다. 새 작업을 생성하세요.": "The saved execution settings changed. Create a new job.",
+  "저장된 항목을 찾지 못했습니다. 입력을 다시 검토하거나 작업 목록을 새로 확인하세요.": "The saved entry was not found. Review the input or refresh Jobs & logs.",
+  "적격 탐색 조건은 all/true/false/missing 중 하나여야 합니다.": "Eligibility exploration must be all, true, false, or missing.",
+  "적격 판정 기준은 recorded/quality 중 하나여야 합니다.": "Eligibility basis must be recorded or quality.",
+  "전체 서열 FASTA 이름은 선택한 체인 ID와 같아야 합니다(예: >A).": "Full-sequence FASTA names must match the selected chain IDs, for example >A.",
+  "전체 서열 구조 예측 엔진은 Boltz-2 또는 Chai-1이어야 합니다.": "Full-sequence target prediction must use Boltz-2 or Chai-1.",
+  "전체 서열·수정 잔기·예측 경로와 경고를 확인하세요.": "Review the full sequence, modified residues, prediction path, and warnings.",
+  "정리 보관본 manifest가 손상되었습니다.": "The retention archive manifest is damaged.",
+  "정리 보관본 경로가 잘못되었습니다.": "Invalid retention archive path.",
+  "정리 보관본 구조 manifest가 손상되었습니다.": "The retention structure manifest is damaged.",
+  "정리 보관본 버전이 잘못되었습니다.": "Invalid retention archive version.",
+  "정리 보관본 쓰기 검증에 실패했습니다.": "Retention archive write verification failed.",
+  "정리 보관본 쓰기 중 원본 결과가 변경됐습니다.": "The original result changed while writing the retention archive.",
+  "정리 보관본 크기를 계산할 수 없습니다.": "Could not calculate the retention archive size.",
+  "정리 보관본 파일 manifest가 손상되었습니다.": "The retention file manifest is damaged.",
+  "정리 보관본 필수 파일 manifest가 손상되었습니다.": "The retention required-file manifest is damaged.",
+  "정리 보관본 해시가 일치하지 않습니다.": "The retention archive hash does not match.",
+  "정리 보관본은 재개할 수 없습니다. 원본 계산이 필요하면 새 분석으로 재실행하세요.": "A retention archive cannot resume. Start a new analysis if you need the original computation.",
+  "정리 보관본이 없습니다.": "No retention archive is available.",
+  "제출을 시작한 배치의 선택 항목은 변경할 수 없습니다.": "Selection cannot change after batch submission begins.",
+  "제출한 배치의 시간 한도는 변경할 수 없습니다.": "The time budget of a submitted batch cannot change.",
+  "좌표·서열 길이가 달라 구간을 임의 절단하지 않았습니다.": "Coordinate and sequence lengths differ. The interval was not truncated arbitrarily.",
+  "준비 변이 수는 1–100000 정수입니다.": "The prepared variant count must be an integer between 1 and 100000.",
+  "중복·누락 CSV 헤더": "Duplicate or missing CSV headers.",
+  "지원하지 않는 동기화 요청": "Unsupported synchronization request.",
+  "지원하지 않는 모드입니다.": "Unsupported mode.",
+  "지원하지 않는 배치 필드입니다.": "Unsupported batch field.",
+  "지원하지 않는 분석 workflow입니다.": "Unsupported analysis workflow.",
+  "지원하지 않는 분석 모드입니다.": "Unsupported analysis mode.",
+  "지원하지 않는 입력 준비 방식입니다.": "Unsupported input-preparation method.",
+  "지원하지 않는 표적 MSA 방식입니다. empty/cache/mmseqs/colabfold_search 중 등록된 방식을 선택하세요.": "Unsupported target MSA method. Select a registered empty, cache, mmseqs, or colabfold_search method.",
+  "지원하지 않는 항목 필드입니다. 경로/명령 대신 검토용 입력을 사용하세요.": "Unsupported entry field. Use review input instead of a path or command.",
+  "진행 단계/실행 상태 형식 오류": "Invalid progress-stage/execution-state format.",
+  "진행 상태 파일을 읽지 못했습니다. 로그를 확인하세요.": "Could not read the progress-state file. Check the logs.",
+  "진행 상태 형식 오류": "Invalid progress-state format.",
+  "초기 백본 엔진은 RFantibody, BoltzGen 또는 both입니다.": "The initial backbone engine must be RFantibody, BoltzGen, or both.",
+  "초기 백본·CDR ColabFold workflow는 design만 지원합니다.": "The initial-backbone/CDR ColabFold workflow supports only design mode.",
+  "초안 버전 또는 입력 형식 오류": "Invalid draft version or input format.",
+  "초안 파일은 심볼릭 링크일 수 없습니다.": "A draft file cannot be a symbolic link.",
+  "최종 구조에 잔기가 없습니다.": "The final structure has no residues.",
+  "최종 복합체 좌표가 손상되었습니다.": "The final complex coordinates are damaged.",
+  "최종 평가 수는 부모 대조 수보다 크고 전체 라이브러리 수 이하여야 합니다(최대 2,000).": "The final evaluation count must exceed the parent-control count and cannot exceed the full library count (maximum 2,000).",
+  "추가 실행 시간은 0초 초과, 7일 이하여야 합니다.": "Additional run time must be greater than 0 seconds and at most 7 days.",
+  "치환 방법 오류": "Invalid substitution method.",
+  "치환 잔기 수는 1–5 범위입니다.": "The substitution-residue count must be between 1 and 5.",
+  "클라우드 결과 동기화가 완료되지 않아 정리를 차단했습니다. 업로드 완료 후 다시 확인하세요.": "Cleanup is blocked because cloud-result synchronization is incomplete. Wait for upload, then review again.",
+  "클라우드 동기화 기록 형식을 확인할 수 없습니다.": "Could not verify the cloud-synchronization record format.",
+  "탐색 조건은 JSON 객체여야 합니다.": "Exploration settings must be a JSON object.",
+  "파일 소유자·형식·하드링크가 안전하지 않습니다.": "The file owner, type, or hard-link count is unsafe.",
+  "파일 스트리밍은 전체 원본 ZIP에 사용합니다.": "File streaming applies to the complete original ZIP.",
+  "파일은 현재 작업 공간 안에 있어야 합니다.": "The file must lie within the current workspace.",
+  "파일이 전송 중 바뀌었습니다.": "The file changed during transfer.",
+  "페이지 커서 정렬 값이 잘못되었습니다.": "Invalid page-cursor sort value.",
+  "페이지 커서가 잘못되었거나 검색 조건이 변경되었습니다.": "The page cursor is invalid or the search settings changed.",
+  "페이지 크기는 1–10,000개여야 합니다.": "Page size must be between 1 and 10,000.",
+  "페이지 크기는 1–100이어야 합니다.": "Page size must be between 1 and 100.",
+  "표적 구간은 시작·끝 위치 객체여야 합니다.": "The target interval must be an object with start/end positions.",
+  "표적 구조의 MSA 방식은 empty/cache/mmseqs/colabfold_search 중 하나여야 합니다. 등록된 방식으로 입력을 다시 검토하세요.": "Target-structure MSA must use empty, cache, mmseqs, or colabfold_search. Review the input with a registered method.",
+  "표적 서열 또는 분석 구간 오류": "Invalid target sequence or analysis interval.",
+  "표적 서열이 필요합니다.": "A target sequence is required.",
+  "표적·WT는 서열 하나를, 라이브러리는 1–10,000개를 입력하세요.": "Enter one target/WT sequence, or 1–10,000 library sequences.",
+  "표적과 공통 파트너의 이름은 달라야 합니다.": "The target and shared partners must have distinct names.",
+  "플랫폼 상태 필드 형식 오류": "Invalid platform-state field format.",
+  "플랫폼 실행은 실제 분석 또는 mock 데모를 사용하세요.": "Use real analysis or a mock demo for platform execution.",
+  "항목 ID는 앞뒤 공백 없는 후보 ID여야 합니다.": "Entry IDs must be valid candidate IDs without leading/trailing spaces.",
+  "항목 ID는 유니코드 정규화·대소문자를 무시해도 서로 달라야 합니다.": "Entry IDs must remain distinct after Unicode normalization and case folding.",
+  "항목별 실행 시간 한도는 0초 초과, 7일 이하여야 합니다.": "Each entry's run time budget must be greater than 0 seconds and at most 7 days.",
+  "현재 단계 이름은 문자열이어야 합니다.": "The current stage name must be a string.",
+  "현재 실행 중인 작업은 정리할 수 없습니다.": "A currently running job cannot be cleaned up.",
+  "현재 입력 파일 목록이 기록된 실행 입력과 다릅니다.": "The current input-file list differs from the recorded execution input.",
+  "현재 입력 파일이 기록된 실행 당시 입력과 다릅니다. 원본을 먼저 복구하세요.": "The current input differs from the input at execution. Restore the original first.",
+  "현재 작업 DB를 확인할 수 없습니다.": "Could not verify the current job database.",
+  "현재 플랫폼 작업은 design/screen/mature 분석을 지원합니다.": "Current platform jobs support design, screen, and mature analyses.",
+  "호스트 GPU 작업 잠금이 전달되지 않았습니다. 대기열에서 다시 실행하세요.": "The host GPU job lock was not inherited. Retry from the queue.",
+  "호스트 GPU 잠금 파일이 일치하지 않습니다. 대기열에서 다시 실행하세요.": "The host GPU lock file does not match. Retry from the queue.",
+  "확인 중 파일이 변경되었습니다.": "A file changed during verification.",
+  "활성·중단·미확인 작업은 정리할 수 없습니다.": "Active, interrupted, or uncertain jobs cannot be cleaned up.",
+  "후보가 없습니다.": "No candidate is available.",
+  "후속 예측은 표적·파트너 합계 25개 체인까지 지원합니다.": "Subsequent prediction supports at most 25 target/partner chains in total.",
+  "공개 예제 파일이 변경되었습니다: {0}. 원본 release를 다시 받으세요.": "The public example file changed: {0}. Download the original release again.",
+  "파일이 없습니다: {0}": "The file does not exist: {0}",
+  "탐색 조건 {0} 형식이 잘못되었습니다.": "Invalid format for exploration setting {0}.",
+  "탐색 조건 {0}는 true/false여야 합니다.": "Exploration setting {0} must be true or false.",
+  "표적 구간은 1–{0} 범위의 시작 ≤ 끝 정수여야 합니다.": "The target interval must use integer positions between 1 and {0}, with start ≤ end.",
+  "후보 수는 1–{0}입니다.": "Candidate count must be between 1 and {0}.",
+  "원본 결합 부위 {0}: 누락·삽입 번호 또는 중복 대응을 확인하세요.": "Original binding-site residue {0}: check missing/insertion numbering or duplicate mappings.",
+  "원본 결합 부위 {0}: 삽입 잔기 번호 대응이 모호합니다.": "Original binding-site residue {0}: insertion-residue mapping is ambiguous.",
+  "{0}: {1}–{2} 정수가 필요합니다.": "{0}: an integer between {1} and {2} is required.",
+  "{0} 설정은 객체여야 합니다.": "Setting {0} must be an object.",
+  "전체 서열 예측 입력은 합계 {0}잔기까지 지원합니다.": "Full-sequence prediction input supports at most {0} residues in total.",
+  "표적 예측 입력은 {0}잔기까지 지원합니다. 전체 서열 길이를 확인하세요.": "Target prediction supports at most {0} residues. Check the full-sequence length.",
+  "{0} 경로는 문자열이어야 합니다.": "Path {0} must be a string.",
+  "{0} 경로는 비어 있지 않은 문자열 또는 null이어야 합니다.": "Path {0} must be a nonempty string or null.",
+  "{0} 설정은 true/false여야 합니다.": "Setting {0} must be true or false.",
+  "JSON 객체가 필요합니다: {0}": "A JSON object is required: {0}",
+  "JSON 기록이 손상되었습니다: {0}": "The JSON record is damaged: {0}",
+  "심볼릭 링크가 있어 정리를 차단했습니다: {0}": "A symbolic link blocked cleanup: {0}",
+  "다른 사용자의 파일입니다: {0}": "The file belongs to another user: {0}",
+  "일반 파일이 아닙니다: {0}": "Not a regular file: {0}",
+  "{0} 입력은 문자열이어야 합니다.": "Input {0} must be a string.",
+  "{0} 입력은 JSON 객체여야 합니다.": "Input {0} must be a JSON object.",
+  "배치당 독립 분석 1–{0}개를 입력하세요.": "Enter 1–{0} independent analyses per batch.",
+  "항목 {0} ({1}): {2}": "Entry {0} ({1}): {2}",
+  "{0}: 입력 검토 오류를 먼저 수정하거나 제외하세요.": "{0}: first correct or exclude entries with input-review errors.",
+  "{0}: 검토 이후 입력 또는 설정이 바뀌었습니다.": "{0}: input or settings changed after review.",
+  "작업 처리에 실패했습니다. 실패한 단계와 서버 로그를 확인하세요. 원본 결과와 오류 기록은 보존됩니다.": "The operation failed. Check the failed stage and server logs. Original results and error records are preserved.",
+  "예측 산출물을 찾지 못했습니다. 엔진 실행 상태와 작업 로그를 확인하세요.": "Prediction artifacts were not found. Check engine execution and job logs.",
+  "내보낼 산출물을 찾지 못했습니다. 저장된 결과와 내보내기 로그를 확인하세요.": "Export artifacts were not found. Check saved results and export logs.",
+  "입력 파일을 찾지 못했습니다. 선택한 파일을 확인하세요.": "The input file was not found. Check the selected file.",
+  "작업에 필요한 파일을 찾지 못했습니다. 실패한 단계와 서버 로그를 확인하세요.": "A required file was not found. Check the failed stage and server logs.",
+  "예측·평가 처리에 실패했습니다. 해당 후보의 엔진 실행 상태와 작업 로그를 확인하세요.": "Prediction or assessment failed. Check this candidate’s engine execution and job logs.",
+  "결과 내보내기에 실패했습니다. 저장된 산출물과 내보내기 로그를 확인하세요.": "Result export failed. Check saved artifacts and export logs.",
+  "입력 처리에 실패했습니다. 파일 형식·서열·필수 항목과 서버 로그를 확인하세요.": "Input processing failed. Check the file format, sequences, required fields, and server logs.",
+  "작업을 시작하지 못했습니다. 서버 저장 공간·잠금 폴더·로그 파일의 쓰기 권한을 확인한 뒤 재개하세요.": "Could not start the job. Check server free space and write permissions for the lock directory and log file, then resume.",
+  "분석 명령이 종료 코드 {0}로 실패했습니다. 실행 로그를 확인하세요.": "The analysis command failed with exit code {0}. Check the execution log.",
+  "실행 프로세스가 종료되었습니다. 기록된 완료 단계만 재개할 수 있습니다.": "The execution process stopped. Resume can reuse only recorded completed stages.",
+  "사용자가 작업을 취소했습니다.": "The user cancelled the job.",
+  "실행 시간 한도에 도달했습니다.": "The run time budget was reached.",
+  "[서버 경로]": "[server path]",
+  "서열 prior 기준 미달": "Below sequence-prior threshold",
+  "서열 prior 미평가": "Sequence prior not evaluated",
+  "PAE 압축 데이터를 읽지 못했습니다. 표와 구조는 계속 확인할 수 있습니다.": "Could not read the compressed PAE data. Tables and structures remain available.",
+  "NanoCoFold 입력 마법사": "NanoCoFold input wizard",
+  "PDB ID 또는 로컬 구조에서 표적, 함께 유지할 단백질, 결합 부위를 확인하고 실행 설정만 저장합니다. GPU 작업은 여기서 시작하지 않습니다.": "Review the target, retained partner proteins, and binding sites from a PDB ID or local structure, then save run settings. No GPU job starts here.",
+  "1. 구조 불러오기": "1. Load a structure",
+  "복합체 번호(assembly)": "Assembly number",
+  "등록된 복합체 1번을 기본으로 읽습니다. 최적 구조라는 뜻은 아닙니다.": "Assembly 1 is loaded by default. This does not mean it is the best structure.",
+  "PDB ID로 불러오기": "Load by PDB ID",
+  "인터넷이 느리거나 실패하면 아래 로컬 업로드를 사용하세요.": "If the network is slow or unavailable, upload a local file below.",
+  "로컬 PDB/mmCIF 파일": "Local PDB/mmCIF file",
+  "고급: 구조 텍스트 직접 붙여넣기": "Advanced: paste structure text",
+  "로컬 구조 불러오기": "Load local structure",
+  "2. 표적과 함께 유지할 단백질 선택": "2. Select the target and retained partners",
+  "표적은 반드시 직접 선택해야 합니다. 기본값은 없음입니다. 표적이 아닌 다른 단백질은 문맥으로 보존됩니다.": "Select the target explicitly; no target is selected by default. Other proteins are retained as context.",
+  "구조를 먼저 불러오세요.": "Load a structure first.",
+  "함께 유지할 단백질": "Proteins to retain",
+  "표적을 고르면 나머지 체인이 표시됩니다.": "Select a target to see the remaining chains.",
+  "결합 부위 후보 계산": "Find candidate binding sites",
+  "표적을 선택하면 계산할 수 있습니다.": "Select a target before calculating.",
+  "3. 결합 부위 확인": "3. Review binding sites",
+  "자동 후보는 표면 노출, 주변 환경, 당질 거리 등을 이용한 휴리스틱입니다. 최적 결합부위나 검증된 결합을 뜻하지 않습니다. PDB B열 원값은 pLDDT나 신뢰도 퍼센트가 아닙니다.": "Automatic sites are heuristics based on exposure, local context, and glycan distance. They do not establish an optimal site or verified binding. Raw PDB B-column values are not pLDDT or confidence percentages.",
+  "3D에서 표적 원자를 클릭하거나 오른쪽 잔기 목록을 키보드로 선택하세요. 표적은 청록색, 파트너는 회색, 선택 결합 부위는 주황색입니다.": "Click target atoms in 3D or use the residue list with the keyboard. The target is teal, partners are gray, and selected sites are orange.",
+  "자동 후보": "Automatic candidates",
+  "아직 계산 결과가 없습니다.": "No calculation results yet.",
+  "수동 잔기 선택": "Select residues manually",
+  "원본 번호로 추가 선택": "Add by original residue number",
+  "원본 번호 적용": "Apply original numbers",
+  "표적을 선택하고 표면 분석을 완료하면 원본 번호를 적용할 수 있습니다.": "Select a target and complete surface analysis before applying original numbers.",
+  "4. 검토와 내보내기": "4. Review and export",
+  "분석 후 선택 내용을 검토할 수 있습니다.": "Review your selection after analysis.",
+  "이 파일은 입력 준비 산출물이며, 결합 성공·발현·친화도 검증이 아님을 확인했습니다.": "I understand that these files prepare inputs; they do not validate binding, expression, or affinity.",
+  "설정 저장하기": "Save settings",
+  "저장 결과": "Saved files",
+  "먼저 doctor로 실행 환경을 점검하세요. 모델 환경·가중치·framework 파일은 별도 설치가 필요합니다. prepare는 입력 준비, design과 screen은 GPU 추론 단계입니다. screen의 YOUR_VHH.fasta는 보유 나노바디 FASTA 경로로 바꾸세요.": "Run doctor to check the environment first. Model environments, weights, and framework files need separate installation. prepare prepares inputs; design and screen perform GPU inference. Replace YOUR_VHH.fasta in the screen command with your nanobody FASTA path.",
+  "예: 1BRS": "Example: 1BRS",
+  "파일 선택이 어렵다면 PDB/mmCIF 내용을 여기에 붙여넣을 수 있습니다.": "You may paste PDB/mmCIF contents here instead of choosing a file.",
+  "원본 번호/라벨 예: 52, 53A": "Original numbers/labels, e.g. 52, 53A",
+  "3D 구조 뷰어": "3D structure viewer",
+  "입력 준비 단계": "Input preparation steps",
+  "입력이나 선택이 바뀌었습니다. 아래 폴더는 이전 입력의 저장본입니다. 한계를 다시 확인한 뒤 현재 입력을 새로 내보내세요.": "The input or selection changed. The folder below contains the previous snapshot. Review the limitations and export the current input again.",
+  "{0} (원본 {1}, author {2})": "{0} (original {1}, author {2})",
+  "RCSB 등록 복합체 {0} assembly {1}": "RCSB entry {0}, assembly {1}",
+  "업로드 {0} / 생물학적 복합체 여부 미확인": "Uploaded {0} / biological assembly unverified",
+  "제거/분리된 항목 요약 {0}개": "{0} removed/separated items",
+  "{0}: {1}개": "{0}: {1}",
+  "상세 예시 보기(최대 20개 / 전체 {0}개)": "Show examples (up to 20 / {0} total)",
+  "출처와 assembly": "Source and assembly",
+  "불러온 체인: 이름, 생물종, 관찰된 원본 번호 범위": "Loaded chains: names, species, and observed original residue ranges",
+  "계산 체인": "Analysis chain",
+  "원본/author": "Original/author",
+  "생물종": "Species",
+  "관찰 범위": "Observed range",
+  "이름 미상": "Unknown name",
+  "생물종 미상": "Unknown species",
+  "{0} · {1} · 원본 {2} · {3}": "{0} · {1} · Original {2} · {3}",
+  "{0} · {1} · 원본 {2}": "{0} · {1} · Original {2}",
+  "선택한 문맥에서 표면 후보를 계산합니다.": "Surface candidates will be calculated in the selected context.",
+  "PDB assembly를 불러오는 중입니다.": "Loading the PDB assembly.",
+  "구조를 불러왔습니다.": "Structure loaded.",
+  "로컬 구조를 읽는 중입니다.": "Reading the local structure.",
+  "로컬 구조를 불러왔습니다.": "Local structure loaded.",
+  "선택한 표적과 문맥으로 결합 부위 후보를 계산하는 중입니다.": "Calculating candidate binding sites for the selected target and context.",
+  "분석 결과가 준비되었습니다.": "Analysis results are ready.",
+  "입력 QC 차단 항목이 있습니다. 해결 전에는 내보낼 수 없습니다.": "Input QC has blocking issues. Resolve them before export.",
+  "새 나노바디 자동 설계는 제한됩니다. 구조 준비와 보유 VHH screen 입력 저장은 계속 가능합니다.": "Automatic new-nanobody design is restricted. You can still prepare structures and save inputs for screening existing VHHs.",
+  "표적 원자를 클릭하거나 후보를 선택하세요.": "Click a target atom or choose a candidate site.",
+  "자동 후보가 없습니다. 수동으로 선택할 수 있습니다.": "No automatic candidate sites. You can select residues manually.",
+  "후보 {0} · 점수 {1}": "Candidate {0} · Score {1}",
+  "원본 잔기: {0}": "Original residues: {0}",
+  "계산용 위치: {0}": "Analysis positions: {0}",
+  "근거 설명 없음": "No explanation recorded",
+  "매몰 잔기가 포함되어 내보낼 수 없습니다.": "Contains buried residues and cannot be exported.",
+  "12개를 초과해 내보낼 수 없습니다.": "More than 12 residues cannot be exported.",
+  "이 후보로 교체": "Use this candidate",
+  "원본 {0}:{1} ({2}) / 계산 #{3}": "Original {0}:{1} ({2}) / Analysis #{3}",
+  "입력 QC 차단 항목이 남아 있습니다.": "Blocking input-QC issues remain.",
+  "결합 부위를 1개 이상 선택하세요.": "Select at least one binding-site residue.",
+  "결합 부위는 최대 12개까지 내보낼 수 있습니다.": "Export at most 12 binding-site residues.",
+  "상대 SASA 0.15 미만의 매몰 잔기는 내보낼 수 없습니다.": "Buried residues with relative SASA below 0.15 cannot be exported.",
+  "한계 확인란을 선택하세요.": "Confirm the limitations checkbox.",
+  "{0}: 상대 SASA 0.15 미만의 매몰 잔기라 내보낼 수 없습니다.": "{0}: a buried residue with relative SASA below 0.15 cannot be exported.",
+  "결합 부위는 최대 12개까지 선택할 수 있습니다.": "Select at most 12 binding-site residues.",
+  " · 매몰 잔기: 내보내기 불가": " · Buried residue: cannot export",
+  "{0} · SASA {1} · B열 원값 {2} · 당질거리 {3}{4}": "{0} · SASA {1} · Raw B-column {2} · Glycan distance {3}{4}",
+  "선택된 결합 부위 {0}개": "{0} binding-site residues selected",
+  "{0}: 원본 번호가 없거나 삽입코드 때문에 모호합니다.": "{0}: original number not found or ambiguous because of an insertion code.",
+  "{0}: 매몰 잔기입니다.": "{0}: buried residue.",
+  "{0}: 12개 한도를 넘습니다.": "{0}: exceeds the 12-residue limit.",
+  "추가됨: {0}{1}": "Added: {0}{1}",
+  " / 제외: ": " / Skipped: ",
+  "일치하는 원본 표적 잔기를 찾지 못했습니다.": "No matching original target residue was found.",
+  "입력 QC 차단 - 해결 전 내보내기 불가": "Blocking input QC — resolve before export",
+  "표적: {0}": "Target: {0}",
+  "{0} ({1}, 원본 {2})": "{0} ({1}, original {2})",
+  "보존 체인: {0}": "Retained chains: {0}",
+  "제거 체인: {0}": "Removed chains: {0}",
+  "표면 분석에 유지한 별도 비단백질 체인: {0}. 단백질과의 소속 관계는 자동 추정하지 않으며 설계·평가 좌표에는 포함하지 않습니다.": "Separate nonprotein chains retained for surface analysis: {0}. Protein association is not inferred automatically; these chains are excluded from design/evaluation coordinates.",
+  "선택 결합 부위: {0}개": "Selected binding-site residues: {0}",
+  "내보내기 전 확인": "Check before export",
+  "새 나노바디 설계 제한 - prepare/screen 입력 저장은 가능": "New-nanobody design restrictions — prepare/screen inputs can still be saved",
+  "스크리닝 제한": "Screening restrictions",
+  "입력·분석 주의사항 {0}개": "{0} input/analysis cautions",
+  "확인할 내용": "Review these items",
+  "설정을 저장하는 중입니다.": "Saving settings.",
+  "내보내기가 완료되었습니다. GPU 작업은 실행하지 않았습니다.": "Export complete. No GPU job was run.",
+  "폴더: {0}": "Folder: {0}",
+  "설정: {0}": "Settings: {0}",
+  "스냅샷 fingerprint: {0}": "Snapshot fingerprint: {0}",
+  "체인 대응표": "Chain mapping",
+  "로컬 화면에서 접근하세요.": "Open the local page to access this resource.",
+  "인증이 만료되었거나 다른 사이트의 요청입니다. 화면을 새로 여세요.": "Authentication expired or the request came from another site. Reopen the page.",
+  "JSON 요청만 지원합니다.": "Only JSON requests are supported.",
+  "입력 데이터를 읽지 못했습니다. 파일과 형식을 확인하세요.": "Could not read the input. Check the file and format.",
+  "앞선 입력을 처리 중입니다. 완료 후 다시 시도하세요.": "The previous input is still being processed. Wait for it to finish, then retry.",
+  "PDB 번호와 파일은 한 번에 하나만 입력하세요.": "Enter either a PDB ID or a file, not both.",
+  "PDB 또는 mmCIF 파일(.pdb/.cif)을 선택하세요. 압축 파일은 먼저 풀어 주세요.": "Choose a PDB or mmCIF file (.pdb/.cif). Extract compressed files first.",
+  "구조 파일이 비어 있거나 20MB 한도를 넘었습니다.": "The structure file is empty or exceeds 20 MB.",
+  "입력이 변경되었거나 없습니다. 구조를 먼저 불러오세요.": "Input changed or is missing. Load the structure first.",
+  "단백질 이름과 원본 체인을 확인한 후 표적 하나를 선택하세요.": "Check protein names and original chains, then select one target.",
+  "유지할 파트너 체인 목록이 현재 입력과 맞지 않습니다.": "The retained partner-chain list does not match the current input.",
+  "PAE가 브라우저 표시 한도(128 MiB)를 넘었습니다. 전체 행렬은 보고서에 보존되며 PAE 저장으로 받을 수 있습니다.": "PAE exceeds the browser display limit (128 MiB). The full matrix remains in the report and can be downloaded with Save PAE.",
+  "이 브라우저는 압축 PAE 보기를 지원하지 않습니다. 최신 Chrome·Edge·Firefox를 사용하세요. 전체 PAE는 저장할 수 있습니다.": "This browser does not support compressed PAE viewing. Use a current Chrome, Edge, or Firefox. The full PAE can still be saved.",
+  "저장 구조 관측": "Saved structure observations",
+  "저장 구조 관측은 1차 평가 구조도 포함합니다. 최종 평가 모델 수는 결과 보고서에서 따로 확인하세요.": "Saved structure observations include first-stage structures. See the result report for final evaluated model counts.",
+  "PAE는 잔기 축과 일치하는 유한한 정사각 행렬이어야 합니다.": "PAE must be a finite square matrix matching the residue axes.",
+  "anchor_chain은 실제 분석 체인 ID여야 합니다.": "anchor_chain must be a chain ID in the analyzed complex.",
+  "interest_positions는 실제 분석 구간의 중복 없는 원본 잔기 번호 정수 목록이어야 합니다.": "interest_positions must list distinct integer original residue numbers within the actual analysis interval.",
+  "결과 목록을 복구 중입니다. 잠시 뒤 재개하세요. 원본 결과는 보존됩니다.": "The result index is being recovered. Resume again shortly. Original results are preserved.",
+  "결과 색인 잠금 파일을 확인할 수 없습니다. 서버 로그를 확인하세요.": "Could not verify the result-index lock file. Check the server logs.",
+  "저장 공간이 부족해 요청을 마치지 못했습니다. 서버의 여유 공간을 확보한 뒤 작업·로그를 새로고침해 현재 상태를 확인하세요.": "The request could not finish because storage is full. Free server space, then refresh Jobs & logs to check the current state.",
+  "작업 공간의 읽기·쓰기 권한을 확인할 수 없습니다. 서버의 파일 권한을 확인한 뒤 작업·로그를 새로고침해 현재 상태를 확인하세요.": "Could not verify workspace read/write permissions. Check server file permissions, then refresh Jobs & logs to check the current state.",
+  "다른 저장 요청을 처리 중입니다. 잠시 후 작업·로그를 새로고침해 현재 상태를 확인하세요.": "Another storage request is in progress. Refresh Jobs & logs shortly to check the current state.",
+  "저장소 요청을 마치지 못했습니다. 서버 로그를 확인한 뒤 작업·로그를 새로고침해 현재 상태를 확인하세요.": "The storage request could not finish. Check server logs, then refresh Jobs & logs to check the current state.",
+  "빠른 입력 검토는 합계 2,000잔기까지 지원합니다. 필요한 복합체 사본을 선택하세요.": "Quick input review supports at most 2,000 residues in total. Select the required assembly copies.",
+  "선택 내용이 바뀌었습니다. 표적과 결합 부위를 다시 확인하세요.": "The selection changed. Check the target and binding sites again.",
+  "추천의 한계와 보존·제거 내역을 확인한 뒤 확인란을 선택하세요.": "Review recommendation limits and retained/removed components, then check the confirmation box.",
+  "hotspot_mode는 none 또는 specified여야 합니다.": "hotspot_mode must be none or specified.",
+  "현재 표적에 실제로 존재하는 결합 부위를 중복 없이 1–12개 선택하세요.": "Select 1–12 distinct binding-site residues that exist in the current target.",
+  "체인 서열 검증에 실패했습니다. 내보내기를 중단합니다.": "Chain-sequence verification failed. Export was stopped.",
+  "요청 형식이 올바르지 않습니다.": "Invalid request format.",
+  "생물종 조회 대상 entity가 너무 많습니다.": "Too many entities for species lookup.",
+  "표준 단백질 체인을 찾지 못했습니다. PDB/mmCIF 파일과 assembly 선택을 확인하세요.": "No standard protein chain was found. Check the PDB/mmCIF file and assembly selection.",
+  "RCSB 응답이 올바른 gzip mmCIF가 아닙니다. PDB ID/assembly 번호를 확인하세요.": "The RCSB response is not valid gzip mmCIF. Check the PDB ID and assembly number.",
+  "전체 model의 원자가 입력 한도를 넘습니다. 필요한 model을 별도 파일로 준비하세요.": "Atoms across all models exceed the input limit. Prepare the required model as a separate file.",
+  "entity 응답 크기 초과": "Entity response exceeds the size limit.",
+  "entity 식별자 불일치": "Entity identifier mismatch.",
+  "RCSB 다운로드 시간이 초과되었습니다. 네트워크 상태나 PDB ID를 확인하세요.": "RCSB download timed out. Check the network and PDB ID.",
+  "confidence_kind 는 'plddt' 또는 'bfactor' 이어야 합니다.": "confidence_kind must be 'plddt' or 'bfactor'.",
+  "hotspots.auto.residues_per_set는 1 ≤ 최소 ≤ 최대 정수 두 개여야 합니다.": "hotspots.auto.residues_per_set must contain two integers with 1 ≤ minimum ≤ maximum.",
+  "hotspots.auto.exclude_positions는 양의 서열 위치 정수 목록이어야 합니다.": "hotspots.auto.exclude_positions must list positive integer sequence positions.",
+  "결합 부위(hotspot)는 표면 특성으로 제안한 표적 잔기입니다. 최적 부위나 결합 성공을 보장하지 않습니다. 결손 잔기·원자를 복구하지 않으며, 절단형 특이성은 별도 입력과 검증이 필요합니다.": "Binding sites (hotspots) are target residues proposed from surface properties. They do not guarantee an optimal site or successful binding. Missing residues/atoms are not repaired; truncated-form specificity requires separate inputs and validation.",
+  "업로드한 파일이 생물학적 복합체인지 확인하세요. 결정 내 중복 사본을 자동 판별하지 않습니다.": "Check that the uploaded file represents the biological assembly. Crystal duplicates are not identified automatically.",
+  "자동 추천 조건을 만족하는 부위가 없습니다. 노출도를 확인하고 직접 선택할 수 있습니다.": "No site meets the automatic recommendation criteria. Check exposure and select residues manually.",
+  "복합체 설계: RFantibody의 T 표기는 여러 항원 사슬을 묶은 형식입니다. 입력 서열·사슬 대응을 검사하고 출력 서열이 정확히 일치할 때만 사슬을 복원합니다. 사슬 복원 후에도 모델 내부의 항원 사슬 경계 표현 한계는 남습니다. RF2 전체 항원 점수는 특정 사슬의 결합 증거가 아니며, 파트너를 포함한 후속 평가가 필요합니다.": "Complex design: RFantibody uses T to combine antigen chains. Input sequence/chain mappings are checked, and chains are restored only when output sequences match exactly. Antigen-boundary representation limitations remain after restoration. Whole-antigen RF2 scores do not establish binding to a particular chain; follow-up evaluation including partners is required.",
+  "단백질 이외 성분은 설계 입력에 포함되지 않습니다. 아래 제거 내역과 결합 부위 영향을 확인하세요.": "Nonprotein components are excluded from design inputs. Review the removed components and possible effects on binding sites below.",
+  "결합 부위 미지정: 결합 위치를 제한하지 않고 탐색합니다.": "No binding site specified: exploration does not constrain the binding location.",
+  "당질 근처의 부위입니다. 제거된 당질이 결합을 가릴 수 있습니다.": "This site is near a glycan. Removed glycans may obstruct binding.",
+  "소수성 잔기가 적은 부위입니다. 성공 가능성을 별도로 확인해야 합니다.": "This site has few hydrophobic residues. Its suitability needs separate assessment.",
+  "평균 상대 노출도 {0}, 소수성 잔기 {1}개. 점수는 후보 비교용이며 확률이 아닙니다.": "Mean relative exposure {0}; {1} hydrophobic residues. The score compares candidates and is not a probability.",
+  "별도 비단백질 체인 {0}은 표면 분석 문맥에 유지했습니다. 선택한 단백질과의 소속 관계는 자동 추정하지 않습니다.": "Separate nonprotein chains {0} were retained as surface-analysis context. Association with selected proteins is not inferred automatically.",
+  "{0}: 노출도를 계산할 수 없어 내보낼 수 없습니다.": "{0}: exposure could not be calculated, so export is unavailable.",
+  "{0}: 복합체 내부에 매몰된 잔기입니다. 노출된 부위를 선택하세요.": "{0}: this residue is buried inside the complex. Select an exposed site.",
+  "{0}: 당질 근처 hotspot. 단백질만의 예측에는 이 차폐가 반영되지 않습니다.": "{0}: site near a glycan. Protein-only prediction does not model this shielding.",
+  "선택한 부위의 당질 차폐를 반영하지 못하므로 자동 설계를 차단합니다.": "Automatic design is blocked because glycan shielding at the selected site cannot be modeled.",
+  "구조 처리에 실패했습니다. 올바른 단일 모델 PDB/mmCIF로 다시 시도하세요. 자세한 내용은 터미널에 표시됩니다.": "Structure processing failed. Retry with a valid single-model PDB/mmCIF. Details appear in the terminal.",
+  "로컬 3D 뷰어 자산이 없습니다. 표에서 잔기를 선택할 수 있습니다.": "The local 3D viewer asset is missing. You can select residues from the table.",
+  "없는 요청입니다.": "The request does not exist.",
+  "없는 경로입니다.": "The path does not exist.",
+  "필수 지표 미평가": "Required metrics not evaluated",
+  "WT 대조군 예측 풀에서 제외": "WT control excluded from the prediction pool",
+  "서열 prior 평가 한도 밖 (구조 미평가)": "Outside the sequence-prior evaluation limit (structure not evaluated)",
   "복합체 예측 · 처음 실행 추천": "Predict complexes · Recommended first run"
 });
 /* Explicit presentation bindings; no DOM observer, input rewriting, or API mutation. */
@@ -2050,17 +2577,29 @@ globalThis.I18N = (() => {
       if(/^\{\d+\}$/.test(part)){keys.push(part);return '([\\s\\S]*?)';}
       return part.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
     }).join('');
-    return {pattern:new RegExp('^'+escaped+'$'),keys,en};
+    return {pattern:new RegExp('^'+escaped+'$'),keys,en,ko};
   });
-  function translate(raw) {
+  function lookup(raw) {
     if(typeof raw!=='string')return raw==null?'':String(raw);
     if(Object.hasOwn(NCF_TRANSLATIONS,raw))return NCF_TRANSLATIONS[raw];
     if(normalized.has(normalize(raw)))return normalized.get(normalize(raw));
-    for(const {pattern,keys,en} of patterns){
+    for(const {pattern,keys,en,ko} of patterns){
+      if(ko==='진행 {0}'&&!/^진행 (?:\d+|미기록)\/(?:\d+|미기록)$/.test(raw))continue;
       const match=pattern.exec(raw);if(!match)continue;
-      const values=new Map(keys.map((k,i)=>[k,match[i+1]]));
+      const values=new Map(keys.map((k,i)=>[k,ko==='진행 {0}' ? match[i+1].replace(/미기록/g,'Not recorded') : match[i+1]]));
       // One replacement pass: data containing {0} is not reinterpreted as a placeholder.
       return en.replace(/\{\d+\}/g,key=>values.get(key)??key);
+    }
+    return null;
+  }
+  function translate(raw) {
+    if(typeof raw!=='string')return raw==null?'':String(raw);
+    const translated=lookup(raw);if(translated!==null)return translated;
+    // Candidate/entry IDs are data. Translate only a recognized complete error
+    // clause after the prefix, preserving even Korean IDs byte for byte.
+    for(let index=raw.indexOf(': ');index>=0;index=raw.indexOf(': ',index+2)){
+      const suffix=lookup(raw.slice(index+2));
+      if(suffix!==null)return raw.slice(0,index+2)+suffix;
     }
     return raw;
   }
@@ -2256,7 +2795,7 @@ const fmt = (value) =>
   value === null ||
   value === undefined ||
   (typeof value === "number" && !Number.isFinite(value))
-    ? "미평가"
+    ? I18N.value(I18N.term("미평가"))
     : typeof value === "number"
       ? Number.isInteger(value) ? String(value) : Math.abs(value) < 0.0005 ? "0.000" : value.toFixed(3)
       : typeof value === "object"
@@ -2323,7 +2862,7 @@ function reportAliases(rows) {
   return aliases;
 }
 function reportReasonLabel(code) {
-  const labels = {clash:"거리 기준 충돌", ipsae:"ipSAE 기준 미통과", iptm:"ipTM 기준 미통과", interface_plddt:"계면 pLDDT 기준 미통과", hotspot:"결합 부위 접촉 기준 미통과", developability:"개발가능성 경고 기준 미통과", developability_unassessed:"CDR 개발가능성 미평가", scoring_error:"구조 점수 계산 오류", not_scored:"구조 점수 미평가", eligibility_unassessed:"적격 판정 미기록·미평가", parent_control:"원본 후보 대조군", wt_control:"야생형 대조군", prediction_error:"예측 오류",prefilter_not_selected:"예측 전 준비·미선정",cross_binding_risk:"전장형 교차 결합 위험",incomplete_comparison:"비교 미완료",first_stage_only:"1차 평가만 완료",boltz_failed_or_incomplete:"Boltz 최종 평가 실패·미완료"};
+  const labels = {wt_control_not_in_model_pool:"WT 대조군 예측 풀에서 제외",sequence_prior_top_n_not_selected:"서열 prior 평가 한도 밖 (구조 미평가)",missing_metrics:"필수 지표 미평가",sequence_prior_prefilter_unmet:"서열 prior 기준 미달",sequence_prior_prefilter_unassessed:"서열 prior 미평가",clash:"거리 기준 충돌", ipsae:"ipSAE 기준 미통과", iptm:"ipTM 기준 미통과", interface_plddt:"계면 pLDDT 기준 미통과", hotspot:"결합 부위 접촉 기준 미통과", developability:"개발가능성 경고 기준 미통과", developability_unassessed:"CDR 개발가능성 미평가", scoring_error:"구조 점수 계산 오류", not_scored:"구조 점수 미평가", eligibility_unassessed:"적격 판정 미기록·미평가", parent_control:"원본 후보 대조군", wt_control:"야생형 대조군", prediction_error:"예측 오류",prefilter_not_selected:"예측 전 준비·미선정",cross_binding_risk:"전장형 교차 결합 위험",incomplete_comparison:"비교 미완료",first_stage_only:"1차 평가만 완료",boltz_failed_or_incomplete:"Boltz 최종 평가 실패·미완료"};
   return Object.hasOwn(labels, code) ? labels[code] : "기록된 제외·미평가 사유";
 }
 function reportReasonCounts(rows, mode) {
@@ -2502,7 +3041,7 @@ async function refreshCatalog() {
   $("catalog-next").disabled = !page.next_cursor;
   const table = el("table"), head = el("thead"), headings = el("tr"), body = el("tbody");
   const columns = [["name", "분석"], ["mode", "모드"], ["created", "실행일"], ["candidate_count", "서열"],
-    ["model_count", "구조 모델"], ["eligible_model_count", "기준 통과"], ["status", "계산 상태"],
+    ["model_count", "저장 구조 관측"], ["eligible_model_count", "기준 통과"], ["status", "계산 상태"],
     ["retention", "보관"], ["elapsed_seconds", "계산 시간"], ["storage_bytes", "서버 용량"]];
   for (const [key, label] of columns) {
     const th = el("th"), button = el("button", label + (state.catalogSort === key ? state.catalogDescending ? " ↓" : " ↑" : ""), "sort-header");
@@ -2524,7 +3063,7 @@ async function refreshCatalog() {
     }
     body.append(tr);
   }
-  table.append(head, body); $("catalog-table").replaceChildren(table);
+  table.append(head, body); $("catalog-table").replaceChildren(table, el("p", I18N.term("저장 구조 관측은 1차 평가 구조도 포함합니다. 최종 평가 모델 수는 결과 보고서에서 따로 확인하세요."), "muted"));
   I18N.text(status, I18N.format("{0}개 표시 · 용량은 색인 시점의 측정값", [page.items.length]));
 }
 async function previewRetention() {
@@ -3989,11 +4528,73 @@ function renderDistribution(observations) {
       { responsive: true, displaylogo: false, modeBarButtonsToRemove: ["sendChartToCloud", "sendDataToCloud", "editInChartStudio"] },
     );
 }
+// Decode only selected offline PAE arrays. Pool records stay compressed; a small
+// promise cache coalesces concurrent language/selection renders without retaining
+// every candidate matrix. Older reports and live API matrices remain supported.
+const offlinePaeCache = new Map();
+const OFFLINE_PAE_VIEW_BYTES = 128 * 1024 * 1024;
+async function offlinePaeValues(pae, payload = window.NANOCOFOLD_OFFLINE) {
+  if (!pae || Array.isArray(pae.values)) return pae?.values;
+  const reference = pae.values_ref, record = payload?.pae_arrays?.[reference];
+  const dimension = record?.dimension, expected = dimension * dimension * 8;
+  if (!/^[a-f0-9]{64}$/.test(reference || "") || !record || record.sha256 !== reference ||
+      record.encoding !== "gzip-base64-float64le" || !Number.isSafeInteger(dimension) || dimension < 1 ||
+      !Number.isSafeInteger(expected) || record.bytes !== expected ||
+      !Array.isArray(pae.labels) || pae.labels.length !== dimension)
+    throw Error("PAE 압축 데이터를 읽지 못했습니다. 표와 구조는 계속 확인할 수 있습니다.");
+  if (expected > OFFLINE_PAE_VIEW_BYTES)
+    throw Error("PAE가 브라우저 표시 한도(128 MiB)를 넘었습니다. 전체 행렬은 보고서에 보존되며 PAE 저장으로 받을 수 있습니다.");
+  if (typeof DecompressionStream !== "function" || !globalThis.crypto?.subtle)
+    throw Error("이 브라우저는 압축 PAE 보기를 지원하지 않습니다. 최신 Chrome·Edge·Firefox를 사용하세요. 전체 PAE는 저장할 수 있습니다.");
+  if (!offlinePaeCache.has(reference)) {
+    const pending = (async () => {
+      if (typeof record.data !== "string" || record.data.length > Math.ceil((expected + 65536) * 4 / 3))
+        throw Error("Invalid compressed PAE size");
+      const compressed = Uint8Array.from(atob(record.data), value => value.charCodeAt(0));
+      const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip")).getReader();
+      const chunks = []; let total = 0;
+      try {
+        for (;;) {
+          const {value, done} = await stream.read(); if (done) break;
+          total += value.byteLength;
+          if (total > expected) throw Error("Decoded PAE exceeds its declared size");
+          chunks.push(value);
+        }
+      } catch (error) { await stream.cancel().catch(() => {}); throw error; }
+      finally { stream.releaseLock(); }
+      if (total !== expected) throw Error("Truncated PAE array");
+      const bytes = new Uint8Array(expected); let offset = 0;
+      for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+      const digest = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), value => value.toString(16).padStart(2,"0")).join("");
+      if (digest !== reference) throw Error("PAE array hash mismatch");
+      const view = new DataView(bytes.buffer), rows = [];
+      for (let i = 0; i < dimension; i++) {
+        const row = [];
+        for (let j = 0; j < dimension; j++) {
+          const value = view.getFloat64((i * dimension + j) * 8, true);
+          if (!Number.isFinite(value)) throw Error("Nonfinite PAE value");
+          row.push(value);
+        }
+        rows.push(row);
+      }
+      return rows;
+    })();
+    offlinePaeCache.set(reference, pending);
+    // Keep the current and most recent matrix; original pool entries are untouched.
+    while (offlinePaeCache.size > 2) offlinePaeCache.delete(offlinePaeCache.keys().next().value);
+  }
+  try { return await offlinePaeCache.get(reference); }
+  catch (error) {
+    offlinePaeCache.delete(reference);
+    throw Error("PAE 압축 데이터를 읽지 못했습니다. 표와 구조는 계속 확인할 수 있습니다.", {cause:error});
+  }
+}
+
 function localizeEmptyPaeAnnotation() {
   const plot = $("pae");
   if (!window.Plotly || plot?.data?.length !== 0 || !plot.layout?.annotations?.length) return;
   const text = !state.structure ? "구조 / PAE 미평가"
-    : state.structure.pae_status === "removed_by_retention" ? "PAE · 용량 정리로 삭제됨" : "PAE 미평가";
+    : state.structure.pae_error ? state.structure.pae_error : state.structure.pae_status === "removed_by_retention" ? "PAE · 용량 정리로 삭제됨" : "PAE 미평가";
   Plotly.relayout(plot, {"annotations[0].text": I18N.value(I18N.term(text))});
 }
 async function loadStructure() {
@@ -4016,7 +4617,7 @@ async function loadStructure() {
       state.candidate?.candidate_id !== id
     )
       return;
-    state.structure = loaded;
+    state.structure = offline && loaded ? {...loaded, pae: loaded.pae ? {...loaded.pae} : loaded.pae} : loaded;
     if (!state.structure) throw Error("이 후보의 구조는 보고서에 없습니다.");
     await renderStructure();
   } catch (e) {
@@ -4254,7 +4855,12 @@ async function renderStructure() {
     );
   warnings(details.appendChild(el("div")), data.issues);
   if (window.Plotly) {
-    const pae = data.pae;
+    let pae = data.pae;
+    if (offline && pae?.values_ref) {
+      try { pae.values = await offlinePaeValues(pae); data.pae_error = null; }
+      catch (error) { data.pae_error = error.message; pae = null; }
+      if (state.structure !== data) return;
+    }
     await Plotly.react(
       $("pae"),
       pae
@@ -4282,7 +4888,7 @@ async function renderStructure() {
           return [{type:"line",xref:"x",yref:"paper",x0:i-.5,x1:i-.5,y0:0,y1:1,line:{color:"#586b78",width:1}},
                   {type:"line",xref:"paper",yref:"y",x0:0,x1:1,y0:i-.5,y1:i-.5,line:{color:"#586b78",width:1}}];
         }) : [],
-        annotations: pae ? [] : [{ text: data.pae_status === "removed_by_retention" ? I18N.value(I18N.term("PAE · 용량 정리로 삭제됨")) : I18N.value(I18N.term("PAE 미평가")), showarrow: false }],
+        annotations: pae ? [] : [{ text: data.pae_error ? I18N.value(I18N.term(data.pae_error)) : data.pae_status === "removed_by_retention" ? I18N.value(I18N.term("PAE · 용량 정리로 삭제됨")) : I18N.value(I18N.term("PAE 미평가")), showarrow: false }],
       },
       { responsive: true, displaylogo: false, displayModeBar: false },
     );
@@ -4479,7 +5085,8 @@ function setupExplorer() {
   action("save-pae", () => {
     const data=state.structure;
     if (!data?.pae) throw Error("이 모델의 PAE는 미제공입니다. 다른 모델의 값을 대신 쓰지 않습니다.");
-    saveBlob(new Blob([JSON.stringify(data.pae,null,2)],{type:"application/json"}),
+    const pae = data.pae.values_ref && !data.pae.values ? {...data.pae, array:window.NANOCOFOLD_OFFLINE?.pae_arrays?.[data.pae.values_ref]} : data.pae;
+    saveBlob(new Blob([JSON.stringify(pae,null,2)],{type:"application/json"}),
       `${data.candidate_id.replace(/[^A-Za-z0-9_.-]/g,"_")}_PAE.json`);
   });
   action("focus-result-residues", () => {

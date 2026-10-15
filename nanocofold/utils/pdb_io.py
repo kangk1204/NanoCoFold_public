@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Iterator, Sequence
 
 import numpy as np
+from Bio.Data.IUPACData import atom_weights
 from Bio.PDB import MMCIFParser, PDBIO, PDBParser, Select, Structure
 from Bio.PDB.Chain import Chain
 from Bio.PDB.Residue import Residue
@@ -96,10 +97,16 @@ def iter_residues(chain: Chain) -> Iterator[Residue]:
 def iter_heavy_atoms(res: Residue):
     for atom in res.get_atoms():
         element = (atom.element or "").strip().upper()
-        if element and element != "H":
+        if element and element not in {"H", "D"}:
             yield atom
-        elif not element and not atom.get_name().startswith("H"):
-            yield atom
+        elif not element:
+            # PDB aligns a two-letter element at column 13, unlike a
+            # one-letter hydrogen atom name (e.g. "HG  " vs " HG ").
+            fullname = atom.get_fullname()
+            two_letter = (len(fullname) == 4 and fullname[2:] == "  "
+                          and fullname[:2].title() in atom_weights)
+            if two_letter or not atom.get_name().startswith(("H", "D")):
+                yield atom
 
 
 def residue_label(res: Residue, chain_id: str, with_icode: bool = True) -> str:
@@ -297,7 +304,7 @@ def parse_plddt(structure: Structure, normalize: bool = True) -> dict[str, float
     for label, values in raw.items():
         mean = float(np.mean(values))
         out[label] = mean
-    if normalize and out and max(out.values()) <= 1.0:
+    if normalize and out and all(np.isfinite(v) for v in out.values()) and max(out.values()) <= 1.0:
         out = {key: value * 100.0 for key, value in out.items()}
     return out
 
@@ -361,6 +368,8 @@ def shared_ca_coords(structure_a: Structure, structure_b: Structure, chain_id: s
         coords_a.append(ca_a)
         coords_b.append(ca_b)
         used.append(label)
+    if not coords_a:
+        return np.zeros((0, 3)), np.zeros((0, 3)), []
     return np.vstack(coords_a), np.vstack(coords_b), used
 
 

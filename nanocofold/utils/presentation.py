@@ -7,7 +7,7 @@ from pathlib import Path
 
 # A slash alone is not evidence of a host path: it also occurs in base64,
 # chemical notation, integrity hashes, and ordinary multilingual prose.
-_HOST_ROOT = r'/(?:home|Users|tmp|var|private|mnt|media|Volumes|opt|usr|etc|srv|scratch|work|workspace|data|root|run|proc|dev|Applications|Library|System|nfs|gpfs)(?=/|$)'
+_HOST_ROOT = r'/(?:home|Users|tmp|var|private|mnt|media|Volumes|opt|usr|etc|srv|scratch|work|workspace|data|root|run|proc|dev|Applications|Library|System|nfs|gpfs|zfs|lustre|beegfs)(?=/|$)'
 # Forward-slash drive notation needs a directory or filename, so the chain
 # label A:/B is not mistaken for a Windows path. Backslashes are unambiguous.
 _WINDOWS_ROOT = r'''(?:[A-Za-z]:\\|[A-Za-z]:/(?=[^\s/"'<>()[\]{};,`|:]+(?:/|\.))|\\\\(?:[?.]\\(?:[A-Za-z]:[\\/])?)?)'''
@@ -24,7 +24,9 @@ _GPU_UUID = re.compile(r'\b(?:GPU|MIG)-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{1
 _OPAQUE_FIELDS = frozenset({'content', 'raw_content', 'smiles', 'canonical_smiles', 'isomeric_smiles',
                             'integrity', 'sha256', 'sha384', 'sha512'})
 _PATH_FIELDS = frozenset({'path', 'paths', 'root', 'source_root', 'workspace', 'cwd',
-                          'env', 'outdir', 'directory', 'destination', 'file', 'filename'})
+                          'env', 'outdir', 'directory', 'destination', 'file', 'filename',
+                          'pythonpath', 'pythonhome', 'conda_prefix', 'virtual_env', 'ld_library_path'})
+_PATH_LIST_FIELDS = frozenset({'path', 'pythonpath', 'ld_library_path', 'library_path', 'cpath', 'pkg_config_path'})
 
 
 def _path_field(field):
@@ -68,7 +70,9 @@ def _portable(value, root, patterns, field=''):
         return value
     if isinstance(value, dict):
         encoded = isinstance(value.get('encoding'), str) and 'base64' in value['encoding'].lower()
-        return {key: item if key == 'data' and encoded else _portable(item, root, patterns, str(key).lower())
+        environment = field in {'environment', 'env'}
+        return {key: item if key == 'data' and encoded else _portable(item, root, patterns,
+                    'path' if environment and isinstance(item, str) and _ABSOLUTE_START.match(item) else str(key).lower())
                 for key, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [_portable(item, root, patterns, field) for item in value]
@@ -98,6 +102,14 @@ def _portable(value, root, patterns, field=''):
     if len(url_parts) > 1:
         return ''.join(part if index % 2 else _portable(part, root, patterns, field)
                        for index, part in enumerate(url_parts))
+    if field in _PATH_LIST_FIELDS and not value.startswith('file://'):
+        # PATH-like variables can start with relative entries. Windows uses
+        # semicolons, so a drive colon must never be treated as a separator.
+        separator = ';' if ';' in value else ':'
+        if separator in value and not (separator == ':' and re.match(r'^[A-Za-z]:[\\/]', value)):
+            parts = value.split(separator)
+            if any(_ABSOLUTE_START.match(part) for part in parts):
+                return separator.join(_portable_path(part, root) if _ABSOLUTE_START.match(part) else part for part in parts)
     if _path_field(field) and _ABSOLUTE_START.match(value):
         diagnostic = re.match(r'(.+?)(:\s.*)', value, re.S)
         if diagnostic:

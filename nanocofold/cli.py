@@ -23,6 +23,7 @@ from .config import (
     resolve_run_dir, read_config_yaml,
 )
 from .utils.atomic import write_csv, write_json
+from .utils.spreadsheet import csv_cell
 from .state import RunState
 from .utils import msa as msa_utils, pdb_io, seq as seq_utils, shell
 from .utils.misc import format_seconds
@@ -67,105 +68,105 @@ def _fresh_computation_origin(run_dir: Path, state: RunState, args, new: bool, h
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="nanocofold",
-        description="타깃+결합 부위 조건 나노바디 설계/스크리닝/성숙 파이프라인 (상업용 라이선스 전용)",
+        description="Target and binding-site nanobody design, screening and maturation pipeline (commercially compatible licenses only)",
     )
     parser.add_argument("--version", action="version", version=f"NanoCoFold {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_init = sub.add_parser("init", help="연구자용 작업 공간과 CPU 데모 준비")
+    p_init = sub.add_parser("init", help="Prepare a researcher workspace and CPU demo")
     p_init.add_argument("--workspace", type=Path, default=Path.cwd())
-    p_setup = sub.add_parser("setup", help="분석 모드별 환경과 검증된 모델 설치")
+    p_setup = sub.add_parser("setup", help="Install environments and verified models for an analysis mode")
     p_setup.add_argument("--workspace", type=Path, default=Path.cwd())
     p_setup.add_argument("--profile", choices=["core", "complex", "design", "screen", "mature", "all", "colabfold", "boltzgen", "opendde"], default="core")
-    p_setup.add_argument("--yes", action="store_true", help="명시한 설치 프로필 실행")
-    p_serve = sub.add_parser("serve", help="설치·분석·결과 탐색 브라우저 앱 시작")
+    p_setup.add_argument("--yes", action="store_true", help="Run the selected installation profile")
+    p_serve = sub.add_parser("serve", help="Start the browser app for setup, analysis and results")
     p_serve.add_argument("--workspace", type=Path, default=Path.cwd())
     p_serve.add_argument("--port", type=int, default=8765)
     p_serve.add_argument("--host", default="127.0.0.1", choices=["127.0.0.1", "localhost", "::1"])
     p_serve.add_argument("--no-browser", action="store_true")
-    p_catalog = sub.add_parser("catalog", help="계산 없이 저장 결과 DB 검색·기존 결과 색인")
+    p_catalog = sub.add_parser("catalog", help="Search or index saved results without computation")
     p_catalog.add_argument("--workspace", type=Path, default=Path.cwd())
-    p_catalog.add_argument("--register", type=Path, help="작업 공간 안 결과 하나를 색인")
-    p_catalog.add_argument("--index-existing", action="store_true", help="runs 직속 기존 결과를 한 번 색인 (추론 없음)")
+    p_catalog.add_argument("--register", type=Path, help="Index one result inside the workspace")
+    p_catalog.add_argument("--index-existing", action="store_true", help="Index existing runs once (no inference)")
     p_catalog.add_argument("--limit", type=int, default=25)
     p_catalog.add_argument("--cursor")
     p_catalog.add_argument("--search", default="")
     p_catalog.add_argument("--mode", default="")
     p_catalog.add_argument("--retention", choices=["", "full", "minimal"], default="")
-    p_retention = sub.add_parser("retention", help="결과 용량 정리 미리보기·확인한 계획 적용")
+    p_retention = sub.add_parser("retention", help="Preview storage retention or apply a reviewed plan")
     p_retention.add_argument("--workspace", type=Path, default=Path.cwd())
     p_retention.add_argument("--run-dir", required=True, type=Path)
-    p_retention.add_argument("--apply", action="store_true", help="계획에 명시한 중간 파일 삭제")
-    p_retention.add_argument("--plan-digest", help="앞서 미리보기에서 확인한 plan_digest")
-    p_retention.add_argument("--yes", action="store_true", help="명시한 파일 삭제에 동의")
+    p_retention.add_argument("--apply", action="store_true", help="Remove intermediate files listed in the plan")
+    p_retention.add_argument("--plan-digest", help="plan_digest from the reviewed preview")
+    p_retention.add_argument("--yes", action="store_true", help="Confirm removal of the listed files")
 
-    p_batch = sub.add_parser("batch", help="네 분석 모드의 배치 입력 검토·제출·상태 조회")
+    p_batch = sub.add_parser("batch", help="Review, submit or inspect batches for all four modes")
     p_batch.add_argument("action", choices=["review", "submit", "status", "cancel"])
     p_batch.add_argument("--workspace", type=Path, default=Path.cwd())
-    p_batch.add_argument("--manifest", type=Path, help="review: JSON 배치 입력")
-    p_batch.add_argument("--id", help="검토에서 받은 배치 ID")
-    p_batch.add_argument("--review-sha256", help="submit: 검토한 배치의 해시")
-    p_batch.add_argument("--selected", nargs="+", help="실행할 항목 ID (기본: 전체)")
-    p_batch.add_argument("--budget-seconds", type=int, default=36000, help="각 항목의 실행 시간 한도")
-    p_batch.add_argument("--wait", action="store_true", help="submit: 큐를 실행하며 모든 선택 항목 종료까지 대기")
+    p_batch.add_argument("--manifest", type=Path, help="review: JSON batch input")
+    p_batch.add_argument("--id", help="Batch ID returned by review")
+    p_batch.add_argument("--review-sha256", help="submit: digest of the reviewed batch")
+    p_batch.add_argument("--selected", nargs="+", help="Entry IDs to run (default: all)")
+    p_batch.add_argument("--budget-seconds", type=int, default=36000, help="Runtime limit per entry in seconds")
+    p_batch.add_argument("--wait", action="store_true", help="submit: process the queue and wait for selected entries to finish")
 
-    p_wizard = sub.add_parser("wizard", help="초보자용 PDB·체인·hotspot 입력 마법사 (로컬 웹, GPU 사용 없음)")
-    p_wizard.add_argument("--port", type=int, default=8765, help="로컬 포트 (0: 빈 포트 자동 선택)")
-    p_wizard.add_argument("--output", type=Path, default=Path("prepared_targets"), help="검토한 입력 저장 위치")
-    p_wizard.add_argument("--no-browser", action="store_true", help="브라우저 자동 열기 생략")
+    p_wizard = sub.add_parser("wizard", help="Guided PDB, chain and binding-site input (local browser; no GPU use)")
+    p_wizard.add_argument("--port", type=int, default=8766, help="Local port (0: select an available port automatically)")
+    p_wizard.add_argument("--output", type=Path, default=Path("prepared_targets"), help="Directory for reviewed inputs")
+    p_wizard.add_argument("--no-browser", action="store_true", help="Do not open a browser automatically")
 
     def add_common(sp: argparse.ArgumentParser) -> None:
-        sp.add_argument("--config", "-c", help="YAML 설정 파일")
-        sp.add_argument("--set", action="append", default=[], help="설정 오버라이드 (a.b=c)")
-        sp.add_argument("--run-id", help="실행 ID (미지정 시 타임스탬프)")
-        sp.add_argument("--run-dir", help="기존 실행 디렉터리 (재개/후속 단계용)")
-        sp.add_argument("--mock", action="store_true", help="GPU/모델 없이 합성 데이터로 검증")
-        sp.add_argument("--dry-run", action="store_true", help="명령만 생성하고 실행하지 않음")
-        sp.add_argument("--reuse-workspace", type=Path, help="정확한 실행 정체성을 비교할 결과 DB 작업 공간")
-        sp.add_argument("--force-rerun", action="store_true", help="과거 결과 재사용을 생략하고 새 계산 수행")
+        sp.add_argument("--config", "-c", help="YAML configuration file")
+        sp.add_argument("--set", action="append", default=[], help="Configuration override (a.b=c)")
+        sp.add_argument("--run-id", help="Run ID (default: timestamp)")
+        sp.add_argument("--run-dir", help="Existing run directory for resume or later stages")
+        sp.add_argument("--mock", action="store_true", help="Use synthetic data without GPUs or models")
+        sp.add_argument("--dry-run", action="store_true", help="Generate commands without executing them")
+        sp.add_argument("--reuse-workspace", type=Path, help="Results workspace for exact execution-identity comparison")
+        sp.add_argument("--force-rerun", action="store_true", help="Run fresh computation instead of reusing saved results")
 
-    p_run = sub.add_parser("run", help="준비→후보생성→스코어링→선별→리포트 전체 실행")
+    p_run = sub.add_parser("run", help="Run preparation, candidate generation, scoring, selection and reporting")
     add_common(p_run)
-    p_run.add_argument("--mode", choices=["complex", "design", "screen", "mature"], help="실행 모드 (config 우선)")
-    p_run.add_argument("--vhh-fasta", help="screen 모드: 후보 나노바디 FASTA")
-    p_run.add_argument("--wt-fasta", help="mature 모드: 야생형 VHH FASTA")
+    p_run.add_argument("--mode", choices=["complex", "design", "screen", "mature"], help="Analysis mode (overrides configuration)")
+    p_run.add_argument("--vhh-fasta", help="screen: candidate nanobody FASTA")
+    p_run.add_argument("--wt-fasta", help="mature: wild-type VHH FASTA")
 
-    p_complex = sub.add_parser("complex", help="일반 단백질 복합체 예측·체인 쌍 평가")
+    p_complex = sub.add_parser("complex", help="Predict general protein complexes and assess chain pairs")
     add_common(p_complex)
 
-    p_prep = sub.add_parser("prepare", help="타깃 구조 확보/결합 부위/truncation")
+    p_prep = sub.add_parser("prepare", help="Prepare the target structure, binding sites and truncation")
     add_common(p_prep)
 
-    p_design = sub.add_parser("design", help="RFantibody de novo 설계")
+    p_design = sub.add_parser("design", help="RFantibody de novo design")
     add_common(p_design)
 
-    p_screen = sub.add_parser("screen", help="보유 VHH 라이브러리 복합체 예측 스크리닝")
+    p_screen = sub.add_parser("screen", help="Screen an existing VHH library with complex predictions")
     add_common(p_screen)
-    p_screen.add_argument("--vhh-fasta", required=False, help="후보 나노바디 FASTA")
+    p_screen.add_argument("--vhh-fasta", required=False, help="Candidate nanobody FASTA")
 
-    p_mature = sub.add_parser("mature", help="기존 바인더 DMS 친화도 성숙")
+    p_mature = sub.add_parser("mature", help="Generate and assess single-mutant variants of an existing binder")
     add_common(p_mature)
-    p_mature.add_argument("--wt-fasta", required=False, help="야생형 VHH FASTA")
+    p_mature.add_argument("--wt-fasta", required=False, help="Wild-type VHH FASTA")
 
-    p_score = sub.add_parser("score", help="복합체 스코어링 + 개발가능성 + 랭킹 + 리포트")
+    p_score = sub.add_parser("score", help="Score complexes, assess developability, rank and report")
     add_common(p_score)
 
-    p_report = sub.add_parser("report", help="기존 실행의 HTML 리포트만 재생성")
+    p_report = sub.add_parser("report", help="Regenerate only the HTML report of an existing run")
     add_common(p_report)
 
-    p_specificity = sub.add_parser("specificity", help="절단형·전장형 짝지은 특이성 캠페인")
+    p_specificity = sub.add_parser("specificity", help="Paired truncated and full-length specificity campaign")
     add_common(p_specificity)
-    p_specificity.add_argument("--vhh-fasta", help="보유 VHH FASTA (run.mode=screen)")
-    p_specificity.add_argument("--wt-fasta", help="WT VHH FASTA (run.mode=mature)")
-    p_doctor = sub.add_parser("doctor", help="환경/GPU/도구/라이선스 점검")
-    p_doctor.add_argument("--config", "-c", help="실제 실행 설정에 필요한 환경 점검")
+    p_specificity.add_argument("--vhh-fasta", help="Existing VHH FASTA (run.mode=screen)")
+    p_specificity.add_argument("--wt-fasta", help="Wild-type VHH FASTA (run.mode=mature)")
+    p_doctor = sub.add_parser("doctor", help="Inspect environments, GPUs, tools and licenses")
+    p_doctor.add_argument("--config", "-c", help="Inspect requirements for the supplied run configuration")
     p_doctor.add_argument("--set", action="append", default=[])
-    p_doctor.add_argument("--json", action="store_true", help="기계 판독 가능한 진단")
-    p_doctor.add_argument("--smoke", action="store_true", help="로컬 가중치로 작은 실제 추론 검증")
-    p_handoff = sub.add_parser("validate-handoff", help="발주 전 서열·construct·비교·검토 상태 검사")
+    p_doctor.add_argument("--json", action="store_true", help="Machine-readable diagnostics")
+    p_doctor.add_argument("--smoke", action="store_true", help="Run a small real inference using local weights")
+    p_handoff = sub.add_parser("validate-handoff", help="Check sequences, constructs, comparisons and review status before ordering")
     p_handoff.add_argument("--run", required=True, type=Path)
-    p_license = sub.add_parser("license", help="라이선스 매니페스트 출력 / 설치 패키지 감사")
-    p_license.add_argument("--audit", action="store_true", help="각 env의 설치 패키지 라이선스 자동 감사")
+    p_license = sub.add_parser("license", help="Print the license manifest or audit installed packages")
+    p_license.add_argument("--audit", action="store_true", help="Audit installed package licenses in each environment")
     return parser
 
 
@@ -1070,6 +1071,20 @@ def _pick_pred_dir(row: pd.Series) -> Path | None:
     return None
 
 
+def _esm_zscores(series: pd.Series) -> pd.Series:
+    """Normalize measured sequence priors without inventing missing scores."""
+    values = pd.to_numeric(series, errors="coerce").replace([np.inf, -np.inf], np.nan)
+    result = pd.Series(np.nan, index=values.index, dtype=float)
+    measured = values.dropna()
+    if measured.empty:
+        return result
+    scale = measured.abs().max()
+    scaled = measured / scale if scale > 0 else measured
+    std = scaled.std(ddof=0)
+    result.loc[measured.index] = (scaled - scaled.mean()) / std if std > 0 else 0.0
+    return result
+
+
 def _finalize(
     cfg: dict,
     run_dir: Path,
@@ -1125,11 +1140,9 @@ def _finalize(
     merged = merged.merge(esm_frame, on=id_column, how="left")
     merged = merged.loc[:, ~merged.columns.duplicated()]
     if "esm_llr" in merged.columns and merged["esm_llr"].notna().any():
-        merged["esm_score"] = merged["esm_llr"]
+        merged["esm_score"] = pd.to_numeric(merged["esm_llr"], errors="coerce").replace([np.inf, -np.inf], np.nan)
     elif "esm_mean_logprob" in merged.columns and merged["esm_mean_logprob"].notna().any():
-        values = pd.to_numeric(merged["esm_mean_logprob"], errors="coerce")
-        std = values.std(ddof=0)
-        merged["esm_score"] = ((values - values.mean()) / std).fillna(0.0) if std and std > 0 else 0.0
+        merged["esm_score"] = _esm_zscores(merged["esm_mean_logprob"])
     else:
         merged["esm_score"] = float("nan")
 
@@ -1137,22 +1150,11 @@ def _finalize(
     cdr_source = str(cfg_get(cfg, "mature.cdr.source", "auto")).lower()
     if not cdr_ranges and cdr_source == "config":
         configured_ranges = cfg_get(cfg, "mature.cdr.regions", {}) or {}
-        normalized_configured_ranges = {}
-        if isinstance(configured_ranges, dict):
-            for name, bounds in configured_ranges.items():
-                if (
-                    name not in {"CDR1", "CDR2", "CDR3"}
-                    or not isinstance(bounds, (list, tuple))
-                    or len(bounds) != 2
-                ):
-                    continue
-                try:
-                    start, end = int(bounds[0]), int(bounds[1])
-                except (TypeError, ValueError):
-                    continue
-                if 1 <= start <= end:
-                    normalized_configured_ranges[name] = (start, end)
-        cdr_ranges = normalized_configured_ranges
+        # The same strict positional validation applies to every CLI mode.
+        # A shared range may still exceed shorter library members; those rows
+        # remain explicitly unassessed below rather than receiving guessed CDRs.
+        longest_sequence = max((len(str(value)) for value in merged[sequence_column]), default=0)
+        cdr_ranges = mature.validate_cdr_ranges(configured_ranges, longest_sequence)
         if not cdr_ranges:
             state.add_warnings("mature.cdr.source=config 이지만 유효한 CDR 범위가 없어 CDR 개발가능성을 미평가합니다.")
         else:
@@ -1182,8 +1184,15 @@ def _finalize(
                 f"ANARCI CDR 주석: {annotated}/{len(merged)} 후보 성공. "
                 "실패 후보의 CDR 의존 liability 는 '미평가'로 기록됩니다."
             )
-    elif not cdr_ranges and (_is_mock(cfg) or _is_dry_run(cfg)):
-        state.add_warnings("mock/dry-run: CDR 의존 liability 는 미평가로 기록됩니다.")
+    elif not cdr_ranges:
+        reason = "mock/dry-run" if _is_mock(cfg) or _is_dry_run(cfg) else "ANARCI 환경 없음"
+        state.add_warnings(
+            reason + ": CDR 의존 liability 는 미평가로 기록됩니다. "
+            "rank.weights.dev_flags가 0이 아니면 종합 순위와 최종 선별을 보류합니다. "
+            "실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 "
+            "mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. "
+            "미평가를 위험 없음으로 처리하지 않습니다."
+        )
     liability_columns = {
         "n_cys", "pI", "net_charge", "mw_kda", "gravy",
         "n_hydrophobic_patches", "cdr_hydrophobic_patches",
@@ -2305,7 +2314,7 @@ def _audit_licenses() -> int:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         for row in rows:
-            writer.writerow({key: row.get(key, "") for key in fieldnames})
+            writer.writerow({key: csv_cell(row.get(key, "")) for key in fieldnames})
     counts: dict[str, int] = {}
     for row in rows:
         counts[row.get("License", "UNKNOWN")] = counts.get(row.get("License", "UNKNOWN"), 0) + 1

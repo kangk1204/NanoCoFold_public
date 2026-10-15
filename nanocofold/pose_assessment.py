@@ -550,7 +550,7 @@ def assess_models(rows: list[dict], cfg: dict | None = None) -> dict:
         model["review_priority"] = _priority(model)
         model["pose_assessment"]["review_priority"] = model["review_priority"]
     tiers = ["multi_engine_supported", "single_engine_promising",
-             "confidence_gate_unmet", "site_unmet", "site_not_assessed", "confidence_not_assessed", "geometry_not_assessed"]
+             "confidence_gate_unmet", "site_unmet", "site_not_assessed", "confidence_not_assessed", "geometry_not_assessed", "disabled"]
     ranking_rule = {"version": "pose_review_rank_v3", "calibrated": False,
                     "scope": "case_id_and_exact_target_sequence_sha256", "ties": "dense_equal_features",
                     "priority_tiers": tiers,

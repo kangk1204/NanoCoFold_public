@@ -32,8 +32,15 @@ def package_report(files: dict[str, bytes], receipt: dict) -> bytes:
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for name, content in sorted(files.items()):
-            archive.writestr(name, content)
-        archive.writestr("delivery_manifest.json", json.dumps(manifest, ensure_ascii=False, allow_nan=False, indent=2))
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.create_system = 3
+            info.external_attr = 0o100644 << 16
+            archive.writestr(info, content, compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
+        info = zipfile.ZipInfo("delivery_manifest.json", date_time=(1980, 1, 1, 0, 0, 0))
+        info.create_system = 3
+        info.external_attr = 0o100644 << 16
+        archive.writestr(info, json.dumps(manifest, ensure_ascii=False, allow_nan=False, indent=2),
+                         compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
     return stream.getvalue()
 
 

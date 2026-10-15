@@ -22,6 +22,7 @@ import yaml
 from . import hotspots
 from .config import ASSET_ROOT, PROJECT_ROOT
 from .utils import pdb_io
+from .utils.spreadsheet import csv_cell
 
 MAX_REQUEST = 20 * 1024 * 1024
 BOUNDARY = (
@@ -278,7 +279,7 @@ class WizardSession:
             with (staging / "residue_mapping.csv").open("w", newline="", encoding="utf-8-sig") as handle:
                 writer = csv.DictWriter(handle, fieldnames=list(mapping[0]))
                 writer.writeheader()
-                writer.writerows(mapping)
+                writer.writerows({key: csv_cell(value) for key, value in row.items()} for row in mapping)
             source_file = Path(self.input["source_file"])
             source_name = "source.cif.gz" if source_file.name.endswith(".cif.gz") else "source" + source_file.suffix
             shutil.copy2(source_file, staging / source_name)
@@ -336,6 +337,14 @@ class WizardSession:
                 + "\n\nYOUR_VHH.fasta는 보유 나노바디 서열 FASTA 경로로 바꾸세요.\n\n"
                 + "\n".join("- " + warning for warning in warnings + design_blockers) + "\n"
             )
+            guide = ("# Reviewed inputs\n\nThis directory is an independent snapshot of your reviewed selection. "
+                     "Export again after changing inputs or selected residues. No GPU inference was run. "
+                     "Binding-site suggestions are surface heuristics, not validated binding or affinity. "
+                     "Missing atoms/residues are not repaired.\n\n"
+                     "Run doctor first. Model environments, weights, and framework files require separate installation. "
+                     "prepare prepares inputs; design and screen run GPU inference. "
+                     "Replace YOUR_VHH.fasta with your own nanobody FASTA path in the commands below.\n\n"
+                     + guide)
             (staging / "README.md").write_text(guide, encoding="utf-8")
             # All files are complete before the visible snapshot appears.
             staging.rename(destination)
@@ -343,7 +352,7 @@ class WizardSession:
                 "warnings": warnings + design_blockers, "fingerprint": fingerprint, "chain_mapping": chain_map}
 
 
-def create_server(output_dir: Path, port: int = 8765) -> ThreadingHTTPServer:
+def create_server(output_dir: Path, port: int = 8766) -> ThreadingHTTPServer:
     session = WizardSession(output_dir)
 
     class Handler(BaseHTTPRequestHandler):
@@ -376,8 +385,9 @@ def create_server(output_dir: Path, port: int = 8765) -> ThreadingHTTPServer:
                 template = Path(__file__).parent / "templates/wizard.html"
                 content = template.read_text(encoding="utf-8").replace("__TOKEN__", session.token)
                 self._send(200, content.encode(), "text/html; charset=utf-8")
-            elif path == "/assets/3dmol-min.js":
-                asset = ASSET_ROOT / "assets/3dmol-min.js"
+            elif path in {"/assets/3dmol-min.js", "/assets/platform-i18n.js"}:
+                asset = (ASSET_ROOT / "assets/3dmol-min.js" if path.endswith("3dmol-min.js")
+                         else Path(__file__).parent / "templates/platform-i18n.js")
                 if asset.is_file():
                     self._send(200, asset.read_bytes(), "application/javascript; charset=utf-8")
                 else:
@@ -429,10 +439,10 @@ def create_server(output_dir: Path, port: int = 8765) -> ThreadingHTTPServer:
     return server
 
 
-def serve(output_dir: Path, port: int = 8765, open_browser: bool = True):
+def serve(output_dir: Path, port: int = 8766, open_browser: bool = True):
     server = create_server(output_dir, port)
     url = f"http://127.0.0.1:{server.server_port}/"
-    print(f"NanoCoFold 입력 마법사: {url}\n저장 위치: {Path(output_dir).resolve()}\nGPU 추론 없음 · 종료: Ctrl+C", flush=True)
+    print(f"NanoCoFold input wizard / 입력 마법사: {url}\nOutput / 저장 위치: {Path(output_dir).resolve()}\nNo GPU inference / GPU 추론 없음 · Stop / 종료: Ctrl+C", flush=True)
     if open_browser:
         webbrowser.open(url)
     try:

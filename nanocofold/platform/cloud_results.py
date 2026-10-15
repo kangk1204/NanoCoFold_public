@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 import json
 import math
+import hashlib
+import re
 import zipfile
 from pathlib import Path
 from .results import ResultReader
@@ -27,6 +29,62 @@ def _presentation_zip(path):
             return isinstance(manifest,dict) and manifest.get('kind')=='presentation_only'
     except (OSError,ValueError,KeyError,zipfile.BadZipFile):
         return False
+
+
+def _presentation_data_identity(content):
+    """Exact saved data and scientific provenance, excluding publication metadata.
+
+    Unknown/legacy documents are kept. This permits omitting a generated view
+    only when its complete rows, axes, coordinates and PAE match the separate
+    delivery report; historical reports with different results stay archived.
+    """
+    match = re.search(rb'<script id="result-data" type="application/json">(.*?)</script>', content, re.S)
+    if not match:
+        return None
+    try:
+        payload = json.loads(match[1])
+        exact = {key: payload[key] for key in ("candidates", "observations", "structures")}
+        exact["pae_arrays"] = payload.get("pae_arrays", {})
+        summary = copy.deepcopy(payload["summary"])
+        for key in ("report_artifact", "delivery_artifact", "source_report_status", "source_delivery_status"):
+            summary.pop(key, None)
+        state = summary.get("state", {})
+        for key in ("execution", "previous_execution", "report_source_execution", "current_phase"):
+            state.pop(key, None)
+        final = state.get("phases", {}).get("final", {})
+        for key in ("report", "report_status", "report_error", "delivery_status", "delivery_error", "delivery"):
+            final.pop(key, None)
+        exact["summary"] = summary
+        exact["filters"] = payload.get("filters", {})
+        provenance = payload["provenance"]
+        exact["engine_provenance"] = provenance.get("engine_provenance")
+        exact["ranking_policy"] = provenance.get("ranking_policy")
+        # Compare source bytes as well as interpreted rows. State is compared
+        # above after excluding report-only publication and clock churn.
+        authoritative = {"run_config.yaml", "complex_results.json", "03_score/scored_candidates.csv",
+                         "05_final/selected_candidates.csv", "03_score/ranking_policy.json", "retained/manifest.json",
+                         "02_comparison/comparison_identity.json", "02_comparison/comparison_status.json", "preflight.json"}
+        exact["sources"] = sorted((row for row in provenance.get("source_artifacts", [])
+                                   if row.get("path") in authoritative), key=lambda row: row["path"])
+        return hashlib.sha256(json.dumps(exact, ensure_ascii=False, sort_keys=True,
+                                         separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+    except (ValueError, TypeError, KeyError, AttributeError):
+        return None
+
+
+def _delivery_identity(path):
+    if not _presentation_zip(path):
+        return None
+    try:
+        with zipfile.ZipFile(path) as archive:
+            info = archive.getinfo('report.html')
+            # An unrecognized/oversized old archive is preserved, not unpacked
+            # merely to optimize another export.
+            if info.file_size > 256 * 1024 * 1024:
+                return None
+            return _presentation_data_identity(archive.read(info))
+    except (OSError, ValueError, KeyError, zipfile.BadZipFile):
+        return None
 
 
 def build_bundle(run_root, destination, snapshot_root=None):
@@ -102,30 +160,40 @@ def build_bundle(run_root, destination, snapshot_root=None):
     # Keep native/input/result files and exact linked entry/explorer bytes.
     # Derived delivery ZIPs and an equivalent offline HTML need not be nested
     # again: they remain separate downloads. Record every omission explicitly.
-    from ..report import report_explorer_path, _explorer_result_identity
+    from ..report import report_explorer_path
     explorer=report_explorer_path(run_root/'report.html')
-    canonical=None
-    if explorer is not None and explorer.is_file():
-        canonical=_explorer_result_identity(explorer.read_bytes())
-    duplicate_html=False
+    delivery=destination/'report_delivery.zip'
+    canonical=_delivery_identity(delivery) if delivery.is_file() else None
+    duplicate_explorers=set()
+    if canonical is not None:
+        for path in run_root.iterdir():
+            if (path.is_file() and not path.is_symlink()
+                    and (path.name=='report_explorer.html' or re.fullmatch(r'.+_explorer-[a-f0-9]{64}\.html',path.name))
+                    and _presentation_data_identity(path.read_bytes())==canonical):
+                duplicate_explorers.add(path)
     offline=destination/'report_offline.html'
-    if canonical is not None and offline.is_file():
-        duplicate_html=canonical==_explorer_result_identity(offline.read_bytes())
+    duplicate_html=(canonical is not None and offline.is_file()
+                    and canonical==_presentation_data_identity(offline.read_bytes()))
     omitted=[]
     with atomic_writer(destination/'results.zip',root=destination) as output:
         with zipfile.ZipFile(output,'w',compression=zipfile.ZIP_DEFLATED) as archive:
             for p in run_root.rglob('*'):
                 if not p.is_file() or p.is_symlink() or p.name=='.run.lock':continue
                 name='original/'+str(p.relative_to(run_root))
-                if _presentation_zip(p):
+                if canonical is not None and p.name=='report_delivery.zip' and _delivery_identity(p)==canonical:
                     omitted.append({'path':name,'sha256':sha256(p),'size':p.stat().st_size,'reason':'derived_presentation_package','separate_download':'report_delivery.zip'})
+                elif p in duplicate_explorers or p==run_root/'report.html' and explorer in duplicate_explorers:
+                    omitted.append({'path':name,'sha256':sha256(p),'size':p.stat().st_size,
+                                    'reason':'equivalent_derived_presentation','separate_download':'report_delivery.zip',
+                                    'scientific_payload_sha256':canonical})
                 else:archive.write(p,name)
             for p in destination.rglob('*'):
                 if p.is_file() and p.name!='results.zip' and not p.name.startswith('.publish-'):
                     name='exploration/'+str(p.relative_to(destination))
                     if p.name=='report_delivery.zip' or p==offline and duplicate_html:
                         omitted.append({'path':name,'sha256':sha256(p),'size':p.stat().st_size,'reason':'separate_presentation_download',
-                                        'canonical_html':'original/'+explorer.name if p==offline else None})
+                                        'separate_download':'report_delivery.zip',
+                                        'scientific_payload_sha256':canonical if p==offline else None})
                     else:archive.write(p,name)
             archive.writestr('report_packaging_manifest.json',json.dumps({'schema_version':1,'native_and_scientific_files_preserved':True,
                 'source_readonly':True,'derived_reports_omitted':omitted},ensure_ascii=False,indent=2))
@@ -170,4 +238,4 @@ def import_nrf2(source,destination):
     write(destination/'index.json',{'schema_version':2,'summary':summary,'rows':rows,'observations':[],'structures':structures,'issues':[]})
     for name in ('comparison.csv','KEAP1_NRF2_ETGE_report.html','KEAP1_NRF2_ETGE_package.zip'):
         write_bytes(destination/name,(source/name).read_bytes(),root=destination)
-    return {'name':summary['name'],'mode':'complex','mock':False,'total':3,'status':'complete','readonly':True,'exports':['comparison.csv','KEAP1_NRF2_ETGE_report.html','KEAP1_NRF2_ETGE_package.zip']}
+    return {'name':summary['name'],'mode':'complex','mock':False,'total':summary['total'],'status':'complete','readonly':True,'exports':['comparison.csv','KEAP1_NRF2_ETGE_report.html','KEAP1_NRF2_ETGE_package.zip']}

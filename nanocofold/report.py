@@ -20,6 +20,7 @@ from .binding_site_assessment import hotspot_assessment
 from .hotspots import requests_automatic_hotspots
 from .utils.misc import to_native
 from .utils.atomic import check_output, write_bytes
+from .utils.presentation import portable_metadata
 from .vendor_assets import VENDOR_SHA256, VIEWER_ASSETS, LICENSE_ASSETS
 from .utils.metric_provenance import metric_provenance
 from . import __version__, rank_select, score_complex
@@ -39,7 +40,7 @@ CANDIDATE_COLUMNS = [
     ("ranking_scope", "순위 범위"),
     ("final_evaluated", "최종 평가 기록"),
     ("final_eligible", "기록 적격"),
-    ("site_satisfied", "지정 결합 부위 충족"),
+    ("site_satisfied", "지정 결합 부위 판정 (기록)"),
     ("site_selection_eligible", "지정 결합 부위 포함 적격"),
     ("pose_consensus_status", "동일 후보 자세 일치"),
     ("pose_supporting_engines", "자세 일치 엔진 수"),
@@ -482,7 +483,7 @@ def generate_report(
         warnings.append("명시한 외부 3D 뷰어를 사용합니다. 뷰어 로딩에 인터넷이 필요하며 오프라인 보고서가 아닙니다.")
     render_context = {
         "title": str(cfg_get(cfg, "report.title", "NanoCoFold")),
-        "run_dir": str(run_dir),
+        "run_dir": run_dir.name,
         "run_id": run_dir.name,
         "generated_at": _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "reporting_version": __version__,
@@ -529,6 +530,12 @@ def generate_report(
         "files": _file_index(run_dir),
         "warnings": list(dict.fromkeys(warnings)),
     }
+    # Sanitize only presentation metadata. Original computation receipts,
+    # coordinates and encoded scientific payloads remain byte-exact.
+    file_total = len(render_context["files"])
+    render_context["files"] = render_context["files"][:200]
+    render_context["files_omitted"] = max(0, file_total - 200)
+    render_context = portable_metadata(render_context, root=run_dir)
     html_bytes = template.render(**render_context).encode("utf-8")
     if explorer_path is not None:
         _publish_immutable_explorer(explorer_path, explorer, root=out_path.parent)
@@ -546,7 +553,6 @@ def _hotspot_columns(context: dict, hotspots_df: pd.DataFrame | None = None) -> 
     return [
         (key, confidence_label if key == "plddt" else label)
         for key, label in HOTSPOT_COLUMNS
-        if key != "confidence_kind"
     ]
 
 
@@ -862,7 +868,7 @@ def _file_index(run_dir: Path) -> list[dict]:
             "size_bytes": size_bytes,
             "kind": path.suffix.lower().lstrip("."),
         })
-    return entries[:200]
+    return entries
 
 
 def escape(value) -> str:

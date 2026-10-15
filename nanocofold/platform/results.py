@@ -171,6 +171,36 @@ def _hotspot_minimum(value):
     return value
 
 
+def _assessed(row):
+    """Count recorded successful model evaluations, never a contradictory failure."""
+    return (row.get("model_record", True) is True and row.get("evaluated") is True
+            and not row.get("error") and not row.get("prediction_error")
+            and row.get("prediction_status") != "failed")
+
+
+def _pack_offline_pae(structure, arrays):
+    """Losslessly pool PAE bytes; keep original matrix axes on each structure."""
+    pae = structure.get("pae")
+    if not pae or "values" not in pae:
+        return structure
+    import base64
+    import gzip
+    import numpy as np
+    matrix = np.asarray(pae["values"], dtype="<f8")
+    if (matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1] or not matrix.shape[0]
+            or len(pae.get("labels", [])) != matrix.shape[0] or not np.isfinite(matrix).all()):
+        raise ValueError("PAE는 잔기 축과 일치하는 유한한 정사각 행렬이어야 합니다.")
+    binary = matrix.tobytes(order="C")
+    digest = hashlib.sha256(binary).hexdigest()
+    if digest not in arrays:
+        arrays[digest] = {"encoding": "gzip-base64-float64le", "dimension": matrix.shape[0],
+                          "bytes": len(binary), "sha256": digest,
+                          "data": base64.b64encode(gzip.compress(binary, compresslevel=9, mtime=0)).decode("ascii")}
+    structure["pae"] = {key: value for key, value in pae.items() if key != "values"}
+    structure["pae"]["values_ref"] = digest
+    return structure
+
+
 class ResultReader:
     def __init__(self, run_dir: Path):
         self.root = Path(run_dir).resolve()
@@ -541,7 +571,7 @@ class ResultReader:
         rows = self.all_rows()
         population = {"candidate_record_total": len(rows),
                       "model_record_total": sum(row.get("model_record") is True for row in rows),
-                      "scored_record_total": sum(row.get("model_record") is True for row in rows),
+                      "scored_record_total": sum(_assessed(row) for row in rows),
                       "preprediction_record_total": sum(row.get("model_record") is False for row in rows),
                       "population_scope": "Candidate records include prepared/generated/prefiltered sequences. Model records are the authoritative final score/complex ledger, including failed/incomplete attempts; evaluated models are counted separately."}
         from ..publication import publication_issue, tables_available
@@ -577,7 +607,7 @@ class ResultReader:
             if type(expected) is not int or expected < 0:
                 expected = None
             return {**population, "id": self.root.name, "mode": "complex", "name": self.config.get("run", {}).get("name", self.root.name),
-                    "total": len(rows), "scored_total": sum(bool(r.get("evaluated")) for r in rows), "failed_candidates": failures, "issues": issues,
+                    "total": len(rows), "scored_total": sum(_assessed(r) for r in rows), "failed_candidates": failures, "issues": issues,
                     "mock": False, "status": status, "complete": status == "complete", "readonly": True,
                     "config": self.config, "state": self.state, "conditions": self.config.get("complex", {}),
                     "source_delivery_status": source_delivery_status, "delivery_artifact": delivery_artifact,
@@ -612,12 +642,12 @@ class ResultReader:
             status = "partial_failure"
         return {**population, "id": self.root.name, "name": run.get("name", self.root.name), "path": str(self.root),
                 "mode": run.get("mode"), "mock": bool(run.get("mock")), "total": len(rows),
-                "scored_total": sum(row["evaluated"] for row in rows),
-                "eligible_total": sum(row.get("final_eligible") is True for row in rows),
-                "quality_eligible_total": sum(row.get("quality_eligible") is True for row in rows),
+                "scored_total": sum(_assessed(row) for row in rows),
+                "eligible_total": sum(_assessed(row) and row.get("final_eligible") is True for row in rows),
+                "quality_eligible_total": sum(_assessed(row) and row.get("quality_eligible") is True for row in rows),
                 "selected_total": sum(row["selected"] for row in rows),
                 "failed_candidates": failures,
-                "zero_eligible": not any(row.get("final_eligible") is True for row in rows),
+                "zero_eligible": not any(_assessed(row) and row.get("final_eligible") is True for row in rows),
                 "complete": finalized and successful_execution and not failures and not issues and not stage_failure, "status": status,
                 "execution_state": execution_state, "warnings": warnings,
                 "platform_status": {**self.platform_status, "applies": status_applies} if self.platform_status else None,
@@ -1222,7 +1252,7 @@ class ResultReader:
             stream = io.StringIO()
             writer = csv.DictWriter(stream, fieldnames=columns)
             writer.writeheader()
-            writer.writerows([{key: csv_cell(json.dumps(value, ensure_ascii=False) if isinstance(value, (dict, list)) else value) for key, value in row.items()} for row in rows])
+            writer.writerows([{key: csv_cell(json.dumps(native(value), ensure_ascii=False, allow_nan=False) if isinstance(value, (dict, list)) else value) for key, value in row.items()} for row in rows])
             return ("\ufeff" + stream.getvalue()).encode()
         if format == "csv":
             return csv_bytes(), "text/csv; charset=utf-8", "candidates.csv"
@@ -1240,7 +1270,7 @@ class ResultReader:
             sheet.title = "All candidates"
             sheet.append(columns)
             for row in rows:
-                values = [json.dumps(row.get(key), ensure_ascii=False) if isinstance(row.get(key), (dict, list)) else row.get(key) for key in columns]
+                values = [json.dumps(native(row.get(key)), ensure_ascii=False, allow_nan=False) if isinstance(row.get(key), (dict, list)) else row.get(key) for key in columns]
                 sheet.append(values)
                 # Preserve exact identifiers while forcing uploaded text to data,
                 # rather than spreadsheet formulas.
@@ -1255,7 +1285,8 @@ class ResultReader:
                 encoded = json.dumps(native(value), ensure_ascii=False)
                 # Excel truncates strings at 32,767 characters. Preserve long
                 # config/artifact manifests in ordered, reconstructable chunks.
-                chunks = [encoded[index:index + 30000] for index in range(0, len(encoded), 30000)] or [""]
+                from ..utils.spreadsheet import excel_text_chunks
+                chunks = excel_text_chunks(encoded)
                 for index, chunk in enumerate(chunks):
                     manifest.append([key, f"{index + 1}/{len(chunks)}", chunk])
             stream = io.BytesIO()
@@ -1279,12 +1310,12 @@ class ResultReader:
         raise ValueError("내보내기 형식은 report_zip/csv/xlsx/fasta/html/zip 중 하나입니다.")
 
     def _offline_payload(self, all_table, filters, provenance, *, delivery_artifact=False, report_artifact=False):
-        structures = []
+        structures, pae_arrays = [], {}
         for row in all_table["rows"]:
             if row["structure_available"]:
                 try:
                     observation = "complex:" + row["candidate_id"] if self.config.get("run", {}).get("mode") == "complex" else None
-                    structures.append(self.structure(row["candidate_id"], observation))
+                    structures.append(_pack_offline_pae(self.structure(row["candidate_id"], observation), pae_arrays))
                 except (OSError, ValueError, KeyError) as exc:
                     self.issues.append(f"{row['candidate_id']}: {exc}")
         observations = self.observations()
@@ -1292,18 +1323,19 @@ class ResultReader:
             if self.config.get("run", {}).get("mode") == "complex" or observation.get("structure_pruned"):
                 continue
             try:
-                structures.append(self.structure(observation["candidate_id"], observation["observation_id"]))
+                structures.append(_pack_offline_pae(self.structure(observation["candidate_id"], observation["observation_id"]), pae_arrays))
             except (OSError, ValueError, KeyError) as exc:
                 self.issues.append(f"{observation['observation_id']}: {exc}")
         from ..utils.presentation import portable_metadata
         return portable_metadata({"summary": self.summary(delivery_artifact=delivery_artifact, report_artifact=report_artifact), "candidates": all_table, "observations": observations,
-                                  "structures": structures, "filters": filters, "provenance": provenance}, root=self.root)
+                                  "structures": structures, "pae_arrays": pae_arrays,
+                                  "filters": filters, "provenance": provenance}, root=self.root)
 
     @staticmethod
     def _offline_document(payload, assets=None):
         from ..report import _resolve_viewer_asset
         template = Path(__file__).resolve().parents[1] / "templates/platform_offline.html"
-        encoded = json.dumps(native(payload), ensure_ascii=False).replace("<", "\\u003c").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
+        encoded = json.dumps(native(payload), ensure_ascii=False, allow_nan=False).replace("<", "\\u003c").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
         if not template.exists():
             return _offline_fallback(encoded).encode()
         document = template.read_text()
@@ -1334,7 +1366,7 @@ class ResultReader:
         # Only these source receipts are hashed. Large MSA databases, caches,
         # logs, old archives and intermediate tensors are never traversed here.
         source_paths = ("run_config.yaml", "run_state.json", "complex_results.json", "models.csv",
-                        *TABLES, "05_final/selected_candidates.csv", "01_target/residue_mapping.csv",
+                        *TABLES, "05_final/selected_candidates.csv", "03_score/ranking_policy.json", "01_target/residue_mapping.csv",
                         "retained/manifest.json", "retained/record.json", "preflight.json",
                         "02_comparison/comparison_identity.json", "02_comparison/comparison_status.json")
         sources = []
@@ -1347,6 +1379,7 @@ class ResultReader:
                       "filtered_ids": [row["candidate_id"] for row in filtered_table["rows"]],
                       "source_artifacts": sources, "viewer_asset_sources": asset_sources,
                       "engine_provenance": self.engine_provenance(),
+                      "ranking_policy": self._json("03_score/ranking_policy.json") if self._path("03_score/ranking_policy.json").is_file() else None,
                       "scope": "report_inputs_and_embedded_structures"}
         payload = self._offline_payload(all_table, filters, provenance, delivery_artifact=True)
         # Hash exactly what the collaborator can inspect, including every seed
@@ -1358,6 +1391,7 @@ class ResultReader:
                      "format": structure["format"], "size": len(content), "sha256": hashlib.sha256(content).hexdigest()}
             if structure.get("pae"):
                 entry["pae_sha256"] = hashlib.sha256(json.dumps(native(structure["pae"]), ensure_ascii=False, sort_keys=True, allow_nan=False).encode()).hexdigest()
+                entry["pae_values_sha256"] = structure["pae"].get("values_ref")
             embedded.append(entry)
         provenance["embedded_structures"] = embedded
         provenance["summary"] = payload["summary"]
@@ -1372,7 +1406,7 @@ class ResultReader:
         writer = csv.DictWriter(stream, fieldnames=all_table["columns"])
         writer.writeheader()
         from ..utils.spreadsheet import csv_cell
-        writer.writerows([{key: csv_cell(json.dumps(value, ensure_ascii=False) if isinstance(value, (dict, list)) else value)
+        writer.writerows([{key: csv_cell(json.dumps(native(value), ensure_ascii=False, allow_nan=False) if isinstance(value, (dict, list)) else value)
                           for key, value in row.items()} for row in all_table["rows"]])
         files["candidates.csv"] = ("\ufeff" + stream.getvalue()).encode()
         if self.config.get("run", {}).get("mode") == "complex":
@@ -1392,6 +1426,18 @@ class ResultReader:
             "기존 결과의 presentation 사본입니다. 예측 신뢰도는 결합 확률·KD 또는 실험 검증이 아닙니다.\n"
             "delivery_manifest.json은 이 패키지의 파일 및 내장 구조/PAE 해시와 출처를 기록합니다.\n").encode()
         files["README.txt"] += "서버 절대 경로는 상대 경로 또는 [local path]로 표시합니다. 원본 계산 영수증은 별도 전체 원본에 보존합니다.\n".encode()
+        english = ("NanoCoFold shareable report\n\nExtract the entire ZIP, then open report.html in Chrome, Edge or Firefox.\n"
+                   "Choose Language in the report to switch between English and Korean. No Python, server, GPU installation or internet is required.\n"
+                   "Check candidate/model counts and exclusions, select a candidate and observation, then inspect its structure and PAE.\n"
+                   "WebGL is needed for 3D. Modern gzip DecompressionStream support is needed for packed PAE; unsupported or oversized views keep tables and structures available.\n"
+                   "All stored rows, including failed and unevaluated records, remain in the package. Display filters do not remove data.\n"
+                   "PAE is losslessly compressed once per unique numeric array; structure-specific residue axes remain separate.\n"
+                   + ("This is a reduced retention archive: sequences, metrics and final coordinates remain; PAE arrays, MSA and intermediate files were removed by explicit retention.\n" if self.retained else "")
+                   + "MSA, logs, weights and intermediate calculation files are omitted. Keep a separate full native archive for reruns and audits.\n"
+                   "Predicted scores do not establish experimental binding, affinity or KD.\n"
+                   "delivery_manifest.json records exact file hashes, provenance and embedded coordinate/PAE receipts.\n"
+                   "Absolute host paths in presentation metadata are relative or [local path]; original internal receipts stay in the native source.\n\n--- 한국어 ---\n\n")
+        files["README.txt"] = english.encode() + files["README.txt"]
         for name in ("3DMOL_LICENSE.txt", "MOLSTAR_LICENSE.txt", "PLOTLY_LICENSE.txt", "vendor_manifest.json"):
             content, evidence = _resolve_viewer_asset({}, name, asset_root=ASSET_ROOT, local_only=True)
             if not evidence["ok"]:

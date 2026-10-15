@@ -116,7 +116,7 @@ const fmt = (value) =>
   value === null ||
   value === undefined ||
   (typeof value === "number" && !Number.isFinite(value))
-    ? "미평가"
+    ? I18N.value(I18N.term("미평가"))
     : typeof value === "number"
       ? Number.isInteger(value) ? String(value) : Math.abs(value) < 0.0005 ? "0.000" : value.toFixed(3)
       : typeof value === "object"
@@ -183,7 +183,7 @@ function reportAliases(rows) {
   return aliases;
 }
 function reportReasonLabel(code) {
-  const labels = {clash:"거리 기준 충돌", ipsae:"ipSAE 기준 미통과", iptm:"ipTM 기준 미통과", interface_plddt:"계면 pLDDT 기준 미통과", hotspot:"결합 부위 접촉 기준 미통과", developability:"개발가능성 경고 기준 미통과", developability_unassessed:"CDR 개발가능성 미평가", scoring_error:"구조 점수 계산 오류", not_scored:"구조 점수 미평가", eligibility_unassessed:"적격 판정 미기록·미평가", parent_control:"원본 후보 대조군", wt_control:"야생형 대조군", prediction_error:"예측 오류",prefilter_not_selected:"예측 전 준비·미선정",cross_binding_risk:"전장형 교차 결합 위험",incomplete_comparison:"비교 미완료",first_stage_only:"1차 평가만 완료",boltz_failed_or_incomplete:"Boltz 최종 평가 실패·미완료"};
+  const labels = {wt_control_not_in_model_pool:"WT 대조군 예측 풀에서 제외",sequence_prior_top_n_not_selected:"서열 prior 평가 한도 밖 (구조 미평가)",missing_metrics:"필수 지표 미평가",sequence_prior_prefilter_unmet:"서열 prior 기준 미달",sequence_prior_prefilter_unassessed:"서열 prior 미평가",clash:"거리 기준 충돌", ipsae:"ipSAE 기준 미통과", iptm:"ipTM 기준 미통과", interface_plddt:"계면 pLDDT 기준 미통과", hotspot:"결합 부위 접촉 기준 미통과", developability:"개발가능성 경고 기준 미통과", developability_unassessed:"CDR 개발가능성 미평가", scoring_error:"구조 점수 계산 오류", not_scored:"구조 점수 미평가", eligibility_unassessed:"적격 판정 미기록·미평가", parent_control:"원본 후보 대조군", wt_control:"야생형 대조군", prediction_error:"예측 오류",prefilter_not_selected:"예측 전 준비·미선정",cross_binding_risk:"전장형 교차 결합 위험",incomplete_comparison:"비교 미완료",first_stage_only:"1차 평가만 완료",boltz_failed_or_incomplete:"Boltz 최종 평가 실패·미완료"};
   return Object.hasOwn(labels, code) ? labels[code] : "기록된 제외·미평가 사유";
 }
 function reportReasonCounts(rows, mode) {
@@ -362,7 +362,7 @@ async function refreshCatalog() {
   $("catalog-next").disabled = !page.next_cursor;
   const table = el("table"), head = el("thead"), headings = el("tr"), body = el("tbody");
   const columns = [["name", "분석"], ["mode", "모드"], ["created", "실행일"], ["candidate_count", "서열"],
-    ["model_count", "구조 모델"], ["eligible_model_count", "기준 통과"], ["status", "계산 상태"],
+    ["model_count", "저장 구조 관측"], ["eligible_model_count", "기준 통과"], ["status", "계산 상태"],
     ["retention", "보관"], ["elapsed_seconds", "계산 시간"], ["storage_bytes", "서버 용량"]];
   for (const [key, label] of columns) {
     const th = el("th"), button = el("button", label + (state.catalogSort === key ? state.catalogDescending ? " ↓" : " ↑" : ""), "sort-header");
@@ -384,7 +384,7 @@ async function refreshCatalog() {
     }
     body.append(tr);
   }
-  table.append(head, body); $("catalog-table").replaceChildren(table);
+  table.append(head, body); $("catalog-table").replaceChildren(table, el("p", I18N.term("저장 구조 관측은 1차 평가 구조도 포함합니다. 최종 평가 모델 수는 결과 보고서에서 따로 확인하세요."), "muted"));
   I18N.text(status, I18N.format("{0}개 표시 · 용량은 색인 시점의 측정값", [page.items.length]));
 }
 async function previewRetention() {
@@ -1849,11 +1849,73 @@ function renderDistribution(observations) {
       { responsive: true, displaylogo: false, modeBarButtonsToRemove: ["sendChartToCloud", "sendDataToCloud", "editInChartStudio"] },
     );
 }
+// Decode only selected offline PAE arrays. Pool records stay compressed; a small
+// promise cache coalesces concurrent language/selection renders without retaining
+// every candidate matrix. Older reports and live API matrices remain supported.
+const offlinePaeCache = new Map();
+const OFFLINE_PAE_VIEW_BYTES = 128 * 1024 * 1024;
+async function offlinePaeValues(pae, payload = window.NANOCOFOLD_OFFLINE) {
+  if (!pae || Array.isArray(pae.values)) return pae?.values;
+  const reference = pae.values_ref, record = payload?.pae_arrays?.[reference];
+  const dimension = record?.dimension, expected = dimension * dimension * 8;
+  if (!/^[a-f0-9]{64}$/.test(reference || "") || !record || record.sha256 !== reference ||
+      record.encoding !== "gzip-base64-float64le" || !Number.isSafeInteger(dimension) || dimension < 1 ||
+      !Number.isSafeInteger(expected) || record.bytes !== expected ||
+      !Array.isArray(pae.labels) || pae.labels.length !== dimension)
+    throw Error("PAE 압축 데이터를 읽지 못했습니다. 표와 구조는 계속 확인할 수 있습니다.");
+  if (expected > OFFLINE_PAE_VIEW_BYTES)
+    throw Error("PAE가 브라우저 표시 한도(128 MiB)를 넘었습니다. 전체 행렬은 보고서에 보존되며 PAE 저장으로 받을 수 있습니다.");
+  if (typeof DecompressionStream !== "function" || !globalThis.crypto?.subtle)
+    throw Error("이 브라우저는 압축 PAE 보기를 지원하지 않습니다. 최신 Chrome·Edge·Firefox를 사용하세요. 전체 PAE는 저장할 수 있습니다.");
+  if (!offlinePaeCache.has(reference)) {
+    const pending = (async () => {
+      if (typeof record.data !== "string" || record.data.length > Math.ceil((expected + 65536) * 4 / 3))
+        throw Error("Invalid compressed PAE size");
+      const compressed = Uint8Array.from(atob(record.data), value => value.charCodeAt(0));
+      const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip")).getReader();
+      const chunks = []; let total = 0;
+      try {
+        for (;;) {
+          const {value, done} = await stream.read(); if (done) break;
+          total += value.byteLength;
+          if (total > expected) throw Error("Decoded PAE exceeds its declared size");
+          chunks.push(value);
+        }
+      } catch (error) { await stream.cancel().catch(() => {}); throw error; }
+      finally { stream.releaseLock(); }
+      if (total !== expected) throw Error("Truncated PAE array");
+      const bytes = new Uint8Array(expected); let offset = 0;
+      for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+      const digest = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), value => value.toString(16).padStart(2,"0")).join("");
+      if (digest !== reference) throw Error("PAE array hash mismatch");
+      const view = new DataView(bytes.buffer), rows = [];
+      for (let i = 0; i < dimension; i++) {
+        const row = [];
+        for (let j = 0; j < dimension; j++) {
+          const value = view.getFloat64((i * dimension + j) * 8, true);
+          if (!Number.isFinite(value)) throw Error("Nonfinite PAE value");
+          row.push(value);
+        }
+        rows.push(row);
+      }
+      return rows;
+    })();
+    offlinePaeCache.set(reference, pending);
+    // Keep the current and most recent matrix; original pool entries are untouched.
+    while (offlinePaeCache.size > 2) offlinePaeCache.delete(offlinePaeCache.keys().next().value);
+  }
+  try { return await offlinePaeCache.get(reference); }
+  catch (error) {
+    offlinePaeCache.delete(reference);
+    throw Error("PAE 압축 데이터를 읽지 못했습니다. 표와 구조는 계속 확인할 수 있습니다.", {cause:error});
+  }
+}
+
 function localizeEmptyPaeAnnotation() {
   const plot = $("pae");
   if (!window.Plotly || plot?.data?.length !== 0 || !plot.layout?.annotations?.length) return;
   const text = !state.structure ? "구조 / PAE 미평가"
-    : state.structure.pae_status === "removed_by_retention" ? "PAE · 용량 정리로 삭제됨" : "PAE 미평가";
+    : state.structure.pae_error ? state.structure.pae_error : state.structure.pae_status === "removed_by_retention" ? "PAE · 용량 정리로 삭제됨" : "PAE 미평가";
   Plotly.relayout(plot, {"annotations[0].text": I18N.value(I18N.term(text))});
 }
 async function loadStructure() {
@@ -1876,7 +1938,7 @@ async function loadStructure() {
       state.candidate?.candidate_id !== id
     )
       return;
-    state.structure = loaded;
+    state.structure = offline && loaded ? {...loaded, pae: loaded.pae ? {...loaded.pae} : loaded.pae} : loaded;
     if (!state.structure) throw Error("이 후보의 구조는 보고서에 없습니다.");
     await renderStructure();
   } catch (e) {
@@ -2114,7 +2176,12 @@ async function renderStructure() {
     );
   warnings(details.appendChild(el("div")), data.issues);
   if (window.Plotly) {
-    const pae = data.pae;
+    let pae = data.pae;
+    if (offline && pae?.values_ref) {
+      try { pae.values = await offlinePaeValues(pae); data.pae_error = null; }
+      catch (error) { data.pae_error = error.message; pae = null; }
+      if (state.structure !== data) return;
+    }
     await Plotly.react(
       $("pae"),
       pae
@@ -2142,7 +2209,7 @@ async function renderStructure() {
           return [{type:"line",xref:"x",yref:"paper",x0:i-.5,x1:i-.5,y0:0,y1:1,line:{color:"#586b78",width:1}},
                   {type:"line",xref:"paper",yref:"y",x0:0,x1:1,y0:i-.5,y1:i-.5,line:{color:"#586b78",width:1}}];
         }) : [],
-        annotations: pae ? [] : [{ text: data.pae_status === "removed_by_retention" ? I18N.value(I18N.term("PAE · 용량 정리로 삭제됨")) : I18N.value(I18N.term("PAE 미평가")), showarrow: false }],
+        annotations: pae ? [] : [{ text: data.pae_error ? I18N.value(I18N.term(data.pae_error)) : data.pae_status === "removed_by_retention" ? I18N.value(I18N.term("PAE · 용량 정리로 삭제됨")) : I18N.value(I18N.term("PAE 미평가")), showarrow: false }],
       },
       { responsive: true, displaylogo: false, displayModeBar: false },
     );
@@ -2339,7 +2406,8 @@ function setupExplorer() {
   action("save-pae", () => {
     const data=state.structure;
     if (!data?.pae) throw Error("이 모델의 PAE는 미제공입니다. 다른 모델의 값을 대신 쓰지 않습니다.");
-    saveBlob(new Blob([JSON.stringify(data.pae,null,2)],{type:"application/json"}),
+    const pae = data.pae.values_ref && !data.pae.values ? {...data.pae, array:window.NANOCOFOLD_OFFLINE?.pae_arrays?.[data.pae.values_ref]} : data.pae;
+    saveBlob(new Blob([JSON.stringify(pae,null,2)],{type:"application/json"}),
       `${data.candidate_id.replace(/[^A-Za-z0-9_.-]/g,"_")}_PAE.json`);
   });
   action("focus-result-residues", () => {

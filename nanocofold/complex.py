@@ -229,7 +229,8 @@ def reference_comparison(structure, entries, reference, settings):
                 "symmetry_candidates_evaluated": evaluated, "permutation_budget": 4096,
                 "mapping_objective": "maximum_matched_CA_then_minimum_all_chain_CA_RMSD_then_lexical_map", "chains": comparisons}, structure
     except (ValueError, KeyError, OSError) as exc:
-        return {"available": False, "reason": str(exc)}, structure
+        from .platform.errors import public_error
+        return {"available": False, "reason": public_error(exc, stage="input")}, structure
 
 
 def structure_data(pred, entries, cfg):

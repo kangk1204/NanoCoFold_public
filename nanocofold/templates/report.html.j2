@@ -290,6 +290,7 @@
   </details>
 
   <h2 id="report-files">06 출처·산출물</h2><p class="muted">생성 시점의 보존 파일입니다. 이 보고서와 후속 전달 ZIP, 내부 잠금 파일은 제외하며 최종 파일 크기·해시는 전달 manifest를 확인하세요.</p>
+  {% if files_omitted %}<p data-file-list-omitted="{{ files_omitted }}">파일 목록은 처음 200개만 표시합니다. 나머지 {{ files_omitted }}개는 전체 원본과 manifest에서 확인하세요.</p>{% endif %}
   <p class="muted">실행 경로: {{ run_dir }} · 보고서 생성: {{ generated_at }}. 로컬 MSA와 별도 API 비교 실행은 각 실행의 설정·출처에서 확인하며 이 보고서의 모델 순위에 합산하지 않습니다.</p>
   <details><summary>실행 당시 기록과 출처 원문</summary><pre>{{ context|tojson(indent=2) }}</pre></details>
   <details id="recorded-engine-provenance"><summary>예측 엔진 버전·가중치·실행 출처</summary>

@@ -688,7 +688,7 @@ def score_complex(
         ca_plddt = {}
     if cb_plddt and not any(value > 0 for value in cb_plddt.values()):
         cb_plddt = {}
-    interface_values = [plddt[label] for label in interface_labels if label in plddt]
+    interface_values = [plddt[label] for label in sorted(interface_labels) if label in plddt]
     interface_plddt = float(np.mean(interface_values)) if interface_values else float("nan")
 
     labels, index_map, pae, confidence = context.labels, context.index_map, context.pae, context.confidence
@@ -724,6 +724,8 @@ def score_complex(
     # For example, 2/3 must not pass a configured 0.6667 contact threshold.
     hotspot_contact_frac = len(contacted) / len(hotspot_min_dist) if hotspot_min_dist else float("nan")
 
+    binder_values = [plddt[key] for key in sorted(plddt) if key.startswith(binder_chain + ":")]
+
     metrics: dict = {
         "label": label or pred.cif.stem,
         "source": pred.source,
@@ -741,7 +743,7 @@ def score_complex(
         "n_target_clashes": geometry["n_clashes"],
         "n_context_clashes": context_clashes,
         "interface_plddt": interface_plddt,
-        "binder_plddt": float(np.mean([plddt[l] for l in plddt if l.startswith(binder_chain + ":")])) if plddt else float("nan"),
+        "binder_plddt": float(np.mean(binder_values)) if binder_values else float("nan"),
         "iptm": pair_iptm,
         "iptm_source": pair_iptm_source,
         "iptm_unavailable_reason": pair_iptm_reason,

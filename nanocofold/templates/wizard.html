@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NanoCoFold 입력 마법사</title>
   <script src="/assets/3dmol-min.js"></script>
+  <script src="/assets/platform-i18n.js"></script>
   <style>
     :root {
       --bg: #f7f3ed;
@@ -160,6 +161,7 @@
 <body>
 <main>
   <header class="intro">
+    <div class="actions"><label for="language-select">Language</label><select id="language-select"><option value="en">English</option><option value="ko">한국어</option></select></div>
     <h1>NanoCoFold 입력 마법사</h1>
     <p class="note">PDB ID 또는 로컬 구조에서 표적, 함께 유지할 단백질, 결합 부위를 확인하고 실행 설정만 저장합니다. GPU 작업은 여기서 시작하지 않습니다.</p>
   </header>
@@ -282,26 +284,27 @@
   const ids = ["loadPdb","loadFile","analyze","addManual","export","ack","pdbId","assemblyId","fileInput","fileText","manualOriginal"];
   const el = Object.fromEntries(ids.map((id) => [id, $(id)]));
 
-  function announce(text) { $("live").textContent = text; }
+  const joinMessages = (values, delimiter=" ") => values.length ? I18N.concat(values.flatMap((value,index) => [index ? delimiter : "", value])) : I18N.term("없음");
+  function announce(value) { I18N.text($("live"), value); }
   function clear(node) { while (node.firstChild) node.removeChild(node.firstChild); }
   function text(tag, value, className) {
     const n = document.createElement(tag);
     if (className) n.className = className;
-    n.textContent = value == null || value === "" ? "-" : String(value);
+    I18N.text(n, value == null || value === "" ? "-" : value);
     return n;
   }
   function button(label, className) {
     const b = document.createElement("button");
     b.type = "button";
-    b.textContent = label;
+    I18N.text(b, I18N.term(label));
     if (className) b.className = className;
     return b;
   }
   function setStatus(id, msg, cls) {
     const n = $(id);
     n.className = "status" + (cls ? " " + cls : "");
-    n.textContent = msg || "";
-    if (msg) announce(msg);
+    I18N.text(n, I18N.term(msg || ""));
+    if (msg) announce(I18N.term(msg));
   }
   async function api(path, body) {
     const controls = path === "/api/load" ? [el.loadPdb, el.loadFile] : path === "/api/analyze" ? [el.analyze] : [el.export];
@@ -336,9 +339,9 @@
       state.input = null; state.selection = null; state.target = ""; state.context = []; state.residues = []; state.pdb = "";
       clear($("targetChoices")); clear($("contextChoices")); clear($("patches")); clear($("residueList"));
       clear($("sourceInfo")); clear($("warnings")); clear($("chainTable"));
-      $("targetChoices").append(text("p", "구조를 먼저 불러오세요.", "note"));
-      $("contextChoices").append(text("p", "표적을 고르면 나머지 체인이 표시됩니다.", "note"));
-      $("patches").append(text("p", "아직 계산 결과가 없습니다.", "note"));
+      $("targetChoices").append(text("p", I18N.term("구조를 먼저 불러오세요."), "note"));
+      $("contextChoices").append(text("p", I18N.term("표적을 고르면 나머지 체인이 표시됩니다."), "note"));
+      $("patches").append(text("p", I18N.term("아직 계산 결과가 없습니다."), "note"));
       el.analyze.disabled = true; el.addManual.disabled = true;
     }
     if (level <= 2) {
@@ -347,8 +350,8 @@
       state.viewer = null; state.viewerSelectionId = "";
       clear($("viewer"));
       setStatus("analyzeStatus", "", ""); setStatus("hotspotStatus", "", "");
-      clear($("review")); $("review").append(text("p", "분석 후 선택 내용을 검토할 수 있습니다.", "note"));
-      clear($("patches")); $("patches").append(text("p", "아직 계산 결과가 없습니다.", "note"));
+      clear($("review")); $("review").append(text("p", I18N.term("분석 후 선택 내용을 검토할 수 있습니다."), "note"));
+      clear($("patches")); $("patches").append(text("p", I18N.term("아직 계산 결과가 없습니다."), "note"));
       clear($("residueList")); el.addManual.disabled = true;
     }
     state.exportGen++;
@@ -359,7 +362,7 @@
     if (!$("exportResult").dataset.snapshot) setStatus("exportStatus", "", "");
   }
   function chainLabel(c) {
-    return `${c.id} (원본 ${c.original_id || "-"}, author ${c.author_chain || "-"})`;
+    return I18N.format("{0} (원본 {1}, author {2})", [c.id, c.original_id || "-", c.author_chain || "-"]);
   }
   function observedRange(c) {
     const rs = Array.isArray(c.residues) ? c.residues : [];
@@ -368,11 +371,11 @@
   }
   function renderMessages(node, title, items, cls) {
     if (!items || !items.length) return;
-    node.append(text("h3", title, cls));
+    node.append(text("h3", I18N.term(title), cls));
     const ul = document.createElement("ul");
     for (const item of items) {
       const li = document.createElement("li");
-      li.textContent = formatValue(item);
+      I18N.text(li, typeof item === "string" ? I18N.term(item) : formatValue(item));
       ul.append(li);
     }
     node.append(ul);
@@ -384,8 +387,8 @@
   }
   function formatSource(source) {
     if (!source || typeof source !== "object") return "local";
-    if (source.kind === "rcsb") return `RCSB 등록 복합체 ${source.pdb_id || "-"} assembly ${source.assembly_id || "-"}`;
-    if (source.kind === "upload") return `업로드 ${source.filename || "-"} / 생물학적 복합체 여부 미확인`;
+    if (source.kind === "rcsb") return I18N.format("RCSB 등록 복합체 {0} assembly {1}", [source.pdb_id || "-", source.assembly_id || "-"]);
+    if (source.kind === "upload") return I18N.format("업로드 {0} / 생물학적 복합체 여부 미확인", [source.filename || "-"]);
     return formatValue(source);
   }
   function summarizeRemoved(removed) {
@@ -402,20 +405,20 @@
   function renderRemoved(node, removed) {
     const summary = summarizeRemoved(removed);
     if (!summary.rows.length) return;
-    node.append(text("h3", `제거/분리된 항목 요약 ${summary.rows.length}개`, "warning"));
+    node.append(text("h3", I18N.format("제거/분리된 항목 요약 {0}개", [summary.rows.length]), "warning"));
     const ul = document.createElement("ul");
     for (const [label, count] of summary.counts.slice(0, 12)) {
       const li = document.createElement("li");
-      li.textContent = `${label}: ${count}개`;
+      I18N.text(li, I18N.format("{0}: {1}개", [label, count]));
       ul.append(li);
     }
     node.append(ul);
     const details = document.createElement("details");
-    details.append(text("summary", `상세 예시 보기(최대 20개 / 전체 ${summary.rows.length}개)`));
+    details.append(text("summary", I18N.format("상세 예시 보기(최대 20개 / 전체 {0}개)", [summary.rows.length])));
     const list = document.createElement("ul");
     for (const item of summary.rows.slice(0, 20)) {
       const li = document.createElement("li");
-      li.textContent = formatValue(item);
+      I18N.text(li, typeof item === "string" ? I18N.term(item) : formatValue(item));
       list.append(li);
     }
     details.append(list);
@@ -424,10 +427,10 @@
   function renderLoaded(data) {
     state.input = data; invalidate(2);
     const source = $("sourceInfo"); clear(source);
-    source.append(text("h3", "출처와 assembly"));
+    source.append(text("h3", I18N.term("출처와 assembly")));
     source.append(text("p", formatSource(data.source)));
     const sourceDetails = document.createElement("details");
-    sourceDetails.append(text("summary", "기술 세부정보"));
+    sourceDetails.append(text("summary", I18N.term("기술 세부정보")));
     sourceDetails.append(text("p", `input_id: ${data.input_id}`));
     sourceDetails.append(text("pre", formatValue(data.source)));
     source.append(sourceDetails);
@@ -437,15 +440,15 @@
     const tableHost = $("chainTable"); clear(tableHost);
     const wrap = document.createElement("div"); wrap.className = "table-wrap";
     const table = document.createElement("table");
-    const caption = document.createElement("caption"); caption.textContent = "불러온 체인: 이름, 생물종, 관찰된 원본 번호 범위";
+    const caption = document.createElement("caption"); I18N.text(caption, I18N.term("불러온 체인: 이름, 생물종, 관찰된 원본 번호 범위"));
     table.append(caption);
     const head = document.createElement("tr");
-    ["계산 체인", "원본/author", "이름", "생물종", "길이", "관찰 범위"].forEach((h) => { const th = text("th", h); th.scope = "col"; head.append(th); });
+    ["계산 체인", "원본/author", "이름", "생물종", "길이", "관찰 범위"].forEach((h) => { const th = text("th", I18N.term(h)); th.scope = "col"; head.append(th); });
     const thead = document.createElement("thead"); thead.append(head); table.append(thead);
     const tbody = document.createElement("tbody"); table.append(tbody);
     for (const c of data.chains || []) {
       const tr = document.createElement("tr");
-      [c.id, `${c.original_id || "-"} / ${c.author_chain || "-"}`, c.name || "이름 미상", c.organism || "생물종 미상", c.length, observedRange(c)]
+      [c.id, `${c.original_id || "-"} / ${c.author_chain || "-"}`, c.name || I18N.term("이름 미상"), c.organism || I18N.term("생물종 미상"), c.length, observedRange(c)]
         .forEach((v) => tr.append(text("td", v)));
       tbody.append(tr);
     }
@@ -457,14 +460,14 @@
     const none = document.createElement("label");
     const r = document.createElement("input"); r.type = "radio"; r.name = "target"; r.value = ""; r.checked = !state.target;
     r.addEventListener("change", () => chooseTarget(""));
-    none.append(r, text("span", "선택 없음"));
+    none.append(r, text("span", I18N.term("선택 없음")));
     $("targetChoices").append(none);
     for (const c of state.input.chains || []) {
       const box = document.createElement("div"); box.className = "chain-choice";
       const label = document.createElement("label");
       const radio = document.createElement("input"); radio.type = "radio"; radio.name = "target"; radio.value = c.id; radio.checked = state.target === c.id;
       radio.addEventListener("change", () => chooseTarget(c.id));
-      label.append(radio, text("span", `${c.name || "이름 미상"} · ${chainLabel(c)} · 원본 ${observedRange(c)} · ${c.organism || "생물종 미상"}`));
+      label.append(radio, text("span", I18N.format("{0} · {1} · 원본 {2} · {3}", [c.name || I18N.term("이름 미상"), chainLabel(c), observedRange(c), c.organism || I18N.term("생물종 미상")])));
       box.append(label); $("targetChoices").append(box);
     }
     const chains = state.input.chains || [];
@@ -473,13 +476,13 @@
       const check = document.createElement("input"); check.type = "checkbox"; check.value = c.id;
       check.checked = state.context.includes(c.id) || (state.target && !state.context.length);
       check.addEventListener("change", () => updateContext(true));
-      label.append(check, text("span", `${c.name || "이름 미상"} · ${chainLabel(c)} · 원본 ${observedRange(c)}`));
+      label.append(check, text("span", I18N.format("{0} · {1} · 원본 {2}", [c.name || I18N.term("이름 미상"), chainLabel(c), observedRange(c)])));
       const div = document.createElement("div"); div.className = "chain-choice"; div.append(label);
       $("contextChoices").append(div);
     }
     updateContext(false);
     el.analyze.disabled = !state.input || !state.target;
-    $("selectionHint").textContent = state.target ? "선택한 문맥에서 표면 후보를 계산합니다." : "표적을 선택하면 계산할 수 있습니다.";
+    I18N.text($("selectionHint"), I18N.term(state.target ? "선택한 문맥에서 표면 후보를 계산합니다." : "표적을 선택하면 계산할 수 있습니다."));
   }
   function chooseTarget(id) {
     state.target = id; state.context = [];
@@ -541,22 +544,22 @@
   }
   function renderPatches(patches) {
     clear($("patches"));
-    if (!patches.length) { $("patches").append(text("p", "자동 후보가 없습니다. 수동으로 선택할 수 있습니다.", "note")); return; }
+    if (!patches.length) { $("patches").append(text("p", I18N.term("자동 후보가 없습니다. 수동으로 선택할 수 있습니다."), "note")); return; }
     for (const p of patches) {
       const card = document.createElement("div"); card.className = "patch";
-      card.append(text("strong", `후보 ${p.set_id || ""} · 점수 ${p.score ?? "-"}`));
+      card.append(text("strong", I18N.format("후보 {0} · 점수 {1}", [p.set_id || "", p.score ?? "-"])));
       const originals = (p.positions || []).map((pos) => {
         const r = residueByPosition(pos);
         return r ? `${r.original_label} (${r.aa})` : "미확인";
       });
-      card.append(text("span", `원본 잔기: ${originals.join(", ")}`));
-      card.append(text("span", `계산용 위치: ${(p.positions || []).join(", ")}`, "note"));
-      card.append(text("span", p.reason || "근거 설명 없음", "note"));
+      card.append(text("span", I18N.format("원본 잔기: {0}", [originals.join(", ")])));
+      card.append(text("span", I18N.format("계산용 위치: {0}", [(p.positions || []).join(", ")]), "note"));
+      card.append(text("span", I18N.term(p.reason || "근거 설명 없음"), "note"));
       const patchResidues = (p.positions || []).map(residueByPosition);
       const patchBuried = patchResidues.filter(isBuried);
       const patchTooLarge = (p.positions || []).length > 12;
-      if (patchBuried.length) card.append(text("span", "매몰 잔기가 포함되어 내보낼 수 없습니다.", "warning"));
-      if (patchTooLarge) card.append(text("span", "12개를 초과해 내보낼 수 없습니다.", "warning"));
+      if (patchBuried.length) card.append(text("span", I18N.term("매몰 잔기가 포함되어 내보낼 수 없습니다."), "warning"));
+      if (patchTooLarge) card.append(text("span", I18N.term("12개를 초과해 내보낼 수 없습니다."), "warning"));
       renderMessages(card, "경고", p.warnings, "warning");
       const b = button("이 후보로 교체", "secondary");
       b.disabled = patchBuried.length > 0 || patchTooLarge;
@@ -572,7 +575,7 @@
     const chain = targetChain();
     const chainText = chain ? (chain.author_chain || chain.original_id || chain.id) : "?";
     const original = r.original_label || r.original_number || "?";
-    return `원본 ${chainText}:${original} (${r.aa || "?"}) / 계산 #${r.position}`;
+    return I18N.format("원본 {0}:{1} ({2}) / 계산 #{3}", [chainText, original, r.aa || "?", r.position]);
   }
   function isBuried(r) {
     return r && (r.relative_sasa == null || Number(r.relative_sasa) < 0.15);
@@ -595,7 +598,7 @@
     const r = residueByPosition(pos);
     if (!r) return false;
     if (nextChecked && isBuried(r)) {
-      setStatus("hotspotStatus", `${residueLabel(r)}: 상대 SASA 0.15 미만의 매몰 잔기라 내보낼 수 없습니다.`, "warning");
+      setStatus("hotspotStatus", I18N.format("{0}: 상대 SASA 0.15 미만의 매몰 잔기라 내보낼 수 없습니다.", [residueLabel(r)]), "warning");
       return false;
     }
     if (nextChecked && !state.hotspots.has(pos) && state.hotspots.size >= 12) {
@@ -615,8 +618,8 @@
       check.dataset.position = String(r.position);
       check.disabled = isBuried(r);
       check.addEventListener("change", () => { if (!tryTogglePosition(r.position, check.checked)) check.checked = state.hotspots.has(r.position); });
-      const suffix = isBuried(r) ? " · 매몰 잔기: 내보내기 불가" : "";
-      label.append(check, text("span", `${residueLabel(r)} · SASA ${r.relative_sasa ?? "-"} · B열 원값 ${r.bfactor ?? "-"} · 당질거리 ${r.dist_to_glycan ?? "-"}${suffix}`));
+      const suffix = isBuried(r) ? I18N.term(" · 매몰 잔기: 내보내기 불가") : "";
+      label.append(check, text("span", I18N.format("{0} · SASA {1} · B열 원값 {2} · 당질거리 {3}{4}", [residueLabel(r), r.relative_sasa ?? "-", r.bfactor ?? "-", r.dist_to_glycan ?? "-", suffix])));
       div.append(label); $("residueList").append(div);
     }
   }
@@ -654,7 +657,7 @@
     markExportStale(); el.ack.checked = false;
     updateResidueChecks(); renderReview(state.selection); updateViewerHotspots();
     const issues = exportIssues();
-    setStatus("hotspotStatus", issues.length ? issues.join(" ") : `선택된 결합 부위 ${state.hotspots.size}개`, issues.length ? "warning" : "ok");
+    setStatus("hotspotStatus", issues.length ? I18N.concat(issues.flatMap((v,i) => [i ? " " : "", I18N.term(v)])) : I18N.format("선택된 결합 부위 {0}개", [state.hotspots.size]), issues.length ? "warning" : "ok");
     updateExportButton();
   }
   function addManual() {
@@ -663,29 +666,29 @@
     for (const t of tokens) {
       const byLabel = state.residues.filter((x) => String(x.original_label) === t);
       const matches = byLabel.length ? byLabel : state.residues.filter((x) => String(x.original_number) === t);
-      if (matches.length !== 1) { skipped.push(`${t}: 원본 번호가 없거나 삽입코드 때문에 모호합니다.`); continue; }
+      if (matches.length !== 1) { skipped.push(I18N.format("{0}: 원본 번호가 없거나 삽입코드 때문에 모호합니다.", [t])); continue; }
       const r = matches[0];
-      if (isBuried(r)) { skipped.push(`${t}: 매몰 잔기입니다.`); continue; }
-      if (state.hotspots.size >= 12 && !state.hotspots.has(r.position)) { skipped.push(`${t}: 12개 한도를 넘습니다.`); continue; }
+      if (isBuried(r)) { skipped.push(I18N.format("{0}: 매몰 잔기입니다.", [t])); continue; }
+      if (state.hotspots.size >= 12 && !state.hotspots.has(r.position)) { skipped.push(I18N.format("{0}: 12개 한도를 넘습니다.", [t])); continue; }
       state.hotspots.add(r.position); added.push(residueLabel(r));
     }
     markHotspotsChanged();
-    setStatus("hotspotStatus", added.length ? `추가됨: ${added.join(", ")}${skipped.length ? " / 제외: " + skipped.join(" ") : ""}` : skipped.join(" ") || "일치하는 원본 표적 잔기를 찾지 못했습니다.", added.length && !skipped.length ? "ok" : "warning");
+    setStatus("hotspotStatus", added.length ? I18N.format("추가됨: {0}{1}", [joinMessages(added, ", "), skipped.length ? I18N.concat([I18N.term(" / 제외: "), joinMessages(skipped)]) : ""]) : skipped.length ? joinMessages(skipped) : I18N.term("일치하는 원본 표적 잔기를 찾지 못했습니다."), added.length && !skipped.length ? "ok" : "warning");
   }
   function renderReview(data) {
     clear($("review"));
-    if (!data) { $("review").append(text("p", "분석 후 선택 내용을 검토할 수 있습니다.", "note")); return; }
+    if (!data) { $("review").append(text("p", I18N.term("분석 후 선택 내용을 검토할 수 있습니다."), "note")); return; }
     renderMessages($("review"), "입력 QC 차단 - 해결 전 내보내기 불가", data.blockers, "error");
     const target = targetChain();
-    $("review").append(text("p", `표적: ${target ? `${target.name} · ${chainLabel(target)}` : data.target}`));
-    const describeChain = (c) => `${c.name || "이름 미상"} (${c.id}, 원본 ${observedRange(c)})`;
-    $("review").append(text("p", `보존 체인: ${(data.retained_chains || []).map(describeChain).join(" / ") || "없음"}`));
-    $("review").append(text("p", `제거 체인: ${(data.removed_chains || []).map(describeChain).join(" / ") || "없음"}`));
+    $("review").append(text("p", I18N.format("표적: {0}", [target ? I18N.concat([target.name, " · ", chainLabel(target)]) : data.target])));
+    const describeChain = (c) => I18N.format("{0} ({1}, 원본 {2})", [c.name || I18N.term("이름 미상"), c.id, observedRange(c)]);
+    $("review").append(text("p", I18N.format("보존 체인: {0}", [joinMessages((data.retained_chains || []).map(describeChain), " / ")])));
+    $("review").append(text("p", I18N.format("제거 체인: {0}", [joinMessages((data.removed_chains || []).map(describeChain), " / ")])));
     if ((data.retained_nonprotein_chains || []).length) {
-      $("review").append(text("p", `표면 분석에 유지한 별도 비단백질 체인: ${data.retained_nonprotein_chains.join(", ")}. 단백질과의 소속 관계는 자동 추정하지 않으며 설계·평가 좌표에는 포함하지 않습니다.`, "warning"));
+      $("review").append(text("p", I18N.format("표면 분석에 유지한 별도 비단백질 체인: {0}. 단백질과의 소속 관계는 자동 추정하지 않으며 설계·평가 좌표에는 포함하지 않습니다.", [data.retained_nonprotein_chains.join(", ")]), "warning"));
     }
     const selected = Array.from(state.hotspots).sort((a, b) => a - b);
-    $("review").append(text("p", `선택 결합 부위: ${selected.length}개`));
+    $("review").append(text("p", I18N.format("선택 결합 부위: {0}개", [selected.length])));
     for (const pos of selected) {
       const r = residueByPosition(pos);
       if (r) $("review").append(text("span", residueLabel(r), "pill"));
@@ -696,7 +699,7 @@
     renderMessages($("review"), "스크리닝 제한", data.screen_blockers, "warning");
     if ((data.warnings || []).length) {
       const details = document.createElement("details");
-      details.append(text("summary", `입력·분석 주의사항 ${data.warnings.length}개`));
+      details.append(text("summary", I18N.format("입력·분석 주의사항 {0}개", [data.warnings.length])));
       renderMessages(details, "확인할 내용", data.warnings, "warning");
       $("review").append(details);
     }
@@ -733,12 +736,12 @@
     $("exportResult").hidden = false;
     $("exportResult").dataset.snapshot = "saved";
     $("commands").hidden = false;
-    $("exportDir").textContent = `폴더: ${data.export_dir || "-"}`;
-    $("configPath").textContent = `설정: ${data.config_path || "-"}`;
-    $("fingerprint").textContent = `스냅샷 fingerprint: ${data.fingerprint || "-"}`;
+    I18N.text($("exportDir"), I18N.format("폴더: {0}", [data.export_dir || "-"]));
+    I18N.text($("configPath"), I18N.format("설정: {0}", [data.config_path || "-"]));
+    I18N.text($("fingerprint"), I18N.format("스냅샷 fingerprint: {0}", [data.fingerprint || "-"]));
     $("commands").textContent = [data.doctor_command, data.prepare_command, data.design_command, data.screen_command].filter(Boolean).join("\n");
     const host = $("chainMapping"); clear(host);
-    host.append(text("h3", "체인 대응표"));
+    host.append(text("h3", I18N.term("체인 대응표")));
     host.append(text("pre", JSON.stringify(data.chain_mapping || {}, null, 2)));
     renderMessages(host, "주의", data.warnings, "warning");
   }
@@ -751,6 +754,7 @@
   el.ack.addEventListener("change", updateExportButton);
   ["pdbId","assemblyId","fileText"].forEach((id) => el[id].addEventListener("input", () => invalidate(1)));
   el.fileInput.addEventListener("change", () => invalidate(1));
+I18N.init();
 })();
 </script>
 </body>

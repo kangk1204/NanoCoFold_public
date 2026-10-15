@@ -63,7 +63,16 @@ def test_report_entry_stays_small_and_separate_explorer_preserves_all_48_models(
     assert {row["candidate_id"] for row in complete["candidates"]["rows"]} == {f"model-{i}" for i in range(48)}
     assert len([s for s in complete["structures"] if s["observation_id"] is None]) == 48
     assert {s["candidate_id"] for s in complete["structures"]} == {f"model-{i}" for i in range(48)}
-    assert all(len(s["pae"]["values"]) == 20 and s["content"] for s in complete["structures"])
+    import base64
+    import gzip
+    import numpy as np
+    assert len(complete["pae_arrays"]) == 1
+    expected = np.load(run / "pae_colabfold_model_0.npz")["pae"].astype("<f8").tobytes()
+    for structure in complete["structures"]:
+        assert structure["content"] and len(structure["pae"]["labels"]) == 20
+        packed = complete["pae_arrays"][structure["pae"]["values_ref"]]
+        assert packed["dimension"] == 20 and packed["bytes"] == 20 * 20 * 8
+        assert gzip.decompress(base64.b64decode(packed["data"])) == expected
     assert all(p.read_bytes() == data for p, data in original.items())
     # Relative link plus a self-contained explorer survives moving both files.
     portable = tmp_path / "copied elsewhere"; portable.mkdir()

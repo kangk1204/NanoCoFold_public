@@ -18,3 +18,16 @@ def force_text(workbook):
             for cell in row:
                 if isinstance(cell.value, str):
                     cell.data_type = "s"
+
+
+def excel_text_chunks(text, limit=30000):
+    """Split losslessly by Excel's UTF-16 units, including supplementary glyphs."""
+    chunks, start, units = [], 0, 0
+    for index, char in enumerate(text):
+        width = 2 if ord(char) > 0xFFFF else 1
+        if units + width > limit:
+            chunks.append(text[start:index])
+            start, units = index, 0
+        units += width
+    chunks.append(text[start:])
+    return chunks

@@ -703,6 +703,8 @@ class ResultCatalog:
                    "status": status, "complete": complete, "retention": retention,
                    "full_execution_available": retention == "full", "candidate_count": len(candidate_ids),
                    "model_count": sum(row.get("structure_available") is True or bool(row.get("cif_path")) for row in observations),
+                   "model_count_scope": "saved_structure_observations_including_first_stage",
+                   "final_model_record_count": summary.get("model_record_total"),
                    "observation_count": len(observations), "evaluated_model_count": summary.get("scored_total", 0),
                    "eligible_model_count": summary.get("eligible_total"),
                    "failed_model_count": summary.get("failed_candidates", 0), "elapsed_seconds": _elapsed(reader),

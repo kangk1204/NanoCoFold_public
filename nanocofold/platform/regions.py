@@ -7,6 +7,7 @@ import shutil
 from pathlib import Path
 
 from ..hotspots import parse_hotspot_spec
+from ..utils.spreadsheet import csv_cell
 from .paths import sha256
 
 
@@ -121,7 +122,7 @@ def apply_regions(folder: Path, cfg: dict, review: dict, payload: dict):
         with mapping_path.open("w", encoding="utf-8-sig", newline="") as stream:
             writer = csv.DictWriter(stream, fieldnames=list(mapping[0]))
             writer.writeheader()
-            writer.writerows(mapping)
+            writer.writerows({key: csv_cell(value) for key, value in row.items()} for row in mapping)
     (folder / "input_review.json").write_text(json.dumps(review, ensure_ascii=False, indent=2))
     records = [("A", cfg["target"]["sequence"])] + [(chr(66+i), c["sequence"]) for i, c in enumerate(cfg["target"].get("aux_chains", []))]
     (folder / "target.fasta").write_text("".join(f">{name}\n{seq}\n" for name, seq in records))

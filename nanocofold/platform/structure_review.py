@@ -238,4 +238,5 @@ def reference_overlay(reader, target, mapping):
                 "rmsd": float(fit.rms), "reference_sha256": provenance["sha256"],
                 "method": "target_CA_rigid_fit", "note": "보존된 입력 표적·파트너 좌표를 표적 Cα로 강체 정렬합니다. 실험 B-factor를 pLDDT로 해석하지 않습니다."}
     except (OSError, ValueError, KeyError, TypeError, IndexError) as exc:
-        return {"available": False, "reason": str(exc)}
+        from .errors import public_error
+        return {"available": False, "reason": public_error(exc, stage="input")}

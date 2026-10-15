@@ -25,6 +25,26 @@ ACTIVE = {"queued", "running", "cancelling"}
 PROFILES = set(INSTALL_PROFILES)
 
 
+@contextlib.contextmanager
+def catalog_registration_lock(store, identifier):
+    """Serialize one job's index recovery with its resume transition."""
+    import fcntl
+    import stat
+    path = store.root / "jobs" / identifier / "catalog.lock"
+    descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    try:
+        info = os.fstat(descriptor)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1:
+            raise ValueError("결과 색인 잠금 파일을 확인할 수 없습니다. 서버 로그를 확인하세요.")
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise ValueError("결과 목록을 복구 중입니다. 잠시 뒤 재개하세요. 원본 결과는 보존됩니다.") from exc
+        yield
+    finally:
+        os.close(descriptor)
+
+
 def gpu_identifier(value) -> str:
     value = str(value)
     if re.fullmatch(r"[0-9]+", value):
@@ -153,6 +173,7 @@ class JobStore:
                 connection.execute("ALTER TABLE jobs ADD COLUMN needs_cleanup INTEGER NOT NULL DEFAULT 0")
                 connection.execute("UPDATE jobs SET needs_cleanup=1 WHERE json_array_length(json_extract(payload,'$.descendants'))>0")
             connection.execute("CREATE INDEX IF NOT EXISTS jobs_cleanup ON jobs(needs_cleanup) WHERE needs_cleanup=1")
+            connection.execute("CREATE INDEX IF NOT EXISTS jobs_catalog_pending ON jobs(json_extract(payload, '$.catalog_pending')) WHERE json_extract(payload, '$.catalog_pending')=1")
             connection.execute("CREATE INDEX IF NOT EXISTS jobs_history ON jobs(created DESC,id DESC)")
             connection.execute("CREATE INDEX IF NOT EXISTS jobs_identity_active ON jobs(json_extract(payload,'$.execution_identity.digest')) WHERE state IN ('queued','running','cancelling')")
             connection.execute("CREATE INDEX IF NOT EXISTS jobs_run_dir ON jobs(json_extract(payload,'$.run_dir'))")
@@ -219,7 +240,7 @@ class JobStore:
             connection.execute("DELETE FROM job_processes WHERE job_id=? AND pid=? AND stamp=?",
                                (identifier, pid, stamp))
 
-    def list(self, *, states=None, kind=None, limit=None, before=None, before_id=None, cleanup=False) -> list[dict]:
+    def list(self, *, states=None, kind=None, limit=None, before=None, before_id=None, cleanup=False, catalog_pending=False) -> list[dict]:
         clauses, values = [], []
         if kind is not None:
             clauses.append("json_extract(payload, '$.kind')=?")
@@ -231,6 +252,8 @@ class JobStore:
             values.extend(sorted(states))
         if cleanup:
             clauses.append("needs_cleanup=1")
+        if catalog_pending:
+            clauses.append("json_extract(payload, '$.catalog_pending')=1")
         if before is not None:
             if before_id is not None:
                 clauses.append("(created<? OR (created=? AND id<?))")
@@ -306,6 +329,10 @@ class JobStore:
                 state = "budget_exhausted" if job.get("budget_exceeded") else "cancelled"
                 changes.update(exit_code=130, can_resume=job["kind"] == "analysis",
                                error="실행 시간 한도에 도달했습니다." if state == "budget_exhausted" else "사용자가 작업을 취소했습니다.")
+            if job.get("kind") == "analysis" and job.get("run_dir") and not job.get("reused_result_id"):
+                # Commit recovery intent with the terminal state. SIGKILL during
+                # subsequent artifact hashing cannot lose the result from the index.
+                changes["catalog_pending"] = Path(job["run_dir"]).is_dir()
             job.update(changes, state=state, phase=state, updated=time.time())
             connection.execute("UPDATE jobs SET state=?,updated=?,payload=?,needs_cleanup=? WHERE id=?",
                                (state, job["updated"], json.dumps(job), int(bool(job.get("descendants"))), identifier))
@@ -366,6 +393,8 @@ class JobManager:
         self.pending_kill_attempts = {}
         self.observed_descendants: dict[str, list[tuple[int, str | None]]] = {}
         self.lockfile = None
+        self.catalog_thread = None
+        self.catalog_retry_after = {}
 
     def start(self):
         if self.thread and self.thread.is_alive():
@@ -379,6 +408,8 @@ class JobManager:
         self.stop_event.set()
         if self.thread:
             self.thread.join(timeout=5)
+        if self.catalog_thread:
+            self.catalog_thread.join(timeout=5)
 
     def create(self, payload: dict, *, kind: str = "analysis") -> dict:
         from .maintenance import maintenance_lock
@@ -512,7 +543,8 @@ class JobManager:
 
     def resume(self, identifier: str, additional_budget_seconds=None) -> dict:
         from .maintenance import maintenance_lock
-        with maintenance_lock(self.workspace):
+        self.store.get(identifier)  # Preserve the missing-job contract before opening its lock.
+        with maintenance_lock(self.workspace), catalog_registration_lock(self.store, identifier):
             return self._resume(identifier, additional_budget_seconds)
 
     def _resume(self, identifier: str, additional_budget_seconds=None) -> dict:
@@ -555,7 +587,7 @@ class JobManager:
             history = current.get("history", []) + [previous]
             current.update(state="queued", resume=Path(current["run_dir"]).exists(), started=None, finished=None,
                            pid=None, pgid=None, process_stamp=None, error=None, history=history, can_resume=False,
-                           budget_exceeded=False, updated=time.time())
+                           budget_exceeded=False, catalog_pending=False, updated=time.time())
             current.update(phase="resume_validation", progress={"completed": 0, "total": current.get("progress", {}).get("total")})
             connection.execute("UPDATE jobs SET state='queued',updated=?,payload=? WHERE id=?", (current["updated"], json.dumps(current), identifier))
         return current
@@ -593,7 +625,8 @@ class JobManager:
             job = json.loads(row["payload"])
             if job["state"] == "queued":
                 job.update(state="cancelled", phase="cancelled", finished=time.time(),
-                           can_resume=job["kind"] == "analysis")
+                           can_resume=job["kind"] == "analysis",
+                           catalog_pending=bool(job.get("run_dir") and Path(job["run_dir"]).is_dir()))
             elif job["state"] in {"running", "cancelling"}:
                 job.update(state="cancelling", phase="cancelling")
             else:
@@ -625,6 +658,28 @@ class JobManager:
         return {"offset": offset, "next_offset": offset + len(data), "text": text, "done": job["state"] in TERMINAL}
 
     def _spawn(self, job: dict) -> bool:
+        try:
+            return self._spawn_worker(job)
+        except OSError as exc:
+            # Storage or process-launch failure belongs to this queue item. A
+            # permanently unwritable lock/log must not starve unrelated jobs.
+            print(f"[platform launch {job['id']}] {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+            if job["id"] in self.failed_launches:
+                return False  # Reconciliation still owns a child awaiting cleanup.
+            from .errors import public_error
+            message = public_error(ValueError(
+                "작업을 시작하지 못했습니다. 서버 저장 공간·잠금 폴더·로그 파일의 쓰기 권한을 확인한 뒤 재개하세요."))
+            current = self.store.get(job["id"])
+            if current["state"] == "queued":
+                terminal = self.store.update(job["id"], expected_states={"queued"}, state="failed", phase="launch_failed",
+                                             error=message, finished=time.time(), can_resume=job["kind"] == "analysis")
+            else:
+                terminal = self.store.finish(job["id"], state="failed", expected_attempt=(current.get("pid"), current.get("process_stamp")),
+                                             error=message, finished=time.time(), can_resume=job["kind"] == "analysis")
+            write_platform_status(terminal)
+            return False
+
+    def _spawn_worker(self, job: dict) -> bool:
         import fcntl
         try:
             allowed_gpu(job["gpu"])
@@ -848,6 +903,54 @@ class JobManager:
                 occupied.add(job["gpu"])
             else:
                 cpu_kinds.add(job["kind"])
+
+        self._start_catalog_recovery()
+
+    def _start_catalog_recovery(self):
+        # One bounded background task at a time; hashing never blocks queue
+        # cancellation/dispatch. Only newly persisted recovery markers are read.
+        if self.catalog_thread and self.catalog_thread.is_alive():
+            return
+        for job in self.store.list(states=TERMINAL, catalog_pending=True):
+            if self.catalog_retry_after.get(job["id"], 0) > time.monotonic() or self._live_attempt_processes(job):
+                continue
+            self.catalog_thread = threading.Thread(target=self._recover_catalog, args=(job,),
+                                                   name="nanocofold-result-index", daemon=True)
+            self.catalog_thread.start()
+            return
+
+    def _recover_catalog(self, snapshot):
+        identifier = snapshot["id"]
+        attempt = (snapshot.get("pid"), snapshot.get("process_stamp"))
+        try:
+            with catalog_registration_lock(self.store, identifier):
+                job = self.store.get(identifier)
+                if (not job.get("catalog_pending") or job["state"] not in TERMINAL
+                        or (job.get("pid"), job.get("process_stamp")) != attempt or self._live_attempt_processes(job)):
+                    return
+                root = Path(job["run_dir"])
+                if root.is_dir():
+                    from ..config import load_config
+                    from .result_catalog import build_identity
+                    reference = job.get("execution_identity")
+                    identity = self.catalog.get_identity(reference["digest"]) if reference else None
+                    if identity:
+                        current = build_identity(self.workspace, load_config(job["config_path"]), job["gpu"])
+                        if current["digest"] != identity["digest"]:
+                            identity = {**identity, "reusable": False,
+                                        "reasons": identity.get("reasons", []) + ["Runtime or inputs changed during execution"]}
+                    self.catalog.register(identifier, root, identity, state=job["state"])
+                self.store.update(identifier, expected_states=TERMINAL, expected_attempt=attempt,
+                                  catalog_pending=False, catalog_error=None)
+                self.catalog_retry_after.pop(identifier, None)
+        except Exception as exc:
+            # Preserve the durable retry marker; a new server can retry too.
+            self.catalog_retry_after[identifier] = time.monotonic() + 30
+            from .errors import public_error
+            with contextlib.suppress(Exception):
+                self.store.update(identifier, expected_states=TERMINAL, expected_attempt=attempt,
+                                  catalog_error=public_error(exc))
+            print(f"[platform catalog {identifier}] {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
 
     def _progress(self, job: dict) -> dict:
         from .eta import RuntimeEstimator
