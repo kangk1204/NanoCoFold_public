@@ -1,0 +1,47 @@
+{
+  "version": "0.4.8rc5",
+  "captured": "2026-10-15",
+  "new_GPU_inference": false,
+  "files": {
+    "01-purpose.jpg": {
+      "bytes": 62645,
+      "sha256": "7cca32a819d8077d34e27cf098becf5dda78f93c5d95ebdf597b8946e3f7fb74"
+    },
+    "02-input.jpg": {
+      "bytes": 140792,
+      "sha256": "755ffaf86bbd034a1497d4e3a8aab95a1412ed4a89713e5668383793d42f0f09"
+    },
+    "03-settings.jpg": {
+      "bytes": 114457,
+      "sha256": "c4989550283b172767d1134fb82f620be05347dffc6b19b6d61e99f61c92d08f"
+    },
+    "04-review.jpg": {
+      "bytes": 64143,
+      "sha256": "40a61278db96b977d982a5ae49afb0a8d420f34eea7e83fe3b91d7051fee76e9"
+    },
+    "05-results.jpg": {
+      "bytes": 69901,
+      "sha256": "5b207ef71eafca676366ed77db1215f7ae6e180875c02859ab3932c36dc48e78"
+    },
+    "06-structure-pae.jpg": {
+      "bytes": 98369,
+      "sha256": "31e59729a815a23a5378ee319c5c8e3673c5ed61d4f9cf1962d24155d4fda05e"
+    },
+    "07-pae.jpg": {
+      "bytes": 17782,
+      "sha256": "a2c346cd42073e64d302ef100ce5c87f903bf883907c162988dffdc81392decc"
+    },
+    "settings-design.jpg": {
+      "bytes": 116226,
+      "sha256": "84472982f2e67ddbd78154852786b77552602c61b90c2830118865678591944c"
+    },
+    "settings-mature.jpg": {
+      "bytes": 116916,
+      "sha256": "ef498afba863f93f59b7a1baf48bc6a60e0f15034c80ffae7d4dfef41c43e659"
+    },
+    "settings-screen.jpg": {
+      "bytes": 115405,
+      "sha256": "0fad0c563c437568c0082ffb78fe4f0e648dcb7ccb8a7b433670742799c0c047"
+    }
+  }
+}

@@ -6,6 +6,10 @@
 
 Predict protein complexes, design new nanobodies, and compare existing candidates or variants. Explore candidate tables, 3D structures, PAE, and shareable HTML reports.
 
+**For your first run, follow sections 1 → 2 → 3.** The public example fills in the sequences and settings; leave advanced settings unchanged. A [large-image walkthrough](docs/browser_quickstart.md#그림으로-따라-하기) is also available (Korean labels).
+
+**If your server is already installed, start at section 2.** Use the same source folder and workspace as the installation. The source under `source/` in a delivery bundle and a saved `report.html` are different entry points. To read existing results, extract the report ZIP and open `report.html`; no installation is needed.
+
 ## 1. Prepare and install
 
 The compute host needs **Ubuntu x86_64**, glibc 2.34 or later, an NVIDIA GPU, and driver 580 or later. `nvidia-smi` must show the GPU correctly. For small examples, prepare at least 16 GB GPU memory, 32 GB RAM, and 150 GiB of free SSD space. Longer proteins and larger libraries may need more resources. Internet access and `sudo` are also required.
@@ -76,6 +80,45 @@ Start with **Predict protein complexes**. You do not need to create sequences or
 5. In **Review & run**, click **Review input & check environment**. Read the input / settings summary and environment check results. **Run analysis** is enabled after the required checks pass. Computation has not been submitted yet.
 6. Click **Run analysis** once. Follow progress in **Jobs & logs**. When finished, click **Open results**.
 
+For the first example, check these values. **Four planned models do not guarantee four successful predictions**; inspect the actual counts afterward. The screenshots show the current Korean interface; select **Language → 한국어** to match them.
+
+| Step | Key settings to check | Screenshot |
+|---|---|---|
+| Purpose | Predict protein complexes | [1](docs/images/quickstart-rc5/01-purpose.jpg) |
+| Input | Barnase 110 aa + Barstar 89 aa, one copy of each | [2](docs/images/quickstart-rc5/02-input.jpg) |
+| Settings | Small starter preset, four engines, seed 42, one model per engine → four planned models | [3](docs/images/quickstart-rc5/03-settings.jpg) |
+| Review & run | Consent for the current sequences → input/environment checks pass → run once | [4 · before checks](docs/images/quickstart-rc5/04-review.jpg) |
+| Results | Completed, failed and unevaluated counts → select a model → structure and PAE | [5](docs/images/quickstart-rc5/05-results.jpg) · [structure](docs/images/quickstart-rc5/06-structure-pae.jpg) · [PAE](docs/images/quickstart-rc5/07-pae.jpg) |
+
+<details>
+<summary>Screenshots 1–2: choose a purpose and check the public input</summary>
+
+![Step 1: choose protein complex prediction](docs/images/quickstart-rc5/01-purpose.jpg)
+
+![Step 2: check both full sequences and copy counts](docs/images/quickstart-rc5/02-input.jpg)
+
+</details>
+
+<details>
+<summary>Screenshots 3–4: check settings and find the review button</summary>
+
+Leave advanced settings unchanged. Screenshot 3 shows the transmission consent box unchecked. Confirm consent for the current public example before continuing. Screenshot 4 is **before environment checks**; the actual run control becomes available after checks pass.
+
+![Step 3: four engines and public MSA settings](docs/images/quickstart-rc5/03-settings.jpg)
+
+![Step 4: review inputs and check the environment](docs/images/quickstart-rc5/04-review.jpg)
+
+</details>
+
+<details>
+<summary>Screenshot 5: inspect an actual saved GPU result</summary>
+
+This is the previously verified rc5 barnase–barstar run with four actual engine models. General complexes do not use VHH eligibility. Capturing the input and settings screens did not submit another calculation.
+
+![Step 5: compare planned and evaluated model counts](docs/images/quickstart-rc5/05-results.jpg)
+
+</details>
+
 After changing inputs or settings, confirm review, environment checks, and transmission consent again. Advanced settings are available in the relevant step; use defaults for the first example. If a request is slow or the connection drops, check the jobs list for an existing submission before clicking again.
 
 [Step-by-step buttons and result interpretation](docs/browser_quickstart.md) · [Example sequence sources and JSON](examples/tutorial/README.md) · [Analysis workflow and selection logic](docs/ANALYSIS_WORKFLOW.md)
@@ -88,6 +131,8 @@ After changing inputs or settings, confirm review, environment checks, and trans
 | Design new nanobodies (`design`) | Full target sequence or structure | New VHH sequences, engine-specific structures, candidate table |
 | Compare existing nanobodies (`screen`) | Target + full VHH sequence for each candidate | Predictions and scores per candidate and engine |
 | Evaluate nanobody variants (`mature`) | Target + full original VHH sequence | WT, CDR substitutions, comparisons with WT from the same engine |
+
+[Settings screenshots for design, screening, and variant evaluation](docs/browser_quickstart.md#목적별-설정-스냅샷) are included in the same guide.
 
 Use amino-acid sequences. FASTA is a text format with a `>name` line followed by the sequence. A VHH is the full nanobody variable domain; a CDR3 fragment alone is insufficient. DNA/RNA and FASTQ are unsupported. Give entries distinct names that do not start with `=`, `+`, `-`, or `@`. Prepared substitution or insertion variants can be compared in `screen` as **full VHH sequences**.
 
