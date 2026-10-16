@@ -148,7 +148,7 @@ class Agent:
         python_files = {str(path.relative_to(root)): sha256(path)
                         for path in sorted(root.rglob('*.py'))
                         if '__pycache__' not in path.parts}
-        return {'comparison_public_api':True,'review_bound_diagnostics':True,
+        return {'comparison_public_api':True,'review_bound_diagnostics':True,'resume_action_receipts_v1':True,
                 'comparison_engine_selection':True,'comparison_predictors':list(AVAILABLE_ENGINES),
                 'complex_comparison':True,'complex_comparison_schema':1,'complex_comparison_predictors':list(AVAILABLE_ENGINES),
                 'package_version':__version__,'application_python_sha256':fingerprint(python_files),
@@ -589,11 +589,20 @@ class Agent:
                     job=self.manager.create({'config':cfg,'mode':request['mode'],'name':request['name'],'budget_seconds':request['budget_seconds'],'submission_id':identifier,'reuse_results':False})
                     with self.manager.store.connect() as db:db.execute('INSERT INTO cloud_sync(id,remote_id) VALUES(?,?)',(identifier,job['id']))
                 action_id=cloud.get('action_id')
-                if cloud.get('action') and (not existing or action_id!=existing['action_id']):
+                if cloud.get('action'):
                     action=json.loads(cloud['action'])
-                    if action['kind']=='cancel':job=self.manager.cancel(job['id'])
-                    elif action['kind']=='resume' and job['state'] in TERMINAL-{'complete'}:job=self.manager.resume(job['id'],action.get('budget_seconds'))
-                    with self.manager.store.connect() as db:db.execute('UPDATE cloud_sync SET action_id=?,result_synced=0 WHERE id=?',(action_id,identifier))
+                    if action['kind']=='resume' and action_id is None:
+                        raise ValueError('Cloud resume requires a stable action ID.')
+                    # Validate receipts even after acknowledgement, so a reused
+                    # ID with changed request bytes cannot be silently accepted.
+                    applied=self.manager.store.resume_action_applied(job['id'],action_id,action)
+                    if not existing or action_id!=existing['action_id']:
+                        if not applied:
+                            if action['kind']=='cancel':job=self.manager.cancel(job['id'])
+                            elif action['kind']=='resume' and job['state'] in TERMINAL-{'complete'}:
+                                job=self.manager.resume(job['id'],action.get('budget_seconds'),
+                                                        action_id=action_id,action_payload=action)
+                        with self.manager.store.connect() as db:db.execute('UPDATE cloud_sync SET action_id=?,result_synced=0 WHERE id=?',(action_id,identifier))
                 logs=self.manager.logs(job['id'],max(0,Path(job['log_path']).stat().st_size-64000) if Path(job['log_path']).exists() else 0)
                 public={k:v for k,v in job.items() if k not in ('config_path','run_dir','log_path','gpu_lock','descendants','last_descendants')};public.update(logs=logs['text'],agent_id=self.agent_id)
                 public['logs']=public_log(public['logs'])

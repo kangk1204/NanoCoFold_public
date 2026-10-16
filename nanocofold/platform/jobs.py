@@ -25,6 +25,17 @@ ACTIVE = {"queued", "running", "cancelling"}
 PROFILES = set(INSTALL_PROFILES)
 
 
+def _resume_action_json(action_id, payload):
+    if not isinstance(action_id, str) or not action_id.strip() or len(action_id) > 200:
+        raise ValueError("A stable cloud action ID of 1–200 characters is required.")
+    if not isinstance(payload, dict):
+        raise ValueError("The cloud action payload must be an object.")
+    try:
+        return json.dumps(payload, sort_keys=True, ensure_ascii=False, allow_nan=False, separators=(",", ":"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("The cloud action payload must contain finite JSON values.") from exc
+
+
 @contextlib.contextmanager
 def catalog_registration_lock(store, identifier):
     """Serialize one job's index recovery with its resume transition."""
@@ -183,6 +194,10 @@ class JobStore:
                 job_id TEXT NOT NULL, pid INTEGER NOT NULL, stamp TEXT NOT NULL,
                 owner_pid INTEGER NOT NULL, owner_stamp TEXT NOT NULL,
                 PRIMARY KEY(job_id,pid,stamp))""")
+            connection.execute("""CREATE TABLE IF NOT EXISTS job_resume_actions (
+                action_id TEXT PRIMARY KEY, job_id TEXT NOT NULL,
+                request_json TEXT NOT NULL, history_length INTEGER NOT NULL,
+                applied REAL NOT NULL)""")
 
     @contextlib.contextmanager
     def connect(self):
@@ -287,6 +302,20 @@ class JobStore:
         if row:
             return row["submission_hash"], self.get(row["job_id"])
         return None
+
+    def resume_action_applied(self, identifier, action_id, payload, connection=None):
+        """A receipt binds one cloud action to one job and the full request."""
+        if action_id is None:
+            return False  # Legacy cancel/acknowledgement records may lack an ID.
+        request_json = _resume_action_json(action_id, payload)
+        if connection is None:
+            with self.connect() as current:
+                return self.resume_action_applied(identifier, action_id, payload, current)
+        receipt = connection.execute("SELECT job_id,request_json FROM job_resume_actions WHERE action_id=?",
+                                     (action_id,)).fetchone()
+        if receipt and (receipt["job_id"] != identifier or receipt["request_json"] != request_json):
+            raise ValueError("This cloud action ID was already applied to a different job or payload.")
+        return receipt is not None
 
     def update(self, identifier: str, *, expected_states=None, expected_attempt=None, expected_history_length=None, **changes) -> dict:
         with self.connect() as connection:
@@ -545,14 +574,30 @@ class JobManager:
             raise ValueError("설치 프로필은 " + "/".join(sorted(PROFILES)) + " 중 하나입니다.")
         return self.store.insert(job)
 
-    def resume(self, identifier: str, additional_budget_seconds=None) -> dict:
+    def resume(self, identifier: str, additional_budget_seconds=None, *, action_id=None, action_payload=None) -> dict:
         from .maintenance import maintenance_lock
         self.store.get(identifier)  # Preserve the missing-job contract before opening its lock.
+        if action_id is not None:
+            if additional_budget_seconds is not None and (isinstance(additional_budget_seconds, bool)
+                    or not isinstance(additional_budget_seconds, (int, float)) or not 0 < additional_budget_seconds <= 604800):
+                raise ValueError("추가 실행 시간은 0초 초과, 7일 이하여야 합니다.")
+            if action_payload is None:
+                action_payload = {"kind": "resume", "budget_seconds": additional_budget_seconds}
+            if (not isinstance(action_payload, dict) or action_payload.get("kind") != "resume"
+                    or action_payload.get("budget_seconds") != additional_budget_seconds):
+                raise ValueError("The cloud resume action payload must match its additional budget.")
+            action_payload = json.loads(_resume_action_json(action_id, action_payload))
+            if self.store.resume_action_applied(identifier, action_id, action_payload):
+                return self.store.get(identifier)
+        elif action_payload is not None:
+            raise ValueError("A cloud resume action payload requires a stable action ID.")
         with maintenance_lock(self.workspace), catalog_registration_lock(self.store, identifier):
-            return self._resume(identifier, additional_budget_seconds)
+            return self._resume(identifier, additional_budget_seconds, action_id=action_id, action_payload=action_payload)
 
-    def _resume(self, identifier: str, additional_budget_seconds=None) -> dict:
+    def _resume(self, identifier: str, additional_budget_seconds=None, *, action_id=None, action_payload=None) -> dict:
         job = self.store.get(identifier)
+        if action_id is not None and self.store.resume_action_applied(identifier, action_id, action_payload):
+            return job
         if job.get("run_dir") and (Path(job["run_dir"]) / "retained").exists():
             raise ValueError("정리 보관본은 재개할 수 없습니다. 원본 계산이 필요하면 새 분석으로 재실행하세요.")
         allowed_gpu(job["gpu"])
@@ -576,6 +621,8 @@ class JobManager:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute("SELECT payload FROM jobs WHERE id=?", (identifier,)).fetchone()
             current = json.loads(row["payload"])
+            if action_id is not None and self.store.resume_action_applied(identifier, action_id, action_payload, connection):
+                return current
             if current["state"] not in {"interrupted", "failed", "partial_failure", "budget_exhausted", "cancelled"}:
                 raise ValueError("작업이 이미 대기 또는 실행 중입니다.")
             if identifier in self.pending_kills or self._live_attempt_processes(current, connection):
@@ -594,6 +641,13 @@ class JobManager:
                            budget_exceeded=False, catalog_pending=False, cancel_requested=False, updated=time.time())
             current.update(phase="resume_validation", progress={"completed": 0, "total": current.get("progress", {}).get("total")})
             connection.execute("UPDATE jobs SET state='queued',updated=?,payload=? WHERE id=?", (current["updated"], json.dumps(current), identifier))
+            if action_id is not None:
+                # Both changes commit or roll back together. A crash before the
+                # cloud_sync acknowledgement cannot grant another attempt or
+                # another budget extension, even if this attempt ends quickly.
+                connection.execute("INSERT INTO job_resume_actions VALUES(?,?,?,?,?)",
+                                   (action_id, identifier, _resume_action_json(action_id, action_payload),
+                                    len(history), current["updated"]))
         return current
 
     def _live_attempt_processes(self, job: dict, connection=None) -> bool:

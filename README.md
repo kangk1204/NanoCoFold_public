@@ -2,7 +2,7 @@
 
 **English** · [한국어](README.ko.md)
 
-**Build: 0.4.8rc7**
+**Build: 0.4.8rc8**
 
 Predict protein complexes, design new nanobodies, and compare existing candidates or variants. Explore candidate tables, 3D structures, PAE, and shareable HTML reports.
 
@@ -139,6 +139,8 @@ This is the previously verified rc5 barnase–barstar run with four actual engin
 </details>
 
 After changing inputs or settings, confirm input review and transmission consent again. Repeat the separate environment check only when the installation, GPU or selected engine configuration changes. Advanced settings are available in the relevant step; use defaults for the first example. If a request is slow or the connection drops, check the jobs list for an existing submission before clicking again.
+
+Closing the browser does not cancel an analysis. To stop one, use its cancel control in **Jobs & logs** and wait until cancellation cleanup finishes. Saved results remain available. To continue an interrupted analysis, use its resume control and review the saved inputs and completed-stage checks; opening an existing result never restarts inference. In the hosted workspace, an older compute agent must be updated before resume is enabled.
 
 [Step-by-step buttons and result interpretation](docs/browser_quickstart.en.md) · [Example sequence sources and JSON](examples/tutorial/README.md) · [Analysis workflow and selection logic](docs/ANALYSIS_WORKFLOW.md)
 
