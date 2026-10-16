@@ -55,7 +55,8 @@ def test_actual_modebar_hover_keeps_compact_light_controls(tmp_path,width,suppli
         page.goto(document.as_uri())
         expect(page.locator("#viewer-candidate-select")).to_be_visible()
         navigation=page.locator(".candidate-navigation :is(button,select)").evaluate_all("nodes=>nodes.map(n=>({minHeight:getComputedStyle(n).minHeight,height:n.getBoundingClientRect().height,background:getComputedStyle(n).backgroundColor,tag:n.tagName}))")
-        assert navigation and all(n["minHeight"]=="44px" and 44<=n["height"]<48 for n in navigation)
+        # Result navigation keeps 48px hit targets; Plotly tools remain compact below.
+        assert navigation and all(n["minHeight"]=="48px" and 48<=n["height"]<52 for n in navigation)
         assert all(n["background"]=="rgb(255, 255, 255)" for n in navigation if n["tag"]=="BUTTON")
         page.locator(".candidate-navigation").screenshot(path=str(tmp_path/f"candidate-navigation-{width}.png"))
         expect(page.locator("#scatter .modebar-btn").first).to_be_attached()
