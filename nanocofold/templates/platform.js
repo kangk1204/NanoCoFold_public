@@ -2051,7 +2051,8 @@ function localizedStructureDataNote(data) {
 function resultChain(role) {
   const data = state.structure;
   const id = role === "target" ? data?.target_chain : data?.binder_chain;
-  return data?.chains?.find(chain => chain.id === id);
+  return (Array.isArray(data?.chains) ? data.chains : []).find(chain =>
+    chain?.id === id && chain.role === role && Array.isArray(chain.residues));
 }
 function syncResultChainControls() {
   const complex = state.result?.mode === "complex";
@@ -2098,6 +2099,7 @@ function focusButton(label, labels, text, measurement) {
 async function renderStructure() {
   const data = state.structure;
   if (!data) return;
+  const chains = (Array.isArray(data.chains) ? data.chains : []).filter(chain => chain && typeof chain.id === "string");
   I18N.text($("structure-data-note"), localizedStructureDataNote(data));
   if (state.viewerData !== data) {
     disposeResultViewer();
@@ -2122,7 +2124,7 @@ async function renderStructure() {
     if (request !== state.viewerRequest || state.structure !== data) { viewer.dispose(); return; }
     state.viewer = viewer;
     syncResultChainControls();
-    if ($("structure-source")) I18N.text($("structure-source"), I18N.format("현재 모델 {0} · 체인 {1} · {2}", [data.candidate_id, data.chains.map(c=>c.id).join(", "), I18N.term(coordinatePresentation(data).caption)]));
+    if ($("structure-source")) I18N.text($("structure-source"), I18N.format("현재 모델 {0} · 체인 {1} · {2}", [data.candidate_id, chains.length ? chains.map(c=>c.id).join(", ") : I18N.term("미기록"), I18N.term(coordinatePresentation(data).caption)]));
     if ($("save-native-structure")) $("save-native-structure").disabled = !coordinatePresentation(data).rawAvailable;
     if ($("save-pae")) $("save-pae").disabled = !data.pae;
   } else if (!state.viewer) {
@@ -2132,8 +2134,10 @@ async function renderStructure() {
   await state.viewer.layers(resultLayers());
   await state.viewer.display(resultDisplay());
   if (state.structure !== data) return;
-  I18N.text($("structure-note"), I18N.format("MolStar · {0} {1} · {2} {3} · 접촉 잔기쌍 {4} · 충돌 잔기쌍 {5}. 서열·PAE·아래 버튼에서 잔기를 선택하세요.", [state.result.mode === 'complex' ? I18N.term('기준 체인') : I18N.term('표적'), data.target_chain, state.result.mode === 'complex' ? I18N.term('파트너') : 'VHH', data.binder_chain, (data.contacts?.length ? data.contacts?.length : 0), (data.clashes?.length ? data.clashes?.length : 0)]));
-  const residues = (data.chains || []).flatMap(c => c.residues.map(r => ({value: r.label, label: `${r.label} ${r.name}`})));
+  I18N.text($("structure-note"), state.viewer.metadataIncomplete ? I18N.term("체인 역할·잔기 정보가 일부 기록되지 않았습니다. 분류하지 않은 좌표는 회색으로 표시하며, 표적·파트너 역할이나 잔기 대응을 추정하지 않습니다.") : I18N.format("MolStar · {0} {1} · {2} {3} · 접촉 잔기쌍 {4} · 충돌 잔기쌍 {5}. 서열·PAE·아래 버튼에서 잔기를 선택하세요.", [state.result.mode === 'complex' ? I18N.term('기준 체인') : I18N.term('표적'), data.target_chain, state.result.mode === 'complex' ? I18N.term('파트너') : 'VHH', data.binder_chain, (data.contacts?.length ? data.contacts?.length : 0), (data.clashes?.length ? data.clashes?.length : 0)]));
+  const residues = chains.flatMap(chain => (Array.isArray(chain.residues) ? chain.residues : [])
+    .filter(residue => residue && typeof residue.label === "string")
+    .map(residue => ({value: residue.label, label: `${residue.label} ${residue.name || ""}`})));
   for (const id of ["residue-a", "residue-b"]) {
     const saved = $(id).value;
     options($(id), [{value: "", label: "잔기 선택"}, ...residues]);
@@ -2146,7 +2150,7 @@ async function renderStructure() {
   const actions = $("structure-actions"); actions.replaceChildren();
   if (data.clashes?.length)
     actions.append(focusButton(`충돌 잔기쌍 · ${data.clashes.length}쌍 보기`, data.clashes.flatMap(p => [p.a, p.b])));
-  if ((state.candidate.developability_details?.warnings || []).some(r => /cys/i.test(r)) && data.cysteines?.residues.length)
+  if ((state.candidate.developability_details?.warnings || []).some(r => /cys/i.test(r)) && data.cysteines?.residues?.length)
     actions.append(focusButton("Cys 위험 사유 · 좌표 확인", data.cysteines.residues, data.cysteines.note));
   const cdrActions = $("cdr-actions"); cdrActions.replaceChildren(el("span", (data.cdr?.note ? data.cdr?.note : I18N.term("CDR 미평가")), "muted"));
   for (const [name, region] of Object.entries(data.cdr?.ranges || {})) {

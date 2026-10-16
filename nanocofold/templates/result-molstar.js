@@ -14,10 +14,14 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     const result = new NanoCoFoldResultViewer(viewer, data);
     try {
       result.structure = await result.load(data.content, data.format, "예측 복합체");
-      for (const chain of data.chains || [])
-        await result.component(result.structure, {auth_asym_id: chain.id}, chain.role,
-          `체인 ${chain.id} · ${chain.role}`, chain.role === "target" ? 0x3b82b2 : chain.role === "binder" ? 0xd79a2b : 0x909ea9,
-          chain.residues.length < 4 ? "ball-and-stick" : "cartoon");
+      result.addCoordinateChains();
+      if (!result.displayChains.length)
+        await result.component(result.structure, {}, "unclassified", "Coordinates", 0x909ea9, "ball-and-stick");
+      for (const chain of result.displayChains)
+        await result.component(result.structure, {auth_asym_id: chain.id}, chain.unclassified ? "unclassified" : chain.role,
+          chain.unclassified ? `Coordinates · ${chain.id}` : `체인 ${chain.id} · ${chain.role}`,
+          chain.role === "target" ? 0x3b82b2 : chain.role === "binder" ? 0xd79a2b : 0x909ea9,
+          chain.unclassified || chain.residues.length < 4 ? "ball-and-stick" : "cartoon");
       for (const [key, labels, color, type] of [
         ["hotspots", data.hotspots || [], 0xcf446b, "ball-and-stick"],
         ["contacts", (data.contacts || []).flatMap(p => [p.a, p.b]), 0x16a092, "ball-and-stick"],
@@ -44,11 +48,38 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
   }
   constructor(viewer, data) {
     this.viewer = viewer; this.data = data; this.representations = new Map();
+    // Presentation metadata is optional in older saved reports. Keep the
+    // original payload/coordinate identity untouched; these copies describe
+    // only how to draw existing coordinates, never scientific chain roles.
+    const recorded = Array.isArray(data.chains) ? data.chains : [];
+    this.displayChains = recorded.filter(chain => chain && typeof chain.id === "string").map(chain => ({
+      ...chain, residues: Array.isArray(chain.residues) ? chain.residues : [],
+      role: ["target", "binder", "context"].includes(chain.role) ? chain.role : "context",
+      unclassified: !["target", "binder", "context"].includes(chain.role),
+    }));
+    this.metadataIncomplete = !recorded.length || recorded.length !== this.displayChains.length ||
+      this.displayChains.some(chain => chain.unclassified) || recorded.some(chain => !Array.isArray(chain?.residues));
     this.disposed = false; this.pending = Promise.resolve();
     this.activeLayers = {target: true, binder: true, context: true};
     this.displayOptions = {sequence: false, residues: false};
     this.residuesCreated = false;
     this.cameraFocusLabels = null;
+  }
+  addCoordinateChains() {
+    // MolStar's parsed author chain IDs are coordinate labels, not inferred
+    // target/binder assignments or residue/PAE correspondences.
+    const recorded = new Set(this.displayChains.map(chain => chain.id));
+    for (const model of this.structure.obj.data.models || []) {
+      const ids = model.atomicHierarchy?.chains?.auth_asym_id;
+      if (!ids) continue;
+      for (let index = 0; index < ids.rowCount; index++) {
+        const id = ids.value(index);
+        if (typeof id !== "string" || recorded.has(id)) continue;
+        this.displayChains.push({id, role:"context", residues:[], unclassified:true});
+        this.metadataIncomplete = true;
+        recorded.add(id);
+      }
+    }
   }
   async load(content, format, label) {
     const plugin = this.viewer.plugin;
@@ -58,10 +89,10 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     return plugin.builders.structure.createStructure(model, {name: "model", params: {}});
   }
   schema(labels, atom) {
-    return {items: [...new Set(labels)].map(label => {
+    return {items: [...new Set(labels || [])].map(label => {
       const m = String(label).match(/^([^:]+):(-?\d+)([A-Za-z]?)$/);
       if (!m) throw Error(`잔기 번호 형식 오류: ${label}`);
-      const residue = this.data.chains.find(c => c.id === m[1])?.residues.find(r => r.label === label);
+      const residue = this.displayChains.find(c => c.id === m[1])?.residues.find(r => r.label === label);
       const atomId = atom && residue?.atom_ids?.[atom];
       return {auth_asym_id: m[1], auth_seq_id: Number(m[2]), pdbx_PDB_ins_code: m[3] || "",
         ...(atom ? {auth_atom_id: atom, ...(atomId != null ? {atom_id: atomId} : {})} : {})};
@@ -96,7 +127,9 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     for (const [key, reprs] of this.representations) {
       const role = key.startsWith("residues-") ? key.slice(9) : key;
       const atoms = key.startsWith("residues-") || ["hotspots", "contacts", "clashes"].includes(key);
-      const visible = !!this.activeLayers[role] && (!atoms || this.displayOptions.residues);
+      // Unknown coordinate roles must stay visible even when a saved report
+      // hides known context chains. Neutral display is not a role assignment.
+      const visible = (role === "unclassified" || !!this.activeLayers[role]) && (!atoms || this.displayOptions.residues);
       for (const repr of reprs)
         this.viewer.plugin.state.data.updateCellState(repr.ref, {isHidden: !visible});
     }
@@ -109,8 +142,9 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
         top: this.displayOptions.sequence ? "full" : "hidden"}});
       this.viewer.handleResize();
       if (this.displayOptions.residues && !this.residuesCreated) {
-        for (const chain of this.data.chains || []) {
+        for (const chain of this.displayChains) {
           if (this.disposed) return;
+          if (chain.unclassified) continue; // Already drawn as neutral atoms.
           await this.component(this.structure, {auth_asym_id: chain.id}, `residues-${chain.role}`,
             `체인 ${chain.id} · 잔기·곁사슬`, chain.role === "target" ? 0x3b82b2 : chain.role === "binder" ? 0xd79a2b : 0x909ea9,
             "ball-and-stick");
@@ -163,7 +197,7 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     const chain = StructureProperties.chain.auth_asym_id(location), number = StructureProperties.residue.auth_seq_id(location);
     const icode = StructureProperties.residue.pdbx_PDB_ins_code(location) || "";
     const label = `${chain}:${number}${icode}`;
-    const chainData = this.data.chains.find(c => c.id === chain);
+    const chainData = this.displayChains.find(c => c.id === chain);
     const index = chainData?.residues.findIndex(r => r.label === label);
     const mapping = chain !== this.data.binder_chain && index >= 0
       ? this.data.residue_mapping?.find(r => r.output_chain === chain && Number(r.output_position) === index + 1) : null;

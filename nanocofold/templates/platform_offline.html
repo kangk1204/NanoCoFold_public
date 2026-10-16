@@ -843,10 +843,14 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     const result = new NanoCoFoldResultViewer(viewer, data);
     try {
       result.structure = await result.load(data.content, data.format, "예측 복합체");
-      for (const chain of data.chains || [])
-        await result.component(result.structure, {auth_asym_id: chain.id}, chain.role,
-          `체인 ${chain.id} · ${chain.role}`, chain.role === "target" ? 0x3b82b2 : chain.role === "binder" ? 0xd79a2b : 0x909ea9,
-          chain.residues.length < 4 ? "ball-and-stick" : "cartoon");
+      result.addCoordinateChains();
+      if (!result.displayChains.length)
+        await result.component(result.structure, {}, "unclassified", "Coordinates", 0x909ea9, "ball-and-stick");
+      for (const chain of result.displayChains)
+        await result.component(result.structure, {auth_asym_id: chain.id}, chain.unclassified ? "unclassified" : chain.role,
+          chain.unclassified ? `Coordinates · ${chain.id}` : `체인 ${chain.id} · ${chain.role}`,
+          chain.role === "target" ? 0x3b82b2 : chain.role === "binder" ? 0xd79a2b : 0x909ea9,
+          chain.unclassified || chain.residues.length < 4 ? "ball-and-stick" : "cartoon");
       for (const [key, labels, color, type] of [
         ["hotspots", data.hotspots || [], 0xcf446b, "ball-and-stick"],
         ["contacts", (data.contacts || []).flatMap(p => [p.a, p.b]), 0x16a092, "ball-and-stick"],
@@ -873,11 +877,38 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
   }
   constructor(viewer, data) {
     this.viewer = viewer; this.data = data; this.representations = new Map();
+    // Presentation metadata is optional in older saved reports. Keep the
+    // original payload/coordinate identity untouched; these copies describe
+    // only how to draw existing coordinates, never scientific chain roles.
+    const recorded = Array.isArray(data.chains) ? data.chains : [];
+    this.displayChains = recorded.filter(chain => chain && typeof chain.id === "string").map(chain => ({
+      ...chain, residues: Array.isArray(chain.residues) ? chain.residues : [],
+      role: ["target", "binder", "context"].includes(chain.role) ? chain.role : "context",
+      unclassified: !["target", "binder", "context"].includes(chain.role),
+    }));
+    this.metadataIncomplete = !recorded.length || recorded.length !== this.displayChains.length ||
+      this.displayChains.some(chain => chain.unclassified) || recorded.some(chain => !Array.isArray(chain?.residues));
     this.disposed = false; this.pending = Promise.resolve();
     this.activeLayers = {target: true, binder: true, context: true};
     this.displayOptions = {sequence: false, residues: false};
     this.residuesCreated = false;
     this.cameraFocusLabels = null;
+  }
+  addCoordinateChains() {
+    // MolStar's parsed author chain IDs are coordinate labels, not inferred
+    // target/binder assignments or residue/PAE correspondences.
+    const recorded = new Set(this.displayChains.map(chain => chain.id));
+    for (const model of this.structure.obj.data.models || []) {
+      const ids = model.atomicHierarchy?.chains?.auth_asym_id;
+      if (!ids) continue;
+      for (let index = 0; index < ids.rowCount; index++) {
+        const id = ids.value(index);
+        if (typeof id !== "string" || recorded.has(id)) continue;
+        this.displayChains.push({id, role:"context", residues:[], unclassified:true});
+        this.metadataIncomplete = true;
+        recorded.add(id);
+      }
+    }
   }
   async load(content, format, label) {
     const plugin = this.viewer.plugin;
@@ -887,10 +918,10 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     return plugin.builders.structure.createStructure(model, {name: "model", params: {}});
   }
   schema(labels, atom) {
-    return {items: [...new Set(labels)].map(label => {
+    return {items: [...new Set(labels || [])].map(label => {
       const m = String(label).match(/^([^:]+):(-?\d+)([A-Za-z]?)$/);
       if (!m) throw Error(`잔기 번호 형식 오류: ${label}`);
-      const residue = this.data.chains.find(c => c.id === m[1])?.residues.find(r => r.label === label);
+      const residue = this.displayChains.find(c => c.id === m[1])?.residues.find(r => r.label === label);
       const atomId = atom && residue?.atom_ids?.[atom];
       return {auth_asym_id: m[1], auth_seq_id: Number(m[2]), pdbx_PDB_ins_code: m[3] || "",
         ...(atom ? {auth_atom_id: atom, ...(atomId != null ? {atom_id: atomId} : {})} : {})};
@@ -925,7 +956,9 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     for (const [key, reprs] of this.representations) {
       const role = key.startsWith("residues-") ? key.slice(9) : key;
       const atoms = key.startsWith("residues-") || ["hotspots", "contacts", "clashes"].includes(key);
-      const visible = !!this.activeLayers[role] && (!atoms || this.displayOptions.residues);
+      // Unknown coordinate roles must stay visible even when a saved report
+      // hides known context chains. Neutral display is not a role assignment.
+      const visible = (role === "unclassified" || !!this.activeLayers[role]) && (!atoms || this.displayOptions.residues);
       for (const repr of reprs)
         this.viewer.plugin.state.data.updateCellState(repr.ref, {isHidden: !visible});
     }
@@ -938,8 +971,9 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
         top: this.displayOptions.sequence ? "full" : "hidden"}});
       this.viewer.handleResize();
       if (this.displayOptions.residues && !this.residuesCreated) {
-        for (const chain of this.data.chains || []) {
+        for (const chain of this.displayChains) {
           if (this.disposed) return;
+          if (chain.unclassified) continue; // Already drawn as neutral atoms.
           await this.component(this.structure, {auth_asym_id: chain.id}, `residues-${chain.role}`,
             `체인 ${chain.id} · 잔기·곁사슬`, chain.role === "target" ? 0x3b82b2 : chain.role === "binder" ? 0xd79a2b : 0x909ea9,
             "ball-and-stick");
@@ -992,7 +1026,7 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     const chain = StructureProperties.chain.auth_asym_id(location), number = StructureProperties.residue.auth_seq_id(location);
     const icode = StructureProperties.residue.pdbx_PDB_ins_code(location) || "";
     const label = `${chain}:${number}${icode}`;
-    const chainData = this.data.chains.find(c => c.id === chain);
+    const chainData = this.displayChains.find(c => c.id === chain);
     const index = chainData?.residues.findIndex(r => r.label === label);
     const mapping = chain !== this.data.binder_chain && index >= 0
       ? this.data.residue_mapping?.find(r => r.output_chain === chain && Number(r.output_position) === index + 1) : null;
@@ -2561,6 +2595,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "서열 prior 평가 한도 밖 (구조 미평가)": "Outside the sequence-prior evaluation limit (structure not evaluated)",
   "지정 결합 부위 판정 (기록)": "Recorded binding-site decision",
   "PAE 자료가 손상되어 표시할 수 없습니다. 표와 구조는 계속 확인할 수 있습니다.": "The PAE data is damaged and cannot be displayed. Tables and structures remain available.",
+  "체인 역할·잔기 정보가 일부 기록되지 않았습니다. 분류하지 않은 좌표는 회색으로 표시하며, 표적·파트너 역할이나 잔기 대응을 추정하지 않습니다.": "Some chain roles or residue metadata were not recorded. Unclassified coordinates are shown in gray; target/partner roles and residue mappings are not inferred.",
   "복합체 예측 · 처음 실행 추천": "Predict complexes · Recommended first run"
 });
 /* Explicit presentation bindings; no DOM observer, input rewriting, or API mutation. */
@@ -4732,7 +4767,8 @@ function localizedStructureDataNote(data) {
 function resultChain(role) {
   const data = state.structure;
   const id = role === "target" ? data?.target_chain : data?.binder_chain;
-  return data?.chains?.find(chain => chain.id === id);
+  return (Array.isArray(data?.chains) ? data.chains : []).find(chain =>
+    chain?.id === id && chain.role === role && Array.isArray(chain.residues));
 }
 function syncResultChainControls() {
   const complex = state.result?.mode === "complex";
@@ -4779,6 +4815,7 @@ function focusButton(label, labels, text, measurement) {
 async function renderStructure() {
   const data = state.structure;
   if (!data) return;
+  const chains = (Array.isArray(data.chains) ? data.chains : []).filter(chain => chain && typeof chain.id === "string");
   I18N.text($("structure-data-note"), localizedStructureDataNote(data));
   if (state.viewerData !== data) {
     disposeResultViewer();
@@ -4803,7 +4840,7 @@ async function renderStructure() {
     if (request !== state.viewerRequest || state.structure !== data) { viewer.dispose(); return; }
     state.viewer = viewer;
     syncResultChainControls();
-    if ($("structure-source")) I18N.text($("structure-source"), I18N.format("현재 모델 {0} · 체인 {1} · {2}", [data.candidate_id, data.chains.map(c=>c.id).join(", "), I18N.term(coordinatePresentation(data).caption)]));
+    if ($("structure-source")) I18N.text($("structure-source"), I18N.format("현재 모델 {0} · 체인 {1} · {2}", [data.candidate_id, chains.length ? chains.map(c=>c.id).join(", ") : I18N.term("미기록"), I18N.term(coordinatePresentation(data).caption)]));
     if ($("save-native-structure")) $("save-native-structure").disabled = !coordinatePresentation(data).rawAvailable;
     if ($("save-pae")) $("save-pae").disabled = !data.pae;
   } else if (!state.viewer) {
@@ -4813,8 +4850,10 @@ async function renderStructure() {
   await state.viewer.layers(resultLayers());
   await state.viewer.display(resultDisplay());
   if (state.structure !== data) return;
-  I18N.text($("structure-note"), I18N.format("MolStar · {0} {1} · {2} {3} · 접촉 잔기쌍 {4} · 충돌 잔기쌍 {5}. 서열·PAE·아래 버튼에서 잔기를 선택하세요.", [state.result.mode === 'complex' ? I18N.term('기준 체인') : I18N.term('표적'), data.target_chain, state.result.mode === 'complex' ? I18N.term('파트너') : 'VHH', data.binder_chain, (data.contacts?.length ? data.contacts?.length : 0), (data.clashes?.length ? data.clashes?.length : 0)]));
-  const residues = (data.chains || []).flatMap(c => c.residues.map(r => ({value: r.label, label: `${r.label} ${r.name}`})));
+  I18N.text($("structure-note"), state.viewer.metadataIncomplete ? I18N.term("체인 역할·잔기 정보가 일부 기록되지 않았습니다. 분류하지 않은 좌표는 회색으로 표시하며, 표적·파트너 역할이나 잔기 대응을 추정하지 않습니다.") : I18N.format("MolStar · {0} {1} · {2} {3} · 접촉 잔기쌍 {4} · 충돌 잔기쌍 {5}. 서열·PAE·아래 버튼에서 잔기를 선택하세요.", [state.result.mode === 'complex' ? I18N.term('기준 체인') : I18N.term('표적'), data.target_chain, state.result.mode === 'complex' ? I18N.term('파트너') : 'VHH', data.binder_chain, (data.contacts?.length ? data.contacts?.length : 0), (data.clashes?.length ? data.clashes?.length : 0)]));
+  const residues = chains.flatMap(chain => (Array.isArray(chain.residues) ? chain.residues : [])
+    .filter(residue => residue && typeof residue.label === "string")
+    .map(residue => ({value: residue.label, label: `${residue.label} ${residue.name || ""}`})));
   for (const id of ["residue-a", "residue-b"]) {
     const saved = $(id).value;
     options($(id), [{value: "", label: "잔기 선택"}, ...residues]);
@@ -4827,7 +4866,7 @@ async function renderStructure() {
   const actions = $("structure-actions"); actions.replaceChildren();
   if (data.clashes?.length)
     actions.append(focusButton(`충돌 잔기쌍 · ${data.clashes.length}쌍 보기`, data.clashes.flatMap(p => [p.a, p.b])));
-  if ((state.candidate.developability_details?.warnings || []).some(r => /cys/i.test(r)) && data.cysteines?.residues.length)
+  if ((state.candidate.developability_details?.warnings || []).some(r => /cys/i.test(r)) && data.cysteines?.residues?.length)
     actions.append(focusButton("Cys 위험 사유 · 좌표 확인", data.cysteines.residues, data.cysteines.note));
   const cdrActions = $("cdr-actions"); cdrActions.replaceChildren(el("span", (data.cdr?.note ? data.cdr?.note : I18N.term("CDR 미평가")), "muted"));
   for (const [name, region] of Object.entries(data.cdr?.ranges || {})) {

@@ -1536,6 +1536,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "서열 prior 평가 한도 밖 (구조 미평가)": "Outside the sequence-prior evaluation limit (structure not evaluated)",
   "지정 결합 부위 판정 (기록)": "Recorded binding-site decision",
   "PAE 자료가 손상되어 표시할 수 없습니다. 표와 구조는 계속 확인할 수 있습니다.": "The PAE data is damaged and cannot be displayed. Tables and structures remain available.",
+  "체인 역할·잔기 정보가 일부 기록되지 않았습니다. 분류하지 않은 좌표는 회색으로 표시하며, 표적·파트너 역할이나 잔기 대응을 추정하지 않습니다.": "Some chain roles or residue metadata were not recorded. Unclassified coordinates are shown in gray; target/partner roles and residue mappings are not inferred.",
   "복합체 예측 · 처음 실행 추천": "Predict complexes · Recommended first run"
 });
 /* Explicit presentation bindings; no DOM observer, input rewriting, or API mutation. */
