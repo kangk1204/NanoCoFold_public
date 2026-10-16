@@ -366,6 +366,64 @@ def _truncation_summary(info) -> str:
     return " · ".join(parts)
 
 
+def _report_i18n_runtime(document: str) -> str:
+    """Inline the shared translator with only this report's owned captions.
+
+    Saved IDs/notes are not localization inputs. A small catalog also keeps the
+    static entry report below the existing delivery size budget.
+    """
+    from html.parser import HTMLParser
+
+    class Captions(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.values = set()
+            self.active = []
+            self.depth = 0
+
+        def handle_starttag(self, tag, attrs):
+            self.depth += 1
+            attrs = dict(attrs)
+            if "data-report-i18n" in attrs:
+                self.active.append((self.depth, []))
+            if "data-report-i18n-attributes" in attrs:
+                for field in ("placeholder", "aria-label", "title"):
+                    if attrs.get(field):
+                        self.values.add(attrs[field])
+            if tag in {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}:
+                self.depth -= 1
+
+        def handle_endtag(self, tag):
+            for depth, parts in list(self.active):
+                if depth == self.depth:
+                    self.values.add("".join(parts))
+                    self.active.remove((depth, parts))
+            self.depth -= 1
+
+        def handle_data(self, text):
+            for _, parts in self.active:
+                parts.append(text)
+
+    captions = Captions()
+    captions.feed(document)
+    captions.values.update(match[1] for match in re.findall(r"I18N\.term\(([\"'])(.*?)\1\)", document))
+    source = (TEMPLATE_DIR / "platform-i18n.js").read_text(encoding="utf-8")
+    pattern = r"const NCF_TRANSLATIONS = Object.freeze\((\{[\s\S]*?\})\);"
+    catalog_match = re.search(pattern, source)
+    if catalog_match is None:
+        raise ValueError("Packaged report translation catalog is missing")
+    catalog = json.loads(catalog_match[1])
+    normalized = {" ".join(value.split()) for value in captions.values}
+    selected = {}
+    for key, value in catalog.items():
+        parts = re.split(r"(\{\d+\})", key)
+        dynamic = "".join(r"[\s\S]*?" if re.fullmatch(r"\{\d+\}", part) else re.escape(part) for part in parts)
+        if " ".join(key.split()) in normalized or (len(parts) > 1 and any(re.fullmatch(dynamic, text) for text in captions.values)):
+            selected[key] = value
+    source = source[:catalog_match.start(1)] + json.dumps(selected, ensure_ascii=False) + source[catalog_match.end(1):]
+    return source.replace("</", "<\\/")
+
+
 def generate_report(
     run_dir: Path,
     cfg: dict,
@@ -383,6 +441,10 @@ def generate_report(
         loader=FileSystemLoader(str(TEMPLATE_DIR)),
         autoescape=select_autoescape(["html", "j2"]),
     )
+    from markupsafe import Markup, escape
+    # Only template-owned derived captions use this marker. Raw saved values
+    # remain unmarked even when they equal a translation key such as 완료.
+    env.globals["report_term"] = lambda value: Markup('<span data-report-i18n>') + escape(str(value)) + Markup('</span>')
     template = env.get_template("report.html.j2")
 
     from .platform.results import ResultReader
@@ -501,6 +563,7 @@ def generate_report(
         "pose_assessments_available": any(key in row for row in scored_rows for key in POSE_STATUS_LABELS),
         "display_identity": _display_identity,
         "reason_summary": presentation["reasons"],
+        "known_reason_codes": list(REASON_LABELS),
         "metric_method_rows": presentation["metric_methods"],
         "threshold_check_rows": _threshold_check_rows([row for row in scored_rows if row.get("model_record", True) is True], recorded_cfg),
         "thresholds_source": "run_config.yaml" if recorded_cfg else "not_recorded",
@@ -536,7 +599,15 @@ def generate_report(
     render_context["files"] = render_context["files"][:200]
     render_context["files_omitted"] = max(0, file_total - 200)
     render_context = portable_metadata(render_context, root=run_dir)
-    html_bytes = template.render(**render_context).encode("utf-8")
+    # Trusted packaged presentation code is self-contained. Add it after
+    # metadata masking so catalog literals are not mistaken for saved paths.
+    render_context["report_i18n_script"] = ""
+    document = template.render(**render_context)
+    slot = '<script id="report-i18n-runtime"></script>'
+    if document.count(slot) != 1:
+        raise ValueError("Report translation runtime slot is invalid")
+    document = document.replace(slot, '<script id="report-i18n-runtime">' + _report_i18n_runtime(document) + '</script>', 1)
+    html_bytes = document.encode("utf-8")
     if explorer_path is not None:
         _publish_immutable_explorer(explorer_path, explorer, root=out_path.parent)
     _atomic_write(out_path, html_bytes, prefix=".report-")

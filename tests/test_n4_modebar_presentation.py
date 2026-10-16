@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 
 from nanocofold import report
+from test_bilingual_report import ReportText
 from test_reassessment_presentation import _payload, _write_document
 from test_supplied_html_boot import supplied_server
 
@@ -28,10 +29,11 @@ def test_static_rank_labels_and_blank_exclusions_preserve_fallback_reasons(tmp_p
     frame=pd.DataFrame(rows);before=frame.copy(deep=True)
     path=report.generate_report(tmp_path,{"run":{"mode":"screen"},"report":{"viewer":"none"}}, {},scored=frame,selected=frame.iloc[[0,2]])
     text=path.read_text()
-    assert ">순위 산정</td>" in text and ">보류</td>" in text
-    assert ">해당 없음</td>" in text and "가중 CDR 개발가능성 미평가" in text
-    assert ">없음</td>" in text and "ipSAE 기준 미통과" in text
-    assert "0.8" in text and "0.1" in text
+    cells = ReportText(text).cells
+    assert "순위 산정" in cells and "보류" in cells
+    assert "해당 없음" in cells and "가중 CDR 개발가능성 미평가" in cells
+    assert "없음" in cells and "ipSAE 기준 미통과" in cells
+    assert "0.8" in cells and "0.1" in cells
     pd.testing.assert_frame_equal(frame,before)
 
 

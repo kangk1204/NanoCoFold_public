@@ -1537,6 +1537,243 @@ const NCF_TRANSLATIONS = Object.freeze({
   "지정 결합 부위 판정 (기록)": "Recorded binding-site decision",
   "PAE 자료가 손상되어 표시할 수 없습니다. 표와 구조는 계속 확인할 수 있습니다.": "The PAE data is damaged and cannot be displayed. Tables and structures remain available.",
   "체인 역할·잔기 정보가 일부 기록되지 않았습니다. 분류하지 않은 좌표는 회색으로 표시하며, 표적·파트너 역할이나 잔기 대응을 추정하지 않습니다.": "Some chain roles or residue metadata were not recorded. Unclassified coordinates are shown in gray; target/partner roles and residue mappings are not inferred.",
+  "(dev_severe): free Cys, N-글리코실화 서열, CDR 탈아미드/이성화, CDR 소수성 패치.": "(dev_severe): free Cys, N-glycosylation motifs, CDR deamidation/isomerization, and hydrophobic CDR patches.",
+  ", 잔기 선택과 거리 측정을 사용할 수 있습니다. 구조·PAE가 없으면 미평가로 남으며 원본 점수·선별 기록을 다시 계산하지 않습니다. 오프라인으로 옮길 때는 이 보고서와 연결된 탐색 HTML 파일을 같은 폴더에 보관하거나 전달 ZIP을 사용하세요.": ", residue selection, and distance measurement. Missing structures or PAE remain unevaluated; original scores and selection records are not recalculated. For offline use, keep this report and its linked explorer HTML in the same folder, or use the delivery ZIP.",
+  ". 로컬 MSA와 별도 API 비교 실행은 각 실행의 설정·출처에서 확인하며 이 보고서의 모델 순위에 합산하지 않습니다.": ". Check each run's settings and provenance for local-MSA or separate API comparisons. Their scores are not added to this report's model ranking.",
+  ". 이 목록은 실험 우선순위이며 특이적 결합이 입증된 목록이 아닙니다.\n    전장형의 낮은 점수는 비결합 증거가 아닙니다. 말단 원자·전하에 의한 인식은 별도 실험 확인이 필요합니다.": ". This is an experimental priority list, not evidence of specific binding. Low scores for the full-length form do not establish non-binding. Recognition involving terminal atoms or charges requires separate experimental confirmation.",
+  ". 일반 복합체에는 VHH 적격 판정을 적용하지 않습니다.": ". VHH eligibility gates do not apply to general complexes.",
+  "/ 전체": "/ total",
+  "03 후보 비교 · 표시": "03 Compare candidates · Showing",
+  "0은 현재 거리 기준에서 충돌이 없다는 뜻이며 실험 성공을 보장하지 않습니다. H-bond/염다리 수는 거리 기반 근사치입니다.": "0 means no clashes under the current distance criterion; it does not guarantee experimental success. H-bond/salt-bridge counts are distance-based approximations.",
+  "NanoCoFold · 상업적 이용 가능 도구만 사용 (LICENSE_MANIFEST.md 참조) · 모든 수치는 예측값이며 실험 검증이 필요합니다.": "NanoCoFold · Uses commercially permitted tools only (see LICENSE_MANIFEST.md) · All values are predictions and require experimental validation.",
+  "VHH 점수의 ipTM은 선택 표적–VHH 쌍의 native 방향값 최솟값입니다. 정확히 두 체인일 때만 native 전체 ipTM을 대신 사용할 수 있습니다. 3체인 이상에서 쌍 값이나 검증된 체인 축이 없으면 미평가입니다. 일반 복합체 요약 ipTM은 전체 값이며 체인 쌍 상세와 구분합니다.": "VHH ipTM is the minimum of the native directional values for the selected target–VHH pair. Native whole-complex ipTM is a fallback only for exactly two chains. Complexes with three or more chains remain unevaluated when pair values or verified chain axes are missing. General-complex summary ipTM is the whole-complex value, distinct from pair details.",
+  "clash는 선택 표적뿐 아니라 유지한 파트너와 VHH 사이의 충돌도 포함합니다. CSV의 n_target_clashes와 n_context_clashes에서 구분할 수 있습니다. 항원끼리의 충돌은 이 값에 포함하지 않습니다.": "Clashes include VHH contacts with both the selected target and retained partners. The CSV separates n_target_clashes and n_context_clashes. Clashes between antigens are not included.",
+  "handoff 게이트 미통과 —": "Handoff gate not passed —",
+  "handoff 게이트 통과 —": "Handoff gate passed —",
+  "· 결합 부위:": "· Binding site:",
+  "· 계산 버전:": "· Computation version:",
+  "· 구조 파일 형식(pdb/cif)과 실제 체인을 사용해 표시.": "· Display uses the recorded structure format (PDB/CIF) and actual chains.",
+  "· 모드:": "· Mode:",
+  "· 보고서 버전:": "· Report version:",
+  "· 보고서 생성:": "· Report created:",
+  "· 생성:": "· Created:",
+  "· 실행 식별 출처:": "· Runtime identity source:",
+  "· 예측 전 준비·미선정": "· Prepared but not selected before prediction",
+  "· 적격 판정 미평가": "· Eligibility not evaluated",
+  "· 표적:": "· Target:",
+  "같은 seed라도 모든 엔진·장치에서 비트 단위 재현을 보장하지 않습니다. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에 한정됩니다. RFantibody·BoltzGen 생성 단계의 난수 통제는 제한적이므로 결합 부위 OFF/ON의 동일 난수 상태나 인과효과를 가정하지 않습니다.": "The same seed does not guarantee bitwise reproducibility across engines and devices. Strict CUDA determinism and repeated verification in the same environment apply only to the Chai path. Randomness control in RFantibody and BoltzGen generation is limited; do not assume identical random states or causal effects for binding-site OFF/ON comparisons.",
+  "개는 전체 원본과 manifest에서 확인하세요.": "entries are available in the full originals and manifest.",
+  "개를 표시합니다. 표의 전체 기록 수와 뷰어의 표시 한도는 별개입니다. 회색은 선택한 두 체인 이외의 보조 체인입니다. PAE 원본 파일과 방향별 계면 PAE 값은 평가표 및 산출물에서 확인하세요. 구조·PAE가 없으면 미평가로 남습니다.": "representative structures. The table's total record count is separate from the viewer limit. Gray denotes auxiliary chains outside the selected pair. Check the tables and artifacts for original PAE files and directional interface PAE. Missing structures or PAE remain unevaluated.",
+  "개발가능성 경고": "Developability warnings",
+  "건": "records",
+  "건 · 실제 모델 기록": "· Actual model records",
+  "건 · 평가 완료": "· Evaluated",
+  "건. 출처:": ". Source:",
+  "검토 순위는 표적·조건·실행 범위 안의 후보 순서이며 동률을 허용합니다. 1위도 보류일 수 있으므로 검토 판정과 이유를 함께 읽으세요. 표적만 정렬하여 같은 후보 서열의 자세를 비교합니다. 엔진 지지 수는 독립 실험 횟수가 아니며 점수를 평균하지 않습니다. 새 VHH를 기존 VHH의 자세에 맞춰 선별하지 않습니다. 설계 구조가 없거나 대응이 불가능하면 미평가로 남습니다. 우선 검토는 실제 결합·KD의 입증이 아닙니다.": "Review rank orders candidates within a target, condition, and run scope and allows ties. Rank 1 can still be held; read the decision and reason together. Poses are compared for the same candidate sequence after target-only alignment. Engine support is not an independent experimental replicate count, and scores are not averaged. New VHHs are not selected to match an existing VHH pose. Missing design structures or mappings remain unevaluated. Review priority does not establish binding or KD.",
+  "검토 정책 v2는 품질·지정 결합 부위를 충족한 엔진별 단독 유망 예측과 같은 자세의 다중 엔진 지지를 구분합니다. 한 엔진만 유망해도 합의 부족을 실패로 간주하지 않습니다. 엔진 간 자세 차이와 설계·재예측 불일치는 별도 진단이며 자동 비결합·탈락 사유가 아닙니다. 이전 정책의 판정은 기록된 버전과 함께 읽으세요.": "Review policy v2 distinguishes promising single-engine predictions that meet quality and binding-site criteria from support by multiple engines for the same pose. A promising result from one engine is not a failure due to lack of consensus. Differences across engines or between design and re-prediction are separate diagnostics, not automatic evidence of non-binding or exclusion. Read earlier decisions with their recorded policy version.",
+  "결합 부위 세트": "Binding-site set",
+  "결합 부위 잔기 특성": "Binding-site residue properties",
+  "결합 부위 평균 B-factor": "Mean binding-site B-factor",
+  "결합 부위 평균 pLDDT": "Mean binding-site pLDDT",
+  "경로": "Path",
+  "계산법은 모델별 기록으로 구분합니다. 기존 점수와 선별 순위는 유지하며, 계산법이 다른 값은 동일한 저자 구현으로 간주하지 않습니다.": "Methods are shown per model record. Existing scores and selection ranks are retained. Values from different methods are not treated as results of the same author implementation.",
+  "계획 모델": "Planned models",
+  "고유 후보 서열": "Unique candidate sequences",
+  "관심 잔기 세트": "Residue-of-interest sets",
+  "관심 잔기와 점수": "Residues of interest and scores",
+  "관측표": "Observations",
+  "구조 기반 지표는 상대 순위용입니다.": "Structure-based metrics are for relative ranking.",
+  "구조 출처": "Structure source",
+  "기록 계산법": "Recorded method",
+  "기록 선별 목록 ·": "Recorded selection ·",
+  "기록 수": "Records",
+  "기록 코드": "Recorded code",
+  "기록 통과": "Recorded pass",
+  "기록된 게이트와 적용 기준": "Recorded gates and applied criteria",
+  "기준 출처": "Threshold source",
+  "는 ipTM·ipSAE 및 실행 당시 기록 적격,": "covers ipTM, ipSAE, and recorded eligibility;",
+  "대조군": "Controls",
+  "또는": "or",
+  "로 확인하세요.": "for details.",
+  "모델 게이트 기록이 없습니다.": "No model gate record is available.",
+  "모델. 전체 선별 기록은": "models. Full selection records:",
+  "모델별 threshold_checks 기록을 우선 표시하며, 없으면 실행 당시": "Model threshold_checks records take priority. Otherwise, the report shows thresholds from the saved",
+  "발주 게이트": "Ordering gate",
+  "버전 출처:": "Version source:",
+  "별도 탐색 파일에는 저장된 전체 후보·관측·모델과 보존된 전체 PAE가 포함됩니다. 후보를 선택하면 MolStar 뷰어에서": "The separate explorer contains all saved candidates, observations, models, and retained full PAE. Select a candidate in MolStar to use",
+  "보고서 설정에 따라 구조 뷰어를 표시하지 않습니다. 저장된 구조·PAE 원본과 평가표는 실행 산출물에서 확인하세요.": "The structure viewer is hidden by the report settings. Saved structures, original PAE, and assessment tables remain in the run artifacts.",
+  "보고서에 제공된 점수 기록을 표시합니다.": "Showing the score records supplied to this report.",
+  "보고서의 표는 설정한 표시 범위입니다. 전체 평가 기록은 산출물의 CSV에서 확인하세요.": "Tables show the configured display range. Full assessment records are in the artifact CSV files.",
+  "보존된 다운로드 파일": "Retained downloadable files",
+  "보존된 분석 결과입니다. 구조·점수·미평가 기록을 확인하고 필요한 파일을 저장하세요.": "These are saved analysis results. Review structures, scores, and unevaluated records, then save the files you need.",
+  "사용자 지정 결합 부위 세트": "User-defined binding-site sets",
+  "상세 지표·원본 기록 펼치기": "Show detailed metrics and original records",
+  "생성 시점의 보존 파일입니다. 이 보고서와 후속 전달 ZIP, 내부 잠금 파일은 제외하며 최종 파일 크기·해시는 전달 manifest를 확인하세요.": "Files retained when the report was generated. This report, later delivery ZIPs, and internal lock files are excluded. Check the delivery manifest for final sizes and hashes.",
+  "서열 길이": "Sequence length",
+  "설정 출처:": "Settings source:",
+  "세 가지 별도 확인": "Three separate checks",
+  "세트": "Set",
+  "실행 ID:": "Run ID:",
+  "실행 경로:": "Run location:",
+  "실행 당시 기록과 출처 원문": "Original execution records and provenance",
+  "실행 당시 설정이 저장되지 않아 보고서 생성 설정만 표시합니다. 과거 판정에 적용된 기준으로 추정하지 않습니다.": "Run-time settings were not saved; only the report-generation settings are shown. They are not assumed to be the criteria used for past decisions.",
+  "실행 모드:": "Run mode:",
+  "실행 상태:": "Run status:",
+  "실험 결과 입력": "Enter experimental results",
+  "아니오": "No",
+  "에서 확인하세요.": ".",
+  "엔진별 표의 순위와 종합점수는 기록된 엔진 안에서만 비교합니다. 엔진 간 점수를 합산하거나 통합 순위를 만들지 않습니다. RF·BG 별칭은 후보를 찾기 위한 표시명이며 원본 ID와 수치는 보존됩니다.": "Compare ranks and composite scores only within the recorded engine. Scores are not combined into a cross-engine ranking. RF/BG aliases help locate candidates; original IDs and values are preserved.",
+  "예": "Yes",
+  "예측 신뢰도": "Prediction confidence",
+  "예측 신뢰도와 지정 결합 부위 충족은 별개입니다. 결합 부위 미접촉·미지정·미평가를 구분합니다. PAE는 참조 구조와의 실측 거리 오차가 아니며 pDockQ2는 실측 DockQ가 아닙니다. 지정 결합 부위 진단은 기존 점수와 선별 기록을 바꾸지 않습니다.": "Prediction confidence and satisfaction of the specified binding site are separate. Distinguish no contact, no specified site, and no assessment. PAE is not a measured distance error against a reference structure, and pDockQ2 is not measured DockQ. Binding-site diagnostics do not change existing scores or selection records.",
+  "예측 엔진 버전·가중치·실행 출처": "Prediction engine versions, weights, and runtime provenance",
+  "예측 전 미선정 후보는 모델 평가 미완료 수에 합산하지 않습니다.": "Candidates not selected before prediction are not counted as incomplete model assessments.",
+  "와": "and",
+  "와 계면 PAE를 함께 확인합니다. 보고서 생성 시 바꾼 설정으로 기존 적격 판정을 다시 계산하지 않습니다.": "and interface PAE should be read together. Changing report settings does not recalculate recorded eligibility.",
+  "원본 ID": "Original ID",
+  "으로 수행하세요.": "for confirmation.",
+  "은 결합 부위 접촉,": "covers binding-site contacts;",
+  "은 기록된 계면·배치 신뢰도 지표입니다. 적용 기준과 통과 여부는 아래 기록 게이트 표에서 확인하세요. 낮은 점수는 비결합의 실험 증거가 아닙니다.": "are recorded interface and arrangement confidence metrics. Check applied criteria and pass records in the gate table below. Low scores are not experimental evidence of non-binding.",
+  "은 동일 후보의 엔진별 자세와 설계·재예측 일치를 뜻합니다. 탐색적 검토 우선순위는 이 기록을 함께 확인하는 값이며 기존 적격·선별 기록을 변경하지 않습니다.": "covers the same candidate's poses across engines and agreement between design and re-prediction. Exploratory review priority considers these records together; it does not change recorded eligibility or selection.",
+  "은 지정 잔기에 예측상 접촉하는 비율입니다. 알려진 전체 에피토프·같은 자세·실제 결합의 검증은 아닙니다.": "is the fraction of specified residues contacted in the prediction. It does not verify the full known epitope, the same pose, or actual binding.",
+  "의 기준과 기록 통과 플래그를 표시합니다. 기준 미기록은 보고서 설정으로 대체하지 않습니다.": "run_config.yaml and recorded pass flags. Missing thresholds are not replaced by report settings.",
+  "이 보고서는 계산 결과와 선별 근거를 정리합니다. 예측 점수는 실제 결합·친화도 향상·KD를 확정하지 않습니다. 미평가 항목은 0점으로 취급하지 않습니다.": "This report summarizes computational results and selection evidence. Prediction scores do not establish binding, improved affinity, or KD. Unevaluated items are not treated as zero.",
+  "일반 복합체의 요약 ipSAE는 기본적으로 검토한 체인 순서의 첫 쌍이며, 체인쌍을 명시한 실행에서는 해당 쌍입니다. 전체 평균·최솟값과 구분합니다. 적용 체인·범위 출처와 모든 체인 쌍의 표·CSV를 함께 확인합니다.": "General-complex summary ipSAE uses the first pair in the reviewed chain order unless a pair was specified. It is distinct from an overall mean or minimum. Review the recorded chains, scope provenance, and all chain-pair tables and CSV files together.",
+  "입력 서열 좌표 대응률": "Input sequence coordinate coverage",
+  "입력에서 지정한 잔기입니다. 실제 접촉 여부와 기능적 결합 부위는 별도로 검토하세요.": "These residues were specified in the input. Review actual contacts and the functional binding site separately.",
+  "자동 제안 결합 부위 세트 · 탐색적 표면 후보": "Automatically suggested binding-site sets · Exploratory surface candidates",
+  "자동 제안 결합 부위 세트가 기록되지 않았습니다.": "No automatically suggested binding-site sets were recorded.",
+  "자세 일관성": "Pose consistency",
+  "잔기": "Residue",
+  "잔기 번호 대응표": "Residue-number mapping",
+  "저자 코드": "Author code",
+  "저장 결과 탐색 원본이 없는 진단·부분 기록은 대표 구조 최대": "Diagnostic or partial records without a saved full explorer show up to",
+  "저장된 엔진 버전·가중치 영수증이 없습니다. 현재 설치 환경으로 과거 실행을 추정하지 않습니다.": "No saved engine version/weight receipt is available. The current installation is not used to infer a past run.",
+  "저장된 전체 후보 기록을 표시합니다.": "Showing all saved candidate records.",
+  "저장된 후보·모델 기록에서 각 사유를 기록당 한 번 집계합니다. 예측 전 준비·미선정은 실제 모델 평가와 구분합니다. 한 기록에 여러 사유가 있을 수 있으므로 합계는 기록 수와 다를 수 있습니다. 기준 미통과와 계산 오류·미평가를 구분해 읽으세요.": "Each reason is counted once per saved candidate/model record. Prepared candidates not selected before prediction are separate from actual model assessments. One record may have several reasons, so totals can differ from record counts. Distinguish unmet criteria from computation errors and unevaluated items.",
+  "전체 모델·구조·PAE 결과 탐색 열기": "Open all models, structures, and PAE in the result explorer",
+  "전체 반복 결과:": "All repeated observations:",
+  "전체 준비 후보 기록": "All prepared candidate records",
+  "절단형 특이성 캠페인": "Truncated-form specificity campaign",
+  "점수": "Score",
+  "제외·미평가 이유 집계": "Exclusion and unevaluated reason counts",
+  "종. 원본 후보는 source_sequence_id 및 원본 ID의 엔진 접두어로 구분합니다. 서열이 모두 기록된 경우에만 고유 서열 수를 계산합니다. 같은 후보의 엔진별 예측은 별도 모델 기록입니다. 기록 선별": ". Source candidates are distinguished by source_sequence_id and engine prefixes in original IDs. Unique sequence counts require all sequences to be recorded. Predictions of the same candidate by different engines are separate model records. Recorded selections:",
+  "좌표 없는 입력 잔기": "Input residues without coordinates",
+  "주의 사항": "Notes and cautions",
+  "지표 계산법·해석·출처": "Metric methods, interpretation, and sources",
+  "지표 순위·종합점수 순위·기록 선별 순위는 다릅니다. 선별은 적격 게이트와 CDR3 다양성 제한을 적용하므로 높은 ipSAE 후보도 제외될 수 있습니다. ESM·AntiFold는 서열/폴딩 prior이며 친화도 예측값이 아닙니다. 심한 위험 수(dev_severe)는 5종 게이트, 전체 위험 수(dev_flags)는 종합점수 가중치입니다.": "Metric rank, composite-score rank, and recorded selection rank are different. Selection applies eligibility gates and CDR3 diversity limits, so a high-ipSAE candidate may be excluded. ESM and AntiFold are sequence/folding priors, not affinity predictions. Severe risks (dev_severe) form a five-category gate; total risks (dev_flags) contribute to composite-score weighting.",
+  "지표 읽는 법": "How to read the metrics",
+  "지표 해석과 한계": "Metric interpretation and limitations",
+  "최종 판단은 SPR/BLI 실험": "Use SPR/BLI experiments for final decisions",
+  "충돌·N/O 근접·반대 전하 접촉은 원자쌍 수입니다. N/O 근접은 각도를 확인한 수소결합이 아니며, 고정 거리 충돌은 원소별 반데르발스 판정이 아닙니다.": "Clashes, N/O proximity, and opposite-charge contacts are atom-pair counts. N/O proximity is not an angle-verified hydrogen bond, and fixed-distance clashes are not element-specific van der Waals assessments.",
+  "크기(KB)": "Size (KB)",
+  "파이프라인 경고": "Pipeline warnings",
+  "파일 목록은 처음 200개만 표시합니다. 나머지": "Only the first 200 files are listed. The remaining",
+  "파일·필수 기록 검증 결과입니다. 실제 결합·KD의 실험 검증을 의미하지 않습니다.": "This validates files and required records. It is not experimental validation of binding or KD.",
+  "평가 모델 기록이 없습니다.": "No assessed model records are available.",
+  "평가 완료": "Assessment complete",
+  "평균 B-factor": "Mean B-factor",
+  "평균 pLDDT": "Mean pLDDT",
+  "표면 특성으로 제안한 후보입니다. 기능적 에피토프나 실제 결합 부위 재현은 검증되지 않았습니다.": "These candidates were suggested from surface properties. A functional epitope or reproduction of an actual binding site has not been validated.",
+  "표시": "Showing",
+  "표시 모델의 적용 기준·통과 기록": "Applied criteria and pass records for displayed models",
+  "표적 구조 절단": "Target structure truncation",
+  "표적 입력·구조 품질": "Target input and structure quality",
+  "합성 발주 목록은 아직 확정할 수 없습니다. 항목별 이유는": "The synthesis order list cannot yet be finalized. Check individual reasons in",
+  "해석·한계": "Interpretation and limitations",
+  "현재 선별 목록은 0건입니다. 제외 사유와 미평가 항목을 확인하세요. 선별 0건만으로 실행 실패나 비결합을 결론내리지 않습니다.": "The current selection contains zero models. Review exclusion reasons and unevaluated items. Zero selections alone do not establish run failure or non-binding.",
+  "형식": "Format",
+  "후보 별칭": "Candidate alias",
+  "후보 비교표": "Candidate comparison",
+  "후보·모델 기록": "candidate/model records",
+  "후보·모델의 기록 점수": "Recorded candidate/model scores",
+  "체인·접촉·충돌 표시": "chain, contact, and clash layers",
+  "체인·접촉·충돌·결합 부위·CDR 표시": "chain, contact, clash, binding-site, and CDR layers",
+  "회색: 다른 체인 · 청록: 기준 체인 · 파랑: 비교 체인": "Gray: other chains · Teal: reference chain · Blue: comparison chain",
+  "회색: 파트너 · 청록: 선택 표적 · 파랑: 나노바디": "Gray: partner · Teal: selected target · Blue: nanobody",
+  "오류 {0}건": "{0} errors",
+  "경고 {0}건": "{0} warnings",
+  "오류 개수 미기록": "Error count not recorded",
+  "경고 개수 미기록": "Warning count not recorded",
+  "{0}–{1} 체인쌍": "chain pair {0}–{1}",
+  "보류 이유 미기록": "Hold reason not recorded",
+  "기록된 제외 사유 (상세·CSV 확인)": "Recorded exclusion reason (see details/CSV)",
+  "제외 사유 미기록": "Exclusion reason not recorded",
+  "미평가·제외 사유 미기록": "Unevaluated; exclusion reason not recorded",
+  "저자 원자 신뢰도 방식으로 기록됨": "Recorded using the author's atom-confidence method",
+  "보고서 표": "Report table",
+  "선택 모델 3D 구조": "Selected model 3D structure",
+  "저장된 검증 가능 CDR 번호 매김이 없습니다.": "No saved verifiable CDR numbering is available.",
+  "저장된 ANARCI 번호 매김": "Saved ANARCI numbering",
+  "저장된 WT ANARCI 구간 · 길이 변화 없는 CDR 치환 후보에 대응": "Saved WT ANARCI regions · Used for CDR substitutions without length changes",
+  "저장된 사용자 지정 서열 구간": "Saved user-defined sequence regions",
+  "SG–SG 좌표 거리입니다. 공유결합·자유 Cys를 확정하지 않으며 서열 기반 제외 판정을 변경하지 않습니다.": "These are coordinate-based SG–SG distances. They do not establish covalent bonds or free Cys and do not change sequence-based exclusion decisions.",
+  "기록 선별 순위 (엔진 내)": "Recorded selection rank (within engine)",
+  "기록 순위 (엔진 내)": "Recorded rank (within engine)",
+  "원본 변이 ID": "Original variant ID",
+  "원본 모델 ID": "Original model ID",
+  "원본 후보 ID": "Original candidate ID",
+  "순위 범위": "Ranking scope",
+  "최종 평가 기록": "Final assessment record",
+  "클러스터": "Cluster",
+  "영역": "Region",
+  "돌연변이": "Mutation",
+  "기록 순위 상태": "Recorded ranking status",
+  "순위 보류 사유": "Reason ranking was held",
+  "ipSAE 범위": "ipSAE scope",
+  "ipSAE 체인 1": "ipSAE chain 1",
+  "ipSAE 체인 2": "ipSAE chain 2",
+  "ipSAE 범위 출처": "ipSAE scope source",
+  "ipTM 범위": "ipTM scope",
+  "ipTM 출처": "ipTM source",
+  "쌍 ipTM 미평가 사유": "Reason pair ipTM was not evaluated",
+  "전체 복합체 ipTM (쌍 게이트 아님)": "Whole-complex ipTM (not the pair gate)",
+  "계면 PAE": "Interface PAE",
+  "PAE 중앙값 (Å)": "Median PAE (Å)",
+  "PAE 90백분위 (Å)": "90th-percentile PAE (Å)",
+  "거리 기준 충돌 원자쌍": "Distance-based clashing atom pairs",
+  "플레이트 ID": "Plate ID",
+  "웰": "Well",
+  "절단형·전장형 비교": "Truncated/full-length comparison",
+  "반복 비교 완료": "Repeated comparison complete",
+  "절단형 ipSAE 최소": "Minimum truncated-form ipSAE",
+  "전장형 ipSAE 최대": "Maximum full-length ipSAE",
+  "ipSAE 차이(KD 아님)": "ipSAE difference (not KD)",
+  "말단 화학 평가": "Terminal chemistry assessment",
+  "제외 이유": "Exclusion reason",
+  "쌍 ipTM 미평가": "Pair ipTM not evaluated",
+  "예측 전 준비·미선정 (모델 미평가 수에 합산하지 않음)": "Prepared but not selected before prediction (excluded from unevaluated-model counts)",
+  "서열 prior 사전필터 기준 미통과 (구조 미평가)": "Sequence-prior prefilter not passed (structure not evaluated)",
+  "서열 prior 사전필터 미평가 (구조 미평가)": "Sequence-prior prefilter not evaluated (structure not evaluated)",
+  "1단계 구조만 평가·최종 구조 미평가": "Only first-stage structure evaluated; final structure not evaluated",
+  "Boltz-2 최종 평가 실패·미완료": "Boltz-2 final assessment failed or incomplete",
+  "짝지은 특이성 비교 미완료": "Paired specificity comparison incomplete",
+  "전장형 교차 결합 위험 진단": "Full-length cross-binding risk diagnostic",
+  "순위 산정": "Ranked",
+  "해당 없음": "Not applicable",
+  "보류": "Held",
+  "가중 CDR 개발가능성 미평가": "Weighted CDR developability not evaluated",
+  "가중 지표 미평가": "Weighted metrics not evaluated",
+  "접촉 없음 또는 가중 계면 지표 미평가": "No contacts or weighted interface metrics not evaluated",
+  "사용": "Enabled",
+  "원본 잔기 {0}개": "Original residues: {0}",
+  "유지 잔기 {0}개": "Retained residues: {0}",
+  "다른 체인 유지 잔기 {0}개": "Retained residues in other chains: {0}",
+  "유지 구간: {0}": "Retained ranges: {0}",
+  "누락 결합 부위: {0}": "Missing binding-site residues: {0}",
+  "선택한 체인쌍": "Selected chain pair",
+  "선택 표적–VHH 체인쌍": "Selected target\u2013VHH chain pair",
+  "전체 복합체": "Whole complex",
+  "이전 기록의 첫 체인쌍": "First chain pair from legacy records",
+  "두 체인 복합체의 원본 전체 ipTM": "Native whole-complex ipTM for a two-chain complex",
+  "체인 이름에 대응한 방향별 원본 ipTM 최솟값": "Minimum native directional ipTM mapped to chain names",
+  "Boltz-2 체인 인덱스에 대응한 방향별 ipTM 최솟값": "Minimum directional ipTM mapped to Boltz-2 chain indices",
+  "Chai-1 원본 체인 축에 대응한 방향별 ipTM 최솟값": "Minimum directional ipTM on the native Chai-1 chain axis",
+  "OpenDDE 검증된 체인 축에 대응한 방향별 ipTM 최솟값": "Minimum directional ipTM on the verified OpenDDE chain axis",
+  "기록된 범위·출처 (원문 확인)": "Recorded scope/source (see original)",
+  "소수성(KD)": "Hydrophobicity (Kyte\u2013Doolittle)",
+  "보존도": "Conservation",
+  "글리칸 거리": "Glycan distance",
   "복합체 예측 · 처음 실행 추천": "Predict complexes · Recommended first run"
 });
 /* Explicit presentation bindings; no DOM observer, input rewriting, or API mutation. */
@@ -1622,6 +1859,8 @@ globalThis.I18N = (() => {
     }
     if(typeof document!=='undefined'){
       document.documentElement.lang=language;
+      if(document.documentElement.dataset?.nanocofoldReportLanguage !== undefined)
+        document.documentElement.dataset.nanocofoldReportLanguage=language;
       const select=document.getElementById('language-select');if(select)select.value=language;
       const label=document.querySelector('[for="language-select"]');if(label)label.textContent=language==='ko'?'언어':'Language';
     }
@@ -1632,21 +1871,38 @@ globalThis.I18N = (() => {
     if(persist){try{localStorage.setItem(storageKey,language);}catch{/* Storage may be blocked in standalone reports. */}}
     if(typeof document!=='undefined')document.dispatchEvent(new CustomEvent('nanocofold:language',{detail:{language}}));
   }
-  function init(){
+  function init({explicit=false}={}){
     let saved;try{saved=localStorage.getItem(storageKey);}catch{}
     const query=new URLSearchParams(location.search).get('lang');
-    language=['en','ko'].includes(query)?query:['en','ko'].includes(saved)?saved:'en';
-    // Bind only initial UI nodes. Later data is handled by explicit call sites.
-    const walk=document.createTreeWalker(document.documentElement,NodeFilter.SHOW_TEXT);
-    const nodes=[];while(walk.nextNode())nodes.push(walk.currentNode);
-    for(const node of nodes){
-      if(node.parentElement?.closest('script,style,textarea,pre,code,[data-i18n-ignore]'))continue;
-      if(/[가-힣]/.test(node.textContent))bind(node,'textContent',term(node.textContent));
+    const delivered=document.documentElement.dataset?.nanocofoldReportLanguage;
+    language=['en','ko'].includes(query)?query:['en','ko'].includes(delivered)?delivered:['en','ko'].includes(saved)?saved:'en';
+    if(explicit)document.documentElement.dataset.nanocofoldReportLanguage=language;
+    // Server-rendered reports mark only template-owned captions. Never walk
+    // their original IDs, notes, JSON, filenames, or other saved user data.
+    if(explicit){
+      for(const node of document.querySelectorAll('[data-report-i18n]')){
+        const source=node.getAttribute('data-report-i18n-key') ?? node.textContent;
+        node.setAttribute('data-report-i18n-key',source);
+        bind(node,'textContent',term(source));
+      }
+    }else{
+      // Bind only initial UI nodes. Later data uses explicit call sites.
+      const walk=document.createTreeWalker(document.documentElement,NodeFilter.SHOW_TEXT);
+      const nodes=[];while(walk.nextNode())nodes.push(walk.currentNode);
+      for(const node of nodes){
+        if(node.parentElement?.closest('script,style,textarea,pre,code,[data-i18n-ignore]'))continue;
+        if(/[가-힣]/.test(node.textContent))bind(node,'textContent',term(node.textContent));
+      }
     }
-    for(const node of document.querySelectorAll('[placeholder],[aria-label],[title]')){
+    for(const node of document.querySelectorAll(explicit ? '[data-report-i18n-attributes]' : '[placeholder],[aria-label],[title]')){
       if(node.closest('[data-i18n-ignore]'))continue;
       for(const field of ['placeholder','aria-label','title']){
-        const value=node.getAttribute(field);if(value&&/[가-힣]/.test(value))bind(node,field,term(value));
+        const sourceName='data-report-i18n-'+field;
+        const value=explicit ? node.getAttribute(sourceName) ?? node.getAttribute(field) : node.getAttribute(field);
+        if(value&&/[가-힣]/.test(value)){
+          if(explicit)node.setAttribute(sourceName,value);
+          bind(node,field,term(value));
+        }
       }
     }
     document.getElementById('language-select')?.addEventListener('change',event=>setLanguage(event.target.value));

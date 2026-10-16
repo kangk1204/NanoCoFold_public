@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 
 from nanocofold import report
+from test_bilingual_report import ReportText
 from nanocofold.platform.results import ResultReader
 from nanocofold.publication import table_hashes
 from test_audit21_presentation import saved_run
@@ -129,12 +130,14 @@ def test_viewer_none_has_no_viewer_limit_notice_and_truncation_is_readable(tmp_p
         "kept_other_chain_residues": 10, "kept_ranges": ["3-82"],
         "missing_hotspots": [], "out_path": "/Users/private/research/target_prepared.pdb"}}}
     document = report.generate_report(run, cfg, context).read_text()
-    assert "대표 구조 최대" not in document
-    assert "설정에 따라 구조 뷰어를 표시하지 않습니다" in document
-    assert "표적 구조 절단" in document and "원본 잔기 250개" in document
-    assert "유지 잔기 80개" in document and "유지 구간: 3-82" in document
-    truncation_row = document.split('scope="row">표적 구조 절단', 1)[1].split('</tr>', 1)[0]
-    assert "Truncation" not in document and "out_path" not in truncation_row and "/Users/private" not in truncation_row
+    parsed = ReportText(document)
+    text = "".join(parsed.text)
+    assert "대표 구조 최대" not in text
+    assert "설정에 따라 구조 뷰어를 표시하지 않습니다" in text
+    assert "표적 구조 절단" in parsed.cells and "원본 잔기 250개" in text
+    assert "유지 잔기 80개" in text and "유지 구간: 3-82" in text
+    truncation_row = parsed.cells[parsed.cells.index("표적 구조 절단") + 1]
+    assert "Truncation" not in text and "out_path" not in truncation_row and "/Users/private" not in truncation_row
     assert not list(run.glob("*explorer*.html"))
 
 
@@ -159,7 +162,8 @@ def test_expanded_metric_scope_labels_keep_raw_record_in_tooltip_and_source(tmp_
                           "iptm_source": "native_global_iptm_two_chain_complex", "iptm": .6}])
     before = rows.copy(deep=True)
     document = report.generate_report(tmp_path, {"report": {"viewer": "none"}}, {}, scored=rows).read_text()
-    assert '<span title="selected_chain_pair">선택한 체인쌍</span>' in document
-    assert '<span title="native_global_iptm_two_chain_complex">두 체인 복합체의 원본 전체 ipTM</span>' in document
+    titles = ReportText(document).titles
+    assert titles["selected_chain_pair"] == "선택한 체인쌍"
+    assert titles["native_global_iptm_two_chain_complex"] == "두 체인 복합체의 원본 전체 ipTM"
     assert report.metric_record_label("unavailable") == "미평가"
     pd.testing.assert_frame_equal(rows, before)

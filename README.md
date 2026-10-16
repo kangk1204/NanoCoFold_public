@@ -2,11 +2,13 @@
 
 **English** · [한국어](README.ko.md)
 
-**Build: 0.4.8rc6**
+**Build: 0.4.8rc7**
 
 Predict protein complexes, design new nanobodies, and compare existing candidates or variants. Explore candidate tables, 3D structures, PAE, and shareable HTML reports.
 
 **For your first run, follow sections 1 → 2 → 3.** The public example fills in the sequences and settings; leave advanced settings unchanged. A [large-image walkthrough](docs/browser_quickstart.en.md#follow-the-screenshots) is also available in English.
+
+**Workflow: check the environment once → prepare inputs and settings → run analysis → follow Jobs & logs → explore results.** An environment check prepares the installation; its completion is not an analysis result.
 
 **If your server is already installed, start at section 2.** Use the same source folder and workspace as the installation. The source under `source/` in a delivery bundle and a saved `report.html` are different entry points. To read existing results, extract the report ZIP and open `report.html`; no installation is needed.
 
@@ -67,7 +69,7 @@ For a remote Ubuntu server, run `bash start.sh --no-browser` on the server. In a
 ssh -L 8765:127.0.0.1:8765 USER@SERVER
 ```
 
-Then open the address above in your PC browser. Inputs and results are viewed on the PC; computation uses the GPU of the Ubuntu server where you installed NanoCoFold.
+Then open the address above in your PC browser. Inputs and results are viewed on the PC; computation uses the GPU of the Ubuntu server where you installed NanoCoFold. The public installer normally stores the workspace in `.nanocofold/workspace` under the source folder; `--workspace` can choose another location. `start.sh` reuses the saved installation location.
 
 ### Update an existing installation
 
@@ -93,6 +95,8 @@ Start with **Predict protein complexes**. You do not need to create sequences or
 4. In **Run settings**, check selected engines, the maximum planned model count, and the MSA method. If using the public MSA server, explicitly check consent to send the current sequences to `api.colabfold.com`. Click **Review settings & continue**.
 5. In **Review & run**, click **Review input** and read the applied input and settings. The saved environment check is reused; this button starts neither another environment job nor a prediction. **Run analysis** is enabled when the matching check is available. If a check is missing for the selected engines, use **Go to environment check**, complete it, and click **Prepare analysis** to return to this reviewed input.
 6. Click **Run analysis** once. Follow progress in **Jobs & logs**. When finished, click **Open results**.
+
+The public example selects the **Small starter preset**. It is different from the broader **Researcher exploration** preset. Before using your own input, check the visible generation/evaluation limits, planned models and time budget. Loading an example does not submit a run or grant MSA transmission consent.
 
 For the first example, check these values. **Four planned models do not guarantee four successful predictions**; inspect the actual counts afterward. The screenshots show the current English interface; select **Language → English** to match them.
 
@@ -157,8 +161,7 @@ For structure files, review chains, residue mappings, missing residues, and the 
 
 ## 5. Read and share results
 
-An **Environment check** job is an installation check, not a prediction. To obtain results, prepare input and click **Run analysis**. Completed analysis jobs show **Open results**. The bilingual report navigation has a fixed layout, and X/Y labels stay attached to their metric selectors. [Current chart layout](docs/images/quickstart-flow/en/charts.jpg). [Report layout](docs/images/quickstart-flow/en/report-nav.jpg).
-
+An **Environment check** job is an installation check, not a prediction. To obtain results, prepare input and click **Run analysis**. Select the completed **analysis** job and click **Open results**. Compare candidates using the X/Y metric selectors and the report navigation. [Chart example](docs/images/quickstart-flow/en/charts.jpg) · [Report navigation](docs/images/quickstart-flow/en/report-nav.jpg).
 
 First inspect **run status and counts of successful, failed, and unevaluated models**. Click a candidate row to open its structure and PAE.
 
@@ -168,9 +171,23 @@ First inspect **run status and counts of successful, failed, and unevaluated mod
 
 The **Full original ZIP · For local archiving** includes server paths and execution logs and is for personal recovery / archiving. Send collaborators the entire **Shareable report ZIP**. Recipients extract the whole ZIP and open **`report.html`**. Saved results can be read on macOS, Windows, or other PCs without a GPU or program installation. Newly generated interactive reports also include the English / Korean selector.
 
+### Find the saved files
+
+Use the workspace shown in the browser. Each analysis is saved under `<workspace>/runs/<job_id>/`; the job identifier is in **Jobs & logs**. When report publication succeeds, start with `report.html` in that run folder. If it links to a `report_explorer-<hash>.html` file, keep that file beside the entry page. Older reports can use `report_explorer.html`. Keep the whole report folder or ZIP together; do not rename or delete a linked explorer.
+
+The detailed worker log is `<workspace>/.nanocofold/jobs/<job_id>/worker.log`, beside the submitted `config.yaml` snapshot. The run folder preserves `run_config.yaml`, `run_state.json` and available engine outputs. An interrupted run can contain partial results; an existing HTML file alone does not prove that the current analysis completed. Read its status and counts.
+
+Use **Language → English / 한국어** in the browser and in newly exported interactive reports. The two languages navigate the same candidates and recorded values. IDs, sequences, coordinates, numeric data, source settings and original execution logs stay as recorded. Existing HTML snapshots keep their original renderer; export a new report to use updated language support.
+
 If PyMOL materials are provided, extract the **whole folder** and open `.pml` through PyMOL **File → Open**. Keep the relative folder layout of scripts and referenced coordinates. PyMOL materials are separate from the general report ZIP. See [viewing in PyMOL](docs/RESULTS.md#pymol에서-보기).
 
 Prediction completion, selection eligibility, and experimentally confirmed binding are distinct. Unevaluated is not zero; WT is a control. Scores from different engines are not summed into one ranking. Review ipTM, interface pLDDT, interface PAE, and structures together. Binding, KD, and expression require experimental validation. See [metrics and result interpretation](docs/RESULTS.md).
+
+## 6. Follow jobs, cancel and resume
+
+In **Jobs & logs**, select the analysis job and open **Detailed execution log**. An environment-check or installation job has no protein prediction to open. A browser disconnect does not create a second submission or automatically stop a detached analysis; reopen the same workspace and inspect the existing job before clicking Run again. Keep the server and compute host available.
+
+To stop an active analysis, use **Cancel job** and wait until cleanup changes **Cancelling** to **Cancelled**. Saved work is retained. For an interrupted, failed or cancelled analysis, resolve the logged cause and use **Verify and resume** when that action is offered. It validates the saved input/configuration and previous process ownership before restarting; it does not resume automatically. After **Time budget exhausted**, enter additional minutes when prompted. If resume is unavailable, read the log rather than submitting a duplicate run. Inspect any available partial results as partial, not as a completed analysis.
 
 [Changelog](CHANGELOG.md) · [Validation record](docs/VALIDATION.md) · [External engine and model terms](LICENSE_MANIFEST.md)
 

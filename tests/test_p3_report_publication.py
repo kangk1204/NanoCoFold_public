@@ -145,7 +145,8 @@ def test_none_viewer_preserves_old_explorers_without_publishing_another(tmp_path
     before = {path: path.read_bytes() for path in run.glob("*explorer*.html")}
     cfg["report"]["viewer"] = "none"
     report.generate_report(run, cfg, {})
-    assert "complete-result-explorer" not in entry.read_text()
+    link = ExplorerLink(); link.feed(entry.read_text())
+    assert link.href is None
     assert {path: path.read_bytes() for path in run.glob("*explorer*.html")} == before
     assert explorer.read_bytes()
 

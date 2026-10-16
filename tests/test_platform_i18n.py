@@ -111,6 +111,10 @@ def test_offline_toggle_preserves_structure_observation_user_id_and_numeric_arra
           residues:state.viewer.selectedLabels,chains:[...document.querySelectorAll('[data-layer]')].map(e=>[e.dataset.layer,e.checked]),
           pae:document.getElementById('pae').data.map(d=>d.z),
           distribution:document.getElementById('distribution').data.map(d=>d.y)})'''
+        # These are owned explanations, not IDs, sequences, or raw receipt JSON.
+        assert page.locator('#cdr-actions').inner_text() == 'No saved verifiable CDR numbering is available.'
+        assert page.locator('#candidate-detail .warning').evaluate_all('nodes=>nodes.every(n=>!/[가-힣]/.test(n.textContent))')
+        assert page.locator('#structure-details > p').evaluate_all('nodes=>nodes.every(n=>!/[가-힣]/.test(n.textContent))')
         english_names=page.locator('#distribution').evaluate('(node)=>node.data.map(trace=>trace.name)')
         assert english_names == ['engine / seed=Not evaluated / MSA=Not recorded / restraint=Not evaluated']
         before=page.evaluate(snapshot)
@@ -130,5 +134,15 @@ def test_offline_toggle_preserves_structure_observation_user_id_and_numeric_arra
         page.locator('#language-select').select_option('ko')
         page.locator('#language-select').select_option('en')
         assert page.locator('#distribution').evaluate('(node)=>node.data.map(trace=>trace.y)') == [[0.9]]
+        page.wait_for_function("()=>state.structure?.candidate_id===state.candidate?.candidate_id&&state.viewer?.data===state.structure&&document.getElementById('pae').data?.[0]?.z?.length===20")
+        selected=page.evaluate(snapshot)
+        for width in [1400,390]:
+            page.set_viewport_size({'width':width,'height':960})
+            for language in ['ko','en']:
+                page.locator('#language-select').select_option(language)
+                assert page.evaluate(snapshot)==selected
+                assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+2')
+                for identifier in ['plot-x','plot-y']:
+                    assert page.locator('#'+identifier).evaluate('node=>{const label=document.querySelector(`label[for="${node.id}"]`);return label.getBoundingClientRect().bottom<=node.getBoundingClientRect().top+1;}')
         assert errors==[] and external==[]
         browser.close()

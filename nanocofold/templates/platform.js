@@ -287,18 +287,18 @@ function warnings(node, messages) {
     ...[...new Set(messages || [])].map((text) => el("div", I18N.term(text), "warning")),
   );
 }
-function table(node, rows, columns) {
+function table(node, rows, columns, {localizedValues = []} = {}) {
   if (node.classList.contains("scroll")) {node.tabIndex=0;node.setAttribute("role","region");if(!node.hasAttribute("aria-label"))I18N.attribute(node, "aria-label", I18N.term("상세 표 스크롤"));}
   const target = el("table"),
     head = el("thead"),
     body = el("tbody"),
     tr = el("tr");
-  target.append(el("caption", (I18N.attributeValue(node, "aria-label") || I18N.term(columns.join(" · ")))));
+  target.append(el("caption", I18N.attributeValue(node, "aria-label") || I18N.concat(columns.flatMap((key, index) => [index ? " · " : "", I18N.term(metricCaption(key, rows))]))));
   columns.forEach((key) => {const th=el("th",I18N.term(metricCaption(key, rows)));th.scope="col";tr.append(th);});
   head.append(tr);
   rows.forEach((row) => {
     const r = el("tr");
-    columns.forEach((key) => r.append(el("td", row[key] == null ? I18N.term("미평가") : ["이유", "조치", "구분"].includes(key) ? I18N.term(fmt(row[key])) : fmt(row[key]))));
+    columns.forEach((key) => r.append(el("td", row[key] == null ? I18N.term("미평가") : ["이유", "조치", "구분", ...localizedValues].includes(key) ? I18N.term(fmt(row[key])) : fmt(row[key]))));
     body.append(r);
   });
   target.append(head, body);
@@ -365,7 +365,7 @@ async function refreshCatalog() {
     ["model_count", "저장 구조 관측"], ["eligible_model_count", "기준 통과"], ["status", "계산 상태"],
     ["retention", "보관"], ["elapsed_seconds", "계산 시간"], ["storage_bytes", "서버 용량"]];
   for (const [key, label] of columns) {
-    const th = el("th"), button = el("button", label + (state.catalogSort === key ? state.catalogDescending ? " ↓" : " ↑" : ""), "sort-header");
+    const th = el("th"), button = el("button", I18N.concat([I18N.term(label), state.catalogSort === key ? state.catalogDescending ? " ↓" : " ↑" : ""]), "sort-header");
     th.scope = "col"; th.setAttribute("aria-sort", state.catalogSort === key ? state.catalogDescending ? "descending" : "ascending" : "none");
     button.onclick = () => {state.catalogDescending = state.catalogSort === key ? !state.catalogDescending : true; state.catalogSort = key; state.catalogCursor = null; refreshCatalog().catch(e => notice(e.message, true));};
     th.append(button); headings.append(th);
@@ -1714,10 +1714,10 @@ async function selectCandidate(id) {
     detail.append(el("p", I18N.term("실행 당시 결합 부위 조건만으로 제외됐습니다. 나머지 기록 기준은 통과했으며 원본 판정·선별 목록은 보존됩니다.")));
   warnings(detail.appendChild(el("div")), [
     ...(row.primary_pair_warning ? [row.primary_pair_warning] : []),
-    ...(row.exclusion_reasons || []).map((r) => "기록 제외 사유: " + reportReasonLabel(r) + " (" + r + ")"),
-    ...(recordedEvaluationError(row) ? ["후보 평가 오류: " + recordedEvaluationError(row)] : []),
+    ...(row.exclusion_reasons || []).map((r) => I18N.concat([I18N.term("기록 제외 사유: "), I18N.term(reportReasonLabel(r)), " (", r, ")"])),
+    ...(recordedEvaluationError(row) ? [I18N.concat([I18N.term("후보 평가 오류: "), I18N.term(recordedEvaluationError(row))])] : []),
     ...(row.missing_metrics?.length
-      ? ["미평가 지표: " + row.missing_metrics.map(key => metricCaption(key, row, state.result?.mode)).join(", ")]
+      ? [I18N.concat([I18N.term("미평가 지표: "), ...row.missing_metrics.flatMap((key, index) => [index ? ", " : "", I18N.term(metricCaption(key, row, state.result?.mode))])])]
       : []),
   ]);
   const dl = el("dl");
@@ -1732,7 +1732,7 @@ async function selectCandidate(id) {
   confidenceScope.append(el("p",I18N.term(state.result?.mode === "complex" ? "요약 ipSAE는 명시한 체인쌍 또는 검토 순서의 첫 쌍입니다. 전체 평균·최솟값과 구분하고 모든 체인쌍의 결과는 상세 표·CSV에서 확인하세요. ipTM은 기록된 적용 범위로 해석하며, 범위가 없으면 전체 복합체 값으로 추정하지 않습니다." : "일반 복합체의 요약 ipSAE는 기본적으로 검토한 체인 순서의 첫 쌍이며, 체인쌍을 명시한 실행에서는 해당 쌍입니다. 전체 평균·최솟값과 구분하고 모든 체인 쌍의 결과는 상세 표·CSV에서 확인합니다. ipTM 전체 값과 선택 표적–VHH 쌍 값은 구분하며, 범위가 없으면 전체 복합체로 추정하지 않습니다."),"muted"));
   if (state.result?.mode === "complex") {
     const selection = row.ipsae_selection === "explicit_primary_pair" ? "명시한 체인쌍" : row.ipsae_selection === "first_pair_in_reviewed_chain_order" ? "검토 순서의 첫 체인쌍" : "선택 기준 미기록";
-    confidenceScope.append(el("p", I18N.format("요약 쌍 선택: {0} · 유한한 기록값의 최솟값 {1} / 최댓값 {2} · 평가 쌍 {3} / 전체 쌍 {4}. 미평가 체인쌍은 최솟값·최댓값에서 제외됩니다.", [selection, fmt(row.min_pair_ipsae), fmt(row.max_pair_ipsae), fmt(row.pair_ipsae_assessed_count), fmt(row.pair_ipsae_total_count)])));
+    confidenceScope.append(el("p", I18N.format("요약 쌍 선택: {0} · 유한한 기록값의 최솟값 {1} / 최댓값 {2} · 평가 쌍 {3} / 전체 쌍 {4}. 미평가 체인쌍은 최솟값·최댓값에서 제외됩니다.", [I18N.term(selection), fmt(row.min_pair_ipsae), fmt(row.max_pair_ipsae), fmt(row.pair_ipsae_assessed_count), fmt(row.pair_ipsae_total_count)])));
   }
   confidenceScope.append(el("pre",JSON.stringify(Object.fromEntries(Object.entries(row).filter(([key])=>/^ipsae_(scope|chain|source|selection)|^iptm_(scope|source|unavailable)|^(primary_pair|(max|min)_pair_ipsae|pair_ipsae_)/.test(key))),null,2)));detail.append(confidenceScope);
   const methodReceipts = Object.entries(row.metric_provenance || {});
@@ -1766,6 +1766,7 @@ async function selectCandidate(id) {
         출처: c.threshold_source,
       })),
       ["지표", "값", "조건", "기준", "통과", "출처"],
+      {localizedValues: ["지표", "통과"]},
     );
     facts.append(
       el(
@@ -2152,7 +2153,7 @@ async function renderStructure() {
     actions.append(focusButton(`충돌 잔기쌍 · ${data.clashes.length}쌍 보기`, data.clashes.flatMap(p => [p.a, p.b])));
   if ((state.candidate.developability_details?.warnings || []).some(r => /cys/i.test(r)) && data.cysteines?.residues?.length)
     actions.append(focusButton("Cys 위험 사유 · 좌표 확인", data.cysteines.residues, data.cysteines.note));
-  const cdrActions = $("cdr-actions"); cdrActions.replaceChildren(el("span", (data.cdr?.note ? data.cdr?.note : I18N.term("CDR 미평가")), "muted"));
+  const cdrActions = $("cdr-actions"); cdrActions.replaceChildren(el("span", I18N.term(data.cdr?.note || "CDR 미평가"), "muted"));
   for (const [name, region] of Object.entries(data.cdr?.ranges || {})) {
     const button = focusButton(`${name} ${region.start}–${region.end}`, region.labels);
     cdrActions.append(button);
@@ -2181,9 +2182,9 @@ async function renderStructure() {
     const text = `${pair.a}:${pair.atom_a} – ${pair.b}:${pair.atom_b} · ${pair.distance.toFixed(2)} Å < ${pair.cutoff} Å (${pair.kind})`;
     details.append(focusButton(text, [pair.a, pair.b], text, [pair.a, pair.b, pair.atom_a, pair.atom_b]));
   }
-  if (state.result.mode !== "complex") details.append(el("h3", I18N.term("VHH Cys SG–SG 거리")), el("p", (data.cysteines?.note ? data.cysteines?.note : I18N.term("미평가"))));
+  if (state.result.mode !== "complex") details.append(el("h3", I18N.term("VHH Cys SG–SG 거리")), el("p", I18N.term(data.cysteines?.note || "미평가")));
   for (const pair of data.cysteines?.pairs || []) {
-    const text = `${pair.a}:SG – ${pair.b}:SG · ${pair.distance == null ? "SG 미관측" : pair.distance.toFixed(3) + " Å"}`;
+    const text = I18N.concat([`${pair.a}:SG – ${pair.b}:SG · `, pair.distance == null ? I18N.term("SG 미관측") : pair.distance.toFixed(3) + " Å"]);
     details.append(focusButton(text, [pair.a, pair.b], text, pair.distance == null ? null : [pair.a, pair.b, "SG", "SG"]));
   }
   if (data.cysteines?.missing_sg.length) details.append(el("p", I18N.concat([I18N.term("SG 없는 Cys: "), data.cysteines.missing_sg.join(", ")])));

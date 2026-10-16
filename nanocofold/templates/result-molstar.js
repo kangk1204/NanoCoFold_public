@@ -13,13 +13,13 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     });
     const result = new NanoCoFoldResultViewer(viewer, data);
     try {
-      result.structure = await result.load(data.content, data.format, "예측 복합체");
+      result.structure = await result.load(data.content, data.format, "Predicted complex");
       result.addCoordinateChains();
       if (!result.displayChains.length)
         await result.component(result.structure, {}, "unclassified", "Coordinates", 0x909ea9, "ball-and-stick");
       for (const chain of result.displayChains)
         await result.component(result.structure, {auth_asym_id: chain.id}, chain.unclassified ? "unclassified" : chain.role,
-          chain.unclassified ? `Coordinates · ${chain.id}` : `체인 ${chain.id} · ${chain.role}`,
+          chain.unclassified ? `Coordinates · ${chain.id}` : `Chain ${chain.id} · ${chain.role}`,
           chain.role === "target" ? 0x3b82b2 : chain.role === "binder" ? 0xd79a2b : 0x909ea9,
           chain.unclassified || chain.residues.length < 4 ? "ball-and-stick" : "cartoon");
       for (const [key, labels, color, type] of [
@@ -32,8 +32,8 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
       for (const [name, region] of Object.entries(data.cdr?.ranges || {}))
         await result.component(result.structure, result.schema(region.labels), "cdr", name, cdrColors[name], "cartoon");
       if (data.reference?.available) {
-        const reference = await result.load(data.reference.content, data.reference.format, "입력 참조 · 표적 Cα 정렬");
-        await result.component(reference, {}, "reference", "보존된 입력 좌표", 0x697582, "cartoon", 0.35);
+        const reference = await result.load(data.reference.content, data.reference.format, "Input reference · target Cα alignment");
+        await result.component(reference, {}, "reference", "Saved input coordinates", 0x697582, "cartoon", 0.35);
       }
       viewer.subscribe(viewer.plugin.behaviors.interaction.click, event => {
         if (result.disposed) return;
@@ -146,7 +146,7 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
           if (this.disposed) return;
           if (chain.unclassified) continue; // Already drawn as neutral atoms.
           await this.component(this.structure, {auth_asym_id: chain.id}, `residues-${chain.role}`,
-            `체인 ${chain.id} · 잔기·곁사슬`, chain.role === "target" ? 0x3b82b2 : chain.role === "binder" ? 0xd79a2b : 0x909ea9,
+            `Chain ${chain.id} · residues/side chains`, chain.role === "target" ? 0x3b82b2 : chain.role === "binder" ? 0xd79a2b : 0x909ea9,
             "ball-and-stick");
         }
         this.residuesCreated = true;

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ko" data-renderer-version="nanocofold-report-v2">
+<html lang="en" data-renderer-version="nanocofold-report-v2">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -15,6 +15,7 @@
   h3 { font-size:24px; line-height:1.6; margin:24px 0 12px; }
   p { margin:12px 0 20px; }
   .sub,.muted,footer { color:var(--muted); font-size:16px; overflow-wrap:anywhere; }
+  .report-language {display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px}.report-language select{min-height:48px;padding:8px 12px;font:inherit;background:#fff;border:1px solid var(--line);border-radius:4px}
   .report-nav { display:flex; flex-wrap:wrap; gap:8px; margin:24px 0; }
   .report-nav a,.viewer-tabs button { min-height:48px; display:inline-flex; align-items:center; padding:10px 16px; border:1px solid var(--line); border-radius:4px; background:#fff; color:var(--fg); text-decoration:none; font:inherit; font-size:16px; }
   .cards { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; margin:20px 0; }
@@ -49,115 +50,117 @@
   @media(prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
   @media print { .wrap { padding:0; max-width:none; } .report-nav,.viewer-tabs { display:none; } .scroll { overflow:visible; } table { font-size:10px; } th,.scroll td:first-child { position:static; } .card,.warnbox { break-inside:avoid; } pre { max-height:none; } }
 </style>
+<script id="report-i18n-runtime">{{ report_i18n_script|safe }}</script>
 </head>
 <body>
-<p data-terminology="binding-site">결합 부위(hotspot)는 나노바디 설계·접촉 평가에 지정한 표적 잔기입니다. 일반 복합체의 관심 잔기는 참조 구조 비교용입니다. 두 설정 모두 실제 결합의 실험적 증거를 뜻하지 않습니다.</p>
+<p data-terminology="binding-site"><span data-report-i18n>결합 부위(hotspot)는 나노바디 설계·접촉 평가에 지정한 표적 잔기입니다. 일반 복합체의 관심 잔기는 참조 구조 비교용입니다. 두 설정 모두 실제 결합의 실험적 증거를 뜻하지 않습니다.</span></p>
 <div class="wrap">
-  <p role="status" aria-live="polite" class="muted">보존된 분석 결과입니다. 구조·점수·미평가 기록을 확인하고 필요한 파일을 저장하세요.</p>
+  <div class="report-language"><label for="language-select">Language / 언어</label> <select id="language-select" aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div>
+  <p role="status" aria-live="polite" class="muted"><span data-report-i18n>보존된 분석 결과입니다. 구조·점수·미평가 기록을 확인하고 필요한 파일을 저장하세요.</span></p>
   <h1>{{ title }}</h1>
-  <div class="sub">실행 ID: {{ run_id }} · 모드: <b>{{ mode }}</b> · {{ "기준 단백질" if mode == "complex" else "표적" }}: <b>{{ target_name }}</b> · 생성: {{ generated_at }} · 보고서 버전: {{ reporting_version|default("미기록", true) }} · 계산 버전: {{ computation_version|default("미기록", true) }}</div>
+  <div class="sub"><span data-report-i18n>실행 ID:</span> {{ run_id }} <span data-report-i18n>· 모드:</span> <b>{{ mode }}</b> · {{ report_term("기준 단백질" if mode == "complex" else "표적") }}: <b>{{ target_name }}</b> <span data-report-i18n>· 생성:</span> {{ generated_at }} <span data-report-i18n>· 보고서 버전:</span> {{ reporting_version|default(report_term("미기록"), true) }} <span data-report-i18n>· 계산 버전:</span> {{ computation_version|default(report_term("미기록"), true) }}</div>
 
-  <nav class="report-nav" aria-label="보고서 내 탐색"><a href="#report-target">01 입력·설정</a><a href="#report-counts">02 후보·모델 수</a><a href="#report-models">03 후보 비교</a><a href="#report-exclusions">04 제외·미평가</a><a href="#report-structure">05 구조·PAE</a><a href="#report-files">06 출처·산출물</a></nav>
-  <p class="interpretation">이 보고서는 계산 결과와 선별 근거를 정리합니다. 예측 점수는 실제 결합·친화도 향상·KD를 확정하지 않습니다. 미평가 항목은 0점으로 취급하지 않습니다.</p>
+  <nav class="report-nav" aria-label="보고서 내 탐색" data-report-i18n-attributes="aria-label"><a href="#report-target"><span data-report-i18n>01 입력·설정</span></a><a href="#report-counts"><span data-report-i18n>02 후보·모델 수</span></a><a href="#report-models"><span data-report-i18n>03 후보 비교</span></a><a href="#report-exclusions"><span data-report-i18n>04 제외·미평가</span></a><a href="#report-structure"><span data-report-i18n>05 구조·PAE</span></a><a href="#report-files"><span data-report-i18n>06 출처·산출물</span></a></nav>
+  <p class="interpretation"><span data-report-i18n>이 보고서는 계산 결과와 선별 근거를 정리합니다. 예측 점수는 실제 결합·친화도 향상·KD를 확정하지 않습니다. 미평가 항목은 0점으로 취급하지 않습니다.</span></p>
 
   {% if warnings %}
-  <h2>주의 사항</h2>
+  <h2><span data-report-i18n>주의 사항</span></h2>
   <div class="warnbox">
-    <b>파이프라인 경고 {{ warnings|length }}건</b>
+    <b><span data-report-i18n>파이프라인 경고</span> {{ warnings|length }}<span data-report-i18n>건</span></b>
     <ul>{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>
   </div>
   {% endif %}
 
   {% if context.handoff_gate and context.handoff_gate.ok is not none %}
-  <h2>발주 게이트</h2>
+  <h2><span data-report-i18n>발주 게이트</span></h2>
   <div class="warnbox{% if context.handoff_gate.ok is sameas false %} blocked{% endif %}">
     {% if context.handoff_gate.ok is sameas true %}
-    <b>handoff 게이트 통과 — {{ ('오류 ' ~ context.handoff_gate.n_errors ~ '건') if context.handoff_gate.n_errors is not none else '오류 개수 미기록' }} · {{ ('경고 ' ~ context.handoff_gate.n_warnings ~ '건') if context.handoff_gate.n_warnings is not none else '경고 개수 미기록' }}</b>
-    <p>파일·필수 기록 검증 결과입니다. 실제 결합·KD의 실험 검증을 의미하지 않습니다.</p>
+    <b><span data-report-i18n>handoff 게이트 통과 —</span> {{ report_term(('오류 ' ~ context.handoff_gate.n_errors ~ '건') if context.handoff_gate.n_errors is not none else '오류 개수 미기록') }} · {{ report_term(('경고 ' ~ context.handoff_gate.n_warnings ~ '건') if context.handoff_gate.n_warnings is not none else '경고 개수 미기록') }}</b>
+    <p><span data-report-i18n>파일·필수 기록 검증 결과입니다. 실제 결합·KD의 실험 검증을 의미하지 않습니다.</span></p>
     {% else %}
-    <b>handoff 게이트 미통과 — {{ ('오류 ' ~ context.handoff_gate.n_errors ~ '건') if context.handoff_gate.n_errors is not none else '오류 개수 미기록' }} · {{ ('경고 ' ~ context.handoff_gate.n_warnings ~ '건') if context.handoff_gate.n_warnings is not none else '경고 개수 미기록' }}</b>
-    <p>합성 발주 목록은 아직 확정할 수 없습니다. 항목별 이유는
-    <code>05_final/handoff_gate.json</code> 또는 <code>nanocofold validate-handoff --run …</code> 로 확인하세요.</p>
+    <b><span data-report-i18n>handoff 게이트 미통과 —</span> {{ report_term(('오류 ' ~ context.handoff_gate.n_errors ~ '건') if context.handoff_gate.n_errors is not none else '오류 개수 미기록') }} · {{ report_term(('경고 ' ~ context.handoff_gate.n_warnings ~ '건') if context.handoff_gate.n_warnings is not none else '경고 개수 미기록') }}</b>
+    <p><span data-report-i18n>합성 발주 목록은 아직 확정할 수 없습니다. 항목별 이유는</span>
+    <code>05_final/handoff_gate.json</code> <span data-report-i18n>또는</span> <code>nanocofold validate-handoff --run …</code> <span data-report-i18n>로 확인하세요.</span></p>
     {% endif %}
     {% if context.handoff_gate.diagnostic %}<p>{{ context.handoff_gate.diagnostic }}</p>{% endif %}
   </div>
   {% endif %}
 
   {% if context.specificity %}
-  <h2>절단형 특이성 캠페인</h2>
+  <h2><span data-report-i18n>절단형 특이성 캠페인</span></h2>
   <div class="warnbox">
-    실행 상태: {{ context.campaign_status }}. 이 목록은 실험 우선순위이며 특이적 결합이 입증된 목록이 아닙니다.
-    전장형의 낮은 점수는 비결합 증거가 아닙니다. 말단 원자·전하에 의한 인식은 별도 실험 확인이 필요합니다.
-    <p>전체 반복 결과: <a href="06_specificity/observations.csv">관측표</a> ·
-    <a href="06_specificity/comparison.csv">후보 비교표</a> ·
-    <a href="06_specificity/residue_mapping.csv">잔기 번호 대응표</a> ·
-    <a href="05_final/controls.csv">대조군</a> ·
-    <a href="05_final/experiment_results.csv">실험 결과 입력</a></p>
+    <span data-report-i18n>실행 상태:</span> {{ context.campaign_status }}<span data-report-i18n>. 이 목록은 실험 우선순위이며 특이적 결합이 입증된 목록이 아닙니다.
+    전장형의 낮은 점수는 비결합 증거가 아닙니다. 말단 원자·전하에 의한 인식은 별도 실험 확인이 필요합니다.</span>
+    <p><span data-report-i18n>전체 반복 결과:</span> <a href="06_specificity/observations.csv"><span data-report-i18n>관측표</span></a> ·
+    <a href="06_specificity/comparison.csv"><span data-report-i18n>후보 비교표</span></a> ·
+    <a href="06_specificity/residue_mapping.csv"><span data-report-i18n>잔기 번호 대응표</span></a> ·
+    <a href="05_final/controls.csv"><span data-report-i18n>대조군</span></a> ·
+    <a href="05_final/experiment_results.csv"><span data-report-i18n>실험 결과 입력</span></a></p>
   </div>
   {% endif %}
 
-  <p class="muted">전체 준비 후보 기록 {{ report_summary.candidate_record_total if report_summary.candidate_record_total is defined and report_summary.candidate_record_total is not none else "미기록" }} · 예측 전 준비·미선정 {{ report_summary.preprediction_record_total if report_summary.preprediction_record_total is defined and report_summary.preprediction_record_total is not none else "미기록" }}.
-  {% if population_scope == "saved_all_candidate_records" %}저장된 전체 후보 기록을 표시합니다.{% else %}보고서에 제공된 점수 기록을 표시합니다.{% endif %}
-  예측 전 미선정 후보는 모델 평가 미완료 수에 합산하지 않습니다.</p>
-  <h2 id="report-target">01 입력·설정</h2>
-  <p>실행 모드: {{ mode if mode else '미기록' }} · 표적: {{ target_name if target_name else '미기록' }} · 결합 부위: {{ context.hotspots|join(', ') if context.hotspots else '미기록' }}</p>
-  <details><summary>입력과 실행 설정 원문</summary><p>설정 출처: <code>{{ run_settings_source }}</code>.{% if run_settings_source == 'report_generation_config' %} 실행 당시 설정이 저장되지 않아 보고서 생성 설정만 표시합니다. 과거 판정에 적용된 기준으로 추정하지 않습니다.{% endif %}</p><pre>{{ run_settings|tojson(indent=2) }}</pre></details>
+  <p class="muted"><span data-report-i18n>전체 준비 후보 기록</span> {{ report_summary.candidate_record_total if report_summary.candidate_record_total is defined and report_summary.candidate_record_total is not none else report_term("미기록") }} <span data-report-i18n>· 예측 전 준비·미선정</span> {{ report_summary.preprediction_record_total if report_summary.preprediction_record_total is defined and report_summary.preprediction_record_total is not none else report_term("미기록") }}.
+  {% if population_scope == "saved_all_candidate_records" %}<span data-report-i18n>저장된 전체 후보 기록을 표시합니다.</span>{% else %}<span data-report-i18n>보고서에 제공된 점수 기록을 표시합니다.</span>{% endif %}
+  <span data-report-i18n>예측 전 미선정 후보는 모델 평가 미완료 수에 합산하지 않습니다.</span></p>
+  <h2 id="report-target"><span data-report-i18n>01 입력·설정</span></h2>
+  <p><span data-report-i18n>실행 모드:</span> {{ mode if mode else report_term('미기록') }} <span data-report-i18n>· 표적:</span> {{ target_name if target_name else report_term('미기록') }} <span data-report-i18n>· 결합 부위:</span> {{ context.hotspots|join(', ') if context.hotspots else report_term('미기록') }}</p>
+  <details><summary><span data-report-i18n>입력과 실행 설정 원문</span></summary><p><span data-report-i18n>설정 출처:</span> <code>{{ run_settings_source }}</code>.{% if run_settings_source == 'report_generation_config' %} <span data-report-i18n>실행 당시 설정이 저장되지 않아 보고서 생성 설정만 표시합니다. 과거 판정에 적용된 기준으로 추정하지 않습니다.</span>{% endif %}</p><pre>{{ run_settings|tojson(indent=2) }}</pre></details>
   {% if context.target_qc is defined %}
-  <div class="scroll" tabindex="0" role="region" aria-label="보고서 표"><table style="max-width:900px"><caption>표적 입력·구조 품질</caption>
-    <tr><th scope="row">서열 길이</th><td>{{ context.target_qc.sequence_length if context.target_qc.sequence_length is defined and context.target_qc.sequence_length is not none else '미기록' }}</td><th scope="row">체인</th><td>{{ context.target_qc.chain_id if context.target_qc.chain_id is defined and context.target_qc.chain_id is not none else '미기록' }}</td></tr>
-    <tr><th scope="row">구조 출처</th><td>{{ context.target_qc.provider if context.target_qc.provider is defined and context.target_qc.provider is not none else '미기록' }}</td>
+  <div class="scroll" tabindex="0" role="region" aria-label="보고서 표" data-report-i18n-attributes="aria-label"><table style="max-width:900px"><caption><span data-report-i18n>표적 입력·구조 품질</span></caption>
+    <tr><th scope="row"><span data-report-i18n>서열 길이</span></th><td>{{ context.target_qc.sequence_length if context.target_qc.sequence_length is defined and context.target_qc.sequence_length is not none else report_term('미기록') }}</td><th scope="row"><span data-report-i18n>체인</span></th><td>{{ context.target_qc.chain_id if context.target_qc.chain_id is defined and context.target_qc.chain_id is not none else report_term('미기록') }}</td></tr>
+    <tr><th scope="row"><span data-report-i18n>구조 출처</span></th><td>{{ context.target_qc.provider if context.target_qc.provider is defined and context.target_qc.provider is not none else report_term('미기록') }}</td>
         {% if context.target_qc.confidence_metric == 'bfactor' %}
-        <th scope="row">평균 B-factor</th><td>{{ context.target_qc.mean_bfactor if context.target_qc.mean_bfactor is defined and context.target_qc.mean_bfactor is not none else '미기록' }}</td>
+        <th scope="row"><span data-report-i18n>평균 B-factor</span></th><td>{{ context.target_qc.mean_bfactor if context.target_qc.mean_bfactor is defined and context.target_qc.mean_bfactor is not none else report_term('미기록') }}</td>
         {% else %}
-        <th scope="row">평균 pLDDT</th><td>{{ context.target_qc.mean_plddt if context.target_qc.mean_plddt is defined and context.target_qc.mean_plddt is not none else '미기록' }}</td>
+        <th scope="row"><span data-report-i18n>평균 pLDDT</span></th><td>{{ context.target_qc.mean_plddt if context.target_qc.mean_plddt is defined and context.target_qc.mean_plddt is not none else report_term('미기록') }}</td>
         {% endif %}</tr>
-    <tr><th scope="row">결합 부위 세트</th><td>{{ context.target_qc.hotspot_set_id if context.target_qc.hotspot_set_id is defined and context.target_qc.hotspot_set_id is not none else '미기록' }}</td>
+    <tr><th scope="row"><span data-report-i18n>결합 부위 세트</span></th><td>{{ context.target_qc.hotspot_set_id if context.target_qc.hotspot_set_id is defined and context.target_qc.hotspot_set_id is not none else report_term('미기록') }}</td>
         {% if context.target_qc.confidence_metric == 'bfactor' %}
-        <th scope="row">결합 부위 평균 B-factor</th><td>{{ context.target_qc.hotspot_mean_bfactor if context.target_qc.hotspot_mean_bfactor is defined and context.target_qc.hotspot_mean_bfactor is not none else '미기록' }}</td>
+        <th scope="row"><span data-report-i18n>결합 부위 평균 B-factor</span></th><td>{{ context.target_qc.hotspot_mean_bfactor if context.target_qc.hotspot_mean_bfactor is defined and context.target_qc.hotspot_mean_bfactor is not none else report_term('미기록') }}</td>
         {% else %}
-        <th scope="row">결합 부위 평균 pLDDT</th><td>{{ context.target_qc.hotspot_mean_plddt if context.target_qc.hotspot_mean_plddt is defined and context.target_qc.hotspot_mean_plddt is not none else '미기록' }}</td>
+        <th scope="row"><span data-report-i18n>결합 부위 평균 pLDDT</span></th><td>{{ context.target_qc.hotspot_mean_plddt if context.target_qc.hotspot_mean_plddt is defined and context.target_qc.hotspot_mean_plddt is not none else report_term('미기록') }}</td>
         {% endif %}</tr>
-    <tr><th scope="row">표적 구조 절단</th><td colspan="3">{{ truncation_summary }}</td></tr>
-    {% if context.target_qc.input_coordinate_coverage is defined %}<tr><th scope="row">입력 서열 좌표 대응률</th><td>{{ context.target_qc.input_coordinate_coverage }}</td><th scope="row">좌표 없는 입력 잔기</th><td>{{ context.target_qc.unmapped_input_residues }}</td></tr>{% endif %}
+    <tr><th scope="row"><span data-report-i18n>표적 구조 절단</span></th><td colspan="3">{% for part in truncation_summary.split(' · ') %}{{ report_term(part) }}{% if not loop.last %} · {% endif %}{% endfor %}</td></tr>
+    {% if context.target_qc.input_coordinate_coverage is defined %}<tr><th scope="row"><span data-report-i18n>입력 서열 좌표 대응률</span></th><td>{{ context.target_qc.input_coordinate_coverage }}</td><th scope="row"><span data-report-i18n>좌표 없는 입력 잔기</span></th><td>{{ context.target_qc.unmapped_input_residues }}</td></tr>{% endif %}
   </table></div>
   {% endif %}
 
   {% if hotspot_rows %}
-  <h3>결합 부위 잔기 특성</h3>
-  <div class="scroll" tabindex="0" role="region" aria-label="보고서 표"><table><caption>관심 잔기와 점수</caption>
-    <tr>{% for key, label in hotspot_columns %}<th scope="col">{{ label }}</th>{% endfor %}</tr>
-    {% for row in hotspot_rows %}<tr>{% for key, label in hotspot_columns %}<td>{{ row.get(key) if row.get(key) is not none else '미평가' }}</td>{% endfor %}</tr>{% endfor %}
+  <h3><span data-report-i18n>결합 부위 잔기 특성</span></h3>
+  <div class="scroll" tabindex="0" role="region" aria-label="보고서 표" data-report-i18n-attributes="aria-label"><table><caption><span data-report-i18n>관심 잔기와 점수</span></caption>
+    <tr>{% for key, label in hotspot_columns %}<th scope="col">{{ report_term(label) }}</th>{% endfor %}</tr>
+    {% for row in hotspot_rows %}<tr>{% for key, label in hotspot_columns %}<td>{{ row.get(key) if row.get(key) is not none else report_term('미평가') }}</td>{% endfor %}</tr>{% endfor %}
   </table></div>
   {% endif %}
 
   {% if automatic_hotspots or hotspot_set_rows %}
   {% if automatic_hotspots %}
-  <h3>자동 제안 결합 부위 세트 · 탐색적 표면 후보</h3>
-  <p class="muted">표면 특성으로 제안한 후보입니다. 기능적 에피토프나 실제 결합 부위 재현은 검증되지 않았습니다.</p>
+  <h3><span data-report-i18n>자동 제안 결합 부위 세트 · 탐색적 표면 후보</span></h3>
+  <p class="muted"><span data-report-i18n>표면 특성으로 제안한 후보입니다. 기능적 에피토프나 실제 결합 부위 재현은 검증되지 않았습니다.</span></p>
   {% else %}
-  <h3>사용자 지정 결합 부위 세트</h3>
-  <p class="muted">입력에서 지정한 잔기입니다. 실제 접촉 여부와 기능적 결합 부위는 별도로 검토하세요.</p>
+  <h3><span data-report-i18n>사용자 지정 결합 부위 세트</span></h3>
+  <p class="muted"><span data-report-i18n>입력에서 지정한 잔기입니다. 실제 접촉 여부와 기능적 결합 부위는 별도로 검토하세요.</span></p>
   {% endif %}
   {% if hotspot_set_rows %}
-  <div class="scroll" tabindex="0" role="region" aria-label="보고서 표"><table><caption>관심 잔기 세트</caption>
-    <tr><th scope="col">세트</th><th scope="col">잔기</th><th scope="col">점수</th></tr>
+  <div class="scroll" tabindex="0" role="region" aria-label="보고서 표" data-report-i18n-attributes="aria-label"><table><caption><span data-report-i18n>관심 잔기 세트</span></caption>
+    <tr><th scope="col"><span data-report-i18n>세트</span></th><th scope="col"><span data-report-i18n>잔기</span></th><th scope="col"><span data-report-i18n>점수</span></th></tr>
     {% set ns = namespace(seen=[]) %}
-    {% for row in hotspot_set_rows %}<tr><td>{{ row.set_id }}</td><td>{{ row.residue }}</td><td>{{ row.score if row.score is defined and row.score is not none else '미평가' }}</td></tr>{% endfor %}
+    {% for row in hotspot_set_rows %}<tr><td>{{ row.set_id }}</td><td>{{ row.residue }}</td><td>{{ row.score if row.score is defined and row.score is not none else report_term('미평가') }}</td></tr>{% endfor %}
   </table></div>
   {% else %}
-  <p class="muted">자동 제안 결합 부위 세트가 기록되지 않았습니다.</p>
+  <p class="muted"><span data-report-i18n>자동 제안 결합 부위 세트가 기록되지 않았습니다.</span></p>
   {% endif %}
   {% endif %}
 
-  <h2 id="report-counts">02 후보·모델 수</h2>
-  {% if expected_models is not none %}<p>계획 모델 {{ expected_models }}건 · 실제 모델 기록 {{ report_summary.model_total if report_summary.model_total is not none else '미기록' }}건 · 평가 완료 {{ report_summary.evaluated_total if report_summary.evaluated_total is not none else '미기록' }}건. 출처: <code>{{ expected_models_source }}</code></p>{% endif %}
+  <h2 id="report-counts"><span data-report-i18n>02 후보·모델 수</span></h2>
+  {% if expected_models is not none %}<p><span data-report-i18n>계획 모델</span> {{ expected_models }}<span data-report-i18n>건 · 실제 모델 기록</span> {{ report_summary.model_total if report_summary.model_total is not none else report_term('미기록') }}<span data-report-i18n>건 · 평가 완료</span> {{ report_summary.evaluated_total if report_summary.evaluated_total is not none else report_term('미기록') }}<span data-report-i18n>건. 출처:</span> <code>{{ expected_models_source }}</code></p>{% endif %}
   <div class="cards">
-    <div class="card"><div class="k">원본 후보</div><div class="v">{{ report_summary.source_candidates if report_summary.source_candidates is not none else '미기록' }}</div></div>
-    <div class="card"><div class="k">전체 모델 기록</div><div class="v">{{ report_summary.model_total if report_summary.model_total is not none else '미기록' }}</div></div>
-    <div class="card"><div class="k">평가 완료 모델</div><div class="v">{{ report_summary.evaluated_total if report_summary.evaluated_total is not none else '미기록' }}</div></div>
-    <div class="card"><div class="k">기록 적격 모델</div><div class="v">{{ '적용 안 함' if mode == 'complex' else (report_summary.eligible_total if report_summary.eligible_total is not none else '미평가') }}</div></div>
+    <div class="card"><div class="k"><span data-report-i18n>원본 후보</span></div><div class="v">{{ report_summary.source_candidates if report_summary.source_candidates is not none else report_term('미기록') }}</div></div>
+    <div class="card"><div class="k"><span data-report-i18n>전체 모델 기록</span></div><div class="v">{{ report_summary.model_total if report_summary.model_total is not none else report_term('미기록') }}</div></div>
+    <div class="card"><div class="k"><span data-report-i18n>평가 완료 모델</span></div><div class="v">{{ report_summary.evaluated_total if report_summary.evaluated_total is not none else report_term('미기록') }}</div></div>
+    <div class="card"><div class="k"><span data-report-i18n>기록 적격 모델</span></div><div class="v">{{ report_term('적용 안 함' if mode == 'complex' else (report_summary.eligible_total if report_summary.eligible_total is not none else '미평가')) }}</div></div>
   </div>
-  <p class="muted">고유 후보 서열 {{ report_summary.unique_sequences if report_summary.unique_sequences is not none else '미기록' }}종. 원본 후보는 source_sequence_id 및 원본 ID의 엔진 접두어로 구분합니다. 서열이 모두 기록된 경우에만 고유 서열 수를 계산합니다. 같은 후보의 엔진별 예측은 별도 모델 기록입니다. 기록 선별 {{ selected_total }}건{% if report_summary.eligibility_missing is not none %} · 적격 판정 미평가 {{ report_summary.eligibility_missing }}건{% endif %}. 일반 복합체에는 VHH 적격 판정을 적용하지 않습니다.</p>
+  <p class="muted"><span data-report-i18n>고유 후보 서열</span> {{ report_summary.unique_sequences if report_summary.unique_sequences is not none else report_term('미기록') }}<span data-report-i18n>종. 원본 후보는 source_sequence_id 및 원본 ID의 엔진 접두어로 구분합니다. 서열이 모두 기록된 경우에만 고유 서열 수를 계산합니다. 같은 후보의 엔진별 예측은 별도 모델 기록입니다. 기록 선별</span> {{ selected_total }}<span data-report-i18n>건</span>{% if report_summary.eligibility_missing is not none %} <span data-report-i18n>· 적격 판정 미평가</span> {{ report_summary.eligibility_missing }}<span data-report-i18n>건</span>{% endif %}<span data-report-i18n>. 일반 복합체에는 VHH 적격 판정을 적용하지 않습니다.</span></p>
 
   {% macro metric_caption(key, label, records) -%}
   {%- if key != 'iptm' -%}{{ label }}
@@ -173,65 +176,65 @@
 
   {% macro candidate_table(rows, expanded=false) %}
   {% set compact = ["selection_rank", "predictor_engine", "final_eligible", "ipsae", "iptm", "interface_plddt", "interface_pae", "n_clashes", "exclusion_reason"] %}
-  <div class="scroll" tabindex="0" role="region" aria-label="보고서 표"><table><caption>후보·모델의 기록 점수</caption>
-    <thead><tr><th scope="col" data-column-key="display_alias">후보 별칭</th>{% if mode != "complex" %}<th scope="col">결합 부위 접촉 수</th><th scope="col">지정 결합 부위 충족</th>{% endif %}{% for key, label in scored_columns if expanded or key in compact %}<th scope="col" data-column-key="{{ key }}">{{ metric_caption(key, label, rows) }}</th>{% endfor %}</tr></thead>
+  <div class="scroll" tabindex="0" role="region" aria-label="보고서 표" data-report-i18n-attributes="aria-label"><table><caption><span data-report-i18n>후보·모델의 기록 점수</span></caption>
+    <thead><tr><th scope="col" data-column-key="display_alias"><span data-report-i18n>후보 별칭</span></th>{% if mode != "complex" %}<th scope="col"><span data-report-i18n>결합 부위 접촉 수</span></th><th scope="col"><span data-report-i18n>지정 결합 부위 충족</span></th>{% endif %}{% for key, label in scored_columns if expanded or key in compact %}<th scope="col" data-column-key="{{ key }}">{{ report_term(metric_caption(key, label, rows)) }}</th>{% endfor %}</tr></thead>
     <tbody>{% for row in rows %}<tr>
       {% set original_id = display_identity(row) %}
-      <td>{{ display_aliases.get(original_id|string, '미기록') }}</td>{% if mode != 'complex' %}{% set site = hotspot_assessment(row) %}<td>{{ (site.contacted|string ~ '/' ~ site.requested|string ~ '개') if site.status not in ['not_assessed', 'not_requested', 'mapping_failed'] else '—' }}</td><td>{{ site.label }}</td>{% endif %}
+      <td>{{ display_aliases.get(original_id|string, report_term('미기록')) }}</td>{% if mode != 'complex' %}{% set site = hotspot_assessment(row) %}<td>{{ report_term((site.contacted|string ~ '/' ~ site.requested|string ~ '개') if site.status not in ['not_assessed', 'not_requested', 'mapping_failed'] else '—') }}</td><td>{{ report_term(site.label) }}</td>{% endif %}
       {% for key, label in scored_columns if expanded or key in compact %}{% set v = row.get(key) %}
-      <td{% if key in ['candidate_id', 'design_id', 'variant_id'] %} class="original-id"{% endif %}>{% if key in ['candidate_id', 'design_id', 'variant_id'] and v is not none %}<details><summary>원본 ID</summary><code>{{ v }}</code></details>{% elif key in ['site_satisfied', 'site_selection_eligible', 'pose_consensus_status', 'design_consistency_status', 'review_priority', 'candidate_review_priority', 'review_priority_reason'] %}{{ pose_status_label(row, key) }}{% elif key == 'ranking_status' %}{{ '순위 산정' if v == 'ranked' else '보류' if v == 'held' else '미기록' }}{% elif key == 'ranking_unavailable_reason' %}{{ '예측 실패' if v == 'prediction_failed' else '가중 지표 미평가' if v == 'weighted_metrics_unavailable' else '가중 CDR 개발가능성 미평가' if v == 'weighted_cdr_assessment_unavailable' else '접촉 없음 또는 가중 계면 지표 미평가' if v == 'interface_metrics_unavailable' else '해당 없음' if not v and row.get('ranking_status') == 'ranked' else '보류 이유 미기록' if not v and row.get('ranking_status') == 'held' else '미평가' if not v else v }}{% elif key == 'exclusion_reason' and not v %}{{ '없음' if row.get('final_eligible') is sameas true else '제외 사유 미기록' if row.get('final_eligible') is sameas false else '미평가·제외 사유 미기록' }}{% elif key in ['ipsae_scope', 'ipsae_scope_source', 'iptm_scope', 'iptm_source'] and v is not none %}<span title="{{ v }}">{{ metric_record_label(v) }}</span>{% elif v is none %}<span class="muted">미평가</span>{% elif key == 'final_evaluated' and v is sameas true %}평가 완료{% elif key == 'final_evaluated' and v is sameas false %}미평가{% elif key == 'final_eligible' and v is sameas true %}적격{% elif key == 'final_eligible' and v is sameas false %}부적격{% elif key == 'ipsae' and mode == 'complex' %}{{ v }} <span class="muted">({{ row.get('ipsae_chain_a') ~ '–' ~ row.get('ipsae_chain_b') ~ ' 체인쌍' if row.get('ipsae_chain_a') and row.get('ipsae_chain_b') else '적용 체인 미기록' }})</span>{% elif key == 'exclusion_reason' %}{% set reason_ns = namespace(labels=[]) %}{% for reason in reason_summary if reason.code in (v|string).split(';') %}{% set reason_ns.labels = reason_ns.labels + [reason.label] %}{% endfor %}{{ reason_ns.labels|join(' · ') if reason_ns.labels else '기록된 제외 사유 (상세·CSV 확인)' }}{% elif v is sameas true %}예{% elif v is sameas false %}아니오{% else %}{{ v }}{% endif %}</td>
+      <td{% if key in ['candidate_id', 'design_id', 'variant_id'] %} class="original-id"{% endif %}>{% if key in ['candidate_id', 'design_id', 'variant_id'] and v is not none %}<details><summary><span data-report-i18n>원본 ID</span></summary><code>{{ v }}</code></details>{% elif key in ['site_satisfied', 'site_selection_eligible', 'pose_consensus_status', 'design_consistency_status', 'review_priority', 'candidate_review_priority', 'review_priority_reason'] %}{{ report_term(pose_status_label(row, key)) }}{% elif key == 'ranking_status' %}{{ report_term('순위 산정' if v == 'ranked' else '보류' if v == 'held' else '미기록') }}{% elif key == 'ranking_unavailable_reason' %}{{ report_term('예측 실패') if v == 'prediction_failed' else report_term('가중 지표 미평가') if v == 'weighted_metrics_unavailable' else report_term('가중 CDR 개발가능성 미평가') if v == 'weighted_cdr_assessment_unavailable' else report_term('접촉 없음 또는 가중 계면 지표 미평가') if v == 'interface_metrics_unavailable' else report_term('해당 없음') if not v and row.get('ranking_status') == 'ranked' else report_term('보류 이유 미기록') if not v and row.get('ranking_status') == 'held' else report_term('미평가') if not v else v }}{% elif key == 'exclusion_reason' and not v %}{{ report_term('없음' if row.get('final_eligible') is sameas true else '제외 사유 미기록' if row.get('final_eligible') is sameas false else '미평가·제외 사유 미기록') }}{% elif key in ['ipsae_scope', 'ipsae_scope_source', 'iptm_scope', 'iptm_source'] and v is not none %}<span title="{{ v }}">{{ report_term(metric_record_label(v)) }}</span>{% elif v is none %}<span class="muted"><span data-report-i18n>미평가</span></span>{% elif key == 'final_evaluated' and v is sameas true %}<span data-report-i18n>평가 완료</span>{% elif key == 'final_evaluated' and v is sameas false %}<span data-report-i18n>미평가</span>{% elif key == 'final_eligible' and v is sameas true %}<span data-report-i18n>적격</span>{% elif key == 'final_eligible' and v is sameas false %}<span data-report-i18n>부적격</span>{% elif key == 'ipsae' and mode == 'complex' %}{{ v }} <span class="muted">({{ report_term(row.get('ipsae_chain_a') ~ '–' ~ row.get('ipsae_chain_b') ~ ' 체인쌍' if row.get('ipsae_chain_a') and row.get('ipsae_chain_b') else '적용 체인 미기록') }})</span>{% elif key == 'exclusion_reason' %}{% set reason_ns = namespace(labels=[]) %}{% for reason in reason_summary if reason.code in (v|string).split(';') %}{% set reason_ns.labels = reason_ns.labels + [reason] %}{% endfor %}{% if reason_ns.labels %}{% for reason in reason_ns.labels %}{{ report_term(reason.label) if reason.code in known_reason_codes else reason.label }}{% if not loop.last %} · {% endif %}{% endfor %}{% else %}{{ report_term('기록된 제외 사유 (상세·CSV 확인)') }}{% endif %}{% elif v is sameas true %}<span data-report-i18n>예</span>{% elif v is sameas false %}<span data-report-i18n>아니오</span>{% else %}{{ v }}{% endif %}</td>
       {% endfor %}
     </tr>{% endfor %}</tbody>
   </table></div>
   {% endmacro %}
 
-  <h2 id="report-models">03 후보 비교 · 표시 {{ scored_rows|length }} / 전체 {{ scored_total }} 후보·모델 기록</h2>
-  <p>예측 신뢰도와 지정 결합 부위 충족은 별개입니다. 결합 부위 미접촉·미지정·미평가를 구분합니다. PAE는 참조 구조와의 실측 거리 오차가 아니며 pDockQ2는 실측 DockQ가 아닙니다. 지정 결합 부위 진단은 기존 점수와 선별 기록을 바꾸지 않습니다.</p>
-  <p>일반 복합체의 요약 ipSAE는 기본적으로 검토한 체인 순서의 첫 쌍이며, 체인쌍을 명시한 실행에서는 해당 쌍입니다. 전체 평균·최솟값과 구분합니다. 적용 체인·범위 출처와 모든 체인 쌍의 표·CSV를 함께 확인합니다.</p>
-  <p>엔진별 표의 순위와 종합점수는 기록된 엔진 안에서만 비교합니다. 엔진 간 점수를 합산하거나 통합 순위를 만들지 않습니다. RF·BG 별칭은 후보를 찾기 위한 표시명이며 원본 ID와 수치는 보존됩니다.</p>
+  <h2 id="report-models"><span data-report-i18n>03 후보 비교 · 표시</span> {{ scored_rows|length }} <span data-report-i18n>/ 전체</span> {{ scored_total }} <span data-report-i18n>후보·모델 기록</span></h2>
+  <p><span data-report-i18n>예측 신뢰도와 지정 결합 부위 충족은 별개입니다. 결합 부위 미접촉·미지정·미평가를 구분합니다. PAE는 참조 구조와의 실측 거리 오차가 아니며 pDockQ2는 실측 DockQ가 아닙니다. 지정 결합 부위 진단은 기존 점수와 선별 기록을 바꾸지 않습니다.</span></p>
+  <p><span data-report-i18n>일반 복합체의 요약 ipSAE는 기본적으로 검토한 체인 순서의 첫 쌍이며, 체인쌍을 명시한 실행에서는 해당 쌍입니다. 전체 평균·최솟값과 구분합니다. 적용 체인·범위 출처와 모든 체인 쌍의 표·CSV를 함께 확인합니다.</span></p>
+  <p><span data-report-i18n>엔진별 표의 순위와 종합점수는 기록된 엔진 안에서만 비교합니다. 엔진 간 점수를 합산하거나 통합 순위를 만들지 않습니다. RF·BG 별칭은 후보를 찾기 위한 표시명이며 원본 ID와 수치는 보존됩니다.</span></p>
   {% if pose_assessments_available %}
-  <div class="interpretation" id="pose-assessment-guide"><h3>세 가지 별도 확인</h3><p><b>예측 신뢰도</b>는 ipTM·ipSAE 및 실행 당시 기록 적격, <b>지정 결합 부위 충족</b>은 결합 부위 접촉, <b>자세 일관성</b>은 동일 후보의 엔진별 자세와 설계·재예측 일치를 뜻합니다. 탐색적 검토 우선순위는 이 기록을 함께 확인하는 값이며 기존 적격·선별 기록을 변경하지 않습니다.</p><p>검토 순위는 표적·조건·실행 범위 안의 후보 순서이며 동률을 허용합니다. 1위도 보류일 수 있으므로 검토 판정과 이유를 함께 읽으세요. 표적만 정렬하여 같은 후보 서열의 자세를 비교합니다. 엔진 지지 수는 독립 실험 횟수가 아니며 점수를 평균하지 않습니다. 새 VHH를 기존 VHH의 자세에 맞춰 선별하지 않습니다. 설계 구조가 없거나 대응이 불가능하면 미평가로 남습니다. 우선 검토는 실제 결합·KD의 입증이 아닙니다.</p><p>검토 정책 v2는 품질·지정 결합 부위를 충족한 엔진별 단독 유망 예측과 같은 자세의 다중 엔진 지지를 구분합니다. 한 엔진만 유망해도 합의 부족을 실패로 간주하지 않습니다. 엔진 간 자세 차이와 설계·재예측 불일치는 별도 진단이며 자동 비결합·탈락 사유가 아닙니다. 이전 정책의 판정은 기록된 버전과 함께 읽으세요.</p></div>
+  <div class="interpretation" id="pose-assessment-guide"><h3><span data-report-i18n>세 가지 별도 확인</span></h3><p><b><span data-report-i18n>예측 신뢰도</span></b><span data-report-i18n>는 ipTM·ipSAE 및 실행 당시 기록 적격,</span> <b><span data-report-i18n>지정 결합 부위 충족</span></b><span data-report-i18n>은 결합 부위 접촉,</span> <b><span data-report-i18n>자세 일관성</span></b><span data-report-i18n>은 동일 후보의 엔진별 자세와 설계·재예측 일치를 뜻합니다. 탐색적 검토 우선순위는 이 기록을 함께 확인하는 값이며 기존 적격·선별 기록을 변경하지 않습니다.</span></p><p><span data-report-i18n>검토 순위는 표적·조건·실행 범위 안의 후보 순서이며 동률을 허용합니다. 1위도 보류일 수 있으므로 검토 판정과 이유를 함께 읽으세요. 표적만 정렬하여 같은 후보 서열의 자세를 비교합니다. 엔진 지지 수는 독립 실험 횟수가 아니며 점수를 평균하지 않습니다. 새 VHH를 기존 VHH의 자세에 맞춰 선별하지 않습니다. 설계 구조가 없거나 대응이 불가능하면 미평가로 남습니다. 우선 검토는 실제 결합·KD의 입증이 아닙니다.</span></p><p><span data-report-i18n>검토 정책 v2는 품질·지정 결합 부위를 충족한 엔진별 단독 유망 예측과 같은 자세의 다중 엔진 지지를 구분합니다. 한 엔진만 유망해도 합의 부족을 실패로 간주하지 않습니다. 엔진 간 자세 차이와 설계·재예측 불일치는 별도 진단이며 자동 비결합·탈락 사유가 아닙니다. 이전 정책의 판정은 기록된 버전과 함께 읽으세요.</span></p></div>
   {% endif %}
-  <p class="muted">지표 순위·종합점수 순위·기록 선별 순위는 다릅니다. 선별은 적격 게이트와 CDR3 다양성 제한을 적용하므로 높은 ipSAE 후보도 제외될 수 있습니다. ESM·AntiFold는 서열/폴딩 prior이며 친화도 예측값이 아닙니다. 심한 위험 수(dev_severe)는 5종 게이트, 전체 위험 수(dev_flags)는 종합점수 가중치입니다.</p>
-  <p class="muted">충돌·N/O 근접·반대 전하 접촉은 원자쌍 수입니다. N/O 근접은 각도를 확인한 수소결합이 아니며, 고정 거리 충돌은 원소별 반데르발스 판정이 아닙니다.</p>
-  <p class="muted">같은 seed라도 모든 엔진·장치에서 비트 단위 재현을 보장하지 않습니다. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에 한정됩니다. RFantibody·BoltzGen 생성 단계의 난수 통제는 제한적이므로 결합 부위 OFF/ON의 동일 난수 상태나 인과효과를 가정하지 않습니다.</p>
-  {% for group in scored_groups %}<h3>{{ group.engine }}</h3>{{ candidate_table(group.rows) }}<details><summary>상세 지표·원본 기록 펼치기</summary>{{ candidate_table(group.rows, true) }}</details>{% else %}<p class="muted">평가 모델 기록이 없습니다.</p>{% endfor %}
-  <p class="muted">보고서의 표는 설정한 표시 범위입니다. 전체 평가 기록은 산출물의 CSV에서 확인하세요.</p>
+  <p class="muted"><span data-report-i18n>지표 순위·종합점수 순위·기록 선별 순위는 다릅니다. 선별은 적격 게이트와 CDR3 다양성 제한을 적용하므로 높은 ipSAE 후보도 제외될 수 있습니다. ESM·AntiFold는 서열/폴딩 prior이며 친화도 예측값이 아닙니다. 심한 위험 수(dev_severe)는 5종 게이트, 전체 위험 수(dev_flags)는 종합점수 가중치입니다.</span></p>
+  <p class="muted"><span data-report-i18n>충돌·N/O 근접·반대 전하 접촉은 원자쌍 수입니다. N/O 근접은 각도를 확인한 수소결합이 아니며, 고정 거리 충돌은 원소별 반데르발스 판정이 아닙니다.</span></p>
+  <p class="muted"><span data-report-i18n>같은 seed라도 모든 엔진·장치에서 비트 단위 재현을 보장하지 않습니다. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에 한정됩니다. RFantibody·BoltzGen 생성 단계의 난수 통제는 제한적이므로 결합 부위 OFF/ON의 동일 난수 상태나 인과효과를 가정하지 않습니다.</span></p>
+  {% for group in scored_groups %}<h3>{{ group.engine }}</h3>{{ candidate_table(group.rows) }}<details><summary><span data-report-i18n>상세 지표·원본 기록 펼치기</span></summary>{{ candidate_table(group.rows, true) }}</details>{% else %}<p class="muted"><span data-report-i18n>평가 모델 기록이 없습니다.</span></p>{% endfor %}
+  <p class="muted"><span data-report-i18n>보고서의 표는 설정한 표시 범위입니다. 전체 평가 기록은 산출물의 CSV에서 확인하세요.</span></p>
   {% if metric_method_rows %}
-  <details id="metric-method-provenance"><summary>pDockQ·pDockQ2 계산법과 기존 저장값</summary>
-    <p>계산법은 모델별 기록으로 구분합니다. 기존 점수와 선별 순위는 유지하며, 계산법이 다른 값은 동일한 저자 구현으로 간주하지 않습니다.</p>
-    <div class="scroll" tabindex="0" role="region" aria-label="보고서 표"><table><caption>지표 계산법·해석·출처</caption><thead><tr><th scope="col">모델</th><th scope="col">지표</th><th scope="col">기록 계산법</th><th scope="col">해석·한계</th><th scope="col">출처</th></tr></thead><tbody>
-    {% for row in metric_method_rows %}<tr><td><code>{{ row.candidate_id }}</code></td><td>{{ row.metric }}</td><td><code>{{ row.recorded_method if row.recorded_method else '미기록' }}</code></td><td class="original-id">{{ row.caveat if row.caveat else '저자 원자 신뢰도 방식으로 기록됨' }}{% if row.status == 'legacy_variant' %}<br><code>{{ row.effective_method }}</code>{% endif %}</td><td><a href="{{ row.source }}">저자 코드</a></td></tr>{% endfor %}
+  <details id="metric-method-provenance"><summary><span data-report-i18n>pDockQ·pDockQ2 계산법과 기존 저장값</span></summary>
+    <p><span data-report-i18n>계산법은 모델별 기록으로 구분합니다. 기존 점수와 선별 순위는 유지하며, 계산법이 다른 값은 동일한 저자 구현으로 간주하지 않습니다.</span></p>
+    <div class="scroll" tabindex="0" role="region" aria-label="보고서 표" data-report-i18n-attributes="aria-label"><table><caption><span data-report-i18n>지표 계산법·해석·출처</span></caption><thead><tr><th scope="col"><span data-report-i18n>모델</span></th><th scope="col"><span data-report-i18n>지표</span></th><th scope="col"><span data-report-i18n>기록 계산법</span></th><th scope="col"><span data-report-i18n>해석·한계</span></th><th scope="col"><span data-report-i18n>출처</span></th></tr></thead><tbody>
+    {% for row in metric_method_rows %}<tr><td><code>{{ row.candidate_id }}</code></td><td>{{ row.metric }}</td><td><code>{{ row.recorded_method if row.recorded_method else report_term('미기록') }}</code></td><td class="original-id">{{ row.caveat if row.caveat else report_term('저자 원자 신뢰도 방식으로 기록됨') }}{% if row.status == 'legacy_variant' %}<br><code>{{ row.effective_method }}</code>{% endif %}</td><td><a href="{{ row.source }}"><span data-report-i18n>저자 코드</span></a></td></tr>{% endfor %}
     </tbody></table></div>
   </details>
   {% endif %}
-  <details id="report-selection"><summary>기록 선별 목록 · {{ selected_total }} 모델</summary>
-    <p class="muted">표시 {{ selected_rows|length }} / 전체 {{ selected_total }} 모델. 전체 선별 기록은 <code>05_final/selected_candidates.csv</code>에서 확인하세요.</p>
+  <details id="report-selection"><summary><span data-report-i18n>기록 선별 목록 ·</span> {{ selected_total }} <span data-report-i18n>모델</span></summary>
+    <p class="muted"><span data-report-i18n>표시</span> {{ selected_rows|length }} <span data-report-i18n>/ 전체</span> {{ selected_total }} <span data-report-i18n>모델. 전체 선별 기록은</span> <code>05_final/selected_candidates.csv</code><span data-report-i18n>에서 확인하세요.</span></p>
     {% for group in selected_groups %}<h3>{{ group.engine }}</h3>{{ candidate_table(group.rows) }}{% endfor %}
-    {% if not selected_rows %}<p>현재 선별 목록은 0건입니다. 제외 사유와 미평가 항목을 확인하세요. 선별 0건만으로 실행 실패나 비결합을 결론내리지 않습니다.</p>{% endif %}
+    {% if not selected_rows %}<p><span data-report-i18n>현재 선별 목록은 0건입니다. 제외 사유와 미평가 항목을 확인하세요. 선별 0건만으로 실행 실패나 비결합을 결론내리지 않습니다.</span></p>{% endif %}
   </details>
 
-  <h2 id="report-exclusions">04 제외·미평가 이유</h2>
-  <p class="muted">저장된 후보·모델 기록에서 각 사유를 기록당 한 번 집계합니다. 예측 전 준비·미선정은 실제 모델 평가와 구분합니다. 한 기록에 여러 사유가 있을 수 있으므로 합계는 기록 수와 다를 수 있습니다. 기준 미통과와 계산 오류·미평가를 구분해 읽으세요.</p>
-  {% if reason_summary %}<div class="scroll" tabindex="0" role="region" aria-label="보고서 표"><table><caption>제외·미평가 이유 집계</caption><thead><tr><th scope="col">이유</th><th scope="col">기록 수</th><th scope="col">기록 코드</th></tr></thead><tbody>
-  {% for reason in reason_summary %}<tr><td>{{ reason.label }}</td><td>{{ reason.count }}</td><td><code>{{ reason.code }}</code></td></tr>{% endfor %}
-  </tbody></table></div>{% else %}<p class="muted">기록된 제외·미평가 사유가 없습니다. 사유 미기록만으로 판정 통과를 추정하지 않습니다.</p>{% endif %}
+  <h2 id="report-exclusions"><span data-report-i18n>04 제외·미평가 이유</span></h2>
+  <p class="muted"><span data-report-i18n>저장된 후보·모델 기록에서 각 사유를 기록당 한 번 집계합니다. 예측 전 준비·미선정은 실제 모델 평가와 구분합니다. 한 기록에 여러 사유가 있을 수 있으므로 합계는 기록 수와 다를 수 있습니다. 기준 미통과와 계산 오류·미평가를 구분해 읽으세요.</span></p>
+  {% if reason_summary %}<div class="scroll" tabindex="0" role="region" aria-label="보고서 표" data-report-i18n-attributes="aria-label"><table><caption><span data-report-i18n>제외·미평가 이유 집계</span></caption><thead><tr><th scope="col"><span data-report-i18n>이유</span></th><th scope="col"><span data-report-i18n>기록 수</span></th><th scope="col"><span data-report-i18n>기록 코드</span></th></tr></thead><tbody>
+  {% for reason in reason_summary %}<tr><td>{{ report_term(reason.label) if reason.code in known_reason_codes else reason.label }}</td><td>{{ reason.count }}</td><td><code>{{ reason.code }}</code></td></tr>{% endfor %}
+  </tbody></table></div>{% else %}<p class="muted"><span data-report-i18n>기록된 제외·미평가 사유가 없습니다. 사유 미기록만으로 판정 통과를 추정하지 않습니다.</span></p>{% endif %}
 
-  <h2 id="report-structure">05 구조·PAE</h2>
+  <h2 id="report-structure"><span data-report-i18n>05 구조·PAE</span></h2>
   {% if interactive_report_href %}
-  <p><a id="complete-result-explorer" href="{{ interactive_report_href }}">전체 모델·구조·PAE 결과 탐색 열기</a></p>
-  <p class="muted">별도 탐색 파일에는 저장된 전체 후보·관측·모델과 보존된 전체 PAE가 포함됩니다. 후보를 선택하면 MolStar 뷰어에서 {{ "체인·접촉·충돌 표시" if mode == "complex" else "체인·접촉·충돌·결합 부위·CDR 표시" }}, 잔기 선택과 거리 측정을 사용할 수 있습니다. 구조·PAE가 없으면 미평가로 남으며 원본 점수·선별 기록을 다시 계산하지 않습니다. 오프라인으로 옮길 때는 이 보고서와 연결된 탐색 HTML 파일을 같은 폴더에 보관하거나 전달 ZIP을 사용하세요.</p>
+  <p><a id="complete-result-explorer" href="{{ interactive_report_href }}"><span data-report-i18n>전체 모델·구조·PAE 결과 탐색 열기</span></a></p>
+  <p class="muted"><span data-report-i18n>별도 탐색 파일에는 저장된 전체 후보·관측·모델과 보존된 전체 PAE가 포함됩니다. 후보를 선택하면 MolStar 뷰어에서</span> {{ report_term("체인·접촉·충돌 표시" if mode == "complex" else "체인·접촉·충돌·결합 부위·CDR 표시") }}<span data-report-i18n>, 잔기 선택과 거리 측정을 사용할 수 있습니다. 구조·PAE가 없으면 미평가로 남으며 원본 점수·선별 기록을 다시 계산하지 않습니다. 오프라인으로 옮길 때는 이 보고서와 연결된 탐색 HTML 파일을 같은 폴더에 보관하거나 전달 ZIP을 사용하세요.</span></p>
   {% elif viewer_enabled %}
-  <p class="muted">저장 결과 탐색 원본이 없는 진단·부분 기록은 대표 구조 최대 {{ viewer_limit }}개를 표시합니다. 표의 전체 기록 수와 뷰어의 표시 한도는 별개입니다. 회색은 선택한 두 체인 이외의 보조 체인입니다. PAE 원본 파일과 방향별 계면 PAE 값은 평가표 및 산출물에서 확인하세요. 구조·PAE가 없으면 미평가로 남습니다.</p>
+  <p class="muted"><span data-report-i18n>저장 결과 탐색 원본이 없는 진단·부분 기록은 대표 구조 최대</span> {{ viewer_limit }}<span data-report-i18n>개를 표시합니다. 표의 전체 기록 수와 뷰어의 표시 한도는 별개입니다. 회색은 선택한 두 체인 이외의 보조 체인입니다. PAE 원본 파일과 방향별 계면 PAE 값은 평가표 및 산출물에서 확인하세요. 구조·PAE가 없으면 미평가로 남습니다.</span></p>
   {% else %}
-  <p class="muted">보고서 설정에 따라 구조 뷰어를 표시하지 않습니다. 저장된 구조·PAE 원본과 평가표는 실행 산출물에서 확인하세요.</p>
+  <p class="muted"><span data-report-i18n>보고서 설정에 따라 구조 뷰어를 표시하지 않습니다. 저장된 구조·PAE 원본과 평가표는 실행 산출물에서 확인하세요.</span></p>
   {% endif %}
   {% if viewer_structures %}
-  <h3>3D 구조 뷰어</h3>
+  <h3><span data-report-i18n>3D 구조 뷰어</span></h3>
   <div class="viewer">
     <div class="viewer-tabs" id="tabs"></div>
-    <div id="viewer3d" role="region" aria-label="선택 모델 3D 구조" tabindex="0"></div>
-    <div class="muted" style="font-size:16px;margin-top:12px">{{ "회색: 다른 체인 · 청록: 기준 체인 · 파랑: 비교 체인" if mode == "complex" else "회색: 파트너 · 청록: 선택 표적 · 파랑: 나노바디" }} · 구조 파일 형식(pdb/cif)과 실제 체인을 사용해 표시.</div>
+    <div id="viewer3d" role="region" aria-label="선택 모델 3D 구조" tabindex="0" data-report-i18n-attributes="aria-label"></div>
+    <div class="muted" style="font-size:16px;margin-top:12px">{{ report_term("회색: 다른 체인 · 청록: 기준 체인 · 파랑: 비교 체인" if mode == "complex" else "회색: 파트너 · 청록: 선택 표적 · 파랑: 나노바디") }} <span data-report-i18n>· 구조 파일 형식(pdb/cif)과 실제 체인을 사용해 표시.</span></div>
   </div>
   <script src="{{ viewer_script }}"></script>
   <script>
@@ -241,13 +244,14 @@
     const tabs = document.getElementById('tabs');
     const host = document.getElementById('viewer3d');
     if (typeof $3Dmol === 'undefined') {
-      host.innerHTML = '<p class="muted">3Dmol.js를 불러오지 못했습니다. 오프라인 환경이면 envs/fetch_3dmol.sh 로 로컬 자산을 준비하세요.</p>';
+      const message=document.createElement('p');message.className='muted';
+      I18N.text(message,I18N.term('3Dmol.js를 불러오지 못했습니다. 오프라인 환경이면 envs/fetch_3dmol.sh 로 로컬 자산을 준비하세요.'));host.replaceChildren(message);
       return;
     }
     structures.forEach((item, index) => {
       const button = document.createElement('button');
-      const engine = item.engine || item.predictor_engine || (item.id.includes('__') ? item.id.split('__')[0] : '엔진 미기록');
-      button.textContent = (aliases[item.id] || item.id) + ' · ' + engine;
+      const engine = item.engine || item.predictor_engine || (item.id.includes('__') ? item.id.split('__')[0] : I18N.term('엔진 미기록'));
+      I18N.text(button,I18N.concat([aliases[item.id] || item.id,' · ',engine]));
       button.setAttribute('aria-pressed', 'false');
       button.title = item.id;
       button.onclick = () => render(index);
@@ -269,41 +273,50 @@
   </script>
   {% endif %}
 
-  <h3 id="report-guide">지표 읽는 법</h3>
-  <details open><summary>지표 해석과 한계</summary>
+  <h3 id="report-guide"><span data-report-i18n>지표 읽는 법</span></h3>
+  <details open><summary><span data-report-i18n>지표 해석과 한계</span></summary>
     <ul>
-      <li><b>ipSAE</b>와 <b>ipTM</b>은 기록된 계면·배치 신뢰도 지표입니다. 적용 기준과 통과 여부는 아래 기록 게이트 표에서 확인하세요. 낮은 점수는 비결합의 실험 증거가 아닙니다.</li>
-      <li><b>계면 pLDDT</b>와 계면 PAE를 함께 확인합니다. 보고서 생성 시 바꾼 설정으로 기존 적격 판정을 다시 계산하지 않습니다.</li>
-      <li>VHH 점수의 ipTM은 선택 표적–VHH 쌍의 native 방향값 최솟값입니다. 정확히 두 체인일 때만 native 전체 ipTM을 대신 사용할 수 있습니다. 3체인 이상에서 쌍 값이나 검증된 체인 축이 없으면 미평가입니다. 일반 복합체 요약 ipTM은 전체 값이며 체인 쌍 상세와 구분합니다.</li>
-      <li>clash는 선택 표적뿐 아니라 유지한 파트너와 VHH 사이의 충돌도 포함합니다. CSV의 n_target_clashes와 n_context_clashes에서 구분할 수 있습니다. 항원끼리의 충돌은 이 값에 포함하지 않습니다.</li>
-      <li><b>결합 부위 접촉률</b>은 지정 잔기에 예측상 접촉하는 비율입니다. 알려진 전체 에피토프·같은 자세·실제 결합의 검증은 아닙니다.</li>
-      <li><b>clash</b> 0은 현재 거리 기준에서 충돌이 없다는 뜻이며 실험 성공을 보장하지 않습니다. H-bond/염다리 수는 거리 기반 근사치입니다.</li>
-      <li><b>개발가능성 경고</b>(dev_severe): free Cys, N-글리코실화 서열, CDR 탈아미드/이성화, CDR 소수성 패치.</li>
-      <li>구조 기반 지표는 상대 순위용입니다. <b>최종 판단은 SPR/BLI 실험</b>으로 수행하세요.</li>
+      <li><b>ipSAE</b><span data-report-i18n>와</span> <b>ipTM</b><span data-report-i18n>은 기록된 계면·배치 신뢰도 지표입니다. 적용 기준과 통과 여부는 아래 기록 게이트 표에서 확인하세요. 낮은 점수는 비결합의 실험 증거가 아닙니다.</span></li>
+      <li><b><span data-report-i18n>계면 pLDDT</span></b><span data-report-i18n>와 계면 PAE를 함께 확인합니다. 보고서 생성 시 바꾼 설정으로 기존 적격 판정을 다시 계산하지 않습니다.</span></li>
+      <li><span data-report-i18n>VHH 점수의 ipTM은 선택 표적–VHH 쌍의 native 방향값 최솟값입니다. 정확히 두 체인일 때만 native 전체 ipTM을 대신 사용할 수 있습니다. 3체인 이상에서 쌍 값이나 검증된 체인 축이 없으면 미평가입니다. 일반 복합체 요약 ipTM은 전체 값이며 체인 쌍 상세와 구분합니다.</span></li>
+      <li><span data-report-i18n>clash는 선택 표적뿐 아니라 유지한 파트너와 VHH 사이의 충돌도 포함합니다. CSV의 n_target_clashes와 n_context_clashes에서 구분할 수 있습니다. 항원끼리의 충돌은 이 값에 포함하지 않습니다.</span></li>
+      <li><b><span data-report-i18n>결합 부위 접촉률</span></b><span data-report-i18n>은 지정 잔기에 예측상 접촉하는 비율입니다. 알려진 전체 에피토프·같은 자세·실제 결합의 검증은 아닙니다.</span></li>
+      <li><b>clash</b> <span data-report-i18n>0은 현재 거리 기준에서 충돌이 없다는 뜻이며 실험 성공을 보장하지 않습니다. H-bond/염다리 수는 거리 기반 근사치입니다.</span></li>
+      <li><b><span data-report-i18n>개발가능성 경고</span></b><span data-report-i18n>(dev_severe): free Cys, N-글리코실화 서열, CDR 탈아미드/이성화, CDR 소수성 패치.</span></li>
+      <li><span data-report-i18n>구조 기반 지표는 상대 순위용입니다.</span> <b><span data-report-i18n>최종 판단은 SPR/BLI 실험</span></b><span data-report-i18n>으로 수행하세요.</span></li>
     </ul>
   </details>
-  <details id="recorded-threshold-checks"><summary>기록된 게이트와 적용 기준</summary>
-    <p>모델별 threshold_checks 기록을 우선 표시하며, 없으면 실행 당시 <code>run_config.yaml</code>의 기준과 기록 통과 플래그를 표시합니다. 기준 미기록은 보고서 설정으로 대체하지 않습니다.</p>
-    {% if threshold_check_rows %}<div class="scroll" tabindex="0" role="region" aria-label="보고서 표"><table><caption>표시 모델의 적용 기준·통과 기록</caption><thead><tr><th scope="col">모델</th><th scope="col">지표</th><th scope="col">값</th><th scope="col">기준</th><th scope="col">기록 통과</th><th scope="col">기준 출처</th></tr></thead><tbody>
-    {% for check in threshold_check_rows %}<tr><td>{{ check.model }}</td><td>{{ check.metric }}</td><td>{{ check.value if check.value is not none else '미평가' }}</td><td>{{ check.operator }} {{ check.threshold if check.threshold is not none else '미기록' }}</td><td>{{ '통과' if check.passed is sameas true else '미통과' if check.passed is sameas false else '미기록' }}</td><td>{{ check.threshold_source if check.threshold_source else '미기록' }}</td></tr>{% endfor %}
-    </tbody></table></div>{% else %}<p>모델 게이트 기록이 없습니다.</p>{% endif %}
+  <details id="recorded-threshold-checks"><summary><span data-report-i18n>기록된 게이트와 적용 기준</span></summary>
+    <p><span data-report-i18n>모델별 threshold_checks 기록을 우선 표시하며, 없으면 실행 당시</span> <code>run_config.yaml</code><span data-report-i18n>의 기준과 기록 통과 플래그를 표시합니다. 기준 미기록은 보고서 설정으로 대체하지 않습니다.</span></p>
+    {% if threshold_check_rows %}<div class="scroll" tabindex="0" role="region" aria-label="보고서 표" data-report-i18n-attributes="aria-label"><table><caption><span data-report-i18n>표시 모델의 적용 기준·통과 기록</span></caption><thead><tr><th scope="col"><span data-report-i18n>모델</span></th><th scope="col"><span data-report-i18n>지표</span></th><th scope="col"><span data-report-i18n>값</span></th><th scope="col"><span data-report-i18n>기준</span></th><th scope="col"><span data-report-i18n>기록 통과</span></th><th scope="col"><span data-report-i18n>기준 출처</span></th></tr></thead><tbody>
+    {% for check in threshold_check_rows %}<tr><td>{{ check.model }}</td><td>{{ report_term(check.metric) }}</td><td>{{ check.value if check.value is not none else report_term('미평가') }}</td><td>{{ check.operator }} {{ check.threshold if check.threshold is not none else report_term('미기록') }}</td><td>{{ report_term('통과' if check.passed is sameas true else '미통과' if check.passed is sameas false else '미기록') }}</td><td>{{ check.threshold_source if check.threshold_source else report_term('미기록') }}</td></tr>{% endfor %}
+    </tbody></table></div>{% else %}<p><span data-report-i18n>모델 게이트 기록이 없습니다.</span></p>{% endif %}
   </details>
 
-  <h2 id="report-files">06 출처·산출물</h2><p class="muted">생성 시점의 보존 파일입니다. 이 보고서와 후속 전달 ZIP, 내부 잠금 파일은 제외하며 최종 파일 크기·해시는 전달 manifest를 확인하세요.</p>
-  {% if files_omitted %}<p data-file-list-omitted="{{ files_omitted }}">파일 목록은 처음 200개만 표시합니다. 나머지 {{ files_omitted }}개는 전체 원본과 manifest에서 확인하세요.</p>{% endif %}
-  <p class="muted">실행 경로: {{ run_dir }} · 보고서 생성: {{ generated_at }}. 로컬 MSA와 별도 API 비교 실행은 각 실행의 설정·출처에서 확인하며 이 보고서의 모델 순위에 합산하지 않습니다.</p>
-  <details><summary>실행 당시 기록과 출처 원문</summary><pre>{{ context|tojson(indent=2) }}</pre></details>
-  <details id="recorded-engine-provenance"><summary>예측 엔진 버전·가중치·실행 출처</summary>
-    {% for engine in engine_provenance %}<h3>{{ engine.engine }}</h3><p>버전 출처: {{ engine.version_source }} · 실행 식별 출처: {{ engine.runtime_source }}</p><pre>{{ engine|tojson(indent=2) }}</pre>{% else %}<p>저장된 엔진 버전·가중치 영수증이 없습니다. 현재 설치 환경으로 과거 실행을 추정하지 않습니다.</p>{% endfor %}
+  <h2 id="report-files"><span data-report-i18n>06 출처·산출물</span></h2><p class="muted"><span data-report-i18n>생성 시점의 보존 파일입니다. 이 보고서와 후속 전달 ZIP, 내부 잠금 파일은 제외하며 최종 파일 크기·해시는 전달 manifest를 확인하세요.</span></p>
+  {% if files_omitted %}<p data-file-list-omitted="{{ files_omitted }}"><span data-report-i18n>파일 목록은 처음 200개만 표시합니다. 나머지</span> {{ files_omitted }}<span data-report-i18n>개는 전체 원본과 manifest에서 확인하세요.</span></p>{% endif %}
+  <p class="muted"><span data-report-i18n>실행 경로:</span> {{ run_dir }} <span data-report-i18n>· 보고서 생성:</span> {{ generated_at }}<span data-report-i18n>. 로컬 MSA와 별도 API 비교 실행은 각 실행의 설정·출처에서 확인하며 이 보고서의 모델 순위에 합산하지 않습니다.</span></p>
+  <details><summary><span data-report-i18n>실행 당시 기록과 출처 원문</span></summary><pre>{{ context|tojson(indent=2) }}</pre></details>
+  <details id="recorded-engine-provenance"><summary><span data-report-i18n>예측 엔진 버전·가중치·실행 출처</span></summary>
+    {% for engine in engine_provenance %}<h3>{{ engine.engine }}</h3><p><span data-report-i18n>버전 출처:</span> {{ engine.version_source }} <span data-report-i18n>· 실행 식별 출처:</span> {{ engine.runtime_source }}</p><pre>{{ engine|tojson(indent=2) }}</pre>{% else %}<p><span data-report-i18n>저장된 엔진 버전·가중치 영수증이 없습니다. 현재 설치 환경으로 과거 실행을 추정하지 않습니다.</span></p>{% endfor %}
   </details>
-  <div class="scroll" tabindex="0" role="region" aria-label="보고서 표"><table><caption>보존된 다운로드 파일</caption>
-    <tr><th scope="col">경로</th><th scope="col">크기(KB)</th><th scope="col">형식</th></tr>
+  <div class="scroll" tabindex="0" role="region" aria-label="보고서 표" data-report-i18n-attributes="aria-label"><table><caption><span data-report-i18n>보존된 다운로드 파일</span></caption>
+    <tr><th scope="col"><span data-report-i18n>경로</span></th><th scope="col"><span data-report-i18n>크기(KB)</span></th><th scope="col"><span data-report-i18n>형식</span></th></tr>
     {% for f in files %}<tr><td><code>{{ f.path }}</code></td><td>{{ (f.size_bytes|string ~ ' B') if f.size_bytes < 1024 else (f.size_kb|string ~ ' KB') }}</td><td>{{ f.kind }}</td></tr>{% endfor %}
   </table></div>
 
   <footer>
-    NanoCoFold · 상업적 이용 가능 도구만 사용 (LICENSE_MANIFEST.md 참조) · 모든 수치는 예측값이며 실험 검증이 필요합니다.
+    <span data-report-i18n>NanoCoFold · 상업적 이용 가능 도구만 사용 (LICENSE_MANIFEST.md 참조) · 모든 수치는 예측값이며 실험 검증이 필요합니다.</span>
   </footer>
 </div>
+<script>
+I18N.init({explicit:true});
+// Keep a report's chosen language when opening its separate offline explorer.
+const explorerLink=document.getElementById('complete-result-explorer');
+if(explorerLink) explorerLink.addEventListener('click',()=>{
+  const destination=new URL(explorerLink.href,location.href);
+  destination.searchParams.set('lang',I18N.language);explorerLink.href=destination.href;
+});
+</script>
 </body>
 </html>
