@@ -69,3 +69,31 @@ test('target/binder controls require recorded role and residue metadata, not IDs
  const target={id:'A',role:'target',residues:[{label:'A:1'}]};context.state.structure={target_chain:'A',chains:[target]};
  assert.equal(context.resultChain('target'),target);
 });
+
+for (const [surface, source] of [['shared UI', ui], ['embedded offline UI', readFileSync(new URL('../nanocofold/templates/platform_offline.html', import.meta.url), 'utf8')]]) {
+ const measure=source.slice(source.indexOf('  action("measure-result-distance",'),source.indexOf('  action("export-result",'));
+ function distanceFixture(structure) {
+  const calls=[], context={state:{structure}, $:id=>({value:id==='residue-a'?'B:1':'B:2'}),
+   focusStructure:async(labels,text)=>calls.push({focus:[...labels],text}),
+   action:(_name,callback)=>{context.measure=callback;}};
+  context.state.viewer={distance:async(...labels)=>calls.push({distance:labels})};
+  vm.createContext(context);vm.runInContext(measure,context);
+  return {context,calls};
+ }
+ test(`${surface}: partial legacy metadata retains exact later-chain CA measurement without modifying records`,async()=>{
+  const structure={chains:[null,{id:'A'},{id:'C',residues:{label:'C:1'}},{id:'B',residues:[null,{},
+   {label:'B:1',ca:[0,0,0]},{label:'B:2',ca:[0,3,4]}]}]};
+  const before=JSON.stringify(structure),{context,calls}=distanceFixture(structure);
+  await context.measure();
+  assert.deepEqual(calls,[{focus:['B:1','B:2'],text:'B:1:CA – B:2:CA · 5.000 Å'},{distance:['B:1','B:2']}]);
+  assert.equal(JSON.stringify(structure),before);
+ });
+ for (const [name,structure] of [['absent chains',{}],['missing residues',{chains:[{id:'A'}]}],
+  ['recorded labels without CA',{chains:[{id:'B',residues:[{label:'B:1'},{label:'B:2'}]}]}]]) {
+  test(`${surface}: ${name} gives the explicit missing-CA error without inventing measurements`,async()=>{
+   const before=JSON.stringify(structure),{context,calls}=distanceFixture(structure);
+   await assert.rejects(context.measure(),/Cα 좌표가 없는 잔기입니다\./);
+   assert.deepEqual(calls,[]);assert.equal(JSON.stringify(structure),before);
+  });
+ }
+}
