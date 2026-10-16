@@ -4012,6 +4012,7 @@ function filters() {
 function clearCandidate() {
   state.candidate = null;
   state.structure = null;
+  setPaeErrorStatus(null);
   state.structureRequest++;
   disposeResultViewer();
   I18N.text($("candidate-title"), I18N.term("후보 선택"));
@@ -4592,15 +4593,35 @@ async function offlinePaeValues(pae, payload = window.NANOCOFOLD_OFFLINE) {
   }
 }
 
+function setPaeErrorStatus(error = null) {
+  const plot = $("pae");
+  if (!plot) return;
+  let status = $("pae-status");
+  if (!status && error) {
+    // Plotly SVG annotations do not wrap long text on narrow screens. Keep
+    // the complete explanation in normal text flow beside the plot instead.
+    status = el("p", undefined, "warning");
+    status.id = "pae-status";
+    status.setAttribute("role", "status");
+    status.style.overflowWrap = "anywhere";
+    status.style.whiteSpace = "normal";
+    plot.after(status);
+  }
+  if (!status) return;
+  status.hidden = !error;
+  I18N.text(status, error ? I18N.term(error) : "");
+}
 function localizeEmptyPaeAnnotation() {
   const plot = $("pae");
+  setPaeErrorStatus(plot?.data?.length === 0 ? state.structure?.pae_error : null);
   if (!window.Plotly || plot?.data?.length !== 0 || !plot.layout?.annotations?.length) return;
   const text = !state.structure ? "구조 / PAE 미평가"
-    : state.structure.pae_error ? state.structure.pae_error : state.structure.pae_status === "removed_by_retention" ? "PAE · 용량 정리로 삭제됨" : "PAE 미평가";
+    : state.structure.pae_error ? "PAE" : state.structure.pae_status === "removed_by_retention" ? "PAE · 용량 정리로 삭제됨" : "PAE 미평가";
   Plotly.relayout(plot, {"annotations[0].text": I18N.value(I18N.term(text))});
 }
 async function loadStructure() {
   if (!state.candidate) return;
+  setPaeErrorStatus(null);
   const id = state.candidate.candidate_id,
     observation = $("observation-select").value,
     request = ++state.structureRequest;
@@ -4890,11 +4911,11 @@ async function renderStructure() {
           return [{type:"line",xref:"x",yref:"paper",x0:i-.5,x1:i-.5,y0:0,y1:1,line:{color:"#586b78",width:1}},
                   {type:"line",xref:"paper",yref:"y",x0:0,x1:1,y0:i-.5,y1:i-.5,line:{color:"#586b78",width:1}}];
         }) : [],
-        annotations: pae ? [] : [{ text: data.pae_error ? I18N.value(I18N.term(data.pae_error)) : data.pae_status === "removed_by_retention" ? I18N.value(I18N.term("PAE · 용량 정리로 삭제됨")) : I18N.value(I18N.term("PAE 미평가")), showarrow: false }],
+        annotations: pae ? [] : [{ text: data.pae_error ? "PAE" : data.pae_status === "removed_by_retention" ? I18N.value(I18N.term("PAE · 용량 정리로 삭제됨")) : I18N.value(I18N.term("PAE 미평가")), showarrow: false }],
       },
       { responsive: true, displaylogo: false, displayModeBar: false },
     );
-    if (!pae && state.structure === data) localizeEmptyPaeAnnotation();
+    if (state.structure === data) localizeEmptyPaeAnnotation();
     const resetPae = $("pae-reset");
     if (resetPae) resetPae.onclick = () => Plotly.relayout($("pae"), {"xaxis.autorange":true, "yaxis.autorange":"reversed"});
     $("pae").removeAllListeners?.("plotly_click");
