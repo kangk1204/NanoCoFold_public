@@ -137,8 +137,14 @@ def test_selected_list_limit_and_planned_model_count_are_visible(tmp_path, cfg):
     (folder / "comparison_status.json").write_text(json.dumps({"expected_rows": 64}))
     frame = pd.DataFrame([{"design_id": f"d{i}", "sequence": "ACDE", "model_record": True, "evaluated": True} for i in range(60)])
     document = report.generate_report(tmp_path, cfg, {}, scored=frame, selected=frame).read_text()
-    assert "표시 50 / 전체 60 후보·모델 기록" in document
-    assert "계획 모델 64건 · 실제 모델 기록 60건" in document
+    from test_bilingual_report import ReportText
+
+    # Captions remain visible when explicit translation spans split the HTML.
+    parsed = ReportText(document)
+    text = "".join(parsed.text)
+    assert "표시 50 / 전체 60 후보·모델 기록" in text
+    assert "계획 모델 64건 · 실제 모델 기록 60건" in text
+    assert [len(table["rows"]) for table in parsed.tables if table["caption"] == "후보·모델의 기록 점수"] == [50, 50, 50]
 
 
 def test_delivery_provenance_includes_saved_versions_and_runtime_identity(tmp_path):

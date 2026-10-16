@@ -294,14 +294,20 @@ def test_saved_mature_report_counts_and_shows_models_before_unpredicted_library(
     state.set_phase("mature", {"evaluated": True})
     protected = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
     document = report.generate_report(tmp_path, cfg, {}, scored=scored, selected=selected).read_text()
-    assert '<div class="k">전체 모델 기록</div><div class="v">5</div>' in document
-    assert '<div class="k">평가 완료 모델</div><div class="v">5</div>' in document
-    assert "예측 전 준비·미선정 50" in document
-    assert "예측 전 미선정 후보는 모델 평가 미완료 수에 합산하지" in document
-    assert "서열 prior 사전필터 기준 미통과" in document
-    assert "v50" in document and 'id="report-models"' in document
-    assert "종합점수·기록 순위 보류 50" not in document
-    assert "0.4.1" in document and __version__ in document
+    from test_bilingual_report import ReportText
+
+    # Translation spans may divide captions; check rendered text and actual values.
+    parsed = ReportText(document)
+    text = "".join(parsed.text)
+    assert parsed.cards["전체 모델 기록"] == "5"
+    assert parsed.cards["평가 완료 모델"] == "5"
+    assert "예측 전 준비·미선정 50" in text
+    assert "예측 전 미선정 후보는 모델 평가 미완료 수에 합산하지" in text
+    assert "서열 prior 사전필터 기준 미통과" in text
+    assert "v50" in parsed.cells and 'id="report-models"' in document
+    assert [len(table["rows"]) for table in parsed.tables if table["caption"] == "후보·모델의 기록 점수"] == [5, 5, 1]
+    assert "종합점수·기록 순위 보류 50" not in text
+    assert "0.4.1" in text and __version__ in text
     assert all(p.read_bytes() == value for p, value in protected.items())
 
 
