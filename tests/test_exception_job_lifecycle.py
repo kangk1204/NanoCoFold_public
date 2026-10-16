@@ -179,7 +179,13 @@ def test_cancelled_descendants_remain_recoverable_if_supervisor_restarts(tmp_pat
         restarted = jobs.JobManager(tmp_path)
         restarted._tick()
         deadline = time.monotonic() + 3
-        while jobs.process_stamp(child_pid) and time.monotonic() < deadline:
+        # Descendant death is asynchronous; keep the supervisor polling until
+        # it has both observed the exit and persisted the terminal state.
+        while time.monotonic() < deadline:
+            restarted._tick()
+            if (jobs.process_stamp(child_pid) is None
+                    and restarted.store.get(job["id"])["state"] == "cancelled"):
+                break
             time.sleep(.02)
         assert jobs.process_stamp(child_pid) is None
         assert restarted.store.get(job["id"])["state"] == "cancelled"
