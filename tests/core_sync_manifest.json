@@ -91,7 +91,7 @@
     "nanocofold/platform/paths.py": "e0cf72a8fde54380b3016925bcf75a03acd44caed76885ffaabab7470f8660c0",
     "nanocofold/platform/regions.py": "23409fe174f211e332b9350dee02872eeb595d0954dedb34bd135531ec1a45a8",
     "nanocofold/platform/result_catalog.py": "2090fa0ee07f447afafb35e0d8b342b242ccb87d16eb9bf5ec01a1eac8aa0021",
-    "nanocofold/platform/results.py": "0adc2c23c3b47c2193f3e4df8e888269906ab1a8acb2e71c34f0df75a737ccfd",
+    "nanocofold/platform/results.py": "b95659cce2bbe72af7231068af68e5d888796f669362dab58164a840f4f47bec",
     "nanocofold/platform/retention.py": "6d617671e32184819538786fc3ca4830141ffa456f9640c098695d226682ded8",
     "nanocofold/platform/structure_review.py": "0ab84aeaba4483a487acdd53cbb3fb59f95da08b15c45f51a3cb7ffe75789090",
     "nanocofold/platform/tutorials.py": "da2de71181d622f40e2de4bff1b52c2a8941dc2ad60dd4453909e67a03f130f5",

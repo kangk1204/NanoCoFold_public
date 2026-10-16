@@ -907,10 +907,16 @@ class ResultReader:
                     labels = pae["labels"]
                     if not isinstance(labels, list) or not all(isinstance(label, str) for label in labels):
                         raise ValueError("invalid_pae_axis")
-                    if data.get("chains"):
-                        coordinate_labels = [residue["label"] for chain in data["chains"]
+                    chains = data.get("chains")
+                    # Legacy displays may record only chain IDs. Compare axes
+                    # only when every chain's residue list was actually saved;
+                    # absent metadata is not evidence of a mismatching PAE.
+                    if (isinstance(chains, list) and chains
+                            and all(isinstance(chain, dict) and isinstance(chain.get("residues"), list)
+                                    for chain in chains)):
+                        coordinate_labels = [residue["label"] for chain in chains
                                              for residue in chain["residues"]]
-                        if labels != coordinate_labels:
+                        if not all(isinstance(label, str) for label in coordinate_labels) or labels != coordinate_labels:
                             raise ValueError("invalid_pae_coordinate_axis")
                     validate_pae(np.asarray(pae["values"], dtype=float), len(labels))
                 except (ValueError, TypeError, KeyError, OverflowError):
