@@ -37,16 +37,16 @@ bash install.sh --profile opendde --gpu GPU-xxxxxxxx-xxxx-xxxx-xxxxxxxxxxxx
 선택한 GPU에 대해 사용자별 공통 잠금을 사용합니다. 잠금 파일을 삭제하지 마세요. 설치가 끝나면 아래 명령으로 웹 화면을 엽니다.
 
 ```bash
-bash start.sh
+bash start.sh --port 18765
 ```
 
-같은 컴퓨터의 브라우저에서 `http://127.0.0.1:8765`를 엽니다. 원격 서버라면 `bash start.sh --no-browser`를 사용하고 자신의 PC의 다른 터미널에서 다음처럼 연결합니다.
+같은 컴퓨터의 브라우저에서 터미널의 `NanoCoFold:` 다음에 표시된 주소(이 명령에서는 `http://127.0.0.1:18765`)를 엽니다. 원격 서버라면 `bash start.sh --no-browser --port 18765`를 사용하고 자신의 PC의 다른 터미널에서 다음처럼 연결합니다.
 
 ```bash
-ssh -L 8765:127.0.0.1:8765 USER@SERVER
+ssh -o ExitOnForwardFailure=yes -L 18765:127.0.0.1:18765 USER@SERVER
 ```
 
-`USER@SERVER`는 자신의 계정과 서버 주소입니다. 설치 위치와 GPU는 `.nanocofold/install-location.json`에 기록되어 시작 명령이 다시 사용합니다.
+`USER@SERVER`는 자신의 계정과 서버 주소입니다. 다른 앱이 열리면 종료하지 말고 [README의 포트 충돌·원격 연결 안내](../README.ko.md#2-브라우저-열기)를 따르세요. 링크만으로 서버가 실행되는 것은 아닙니다. 설치 위치와 GPU는 `.nanocofold/install-location.json`에 기록되어 시작 명령이 다시 사용합니다.
 
 ## 모든 기능의 환경 설치
 

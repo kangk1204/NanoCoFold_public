@@ -1149,6 +1149,33 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "자세 평가 기록의 점수표 해시·모델 대응이 일치하지 않아 추가 기록을 적용하지 않았습니다.": "Additional pose-assessment records were not applied because their score-table hashes or model correspondence did not match.",
+  "FASTA {0}번째 후보: 이름이 없습니다. >이름을 입력하세요.": "FASTA entry {0}: the name is missing. Enter >name.",
+  "FASTA {0}번째 후보 ({1}): 서열이 비어 있습니다.": "FASTA entry {0} ({1}): the sequence is empty.",
+  "FASTA {0}번째 후보 ({1}): 허용되지 않는 문자 {2}. 표준 아미노산 20종만 입력하세요.": "FASTA entry {0} ({1}): unsupported characters {2}. Use only the 20 standard amino acids.",
+  "FASTA {0}번째 후보 ({1}): 이름이 중복됩니다.": "FASTA entry {0} ({1}): the name is duplicated.",
+  "ipSAE와 ipTM은 기록된 계면·배치 신뢰도 지표입니다. 적용 기준과 통과 여부는 아래 기록 게이트 표에서 확인하세요. 낮은 점수는 비결합의 실험 증거가 아닙니다.": "ipSAE and ipTM are recorded interface and arrangement confidence metrics. Check the recorded gates below for criteria and pass status. A low score is not experimental evidence of nonbinding.",
+  "계면 pLDDT와 계면 PAE를 함께 확인합니다. 보고서 생성 시 바꾼 설정으로 기존 적격 판정을 다시 계산하지 않습니다.": "Read interface pLDDT and interface PAE together. Changing settings during report generation does not recalculate the original eligibility decision.",
+  "결합 부위 접촉률은 지정 잔기에 예측상 접촉하는 비율입니다. 알려진 전체 에피토프·같은 자세·실제 결합의 검증은 아닙니다.": "Binding-site contact fraction is the fraction of specified residues with predicted contacts. It does not establish a complete known epitope, the same pose, or actual binding.",
+  "개발가능성 경고(dev_severe): free Cys, N-글리코실화 서열, CDR 탈아미드/이성화, CDR 소수성 패치.": "Developability warnings (dev_severe): free cysteine, N-glycosylation motifs, CDR deamidation/isomerization, and hydrophobic CDR patches.",
+  "구조 기반 지표는 상대 순위용입니다. 최종 판단은 SPR/BLI 실험으로 수행하세요.": "Structure-based metrics support relative ranking. Make final decisions using SPR/BLI experiments.",
+  "예측 신뢰도는 ipTM·ipSAE 및 실행 당시 기록 적격, 지정 결합 부위 충족은 결합 부위 접촉, 자세 일관성은 동일 후보의 엔진별 자세와 설계·재예측 일치를 뜻합니다. 탐색적 검토 우선순위는 이 기록을 함께 확인하는 값이며 기존 적격·선별 기록을 변경하지 않습니다.": "Prediction confidence refers to ipTM, ipSAE and recorded eligibility; specified binding-site support refers to binding-site contacts; pose consistency refers to agreement of the same candidate across engines and between designed and repredicted structures. Exploratory review priority considers these records together and does not change original eligibility or selection records.",
+  "캐시된 MSA가 없습니다: [local path] 서열만 입력으로 단일서열 모드(msa=empty)로 진행합니다. 정확도를 높이려면 structure.msa.backend=colabfold_search 로 MSA를 먼저 생성하세요.": "No cached MSA is available: [local path]. Continuing with the input sequence alone (msa=empty). To use an MSA, generate it first with structure.msa.backend=colabfold_search.",
+  "structure.provider는 boltz2, boltz, chai1, none, sequence, mock 중 하나여야 합니다.": "structure.provider must be one of boltz2, boltz, chai1, none, sequence or mock.",
+  "report.viewer는 3dmol 또는 none이어야 합니다.": "report.viewer must be 3dmol or none.",
+  "expression.host는 ecoli_periplasmic 또는 mammalian이어야 합니다.": "expression.host must be ecoli_periplasmic or mammalian.",
+  "public_api는 표적·생성 서열을 외부 서버로 전송합니다. 동의한 경우에만 screen.allow_public_msa_server=true로 설정하세요.": "public_api sends target and generated sequences to an external server. Set screen.allow_public_msa_server=true only if you consent to this transfer.",
+  "{0}는 문자열이어야 합니다.": "{0} must be a string.",
+  "{0}는 null 또는 0–4294967295 사이의 정수여야 합니다.": "{0} must be null or an integer from 0 to 4294967295.",
+  "{0}에는 디렉터리가 아닌 파일 경로를 지정하세요: {1}": "{0} requires a file path, not a directory: {1}",
+  "제공한 표적 구조의 선택 체인에 아미노산 잔기가 1개만 있습니다. 체인 선택과 구조 파일의 누락 여부를 확인하세요. 단백질 접힘·결합 계면을 해석하기에는 정보가 매우 제한적입니다.": "The selected chain in the provided target structure contains only one amino-acid residue. Check the chain selection and whether the structure file is incomplete. It contains very limited information for interpreting protein folding or a binding interface.",
+  "fallback_to_ineligible=true의 부적격 진단 목록은 발주 승인이 아닙니다.": "An ineligible diagnostic list created with fallback_to_ineligible=true is not approval for a synthesis order.",
+  "성숙화 변이 라이브러리 준비 중": "Preparing the variant library",
+  "성숙화 라이브러리 {0}개에서 평가 후보 선별 중": "Selecting evaluation candidates from {0} variants",
+  "후보 {0}/{1} 점수 계산 중 · {2}": "Scoring candidate {0}/{1} · {2}",
+  "dev_flags 가중치는 종합점수에만 적용됩니다. CDR 미평가는 가중치가 0이어도 최종 적격을 통과하지 않습니다. fallback_to_ineligible=true로 만든 부적격 진단 목록은 발주 승인이 아닙니다.": "The dev_flags weight affects the composite score. An unevaluated CDR does not pass final eligibility even if this weight is zero. An ineligible diagnostic list created with fallback_to_ineligible=true is not approval for a synthesis order.",
+  "mock/dry-run: CDR 의존 liability 는 미평가로 기록됩니다. rank.weights.dev_flags가 0이 아니면 CDR 미평가로 종합 순위를 보류합니다. rank.weights.dev_flags=0으로 바꾸어도 CDR 평가가 없으면 최종 적격은 통과하지 않으며, 기본 선별은 계속 보류합니다. 실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. 미평가를 위험 없음으로 처리하지 않습니다.": "mock/dry-run: CDR-dependent liabilities are recorded as unevaluated. If rank.weights.dev_flags is nonzero, the composite ranking is held because CDR assessment is missing. Setting rank.weights.dev_flags=0 does not pass final eligibility without CDR assessment; default selection remains held. For actual analysis, install ANARCI with envs/setup_antibody.sh or set mature.cdr.source=config with validated 1-based CDR ranges. Unevaluated does not mean risk-free.",
+  "ANARCI 환경 없음: CDR 의존 liability 는 미평가로 기록됩니다. rank.weights.dev_flags가 0이 아니면 CDR 미평가로 종합 순위를 보류합니다. rank.weights.dev_flags=0으로 바꾸어도 CDR 평가가 없으면 최종 적격은 통과하지 않으며, 기본 선별은 계속 보류합니다. 실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. 미평가를 위험 없음으로 처리하지 않습니다.": "ANARCI environment unavailable: CDR-dependent liabilities are recorded as unevaluated. If rank.weights.dev_flags is nonzero, the composite ranking is held because CDR assessment is missing. Setting rank.weights.dev_flags=0 does not pass final eligibility without CDR assessment; default selection remains held. For actual analysis, install ANARCI with envs/setup_antibody.sh or set mature.cdr.source=config with validated 1-based CDR ranges. Unevaluated does not mean risk-free.",
   "정리 보관본은 읽기 전용입니다. 재분석에는 정리 전 전체 원본 결과가 필요합니다.": "The compact archive is read-only. Reanalysis requires the complete original results from before cleanup.",
   "현재 평가 기준": "Current assessment criteria",
   "원래 예측 설정": "Original prediction settings",
@@ -4837,6 +4864,7 @@ async function selectCandidate(id) {
   detail.append(el("p", I18N.term("PAE는 Å 단위입니다. pDockQ2는 CA 8 Å 접촉과 방향별 PAE를 사용하며 두 체인 중 최소값을 표시합니다. AlphaFold-Multimer에서 보정됐고 Boltz·Chai·OpenDDE 값은 탐색용입니다. 예측 지표는 실제 결합이나 KD를 입증하지 않습니다."), "muted"));
   detail.append(el("p", I18N.term("종합점수는 기록된 엔진과 후보 집합 안의 상대 점수입니다. 적용·제외 가중치는 ranking_policy의 엔진별 정책을 확인하세요. 일부 후보만 재평가한 결과는 통합 순위나 엔진 성능 비교가 아닙니다. 과거 혼합 배치 기록은 원래 정규화 범위를 유지합니다. 선별 순위는 적격 게이트와 다양성 제한을 추가 적용합니다. ESM·AntiFold는 서열/폴딩 prior입니다. dev_severe는 심한 5종 게이트, dev_flags는 전체 평가 위험 수 가중치입니다. N/O 근접·반대 전하 접촉·충돌의 단위는 원자쌍이며, 확인된 수소결합 수나 원소별 반데르발스 판정이 아닙니다."), "muted"));
   detail.append(el("p", I18N.term("같은 seed라도 엔진·장치 전체의 비트 단위 재현을 보장하지 않습니다. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에 한정됩니다. 생성 단계의 결합 부위 OFF/ON을 동일 난수 상태로 가정하지 않습니다."), "muted"));
+  detail.append(el("p", I18N.term("dev_flags 가중치는 종합점수에만 적용됩니다. CDR 미평가는 가중치가 0이어도 최종 적격을 통과하지 않습니다. fallback_to_ineligible=true로 만든 부적격 진단 목록은 발주 승인이 아닙니다."), "muted"));
   if (row.threshold_checks !== undefined) {
     const facts = el("details"),
       caption = el("summary", I18N.term(row.assessment_status ? "현재 평가 기준" : "지표 해석·실행 당시 선별 기준"));
@@ -6063,10 +6091,23 @@ function noviceFasta(content) {
     if (line.startsWith(">")) { current = {name: line.slice(1).trim(), sequence: "", copies: 1}; rows.push(current); }
     else { if (!current) throw Error("FASTA는 >이름으로 시작해야 합니다."); current.sequence += line.replace(/\s/g, "").toUpperCase(); }
   }
-  if (!rows.length || rows.some(r => !r.name || !r.sequence || /[^ACDEFGHIKLMNPQRSTVWY]/.test(r.sequence)))
+  if (!rows.length)
     throw Error("이름과 표준 아미노산 서열을 확인하세요. X·DNA/RNA·빈 서열은 사용할 수 없습니다.");
-  if (new Set(rows.map(r => r.name.toLowerCase())).size !== rows.length) throw Error("FASTA 이름은 중복될 수 없습니다.");
+  const names = new Set();
+  for (const [index, row] of rows.entries()) {
+    if (!row.name) throw Error(`FASTA ${index + 1}번째 후보: 이름이 없습니다. >이름을 입력하세요.`);
+    if (!row.sequence) throw Error(`FASTA ${index + 1}번째 후보 (${row.name}): 서열이 비어 있습니다.`);
+    const invalid = [...new Set(Array.from(row.sequence).filter(letter => !"ACDEFGHIKLMNPQRSTVWY".includes(letter)))].sort();
+    if (invalid.length) throw Error(`FASTA ${index + 1}번째 후보 (${row.name}): 허용되지 않는 문자 ${invalid.slice(0, 10).join(", ")}. 표준 아미노산 20종만 입력하세요.`);
+    const key = row.name.toLowerCase();
+    if (names.has(key)) throw Error(`FASTA ${index + 1}번째 후보 (${row.name}): 이름이 중복됩니다.`);
+    names.add(key);
+  }
   return rows;
+}
+function noviceInputFasta(id) {
+  try { return noviceFasta($(id).value); }
+  catch (error) { error.inputField = $(id); throw error; }
 }
 function noviceComplexProteins() {
   if ($("input-kind").value === "structure") {
@@ -6077,7 +6118,7 @@ function noviceComplexProteins() {
       return {name: c.name || id, sequence: c.sequence, copies: 1};
     });
   }
-  const entries = noviceFasta($("complex-fasta").value);
+  const entries = noviceInputFasta("complex-fasta");
   for (const [i, row] of entries.entries()) row.copies = Number($("complex-copies-" + i)?.value || 1);
   const n = entries.reduce((n,r) => n+r.copies,0), length = entries.reduce((n,r) => n+r.copies*r.sequence.length,0);
   if (entries.some(r => !Number.isInteger(r.copies) || r.copies<1) || n<2 || n>25 || length>2000)
@@ -6141,6 +6182,33 @@ async function initNoviceFlow() {
   const copies=el("div");copies.id="novice-complex-copies";complex.append(label,fasta,copies);inputCard.insertBefore(complex,$("fasta-fields"));
   const footer=el("div",null,"novice-footer"),prev=el("button",I18N.term("이전"),"secondary"),next=el("button",I18N.term("입력 확인 후 다음")),reason=el("p");prev.id="novice-previous";next.id="novice-next";reason.id="novice-blocker";reason.setAttribute("role","alert");footer.append(prev,next,reason);host.append(footer);
   let step=0,restoring=false,draftTimer,saveQueue=Promise.resolve();
+  const sequenceHelp = new Map();
+  for (const id of ["complex-fasta", "target-fasta", "vhh-fasta", "wt-fasta"]) {
+    const field = $(id), help = el("p", null, "error field-error");
+    help.id = id + "-validation"; help.hidden = true; help.setAttribute("role", "status");
+    field.setAttribute("aria-describedby", [field.getAttribute("aria-describedby"), help.id].filter(Boolean).join(" "));
+    field.after(help); sequenceHelp.set(id, help);
+  }
+  function refreshSequenceHelp() {
+    const mode = $("mode").value, sequenceInput = $("input-kind").value === "fasta";
+    const active = new Set(mode === "complex" ? (sequenceInput ? ["complex-fasta"] : []) : [
+      ...(sequenceInput ? ["target-fasta"] : []), ...(mode === "screen" ? ["vhh-fasta"] : mode === "mature" ? ["wt-fasta"] : [])]);
+    let blocked = false;
+    for (const [id, help] of sequenceHelp) {
+      const field = $(id); let message = "";
+      if (active.has(id) && field.value.trim()) {
+        try {
+          const rows = noviceFasta(field.value);
+          if (id === "target-fasta" && rows.length !== 1) throw Error("단일 분석은 표적 1개입니다. 여러 표적은 배치 분석을 사용하세요.");
+          if (id === "wt-fasta" && rows.length !== 1) throw Error("WT VHH 1개를 입력하세요.");
+        } catch (error) { message = error.message; }
+      }
+      help.hidden = !message; I18N.text(help, I18N.term(message));
+      if (message) { field.setAttribute("aria-invalid", "true"); field.setAttribute("aria-errormessage", help.id); blocked = true; }
+      else if (field.getAttribute("aria-errormessage") === help.id) { field.removeAttribute("aria-invalid"); field.removeAttribute("aria-errormessage"); }
+    }
+    next.disabled = step === 1 && blocked;
+  }
   host.insertBefore(rail, task);
   const tasks=["목적을 고르세요. 필요한 입력과 결과를 확인하면 다음으로 이동합니다.","전체 서열·체인 순서·사본 수를 확인하세요. 오류 없는 필수 입력이면 다음으로 이동합니다.","최대 계획 모델 수·선택 엔진·MSA 전송 여부를 확인하세요.","입력 확인을 누른 뒤 적용 조건을 읽고 분석 실행을 누르세요. 환경 확인 기록은 재사용하며, 입력 확인은 계산을 시작하지 않습니다."];
   function render(){
@@ -6153,17 +6221,18 @@ async function initNoviceFlow() {
     const simulated=$("mock").checked&&!isComplex;ml.hidden=simulated;msa.hidden=simulated;cl.hidden=simulated;demoMsaNote.hidden=!simulated;
     try {I18N.text(plan, I18N.term(noviceModelPlan(inputSettings(true),$("mode").value,$("mode").value==="screen"?noviceFasta($("vhh-fasta").value).length:0)));}catch(e){I18N.text(plan, I18N.term(e.message));}
     I18N.text($("review-input"), I18N.term("입력 확인"));I18N.text($("start-job"), I18N.term("분석 실행"));
+    refreshSequenceHelp();
   }
   function jump(n){step=n;I18N.text(reason, "");render();heading.focus();}
   state.showInputReview = () => jump(state.input ? 3 : 1);
   function validateInputs(){
     if($("mode").value==="complex") return noviceComplexProteins();
-    if($("input-kind").value==="fasta") {if(noviceFasta($("target-fasta").value).length!==1)throw Error("단일 분석은 표적 1개입니다. 여러 표적은 배치 분석을 사용하세요.");}
+    if($("input-kind").value==="fasta") {if(noviceInputFasta("target-fasta").length!==1)throw Error("단일 분석은 표적 1개입니다. 여러 표적은 배치 분석을 사용하세요.");}
     else if(!state.analyzed||!$("acknowledge").checked)throw Error("구조를 불러오고 체인·준비 방식과 경고를 확인하세요.");
-    if($("mode").value==="screen")noviceFasta($("vhh-fasta").value);
-    if($("mode").value==="mature"&&noviceFasta($("wt-fasta").value).length!==1)throw Error("WT VHH 1개를 입력하세요.");
+    if($("mode").value==="screen")noviceInputFasta("vhh-fasta");
+    if($("mode").value==="mature"&&noviceInputFasta("wt-fasta").length!==1)throw Error("WT VHH 1개를 입력하세요.");
   }
-  next.onclick=()=>{try {if(step===1)validateInputs();else inputSettings();jump(step+1);}catch(e){I18N.text(reason, I18N.term(e.message));const field=step===2?consent:$("mode").value==="complex"?fasta:$("input-kind").value==="fasta"?$("target-fasta"):$("structure-file");field.focus();field.setAttribute("aria-invalid","true");}};
+  next.onclick=()=>{try {if(step===1)validateInputs();else inputSettings();jump(step+1);}catch(e){I18N.text(reason, I18N.term(e.message));const field=e.inputField||(step===2?consent:$("mode").value==="complex"?fasta:$("input-kind").value==="fasta"?$("target-fasta"):$("structure-file"));field.focus();field.setAttribute("aria-invalid","true");}};
   start.onclick=()=>{fields();jump(1);};prev.onclick=()=>jump(step-1);
   function copiesReview(){try{const old=[...copies.querySelectorAll("input")].map(i=>i.value),rows=noviceFasta(fasta.value);copies.replaceChildren(...rows.map((r,i)=>{const l=el("label",I18N.format("{0} · {1} · {2} aa · 사본 수", [String.fromCharCode(65+i), r.name, r.sequence.length])),n=el("input");n.id="complex-copies-"+i;n.type="number";n.min="1";n.max="25";n.value=old[i]||"1";l.append(n);return l;}));}catch(e){I18N.text(copies, I18N.term(e.message));}}
   fasta.addEventListener("input",copiesReview);

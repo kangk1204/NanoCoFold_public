@@ -214,6 +214,29 @@ Prepare an input using one method. Selecting a structure file disables the PDB I
 
 For structure files, review chains, residue mappings, missing residues, and the preparation method. Public MSA transmits sequences externally. For private research inputs, check your institution's policy and choose a suitable MSA method. Consent for a public example does not carry over to your own sequences.
 
+<details>
+<summary>Optional: practice variant evaluation in the terminal without a GPU</summary>
+
+In the NanoCoFold environment prepared by the [installation steps above](#1-prepare-and-install), activate it with `source .nanocofold/workspace/.venv-dev/bin/activate`, open this source folder in the terminal and copy the command below. It uses the included public FASTAs, explicitly samples at most **3 DMS variants**, and evaluates at most **2 variant candidates** after prefiltering. `--mock` generates synthetic structures and synthetic CDR annotations for practicing the workflow. These are not research predictions or orderable candidates.
+
+If you installed with a custom `--workspace`, use that workspace path in place of `.nanocofold/workspace` in the activation command. The saved path is in `.nanocofold/install-location.json`.
+
+```bash
+nanocofold run --mode mature --mock \
+  --wt-fasta examples/tutorial/wt_vhh.fasta \
+  --set target.fasta=examples/tutorial/target.fasta \
+  --set mature.cdr.source=config \
+  --set mature.library.max_variants=3 \
+  --set mature.prefilter.top_n=2 \
+  --set run.name=mature_mock_small
+```
+
+The terminal prints the actual candidate count before prediction, then **candidate n/total** while calculating scores. When it finishes, open the printed **report.html** path. Keep the linked report files together when moving it.
+
+`--mock` alone keeps your chosen library and candidate limits; it does not automatically shrink a research run. The research default can send up to **200** mature candidates to evaluation. Use the two explicit limits above for a short practice run. For research, remove `--mock` and use reviewed inputs and validated CDR annotations; do not reuse synthetic CDR positions.
+
+</details>
+
 ## 5. Read and share results
 
 **To open your result:** **Jobs & logs → select your analysis job → Open results**. On a small screen, scroll below the job details to find its actions. You can also use **Explore results → Select run** to reopen a saved analysis in the same workspace.

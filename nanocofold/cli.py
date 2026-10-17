@@ -12,7 +12,7 @@ import warnings
 from pathlib import Path
 from . import __version__
 
-from .console_progress import ConsoleProgress, batch_detail, elapsed_text
+from .console_progress import ConsoleProgress, activity, batch_detail, elapsed_text
 
 import pandas as pd
 import numpy as np
@@ -21,7 +21,7 @@ from . import design_rfantibody, developability, handoff, mature, provenance, ra
 from . import score_complex as scorer
 from .config import (
     PROJECT_ROOT, cfg_get, dump_resolved, load_config, resolve_path, resolve_run_artifact,
-    resolve_run_dir, read_config_file, apply_overrides,
+    resolve_run_dir, read_config_file, apply_overrides, require_input_file,
 )
 from .utils.atomic import write_csv, write_json
 from .utils.spreadsheet import csv_cell
@@ -339,8 +339,7 @@ def _preflight_input_files(cfg: dict, args, *, required=False) -> None:
         if value in (None, ""):
             continue
         path = resolve_path(cfg, value)
-        if not path.is_file():
-            raise FileNotFoundError(f"{setting} 파일을 찾을 수 없습니다: {path}")
+        require_input_file(path, setting)
         if setting.endswith("fasta"):
             records = seq_utils.read_fasta(path, candidate_ids=setting == "screen.vhh_fasta")
             if setting != "screen.vhh_fasta" and len(records) != 1:
@@ -883,42 +882,43 @@ def _preserve_input_predictor_engine(frame: pd.DataFrame) -> pd.DataFrame:
 
 def _score_candidates(cfg: dict, pred_frame: pd.DataFrame, target: dict, id_column: str = "design_id") -> pd.DataFrame:
     rows: list[dict] = []
-    for _, row in pred_frame.iterrows():
+    for candidate_number, (_, row) in enumerate(pred_frame.iterrows(), start=1):
         candidate_id = str(row[id_column])
-        if row.get("prediction_status") == "failed":
-            rows.append({id_column: candidate_id, "error": row.get("prediction_error") or "예측 엔진 실패"})
-            continue
-        target_chain = str(row.get("target_chain", "A"))
-        binder_chain = str(row.get("binder_chain", "B"))
-        pred_dir = _pick_pred_dir(row)
-        if pred_dir is None:
-            rows.append({id_column: candidate_id, "error": "예측 경로를 찾을 수 없습니다(존재하지 않는 pred_dir)"})
-            continue
-        try:
-            if pred_dir.is_dir() or pred_dir.is_file():
-                raw_model_index = row.get("model_index")
-                model_index = None
-                if raw_model_index is not None and not pd.isna(raw_model_index):
-                    if isinstance(raw_model_index, bool) or float(raw_model_index) != int(raw_model_index) or int(raw_model_index) < 0:
-                        raise ValueError("모델 번호는 0 이상의 정수여야 합니다.")
-                    model_index = int(raw_model_index)
-                pred = scorer.find_prediction_files(pred_dir, model_index=model_index)
-            else:
-                matches = sorted(pred_dir.parent.glob(f"{candidate_id}*.pdb")) if pred_dir.parent.exists() else []
-                if not matches:
-                    raise FileNotFoundError(pred_dir)
-                pred = scorer.find_prediction_files(matches[0])
-            hotspot_labels = _prediction_hotspot_labels(pred.cif, target_chain, target)
-            _validate_candidate_prediction_sequences(pred.cif, target_chain, binder_chain, row, target)
-            metrics = scorer.score_complex(
-                pred.cif, target_chain, binder_chain, hotspot_labels, cfg, pred=pred, label=candidate_id
-            )
-            metrics[id_column] = candidate_id
-            rows.append(metrics)
-        except (shell.ExecutionCancelled, TimeoutError, subprocess.TimeoutExpired):
-            raise
-        except Exception as exc:  # noqa: BLE001
-            rows.append({id_column: candidate_id, "error": screen.prediction_failure_reason(pred_dir) or str(exc)})
+        with activity(f"후보 {candidate_number}/{len(pred_frame)} 점수 계산 중 · {candidate_id}"):
+            if row.get("prediction_status") == "failed":
+                rows.append({id_column: candidate_id, "error": row.get("prediction_error") or "예측 엔진 실패"})
+                continue
+            target_chain = str(row.get("target_chain", "A"))
+            binder_chain = str(row.get("binder_chain", "B"))
+            pred_dir = _pick_pred_dir(row)
+            if pred_dir is None:
+                rows.append({id_column: candidate_id, "error": "예측 경로를 찾을 수 없습니다(존재하지 않는 pred_dir)"})
+                continue
+            try:
+                if pred_dir.is_dir() or pred_dir.is_file():
+                    raw_model_index = row.get("model_index")
+                    model_index = None
+                    if raw_model_index is not None and not pd.isna(raw_model_index):
+                        if isinstance(raw_model_index, bool) or float(raw_model_index) != int(raw_model_index) or int(raw_model_index) < 0:
+                            raise ValueError("모델 번호는 0 이상의 정수여야 합니다.")
+                        model_index = int(raw_model_index)
+                    pred = scorer.find_prediction_files(pred_dir, model_index=model_index)
+                else:
+                    matches = sorted(pred_dir.parent.glob(f"{candidate_id}*.pdb")) if pred_dir.parent.exists() else []
+                    if not matches:
+                        raise FileNotFoundError(pred_dir)
+                    pred = scorer.find_prediction_files(matches[0])
+                hotspot_labels = _prediction_hotspot_labels(pred.cif, target_chain, target)
+                _validate_candidate_prediction_sequences(pred.cif, target_chain, binder_chain, row, target)
+                metrics = scorer.score_complex(
+                    pred.cif, target_chain, binder_chain, hotspot_labels, cfg, pred=pred, label=candidate_id
+                )
+                metrics[id_column] = candidate_id
+                rows.append(metrics)
+            except (shell.ExecutionCancelled, TimeoutError, subprocess.TimeoutExpired):
+                raise
+            except Exception as exc:  # noqa: BLE001
+                rows.append({id_column: candidate_id, "error": screen.prediction_failure_reason(pred_dir) or str(exc)})
     frame = pd.DataFrame(rows)
     if id_column not in frame.columns:
         frame[id_column] = pd.Series(dtype="object")
@@ -1250,11 +1250,14 @@ def _finalize(
         reason = "mock/dry-run" if _is_mock(cfg) or _is_dry_run(cfg) else "ANARCI 환경 없음"
         state.add_warnings(
             reason + ": CDR 의존 liability 는 미평가로 기록됩니다. "
-            "rank.weights.dev_flags가 0이 아니면 종합 순위와 최종 선별을 보류합니다. "
+            "rank.weights.dev_flags가 0이 아니면 CDR 미평가로 종합 순위를 보류합니다. "
+            "rank.weights.dev_flags=0으로 바꾸어도 CDR 평가가 없으면 최종 적격은 통과하지 않으며, 기본 선별은 계속 보류합니다. "
             "실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 "
             "mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. "
             "미평가를 위험 없음으로 처리하지 않습니다."
         )
+        if cfg_get(cfg, "rank.fallback_to_ineligible", False):
+            state.add_warnings("fallback_to_ineligible=true의 부적격 진단 목록은 발주 승인이 아닙니다.")
     liability_columns = {
         "n_cys", "pI", "net_charge", "mw_kda", "gravy",
         "n_hydrophobic_patches", "cdr_hydrophobic_patches",
@@ -1825,10 +1828,12 @@ def cmd_mature(args) -> int:
         state.add_warnings(warnings)
     print(f"[mature] CDR 범위: {cdr_ranges}")
 
-    library = mature.generate_library(wt_sequence, cdr_ranges, cfg)
+    with activity("성숙화 변이 라이브러리 준비 중"):
+        library = mature.generate_library(wt_sequence, cdr_ranges, cfg)
     phase_dir = run_dir / "02_mature"
     from . import cascade
-    prefiltered, info = mature.run_prefilter(library, wt_sequence, cascade.mature_prefilter_config(cfg), phase_dir, mock=mock, dry_run=dry_run)
+    with activity(f"성숙화 라이브러리 {len(library)}개에서 평가 후보 선별 중"):
+        prefiltered, info = mature.run_prefilter(library, wt_sequence, cascade.mature_prefilter_config(cfg), phase_dir, mock=mock, dry_run=dry_run)
     print(f"[mature] 라이브러리 {len(library)}종 → 프리필터 {info.get('selected', 0)}종 (ΔLLR ≥ {info.get('threshold')})")
     if not dry_run:
         state.set_phase("mature", {
@@ -1848,6 +1853,10 @@ def cmd_mature(args) -> int:
 
 
 def _mature_flow(cfg, run_dir, state, target, candidates, cdr_ranges):
+    if _is_mock(cfg):
+        print(f"[mature mock] 평가 예정 후보: {len(candidates)}개 · GPU를 쓰지 않는 합성 연습입니다.")
+        print("[mature mock] 연구용 기본값과 지정한 설정은 자동 축소하지 않습니다. "
+              "빠른 연습은 --set mature.library.max_variants=3 --set mature.prefilter.top_n=2를 직접 지정하세요.")
     from . import engine_comparison
     if engine_comparison.enabled(cfg):
         engine_comparison.run(cfg, run_dir, state, target, candidates, cdr_ranges,
@@ -2232,9 +2241,11 @@ def cmd_run(args) -> int:
         )
         if not dry_run:
             state.add_warnings(warnings)
-        library = mature.generate_library(wt_sequence, cdr_ranges, cfg)
+        with activity("성숙화 변이 라이브러리 준비 중"):
+            library = mature.generate_library(wt_sequence, cdr_ranges, cfg)
         from . import cascade
-        prefiltered, info = mature.run_prefilter(library, wt_sequence, cascade.mature_prefilter_config(cfg), run_dir / "02_mature", mock=mock, dry_run=dry_run)
+        with activity(f"성숙화 라이브러리 {len(library)}개에서 평가 후보 선별 중"):
+            prefiltered, info = mature.run_prefilter(library, wt_sequence, cascade.mature_prefilter_config(cfg), run_dir / "02_mature", mock=mock, dry_run=dry_run)
         if not dry_run:
             state.set_phase("mature", {
                 "wt_sequence": wt_sequence,

@@ -52,6 +52,9 @@ def read_fasta(path: str | Path, *, candidate_ids: bool = True) -> dict[str, str
 
     중복 ID와 빈 ID는 조용히 덮어쓰지 않고 오류로 처리한다(F17).
     """
+    from ..config import require_input_file
+
+    path = require_input_file(path, "FASTA")
     records: dict[str, str] = {}
     folded_ids: set[str] = set()
     name: str | None = None

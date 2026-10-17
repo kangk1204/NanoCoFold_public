@@ -220,6 +220,29 @@ VHH·WT는 FASTA를 직접 붙여 넣거나 파일을 한 번 불러옵니다. �
 
 구조 파일은 체인·잔기 대응·누락 잔기와 구조 준비 방식을 확인합니다. 공용 MSA는 서열을 외부로 전송하는 단계입니다. 비공개 연구 입력에는 기관의 전송 정책을 확인하고 적합한 MSA 방식을 선택하세요. 공개 예제의 전송 동의를 자신의 서열에 그대로 적용하지 않습니다.
 
+<details>
+<summary>선택: GPU 없이 터미널에서 작은 변이 평가 연습하기</summary>
+
+[위 설치 단계](#1-준비와-설치)로 준비한 환경을 `source .nanocofold/workspace/.venv-dev/bin/activate`로 활성화한 터미널에서, 소스 폴더로 이동해 아래 명령을 그대로 복사해 실행하세요. 포함된 공개 FASTA를 사용하고, DMS 변이를 **최대 3개로 직접 표본 제한**한 뒤 **변이 후보 최대 2개**를 평가합니다. `--mock`은 사용 흐름을 연습하기 위한 합성 구조와 합성 CDR 주석을 만듭니다. 연구 예측이나 발주 후보가 아닙니다.
+
+별도 `--workspace`로 설치했다면 활성화 명령의 `.nanocofold/workspace`를 해당 작업 공간 경로로 바꾸세요. 저장된 경로는 `.nanocofold/install-location.json`에 있습니다.
+
+```bash
+nanocofold run --mode mature --mock \
+  --wt-fasta examples/tutorial/wt_vhh.fasta \
+  --set target.fasta=examples/tutorial/target.fasta \
+  --set mature.cdr.source=config \
+  --set mature.library.max_variants=3 \
+  --set mature.prefilter.top_n=2 \
+  --set run.name=mature_mock_small
+```
+
+예측 전에 실제 평가 후보 수가 표시되고, 점수 계산 중에는 **후보 n/전체 수**가 나옵니다. 끝나면 터미널에 출력된 **report.html** 경로를 여세요. 보고서를 옮길 때는 연결된 파일도 함께 보관합니다.
+
+`--mock`만 붙이면 지정한 라이브러리·후보 수를 그대로 사용하며 연구 설정을 자동 축소하지 않습니다. 성숙화 연구 기본값은 최대 **200개**를 평가할 수 있으므로, 짧은 연습에는 위의 두 제한을 직접 지정하세요. 실제 연구에서는 `--mock`을 빼고 검토한 입력과 검증된 CDR 주석을 사용하며, 합성 CDR 위치를 재사용하지 마세요.
+
+</details>
+
 ## 5. 결과 읽기와 전달
 
 **결과를 여는 경로:** **작업·로그 → 자신이 제출한 분석 작업 선택 → 결과 열기**. 작은 화면에서는 작업 상세 아래로 내려 버튼을 찾으세요. 같은 작업 공간의 저장 결과는 **결과 탐색 → 실행 선택**에서도 다시 열 수 있습니다.

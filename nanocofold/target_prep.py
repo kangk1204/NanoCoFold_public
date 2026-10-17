@@ -10,7 +10,7 @@ import pandas as pd
 from . import hotspots as hotspots_mod
 from . import mock as mock_mod
 from . import provenance
-from .config import cfg_get, cfg_seed, resolve_path
+from .config import cfg_get, cfg_seed, require_input_file, resolve_path
 from .utils import msa as msa_utils
 from .utils import pdb_io, seq as seq_utils, shell
 from .utils.misc import to_native
@@ -39,8 +39,7 @@ def resolve_target_sequence(cfg: dict) -> str:
         return sequence
     fasta = resolve_path(cfg, cfg_get(cfg, "target.fasta"))
     if fasta:
-        if not fasta.is_file():
-            raise FileNotFoundError(f"target.fasta 파일을 찾을 수 없습니다: {fasta}")
+        require_input_file(fasta, "target.fasta")
         records = seq_utils.read_fasta(fasta, candidate_ids=False)
         if not records:
             raise ValueError(f"FASTA에서 서열을 읽지 못했습니다: {fasta}")
@@ -49,8 +48,7 @@ def resolve_target_sequence(cfg: dict) -> str:
         return seq_utils.clean_sequence(next(iter(records.values())))
     pdb_path = resolve_path(cfg, cfg_get(cfg, "target.pdb"))
     if pdb_path:
-        if not pdb_path.is_file():
-            raise FileNotFoundError(f"target.pdb 파일을 찾을 수 없습니다: {pdb_path}")
+        require_input_file(pdb_path, "target.pdb")
         chain_id = str(cfg_get(cfg, "target.chain", "A"))
         structure = pdb_io.load_structure(pdb_path)
         chain = pdb_io.get_chain(structure, chain_id)
@@ -229,10 +227,13 @@ def _prepare_target_impl(
         )
 
     provided_pdb = resolve_path(cfg, cfg_get(cfg, "target.pdb"))
-    if provided_pdb and provided_pdb.is_file():
+    if provided_pdb:
+        require_input_file(provided_pdb, "target.pdb")
         provided_structure = pdb_io.load_structure(provided_pdb)
         for provided_chain in next(provided_structure.get_models()):
             pdb_io.validate_polymer_residues(provided_chain)
+        if len(list(pdb_io.iter_residues(pdb_io.get_chain(provided_structure, chain_id)))) == 1:
+            warnings.append("제공한 표적 구조의 선택 체인에 아미노산 잔기가 1개만 있습니다. 체인 선택과 구조 파일의 누락 여부를 확인하세요. 단백질 접힘·결합 계면을 해석하기에는 정보가 매우 제한적입니다.")
         # Reject incompatible native inputs before MSA requests or inference.
         _structure_index_maps(provided_pdb, chain_id, sequence, warnings=warnings, mapping_qc=mapping_qc)
     sequence_only = provider in {"none", "sequence"} and not (provided_pdb and provided_pdb.exists())
@@ -721,8 +722,7 @@ def _acquire_structure(
     aux_chains = aux_chains or []
     provided = resolve_path(cfg, cfg_get(cfg, "target.pdb"))
     if provided:
-        if not provided.exists():
-            raise FileNotFoundError(f"target.pdb 를 찾을 수 없습니다: {provided}")
+        require_input_file(provided, "target.pdb")
         destination = phase_dir / f"target_raw{provided.suffix}"
         shutil.copy(provided, destination)
         return destination

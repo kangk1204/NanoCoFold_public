@@ -194,7 +194,7 @@
   <p><span data-report-i18n>일반 복합체의 요약 ipSAE는 기본적으로 검토한 체인 순서의 첫 쌍이며, 체인쌍을 명시한 실행에서는 해당 쌍입니다. 전체 평균·최솟값과 구분합니다. 적용 체인·범위 출처와 모든 체인 쌍의 표·CSV를 함께 확인합니다.</span></p>
   <p><span data-report-i18n>엔진별 표의 순위와 종합점수는 기록된 엔진 안에서만 비교합니다. 엔진 간 점수를 합산하거나 통합 순위를 만들지 않습니다. RF·BG 별칭은 후보를 찾기 위한 표시명이며 원본 ID와 수치는 보존됩니다.</span></p>
   {% if pose_assessments_available %}
-  <div class="interpretation" id="pose-assessment-guide"><h3><span data-report-i18n>세 가지 별도 확인</span></h3><p><b><span data-report-i18n>예측 신뢰도</span></b><span data-report-i18n>는 ipTM·ipSAE 및 실행 당시 기록 적격,</span> <b><span data-report-i18n>지정 결합 부위 충족</span></b><span data-report-i18n>은 결합 부위 접촉,</span> <b><span data-report-i18n>자세 일관성</span></b><span data-report-i18n>은 동일 후보의 엔진별 자세와 설계·재예측 일치를 뜻합니다. 탐색적 검토 우선순위는 이 기록을 함께 확인하는 값이며 기존 적격·선별 기록을 변경하지 않습니다.</span></p><p><span data-report-i18n>검토 순위는 표적·조건·실행 범위 안의 후보 순서이며 동률을 허용합니다. 1위도 보류일 수 있으므로 검토 판정과 이유를 함께 읽으세요. 표적만 정렬하여 같은 후보 서열의 자세를 비교합니다. 엔진 지지 수는 독립 실험 횟수가 아니며 점수를 평균하지 않습니다. 새 VHH를 기존 VHH의 자세에 맞춰 선별하지 않습니다. 설계 구조가 없거나 대응이 불가능하면 미평가로 남습니다. 우선 검토는 실제 결합·KD의 입증이 아닙니다.</span></p><p><span data-report-i18n>검토 정책 v2는 품질·지정 결합 부위를 충족한 엔진별 단독 유망 예측과 같은 자세의 다중 엔진 지지를 구분합니다. 한 엔진만 유망해도 합의 부족을 실패로 간주하지 않습니다. 엔진 간 자세 차이와 설계·재예측 불일치는 별도 진단이며 자동 비결합·탈락 사유가 아닙니다. 이전 정책의 판정은 기록된 버전과 함께 읽으세요.</span></p></div>
+  <div class="interpretation" id="pose-assessment-guide"><h3><span data-report-i18n>세 가지 별도 확인</span></h3><p><span data-report-i18n>예측 신뢰도는 ipTM·ipSAE 및 실행 당시 기록 적격, 지정 결합 부위 충족은 결합 부위 접촉, 자세 일관성은 동일 후보의 엔진별 자세와 설계·재예측 일치를 뜻합니다. 탐색적 검토 우선순위는 이 기록을 함께 확인하는 값이며 기존 적격·선별 기록을 변경하지 않습니다.</span></p><p><span data-report-i18n>검토 순위는 표적·조건·실행 범위 안의 후보 순서이며 동률을 허용합니다. 1위도 보류일 수 있으므로 검토 판정과 이유를 함께 읽으세요. 표적만 정렬하여 같은 후보 서열의 자세를 비교합니다. 엔진 지지 수는 독립 실험 횟수가 아니며 점수를 평균하지 않습니다. 새 VHH를 기존 VHH의 자세에 맞춰 선별하지 않습니다. 설계 구조가 없거나 대응이 불가능하면 미평가로 남습니다. 우선 검토는 실제 결합·KD의 입증이 아닙니다.</span></p><p><span data-report-i18n>검토 정책 v2는 품질·지정 결합 부위를 충족한 엔진별 단독 유망 예측과 같은 자세의 다중 엔진 지지를 구분합니다. 한 엔진만 유망해도 합의 부족을 실패로 간주하지 않습니다. 엔진 간 자세 차이와 설계·재예측 불일치는 별도 진단이며 자동 비결합·탈락 사유가 아닙니다. 이전 정책의 판정은 기록된 버전과 함께 읽으세요.</span></p></div>
   {% endif %}
   <p class="muted"><span data-report-i18n>지표 순위·종합점수 순위·기록 선별 순위는 다릅니다. 선별은 적격 게이트와 CDR3 다양성 제한을 적용하므로 높은 ipSAE 후보도 제외될 수 있습니다. ESM·AntiFold는 서열/폴딩 prior이며 친화도 예측값이 아닙니다. 심한 위험 수(dev_severe)는 5종 게이트, 전체 위험 수(dev_flags)는 종합점수 가중치입니다.</span></p>
   <p class="muted"><span data-report-i18n>충돌·N/O 근접·반대 전하 접촉은 원자쌍 수입니다. N/O 근접은 각도를 확인한 수소결합이 아니며, 고정 거리 충돌은 원소별 반데르발스 판정이 아닙니다.</span></p>
@@ -275,16 +275,17 @@
   {% endif %}
 
   <h3 id="report-guide"><span data-report-i18n>지표 읽는 법</span></h3>
+  <p class="muted"><span data-report-i18n>dev_flags 가중치는 종합점수에만 적용됩니다. CDR 미평가는 가중치가 0이어도 최종 적격을 통과하지 않습니다. fallback_to_ineligible=true로 만든 부적격 진단 목록은 발주 승인이 아닙니다.</span></p>
   <details open><summary><span data-report-i18n>지표 해석과 한계</span></summary>
     <ul>
-      <li><b>ipSAE</b><span data-report-i18n>와</span> <b>ipTM</b><span data-report-i18n>은 기록된 계면·배치 신뢰도 지표입니다. 적용 기준과 통과 여부는 아래 기록 게이트 표에서 확인하세요. 낮은 점수는 비결합의 실험 증거가 아닙니다.</span></li>
-      <li><b><span data-report-i18n>계면 pLDDT</span></b><span data-report-i18n>와 계면 PAE를 함께 확인합니다. 보고서 생성 시 바꾼 설정으로 기존 적격 판정을 다시 계산하지 않습니다.</span></li>
+      <li><span data-report-i18n>ipSAE와 ipTM은 기록된 계면·배치 신뢰도 지표입니다. 적용 기준과 통과 여부는 아래 기록 게이트 표에서 확인하세요. 낮은 점수는 비결합의 실험 증거가 아닙니다.</span></li>
+      <li><span data-report-i18n>계면 pLDDT와 계면 PAE를 함께 확인합니다. 보고서 생성 시 바꾼 설정으로 기존 적격 판정을 다시 계산하지 않습니다.</span></li>
       <li><span data-report-i18n>VHH 점수의 ipTM은 선택 표적–VHH 쌍의 native 방향값 최솟값입니다. 정확히 두 체인일 때만 native 전체 ipTM을 대신 사용할 수 있습니다. 3체인 이상에서 쌍 값이나 검증된 체인 축이 없으면 미평가입니다. 일반 복합체 요약 ipTM은 전체 값이며 체인 쌍 상세와 구분합니다.</span></li>
       <li><span data-report-i18n>clash는 선택 표적뿐 아니라 유지한 파트너와 VHH 사이의 충돌도 포함합니다. CSV의 n_target_clashes와 n_context_clashes에서 구분할 수 있습니다. 항원끼리의 충돌은 이 값에 포함하지 않습니다.</span></li>
-      <li><b><span data-report-i18n>결합 부위 접촉률</span></b><span data-report-i18n>은 지정 잔기에 예측상 접촉하는 비율입니다. 알려진 전체 에피토프·같은 자세·실제 결합의 검증은 아닙니다.</span></li>
+      <li><span data-report-i18n>결합 부위 접촉률은 지정 잔기에 예측상 접촉하는 비율입니다. 알려진 전체 에피토프·같은 자세·실제 결합의 검증은 아닙니다.</span></li>
       <li><b>clash</b> <span data-report-i18n>0은 현재 거리 기준에서 충돌이 없다는 뜻이며 실험 성공을 보장하지 않습니다. H-bond/염다리 수는 거리 기반 근사치입니다.</span></li>
-      <li><b><span data-report-i18n>개발가능성 경고</span></b><span data-report-i18n>(dev_severe): free Cys, N-글리코실화 서열, CDR 탈아미드/이성화, CDR 소수성 패치.</span></li>
-      <li><span data-report-i18n>구조 기반 지표는 상대 순위용입니다.</span> <b><span data-report-i18n>최종 판단은 SPR/BLI 실험</span></b><span data-report-i18n>으로 수행하세요.</span></li>
+      <li><span data-report-i18n>개발가능성 경고(dev_severe): free Cys, N-글리코실화 서열, CDR 탈아미드/이성화, CDR 소수성 패치.</span></li>
+      <li><span data-report-i18n>구조 기반 지표는 상대 순위용입니다. 최종 판단은 SPR/BLI 실험으로 수행하세요.</span></li>
     </ul>
   </details>
   <details id="recorded-threshold-checks"><summary><span data-report-i18n>기록된 게이트와 적용 기준</span></summary>

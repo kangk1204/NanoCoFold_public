@@ -58,7 +58,7 @@ def _path_patterns(root):
             # mounts and spaces; it must not match a neighboring root name.
             path_root = '(?:' + re.escape(prefix) + r'(?=/|$)|' + path_root + ')'
     quoted = re.compile(r'''(["'])(''' + path_root + r'''[^\r\n]*?)\1''')
-    continuation = r'''(?:[ \t]+[^\s"\'<>()[\]{};,`|:]+(?=/)''' + _PATH_TAIL + ")*"
+    continuation = r'''(?:[ \t]+[^\s"\'<>()[\]{};,`|:]+(?=[\\/])''' + _PATH_TAIL + ")*"
     token = re.compile(_BOUNDARY + path_root + _PATH_TAIL + continuation)
     # A filename extension provides an exact end for paths containing spaces.
     spaced_file = re.compile(_BOUNDARY + path_root + r'''[^\r\n"'<>()[\]{};,`|:]*?\.[A-Za-z0-9]{1,12}(?=$|[\s"'<>()[\]{};,`|:])''')

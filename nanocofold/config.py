@@ -202,6 +202,22 @@ def _validate(cfg: dict, *, historical: bool = False) -> None:
     _validate_scalar_shapes(cfg, historical=historical)
     if not historical:
         developability_patterns(cfg)
+        # Keep supported aliases/case handling and deliberately unset template
+        # values. Historical reports retain their original metadata verbatim.
+        for dotted, allowed, message in (
+                ("structure.provider", {"boltz2", "boltz", "chai1", "none", "sequence", "mock"},
+                 "structure.provider는 boltz2, boltz, chai1, none, sequence, mock 중 하나여야 합니다."),
+                ("report.viewer", {"3dmol", "none"}, "report.viewer는 3dmol 또는 none이어야 합니다."),
+                ("expression.host", {"ecoli_periplasmic", "mammalian"},
+                 "expression.host는 ecoli_periplasmic 또는 mammalian이어야 합니다.")):
+            value = cfg_get(cfg, dotted)
+            if value is None:
+                continue
+            normalized = value.lower() if isinstance(value, str) else None
+            if dotted == "expression.host" and normalized is not None:
+                normalized = normalized.strip()
+            if normalized not in allowed:
+                raise ValueError(message)
 
     _external_viewer_url(cfg)
     for dotted in ("run", "target", "structure", "design", "screen", "mature", "score", "rank",
@@ -347,7 +363,7 @@ def _validate(cfg: dict, *, historical: bool = False) -> None:
     if type(consent) is not bool:
         raise ValueError("screen.allow_public_msa_server는 true/false여야 합니다.")
     if msa_source == "public_api" and consent is not True:
-        raise ValueError("public_api uploads target/generated sequences; screen.allow_public_msa_server=true is required")
+        raise ValueError("public_api는 표적·생성 서열을 외부 서버로 전송합니다. 동의한 경우에만 screen.allow_public_msa_server=true로 설정하세요.")
     comparison = comparison_settings(cfg)
     if comparison["enabled"]:
         if mode not in {"design", "screen", "mature"} or cfg_get(cfg, "specificity.enabled", False):
@@ -426,7 +442,10 @@ def _validate_scalar_shapes(cfg, *, historical=False):
                 if value < 0 and path not in signed and not path.startswith("rank.weights."):
                     raise ValueError(f"{path}는 0 이상이어야 합니다.")
             elif not historical and isinstance(expected, str) and value is not None and path != "target.hotspots" and not isinstance(value, str):
-                raise ValueError(f"{path}는 문자열이어야 합니다. ':'를 포함하는 --set 값은 따옴표로 감싸세요.")
+                message = f"{path}는 문자열이어야 합니다."
+                if isinstance(value, dict):
+                    message += " ':'를 포함하는 --set 값은 따옴표로 감싸세요."
+                raise ValueError(message)
             elif not historical and isinstance(expected, list) and value is not None and not isinstance(value, list):
                 raise ValueError(f"{path}는 목록이어야 합니다.")
     visit(defaults, cfg)
@@ -574,7 +593,7 @@ def cfg_seed(cfg: dict, dotted: str, default: int = 42) -> int:
     if value is None:
         return int(default)
     if type(value) is not int or not 0 <= value < 2**32:
-        raise ValueError(f"{dotted} seed는 null 또는 0–4294967295 사이의 정수여야 합니다.")
+        raise ValueError(f"{dotted}는 null 또는 0–4294967295 사이의 정수여야 합니다.")
     return value
 
 
@@ -623,6 +642,16 @@ def resolve_path(cfg: dict, value: str | Path | None) -> Path | None:
     path = Path(value)
     if not path.is_absolute():
         path = PROJECT_ROOT / path
+    return path
+
+
+def require_input_file(path: str | Path, setting: str) -> Path:
+    """Explain a directory input distinctly from a missing file before reading it."""
+    path = Path(path)
+    if path.is_dir():
+        raise IsADirectoryError(f"{setting}에는 디렉터리가 아닌 파일 경로를 지정하세요: {path}")
+    if not path.is_file():
+        raise FileNotFoundError(f"{setting} 파일을 찾을 수 없습니다: {path}")
     return path
 
 

@@ -1755,6 +1755,7 @@ async function selectCandidate(id) {
   detail.append(el("p", I18N.term("PAE는 Å 단위입니다. pDockQ2는 CA 8 Å 접촉과 방향별 PAE를 사용하며 두 체인 중 최소값을 표시합니다. AlphaFold-Multimer에서 보정됐고 Boltz·Chai·OpenDDE 값은 탐색용입니다. 예측 지표는 실제 결합이나 KD를 입증하지 않습니다."), "muted"));
   detail.append(el("p", I18N.term("종합점수는 기록된 엔진과 후보 집합 안의 상대 점수입니다. 적용·제외 가중치는 ranking_policy의 엔진별 정책을 확인하세요. 일부 후보만 재평가한 결과는 통합 순위나 엔진 성능 비교가 아닙니다. 과거 혼합 배치 기록은 원래 정규화 범위를 유지합니다. 선별 순위는 적격 게이트와 다양성 제한을 추가 적용합니다. ESM·AntiFold는 서열/폴딩 prior입니다. dev_severe는 심한 5종 게이트, dev_flags는 전체 평가 위험 수 가중치입니다. N/O 근접·반대 전하 접촉·충돌의 단위는 원자쌍이며, 확인된 수소결합 수나 원소별 반데르발스 판정이 아닙니다."), "muted"));
   detail.append(el("p", I18N.term("같은 seed라도 엔진·장치 전체의 비트 단위 재현을 보장하지 않습니다. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에 한정됩니다. 생성 단계의 결합 부위 OFF/ON을 동일 난수 상태로 가정하지 않습니다."), "muted"));
+  detail.append(el("p", I18N.term("dev_flags 가중치는 종합점수에만 적용됩니다. CDR 미평가는 가중치가 0이어도 최종 적격을 통과하지 않습니다. fallback_to_ineligible=true로 만든 부적격 진단 목록은 발주 승인이 아닙니다."), "muted"));
   if (row.threshold_checks !== undefined) {
     const facts = el("details"),
       caption = el("summary", I18N.term(row.assessment_status ? "현재 평가 기준" : "지표 해석·실행 당시 선별 기준"));
@@ -2981,10 +2982,23 @@ function noviceFasta(content) {
     if (line.startsWith(">")) { current = {name: line.slice(1).trim(), sequence: "", copies: 1}; rows.push(current); }
     else { if (!current) throw Error("FASTA는 >이름으로 시작해야 합니다."); current.sequence += line.replace(/\s/g, "").toUpperCase(); }
   }
-  if (!rows.length || rows.some(r => !r.name || !r.sequence || /[^ACDEFGHIKLMNPQRSTVWY]/.test(r.sequence)))
+  if (!rows.length)
     throw Error("이름과 표준 아미노산 서열을 확인하세요. X·DNA/RNA·빈 서열은 사용할 수 없습니다.");
-  if (new Set(rows.map(r => r.name.toLowerCase())).size !== rows.length) throw Error("FASTA 이름은 중복될 수 없습니다.");
+  const names = new Set();
+  for (const [index, row] of rows.entries()) {
+    if (!row.name) throw Error(`FASTA ${index + 1}번째 후보: 이름이 없습니다. >이름을 입력하세요.`);
+    if (!row.sequence) throw Error(`FASTA ${index + 1}번째 후보 (${row.name}): 서열이 비어 있습니다.`);
+    const invalid = [...new Set(Array.from(row.sequence).filter(letter => !"ACDEFGHIKLMNPQRSTVWY".includes(letter)))].sort();
+    if (invalid.length) throw Error(`FASTA ${index + 1}번째 후보 (${row.name}): 허용되지 않는 문자 ${invalid.slice(0, 10).join(", ")}. 표준 아미노산 20종만 입력하세요.`);
+    const key = row.name.toLowerCase();
+    if (names.has(key)) throw Error(`FASTA ${index + 1}번째 후보 (${row.name}): 이름이 중복됩니다.`);
+    names.add(key);
+  }
   return rows;
+}
+function noviceInputFasta(id) {
+  try { return noviceFasta($(id).value); }
+  catch (error) { error.inputField = $(id); throw error; }
 }
 function noviceComplexProteins() {
   if ($("input-kind").value === "structure") {
@@ -2995,7 +3009,7 @@ function noviceComplexProteins() {
       return {name: c.name || id, sequence: c.sequence, copies: 1};
     });
   }
-  const entries = noviceFasta($("complex-fasta").value);
+  const entries = noviceInputFasta("complex-fasta");
   for (const [i, row] of entries.entries()) row.copies = Number($("complex-copies-" + i)?.value || 1);
   const n = entries.reduce((n,r) => n+r.copies,0), length = entries.reduce((n,r) => n+r.copies*r.sequence.length,0);
   if (entries.some(r => !Number.isInteger(r.copies) || r.copies<1) || n<2 || n>25 || length>2000)
@@ -3059,6 +3073,33 @@ async function initNoviceFlow() {
   const copies=el("div");copies.id="novice-complex-copies";complex.append(label,fasta,copies);inputCard.insertBefore(complex,$("fasta-fields"));
   const footer=el("div",null,"novice-footer"),prev=el("button",I18N.term("이전"),"secondary"),next=el("button",I18N.term("입력 확인 후 다음")),reason=el("p");prev.id="novice-previous";next.id="novice-next";reason.id="novice-blocker";reason.setAttribute("role","alert");footer.append(prev,next,reason);host.append(footer);
   let step=0,restoring=false,draftTimer,saveQueue=Promise.resolve();
+  const sequenceHelp = new Map();
+  for (const id of ["complex-fasta", "target-fasta", "vhh-fasta", "wt-fasta"]) {
+    const field = $(id), help = el("p", null, "error field-error");
+    help.id = id + "-validation"; help.hidden = true; help.setAttribute("role", "status");
+    field.setAttribute("aria-describedby", [field.getAttribute("aria-describedby"), help.id].filter(Boolean).join(" "));
+    field.after(help); sequenceHelp.set(id, help);
+  }
+  function refreshSequenceHelp() {
+    const mode = $("mode").value, sequenceInput = $("input-kind").value === "fasta";
+    const active = new Set(mode === "complex" ? (sequenceInput ? ["complex-fasta"] : []) : [
+      ...(sequenceInput ? ["target-fasta"] : []), ...(mode === "screen" ? ["vhh-fasta"] : mode === "mature" ? ["wt-fasta"] : [])]);
+    let blocked = false;
+    for (const [id, help] of sequenceHelp) {
+      const field = $(id); let message = "";
+      if (active.has(id) && field.value.trim()) {
+        try {
+          const rows = noviceFasta(field.value);
+          if (id === "target-fasta" && rows.length !== 1) throw Error("단일 분석은 표적 1개입니다. 여러 표적은 배치 분석을 사용하세요.");
+          if (id === "wt-fasta" && rows.length !== 1) throw Error("WT VHH 1개를 입력하세요.");
+        } catch (error) { message = error.message; }
+      }
+      help.hidden = !message; I18N.text(help, I18N.term(message));
+      if (message) { field.setAttribute("aria-invalid", "true"); field.setAttribute("aria-errormessage", help.id); blocked = true; }
+      else if (field.getAttribute("aria-errormessage") === help.id) { field.removeAttribute("aria-invalid"); field.removeAttribute("aria-errormessage"); }
+    }
+    next.disabled = step === 1 && blocked;
+  }
   host.insertBefore(rail, task);
   const tasks=["목적을 고르세요. 필요한 입력과 결과를 확인하면 다음으로 이동합니다.","전체 서열·체인 순서·사본 수를 확인하세요. 오류 없는 필수 입력이면 다음으로 이동합니다.","최대 계획 모델 수·선택 엔진·MSA 전송 여부를 확인하세요.","입력 확인을 누른 뒤 적용 조건을 읽고 분석 실행을 누르세요. 환경 확인 기록은 재사용하며, 입력 확인은 계산을 시작하지 않습니다."];
   function render(){
@@ -3071,17 +3112,18 @@ async function initNoviceFlow() {
     const simulated=$("mock").checked&&!isComplex;ml.hidden=simulated;msa.hidden=simulated;cl.hidden=simulated;demoMsaNote.hidden=!simulated;
     try {I18N.text(plan, I18N.term(noviceModelPlan(inputSettings(true),$("mode").value,$("mode").value==="screen"?noviceFasta($("vhh-fasta").value).length:0)));}catch(e){I18N.text(plan, I18N.term(e.message));}
     I18N.text($("review-input"), I18N.term("입력 확인"));I18N.text($("start-job"), I18N.term("분석 실행"));
+    refreshSequenceHelp();
   }
   function jump(n){step=n;I18N.text(reason, "");render();heading.focus();}
   state.showInputReview = () => jump(state.input ? 3 : 1);
   function validateInputs(){
     if($("mode").value==="complex") return noviceComplexProteins();
-    if($("input-kind").value==="fasta") {if(noviceFasta($("target-fasta").value).length!==1)throw Error("단일 분석은 표적 1개입니다. 여러 표적은 배치 분석을 사용하세요.");}
+    if($("input-kind").value==="fasta") {if(noviceInputFasta("target-fasta").length!==1)throw Error("단일 분석은 표적 1개입니다. 여러 표적은 배치 분석을 사용하세요.");}
     else if(!state.analyzed||!$("acknowledge").checked)throw Error("구조를 불러오고 체인·준비 방식과 경고를 확인하세요.");
-    if($("mode").value==="screen")noviceFasta($("vhh-fasta").value);
-    if($("mode").value==="mature"&&noviceFasta($("wt-fasta").value).length!==1)throw Error("WT VHH 1개를 입력하세요.");
+    if($("mode").value==="screen")noviceInputFasta("vhh-fasta");
+    if($("mode").value==="mature"&&noviceInputFasta("wt-fasta").length!==1)throw Error("WT VHH 1개를 입력하세요.");
   }
-  next.onclick=()=>{try {if(step===1)validateInputs();else inputSettings();jump(step+1);}catch(e){I18N.text(reason, I18N.term(e.message));const field=step===2?consent:$("mode").value==="complex"?fasta:$("input-kind").value==="fasta"?$("target-fasta"):$("structure-file");field.focus();field.setAttribute("aria-invalid","true");}};
+  next.onclick=()=>{try {if(step===1)validateInputs();else inputSettings();jump(step+1);}catch(e){I18N.text(reason, I18N.term(e.message));const field=e.inputField||(step===2?consent:$("mode").value==="complex"?fasta:$("input-kind").value==="fasta"?$("target-fasta"):$("structure-file"));field.focus();field.setAttribute("aria-invalid","true");}};
   start.onclick=()=>{fields();jump(1);};prev.onclick=()=>jump(step-1);
   function copiesReview(){try{const old=[...copies.querySelectorAll("input")].map(i=>i.value),rows=noviceFasta(fasta.value);copies.replaceChildren(...rows.map((r,i)=>{const l=el("label",I18N.format("{0} · {1} · {2} aa · 사본 수", [String.fromCharCode(65+i), r.name, r.sequence.length])),n=el("input");n.id="complex-copies-"+i;n.type="number";n.min="1";n.max="25";n.value=old[i]||"1";l.append(n);return l;}));}catch(e){I18N.text(copies, I18N.term(e.message));}}
   fasta.addEventListener("input",copiesReview);
