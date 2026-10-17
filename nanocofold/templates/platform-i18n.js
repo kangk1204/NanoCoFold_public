@@ -44,6 +44,14 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "관리 설치 기록을 확인할 수 없습니다. 원래 bash install.sh 명령을 다시 실행하세요. / Cannot verify installation; rerun the original bash install.sh command.": "Cannot verify installation; rerun the original bash install.sh command.",
+  "관리 설치 위치가 일치하지 않습니다. 기존 파일을 보존하고 bash install.sh 설정을 확인하세요. / Managed installation identity differs; check bash install.sh settings.": "Managed installation identity differs; check bash install.sh settings.",
+  "등록된 외부 명령을 정리 중입니다. 종료 후 다시 실행하세요. / An owned command is still finishing.": "An owned command is still finishing.",
+  "설치 잠금 인계를 확인할 수 없습니다. 원래 bash install.sh 명령을 다시 실행하세요. / Cannot verify installation lock handoff; rerun bash install.sh.": "Cannot verify installation lock handoff; rerun bash install.sh.",
+  "설치가 완료되지 않았거나 설치 위치가 다릅니다. 원래 bash install.sh 명령을 다시 실행하세요. / Installation is incomplete or its identity differs; rerun the original bash install.sh command.": "Installation is incomplete or its identity differs; rerun the original bash install.sh command.",
+  "설치가 완료되지 않았습니다. 원래 bash install.sh 명령을 다시 실행하세요. / Installation is incomplete; rerun the original bash install.sh command.": "Installation is incomplete; rerun the original bash install.sh command.",
+  "완료 후 결과를 정리하는 작업 프로세스가 남아 있습니다. 종료 후 다시 실행하세요. / A recorded job process is still finishing; retry after it exits.": "A recorded job process is still finishing; retry after it exits.",
+  "응용 프로그램 잠금 인계를 확인할 수 없습니다. / Cannot verify application lease handoff.": "Cannot verify application lease handoff.",
   "보존·결과 등록 경로에 심볼릭 링크가 있습니다. 작업 공간에서 pwd -P로 실제 경로를 확인해 다시 지정하세요. macOS /var/folders는 /private/var/folders를 사용하세요.": "The retention or result-registration path contains a symbolic link. Run pwd -P in the workspace and specify the physical path. On macOS, use /private/var/folders instead of /var/folders.",
   "합성 mock 연습 · 기록 선별 0건": "Synthetic mock practice · 0 recorded selections",
   "선별 0건만으로 실행 실패를 뜻하지 않습니다. mock 점수·구조는 사용법 연습용이며 실제 후보의 품질이나 결합을 검증하지 않습니다. 아래 제외·미평가 사유와 실행 상태를 확인하세요.": "Zero selections alone do not mean the run failed. Mock scores and structures are for learning the workflow and do not validate real candidate quality or binding. Check the exclusion and unevaluated reasons below and the execution status.",
