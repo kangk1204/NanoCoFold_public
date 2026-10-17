@@ -570,9 +570,12 @@ class ResultReader:
             recorded = isinstance(source, dict) and threshold_key in source
             if isinstance(recorded_checks, list):
                 continue
+            passed = row.get(flag) if flag else None
+            if self.assessment and self.assessment["status"] != "verified":
+                passed = None
             checks.append({"metric": metric, "value": row.get(metric), "operator": operator,
                            "threshold": source[threshold_key] if recorded else None,
-                           "passed": row.get(flag) if flag else None,
+                           "passed": passed,
                            "threshold_source": source_name if recorded or self.assessment else "not_recorded"})
         cdr = self.config.get("mature", {}).get("cdr", {})
         if not isinstance(cdr, dict):

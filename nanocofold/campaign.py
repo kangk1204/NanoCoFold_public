@@ -526,6 +526,8 @@ def write_outputs(cfg: dict, root: Path, definition: dict, candidates: pd.DataFr
 
 def reanalyze(cfg: dict, root: Path) -> dict:
     """Rebuild selection/report without engines, preserving the original target identity."""
+    if (root / "retained").exists():
+        raise ValueError("정리 보관본은 읽기 전용입니다. 재분석에는 정리 전 전체 원본 결과가 필요합니다.")
     payload = _read(root / "06_specificity" / "results.json")
     if not payload:
         raise ValueError("특이성 재분석 자료가 없습니다.")
