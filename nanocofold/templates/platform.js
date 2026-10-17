@@ -1327,7 +1327,8 @@ async function loadResult(id) {
   );
   warnings($("result-issues"), [
     ...(summary.issues || []),
-    ...(summary.warnings || []).map(message => "실행 당시 기록 경고: " + message),
+    ...[...new Set((summary.warnings || []).map(String))].map(message =>
+      I18N.concat([I18N.term("실행 당시 기록 경고: "), I18N.term(message)])),
   ]);
   I18N.text($("result-provenance"), JSON.stringify(provenance || {}, null, 2));
   if (provenance?.status === "unavailable") notice(provenance.issue, true);

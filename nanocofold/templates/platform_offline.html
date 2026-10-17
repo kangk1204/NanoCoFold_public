@@ -1149,6 +1149,7 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "엔진별 추천 목록을 따로 저장했습니다. 통합 발주 목록은 연구자가 서열을 선택한 뒤 작성해야 합니다.": "Recommendations were saved separately for each engine. Compile a combined order list only after a researcher selects the sequences.",
   "관리 설치 기록을 확인할 수 없습니다. 원래 bash install.sh 명령을 다시 실행하세요. / Cannot verify installation; rerun the original bash install.sh command.": "Cannot verify installation; rerun the original bash install.sh command.",
   "관리 설치 위치가 일치하지 않습니다. 기존 파일을 보존하고 bash install.sh 설정을 확인하세요. / Managed installation identity differs; check bash install.sh settings.": "Managed installation identity differs; check bash install.sh settings.",
   "등록된 외부 명령을 정리 중입니다. 종료 후 다시 실행하세요. / An owned command is still finishing.": "An owned command is still finishing.",
@@ -4479,7 +4480,8 @@ async function loadResult(id) {
   );
   warnings($("result-issues"), [
     ...(summary.issues || []),
-    ...(summary.warnings || []).map(message => "실행 당시 기록 경고: " + message),
+    ...[...new Set((summary.warnings || []).map(String))].map(message =>
+      I18N.concat([I18N.term("실행 당시 기록 경고: "), I18N.term(message)])),
   ]);
   I18N.text($("result-provenance"), JSON.stringify(provenance || {}, null, 2));
   if (provenance?.status === "unavailable") notice(provenance.issue, true);
