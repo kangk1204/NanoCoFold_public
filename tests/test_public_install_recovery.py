@@ -45,6 +45,18 @@ def installed(tmp_path, monkeypatch):
     return repo, owner, marker, protected
 
 
+def test_start_keeps_workspace_options_environment_and_existing_results(installed):
+    repo, owner, _, protected = installed
+    def child(argv, **kwargs):
+        assert argv == [str(owner / ".venv-dev/bin/nanocofold"), "serve", "--workspace", str(owner),
+                        "--no-browser", "--port", "18765"]
+        assert kwargs["env"]["NANOCOFOLD_ROOT"] == str(owner)
+        assert len(kwargs["pass_fds"]) == 1
+        return 7
+    assert start(repo, ["--no-browser", "--port", "18765"], call=child) == 7
+    assert {p: p.read_bytes() for p in protected} == protected
+
+
 @pytest.mark.parametrize("interrupted", [False, True])
 def test_failed_reinstall_blocks_start_and_runtime_until_explicit_retry(installed, monkeypatch, interrupted):
     repo, owner, marker, protected = installed

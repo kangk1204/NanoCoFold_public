@@ -202,6 +202,9 @@ def _validate(cfg: dict, *, historical: bool = False) -> None:
     _validate_scalar_shapes(cfg, historical=historical)
     if not historical:
         developability_patterns(cfg)
+        screen_engine = cfg_get(cfg, "screen.engine")
+        if not isinstance(screen_engine, str) or screen_engine not in {"chai1", "boltz2", "colabfold", "opendde"}:
+            raise ValueError("screen.engine은 chai1, boltz2, colabfold, opendde 중 하나여야 합니다.")
         # Keep supported aliases/case handling and deliberately unset template
         # values. Historical reports retain their original metadata verbatim.
         for dotted, allowed, message in (

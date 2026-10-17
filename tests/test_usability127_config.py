@@ -16,16 +16,20 @@ from nanocofold.utils import seq
 @pytest.mark.parametrize("setting,value", [
     ("structure.provider", "alphafold9"), ("report.viewer", "notaviewer"), ("expression.host", "insect"),
     ("structure.provider", ""), ("report.viewer", ""), ("expression.host", ""),
+    *[("screen.engine", value) for value in ("bogus2", "", "BOLTZ2", "boltz", None, 12, [], {})],
 ])
 def test_current_unknown_enum_fails_at_config_load(setting, value):
+    cfg = config.load_config()
+    config.cfg_set(cfg, setting, value)
     with pytest.raises(ValueError, match=setting.replace(".", r"\.")):
-        config.load_config(overrides=[setting + "=" + yaml.safe_dump(value).splitlines()[0]])
+        config._validate(cfg)
 
 
 @pytest.mark.parametrize("setting,value", [
     *[("structure.provider", value) for value in ("boltz2", "boltz", "chai1", "none", "sequence", "mock", "BOLTZ2", "NONE", None)],
     *[("report.viewer", value) for value in ("3dmol", "none", "3DMOL", "NONE", None)],
     *[("expression.host", value) for value in ("ecoli_periplasmic", "mammalian", "MAMMALIAN", " mammalian ", None)],
+    *[("screen.engine", value) for value in ("chai1", "boltz2", "colabfold", "opendde")],
 ])
 def test_supported_alias_case_and_unset_template_values_are_preserved(setting, value):
     cfg = config.load_config()
@@ -37,7 +41,7 @@ def test_supported_alias_case_and_unset_template_values_are_preserved(setting, v
     assert cfg["score"]["thresholds"] == original_thresholds and cfg["rank"] == original_rank
 
 
-@pytest.mark.parametrize("setting,value", [("structure.provider", "historical_provider"), ("report.viewer", "historical_viewer"), ("expression.host", "insect")])
+@pytest.mark.parametrize("setting,value", [("structure.provider", "historical_provider"), ("report.viewer", "historical_viewer"), ("expression.host", "insect"), ("screen.engine", "historical_engine")])
 def test_historical_metadata_remains_readable_without_rewriting(setting, value, tmp_path):
     path = tmp_path / "run_config.yaml"
     source = config.load_config()

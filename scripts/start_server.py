@@ -8,12 +8,27 @@ import sys
 from install_runtime import ROOT, lock, require_complete_core
 
 
-def start(root=ROOT, arguments=None, *, call=subprocess.call):
-    receipt = json.loads((root / ".nanocofold/install-location.json").read_text())
+def installation_location(root):
+    try:
+        receipt = json.loads((root / ".nanocofold/install-location.json").read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raise ValueError("설치가 필요합니다. 먼저 bash install.sh를 실행하세요. / First run bash install.sh, then start again.") from None
+    except (OSError, ValueError, UnicodeError):
+        raise ValueError("설치 기록을 읽을 수 없습니다. bash install.sh를 다시 실행하세요. / Cannot read the installation record. Rerun bash install.sh.") from None
+    if (not isinstance(receipt, dict) or not isinstance(receipt.get("workspace"), str)
+            or not receipt["workspace"].strip()
+            or not isinstance(receipt.get("uv_path", ""), (str, type(None)))
+            or not isinstance(receipt.get("gpu", ""), (str, type(None)))):
+        raise ValueError("설치 기록을 확인할 수 없습니다. bash install.sh를 다시 실행하세요. / Invalid installation record. Rerun bash install.sh.")
     workspace = Path(receipt["workspace"])
+    if not workspace.is_absolute() or not (workspace / ".venv-dev/bin/nanocofold").is_file():
+        raise ValueError("설치된 프로그램을 찾을 수 없습니다. bash install.sh를 다시 실행하세요. / Cannot find the installed program. Rerun bash install.sh.")
+    return receipt, workspace
+
+
+def start(root=ROOT, arguments=None, *, call=subprocess.call):
+    receipt, workspace = installation_location(root)
     binary = workspace / ".venv-dev/bin/nanocofold"
-    if not workspace.is_absolute() or not binary.is_file():
-        raise ValueError("설치 위치를 확인하지 못했습니다.")
     # Hold before the child imports the installed package, until the server exits.
     with lock(workspace / ".platform/public-install.lock", shared=True) as descriptor:
         require_complete_core(workspace)

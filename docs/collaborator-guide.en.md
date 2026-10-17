@@ -95,6 +95,8 @@ After the public example, choose your research purpose and enter your own amino 
 
 ## 5. Open and share ZIP files
 
+GitHub's **Download ZIP** contains the source for installation. The sample ZIPs below are provided separately. `START_HERE.html` is included in the combined sample ZIP and the complex sample ZIP.
+
 **Extract the entire ZIP**, then open the following file in the extracted folder:
 
 | File received | How to open it |

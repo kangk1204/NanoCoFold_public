@@ -95,6 +95,8 @@ ssh -o ExitOnForwardFailure=yes -L 18765:127.0.0.1:18765 USER@SERVER
 
 ## 5. ZIP 열기와 결과 전달
 
+GitHub의 **Download ZIP**은 설치용 소스입니다. 아래의 샘플 ZIP은 별도로 전달하며, `START_HERE.html`은 통합 샘플 ZIP과 complex 샘플 ZIP에 들어 있습니다.
+
 받은 ZIP **전체를 압축 해제**한 뒤, 생성된 폴더에서 아래 파일을 엽니다.
 
 | 받은 파일 | 여는 방법 |
