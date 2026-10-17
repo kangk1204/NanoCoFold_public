@@ -546,7 +546,8 @@ def _validate_scalar_shapes(cfg, *, historical=False):
     defaults.setdefault("complex", {key: None for key in (
         "proteins", "engine", "comparison_engines", "seeds", "recycles", "diffusion_steps",
         "models_per_seed", "msa", "restraints", "primary_pair", "reference_symmetry",
-        "msa_source", "allow_public_msa_server", "anchor_chain", "interest_positions", "reference_path")})
+        "msa_source", "allow_public_msa_server", "anchor_chain", "interest_positions", "reference_path",
+        "reference_model_selection")})
     extensions = {"name", "id", "metadata", "case_id", "source", "reference", "api_msa_consent",
                   "input_review", "hotspots.auto.exclude_positions", "complex.metadata", "specificity.metadata"}
     def unknown(default, current, prefix=""):

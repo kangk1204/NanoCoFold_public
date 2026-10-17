@@ -593,8 +593,6 @@ def iptm_availability_warnings(cfg: dict, *, target_chain_count: int | None = No
     engines = [str(cfg_get(cfg, "screen.engine", "colabfold")).lower()]
     if cfg_get(cfg, "screen.comparison.enabled", False):
         engines = [str(engine).lower() for engine in (cfg_get(cfg, "screen.comparison.engines", []) or [])]
-    if cfg_get(cfg, "screen.cascade.enabled", False):
-        engines.append(str(cfg_get(cfg, "screen.cascade.first_engine", "colabfold")).lower())
     if "colabfold" not in engines:
         return []
     return ["ColabFold의 3체인 이상 예측은 native 표적–VHH 쌍 ipTM을 제공하지 않습니다. "

@@ -13,7 +13,7 @@ def to_native(obj: Any) -> Any:
     if isinstance(obj, (list, tuple, set)):
         return [to_native(value) for value in obj]
     if isinstance(obj, np.ndarray):
-        return obj.tolist()
+        return to_native(obj.tolist())
     if isinstance(obj, np.integer):
         return int(obj)
     if isinstance(obj, np.floating):
