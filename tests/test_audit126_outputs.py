@@ -157,7 +157,14 @@ def test_real_report_display_utc_units_and_source_preservation(tmp_path):
     before = rows.copy(deep=True)
     path = report.generate_report(tmp_path / "absent-source", options, {}, scored=rows, out_path=tmp_path / "report.html")
     text = path.read_text()
-    assert "72.96000000000001" not in text and "0.30000000000000004" not in text
+    # Display is concise while an inert attribute retains exact recorded
+    # precision for inspection. Do not confuse HTML source with visible text.
+    from test_bilingual_report import ReportText
+    visible = ReportText(text)
+    assert "72.96000000000001" not in visible.cells and "0.30000000000000004" not in visible.cells
+    assert "72.96" in visible.cells and "0.3" in visible.cells
+    assert 'data-recorded-value="72.96000000000001"' in text
+    assert 'data-recorded-value="0.30000000000000004"' in text
     assert re.search(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", text)
     assert "계면 PAE (Å)" in text
     assert dict(report.HOTSPOT_COLUMNS)["dist_to_glycan"] == "글리칸 거리 (Å)"

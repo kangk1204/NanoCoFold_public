@@ -422,6 +422,15 @@ def _report_i18n_runtime(document: str) -> str:
     captions = Captions()
     captions.feed(document)
     captions.values.update(match[1] for match in re.findall(r"I18N\.term\(([\"'])(.*?)\1\)", document))
+    # The translator composes this one authored warning from diagnostic
+    # clauses. Select its clause keys as well as the whole message, matching
+    # the runtime's sentence boundary exactly. Never split arbitrary captions,
+    # original IDs, settings JSON, notes or unmarked preformatted records.
+    ranking_clauses = set()
+    for value in captions.values:
+        if re.match(r"^종합점수·기록 순위 보류 \d+/\d+개 모델\.(?:\s|$)", value):
+            ranking_clauses.update(re.split(r"(?<=\.)\s+", value))
+    captions.values.update(ranking_clauses)
     source = (TEMPLATE_DIR / "platform-i18n.js").read_text(encoding="utf-8")
     pattern = r"const NCF_TRANSLATIONS = Object.freeze\((\{[\s\S]*?\})\);"
     catalog_match = re.search(pattern, source)
