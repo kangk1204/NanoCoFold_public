@@ -168,6 +168,21 @@ def reject_active_jobs(workspace):
         connection.close()
 
 
+def require_complete_core(workspace):
+    """Do not start an old location receipt after a failed in-place reinstall."""
+    marker = workspace / ".platform/public-core-install.json"
+    if not marker.exists() and not marker.is_symlink():
+        return  # Preserve older installations without a managed-core marker.
+    try:
+        record = json.loads(marker.read_text())
+    except (OSError, ValueError) as error:
+        raise ValueError("관리 설치 기록을 확인할 수 없습니다. 원래 bash install.sh 명령을 다시 실행하세요. / Cannot verify installation; rerun the original bash install.sh command.") from error
+    if (not isinstance(record, dict) or record.get("workspace") != str(workspace)
+            or record.get("python") != str(workspace / ".venv-dev/bin/python")
+            or record.get("status") != "complete"):
+        raise ValueError("설치가 완료되지 않았거나 설치 위치가 다릅니다. 원래 bash install.sh 명령을 다시 실행하세요. / Installation is incomplete or its identity differs; rerun the original bash install.sh command.")
+
+
 def stop_owned_installer(process, grace_seconds):
     """Stop only our unreaped session, keeping its PID reserved until cleanup."""
     if process.returncode is not None:
@@ -248,7 +263,8 @@ def install(args):
         raise ValueError("심볼릭 링크 core 환경은 변경하지 않습니다. 별도 workspace를 사용하세요.")
     environment = {**os.environ, "PYTHONUNBUFFERED": "1", "NANOCOFOLD_ROOT": str(workspace)}
     with contextlib.ExitStack() as stack:
-        stack.enter_context(lock(workspace / ".platform/public-install.lock"))
+        installation = stack.enter_context(lock(workspace / ".platform/public-install.lock"))
+        environment["NANOCOFOLD_INSTALL_LOCK_FD"] = str(installation)
         reject_active_jobs(workspace)
         core_marker = workspace / ".platform/public-core-install.json"
         core_python = workspace / ".venv-dev/bin/python"
@@ -256,14 +272,16 @@ def install(args):
             marker = json.loads(core_marker.read_text()) if core_marker.is_file() else {}
             if marker.get("workspace") != str(workspace) or marker.get("python") != str(core_python):
                 raise ValueError("이 설치기가 관리하지 않는 기존 core 환경을 변경하지 않습니다. 새 workspace를 지정하세요.")
-        descriptors = ()
+        # Package children keep exclusion even if this wrapper is terminated.
+        # init/setup validate this handoff rather than deadlocking on a new flock.
+        descriptors = (installation,)
         if gpu:
             lock_root = Path(os.environ.get("NANOCOFOLD_GPU_LOCK_DIR", str(Path.home() / ".cache/nanocofold")))
             if not lock_root.is_absolute():
                 raise ValueError("NANOCOFOLD_GPU_LOCK_DIR는 절대 경로여야 합니다.")
             descriptor = stack.enter_context(lock(lock_root / ("gpu-" + gpu["uuid"] + ".lock")))
             environment.update(CUDA_VISIBLE_DEVICES=gpu["uuid"], NANOCOFOLD_GPU=gpu["uuid"], NANOCOFOLD_GPU_LOCK_FD=str(descriptor))
-            descriptors = (descriptor,)
+            descriptors += (descriptor,)
         attempt = workspace / ".platform/install-attempts" / (datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ") + ".json")
         receipt = {"schema_version": 1, "started_utc": now(), "status": "installing", "workspace": str(workspace), "profile": args.profile, "gpu": gpu}
         save(attempt, receipt)

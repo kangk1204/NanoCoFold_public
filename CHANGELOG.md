@@ -5,6 +5,10 @@
 
 ## 0.4.8rc9 — 2026-10-17
 
+Specificity campaigns apply the declared maturation library strategy, variant bounds and design engine selection. Managed core installation recovery and CLI/update exclusion protect existing work. The Site's selected-model PAE export includes verified numerical values, and legacy report scope captions follow the selected candidate. Final tests and deployment acceptance are recorded separately; historical results are preserved.
+
+특이성 캠페인의 변이 생성 전략·상한·설계 엔진 선택, 관리 core 설치 복구와 CLI 실행 중 업데이트 차단을 보완했습니다. Site의 선택 모델 PAE 다운로드는 검증된 전체 수치를 포함하며, 기존 보고서의 범위 라벨은 선택 후보를 따릅니다. 최종 검사·운영 배포 확인은 별도 영수증으로 구분하고 기존 결과는 보존합니다.
+
 Mobile account/sign-out remains accessible; disconnected status and the 320px step rail fit small screens. Comparison errors, engine labels/colors and empty-state guidance follow the selected language. Chart summaries and raw-data alternatives improve access. Original identifiers, sequences, scores and selection gates are preserved.
 
 Fresh explicit CLI run directories record their computation version under the run lock. Existing results are never relabelled with a newer computation version. The whole-target residue property table is labelled accurately, folded by default and linked to the full CSV. Receipts distinguish recorded PAE metric precision from composite-score precision.

@@ -266,11 +266,13 @@ def test_gpu_lock_fd_is_passed_to_setup_without_reopening(mock_install, monkeypa
     original = bootstrap.subprocess.run
     identities = []
     def run(argv, **kwargs):
+        import os
         environment = kwargs["env"]
         descriptor = int(environment["NANOCOFOLD_GPU_LOCK_FD"])
-        assert kwargs["pass_fds"] == (descriptor,)
+        installation = int(environment["NANOCOFOLD_INSTALL_LOCK_FD"])
+        assert kwargs["pass_fds"] == (installation, descriptor)
+        assert os.fstat(installation).st_ino == (args.workspace / ".platform/public-install.lock").stat().st_ino
         assert environment["CUDA_VISIBLE_DEVICES"] == GPU
-        import os
         info = os.fstat(descriptor)
         identities.append((info.st_dev, info.st_ino))
         with pytest.raises(ValueError, match="다른 설치"):

@@ -14,7 +14,10 @@ import threading
 
 
 def main():
-    lifeline, status, request, gpu = map(int, sys.argv[1:])
+    lifeline, status, request, *reservations = map(int, sys.argv[1:])
+    # The old single GPU descriptor (including -1) remains valid. Additional
+    # descriptors carry installed-core reservations without replacing the GPU.
+    reservations = tuple(dict.fromkeys(fd for fd in reservations if fd >= 0))
     # EOF before acknowledgement means the owner died before authorizing work.
     if os.read(lifeline, 1) != b"G":
         return
@@ -42,7 +45,7 @@ def main():
             payload = json.load(handle)
         try:
             child = subprocess.Popen(payload["argv"], env=payload["env"],
-                                     close_fds=True, pass_fds=(gpu,) if gpu >= 0 else ())
+                                     close_fds=True, pass_fds=reservations)
         except OSError as exc:
             result = {"errno": exc.errno, "strerror": exc.strerror}
         else:

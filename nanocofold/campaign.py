@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import design_rfantibody, developability, handoff, mature, rank_select, report, screen, specificity
+from . import design_routing, developability, handoff, mature, rank_select, report, screen, specificity
 from .config import PROJECT_ROOT, cfg_get, dump_resolved, resolve_path
 from .utils import msa, seq, shell
 from .utils.misc import to_native
@@ -121,7 +121,7 @@ def _candidate_library(cfg: dict, run_dir: Path, target: dict) -> pd.DataFrame:
         generation_cfg = copy.deepcopy(cfg)
         generation_cfg["design"]["num_designs"] = min(int(cfg_get(cfg, "design.num_designs", 128)), 128)
         generation_cfg["design"]["mpnn"]["seqs_per_struct"] = min(int(cfg_get(cfg, "design.mpnn.seqs_per_struct", 2)), 2)
-        candidates = design_rfantibody.run_design(generation_cfg, run_dir, target, mock=mock)["candidates"]
+        candidates = design_routing.run_design(generation_cfg, run_dir, target, mock=mock)["candidates"]
     elif mode == "mature":
         wt = mature.resolve_wt_sequence(cfg)
         if cfg_get(cfg, "mature.cdr.source") == "config":
@@ -132,15 +132,18 @@ def _candidate_library(cfg: dict, run_dir: Path, target: dict) -> pd.DataFrame:
             cdr = {}
         if not developability.sequence_liabilities(wt, cfg, cdr)["dev_cdr_evaluated"]:
             raise ValueError("WT CDR1/2/3 확인이 필요합니다. 자동 주석 실패를 임의 범위로 대체하지 않습니다.")
-        lib = mature.generate_dms_library(wt, cdr, exclude_cys=bool(cfg_get(cfg, "mature.exclude.cys_substitution", True)),
-                                         protect_wt_cys=bool(cfg_get(cfg, "mature.exclude.wt_cys", True)))
+        lib = mature.generate_library(wt, cdr, cfg)
         pre_cfg = copy.deepcopy(cfg)
         pre_cfg["rank"]["include_wt_control"] = True
         candidates, _ = mature.run_prefilter(lib, wt, pre_cfg, run_dir / "02_mature", mock=mock)
         candidates = candidates.rename(columns={"variant_id": "design_id"})
     else:
         raise ValueError(mode)
-    candidates = candidates[[c for c in ("design_id", "sequence", "source", "mutation", "esm_llr") if c in candidates]].copy()
+    # Generation provenance must survive the campaign's sequence-only prediction
+    # boundary; it is independent of the later specificity prediction engine.
+    candidates = candidates[[c for c in ("design_id", "sequence", "source", "parent_engine", "initial_design_id",
+                                         "mutation", "mutation_count", "mutation_positions", "library_strategy",
+                                         "library_seed", "esm_llr") if c in candidates]].copy()
     if candidates.empty:
         return pd.DataFrame(columns=["design_id", "sequence", "source", "sequence_sha256", "cdr3", "dev_cdr_evaluated", "dev_severe"])
     candidates["sequence"] = candidates.sequence.map(seq.clean_sequence)

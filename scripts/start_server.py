@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-from install_runtime import ROOT, lock
+from install_runtime import ROOT, lock, require_complete_core
 
 
 def start(root=ROOT, arguments=None, *, call=subprocess.call):
@@ -16,6 +16,7 @@ def start(root=ROOT, arguments=None, *, call=subprocess.call):
         raise ValueError("설치 위치를 확인하지 못했습니다.")
     # Hold before the child imports the installed package, until the server exits.
     with lock(workspace / ".platform/public-install.lock", shared=True) as descriptor:
+        require_complete_core(workspace)
         try:
             state = json.loads((workspace / ".platform/core-update-state.json").read_text())
         except FileNotFoundError:

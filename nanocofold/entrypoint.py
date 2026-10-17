@@ -9,6 +9,21 @@ from .console_progress import ConsoleProgress
 
 
 def main(argv=None):
+    args = list(sys.argv[1:] if argv is None else argv)
+    if args == ["--version"]:
+        return _main(args)
+    from .platform.maintenance import installed_core_lease
+    try:
+        # Reserve the installed interpreter before importing analysis modules or
+        # selecting a different input/output workspace.
+        with installed_core_lease(args[0] if args else None):
+            return _main(args)
+    except (OSError, ValueError) as error:
+        print("[오류] " + str(error), file=sys.stderr)
+        return 1
+
+
+def _main(argv=None):
     # Python normally buffers when a user pipes the CLI into tee or a log file.
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):

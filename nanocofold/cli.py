@@ -174,12 +174,17 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     from .utils.shell import cancellation_signals
+    from .platform.maintenance import installed_core_lease
+    arguments = list(sys.argv[1:] if argv is None else argv)
     try:
-        with cancellation_signals():
-            return _main(argv)
+        with installed_core_lease(arguments[0] if arguments else None), cancellation_signals():
+            return _main(arguments)
     except KeyboardInterrupt:
         print("[취소] 사용자 요청으로 실행을 중단했습니다.", file=sys.stderr)
         return 130
+    except (OSError, ValueError) as error:
+        print("[오류] " + str(error), file=sys.stderr)
+        return 1
 
 
 def _main(argv: list[str] | None = None) -> int:

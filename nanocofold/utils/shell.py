@@ -110,7 +110,7 @@ def _command_process(argv, *, cwd, env, stdin, output, inherited, cancellation, 
             helper = Path(__file__).with_name("process_guard.py")
             process = subprocess.Popen(
                 [sys.executable, "-I", str(helper), str(lifeline_read), str(status_write),
-                 str(request.fileno()), str(inherited[0] if inherited else -1)],
+                 str(request.fileno()), *(str(descriptor) for descriptor in inherited)],
                 cwd=cwd, env=env, stdin=stdin, stdout=output, stderr=subprocess.STDOUT,
                 start_new_session=True, pass_fds=(*inherited, lifeline_read, status_write, request.fileno()))
             os.close(lifeline_read)
@@ -193,6 +193,15 @@ def _budgeted_process(argv, *, cwd, env, timeout, stdin_text: str | None = None,
         descriptor = int(gpu_descriptor)
         os.fstat(descriptor)
         inherited = (descriptor,)
+    from ..platform.maintenance import CORE_LEASE_ENV, core_lease_handoffs
+    leases = core_lease_handoffs()
+    if leases:
+        # The active interpreter owns these capabilities, independently of
+        # custom tool environments. Children retain the reservation after a
+        # forced parent death; process-local ContextVars avoid thread races.
+        env = dict(os.environ) if env is None else dict(env)
+        env[CORE_LEASE_ENV] = json.dumps(leases, separators=(",", ":"))
+        inherited = tuple(dict.fromkeys((*inherited, *(item[0] for item in leases))))
     with tempfile.TemporaryFile(mode="w+b") as captured, tempfile.TemporaryFile(mode="w+b") as stdin:
         output = output_handle if output_handle is not None else captured
         if stdin_text is not None:
