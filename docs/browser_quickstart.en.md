@@ -100,13 +100,28 @@ Choose either a structure file or a PDB ID; use **Change input method** to switc
 
 In results, select a candidate to inspect its structure. Use **Show detailed metric columns** when needed. **Save selected display coordinates** saves the displayed coordinates; **Download original engine coordinates** is available only when the original is preserved and matches its recorded hash. Preparation/preselection records are not counted as failed prediction models. Unevaluated is not zero, and low confidence is different from execution failure. The full original ZIP includes server paths/logs and is intended for personal archiving; share the report ZIP with collaborators.
 
+## Read the report in six steps
+
+| Section | What to check |
+|---|---|
+| 01 Inputs & settings | Are these the sequences and conditions you intended? |
+| 02 Candidate & model counts | Separate completed, failed and unevaluated models. General complexes have no VHH eligibility filter. |
+| 03 Compare candidates | Select a candidate/model and its prediction engine; read its recorded scores. |
+| 04 Excluded / unevaluated | If selection is zero, distinguish assessed candidates excluded by criteria from candidates that could not be assessed. Neither means a measured absence of binding. |
+| 05 Structure & PAE | Inspect the selected model's structure and residue-placement uncertainty together. |
+| 06 Provenance & artifacts | Check recorded conditions and save the appropriate report/data files. |
+
+Section links move within the report. Browser **Back / Forward** returns to an earlier section or view; it does not submit, cancel or restart analysis. Keep the same selected candidate when comparing languages.
+
+The steps above use the locally installed application's labels. An administrator-hosted Site can instead show **Jobs**, **Reports and provenance**, **Offline HTML**, and **Resume verified stages**. Use **Offline HTML** for the current-language report presentation. A disabled resume control can mean that the old compute agent lacks safe-resume support; read its reason and contact the administrator rather than submitting a duplicate.
+
 ## Saved files and offline reports
 
 Use the workspace shown in the browser. Each analysis is saved under `<workspace>/runs/<job_id>/`; the job identifier is in **Jobs & logs**. When report publication succeeds, start with `report.html` in that run folder. If it links to a `report_explorer-<hash>.html` file, keep that file beside the entry page. Older reports can use `report_explorer.html`. Keep the whole report folder or ZIP together; do not rename or delete a linked explorer.
 
 The detailed worker log is `<workspace>/.nanocofold/jobs/<job_id>/worker.log`, beside the submitted `config.yaml` snapshot. The run folder preserves `run_config.yaml`, `run_state.json` and available engine outputs. An interrupted run can contain partial results; an existing HTML file alone does not prove that the current analysis completed. Read its status and counts.
 
-Use **Language → English / 한국어** in the browser and in newly exported interactive reports. The two languages navigate the same candidates and recorded values. IDs, sequences, coordinates, numeric data, source settings and original execution logs stay as recorded. Existing HTML snapshots keep their original renderer; export a new report to use updated language support.
+Use **Language → English / 한국어** in the browser and in newly exported interactive reports. The two languages navigate the same candidates and recorded values. IDs, sequences, coordinates, numeric data, source settings and original execution logs stay as recorded. Previously saved HTML and report ZIPs keep the renderer and language support they were created with. Downloading a historical ZIP again does not convert it to the current interface. Use the current report viewer/export offered by the application for a current-language presentation; keep the historical archive and scientific records unchanged.
 
 ## Follow jobs, cancel and resume
 

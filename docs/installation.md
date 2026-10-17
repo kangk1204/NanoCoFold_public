@@ -100,11 +100,25 @@ v0.4.2 이하에서는 `nvidia-smi`가 표준 출력에 쓴 오류가 가려져 
 
 ## 새 릴리스로 업데이트
 
-진행 중인 분석을 모두 끝내고 웹 서버를 종료합니다. 새 릴리스 ZIP을 **새 폴더**에 압축 해제한 뒤 필요한 프로필을 위와 같은 순서로 설치해 새 작업 공간을 준비하는 방법을 권합니다. 모든 기능의 환경을 원하면 `bash install.sh --profile all`을 사용합니다. 이전 소스 폴더·작업 공간·분석 원본은 보관하세요. [업데이트 안내](UPGRADING.md)를 따릅니다.
+**같은 설치본의 앱만 갱신할 때**는 모든 대기·실행 작업이 끝난 뒤 서버 터미널에서 Ctrl+C로 웹 서버를 종료합니다. 원래 설치한 소스 폴더에서 다음 명령을 실행합니다.
 
-기존 작업 공간의 제자리 갱신은 관리자 옵션입니다. 이 공개 설치기가 만든 `.platform/public-core-install.json` 소유 기록이 있고, 모든 작업과 웹 서버를 종료한 경우에만 `--workspace /기존/절대/경로`로 지정하세요. 대기/실행 중 작업이 확인되면 환경 갱신을 거부합니다. 기존 웹 서버의 실행 여부까지 자동 감지하지는 않으므로 먼저 직접 종료해야 합니다. 다른 설치기가 만든 환경은 자동으로 변경하지 않습니다.
+```bash
+git pull --ff-only
+bash update.sh
+bash start.sh --port 18765
+```
 
-릴리스 태그와 `CHANGELOG.md`를 함께 기록하세요. 이미 생성한 구조·PAE가 새 버전으로 자동 재예측되지는 않습니다. 점수 정책이 바뀌는 릴리스는 변경 기록의 재채점 안내를 따릅니다. 이전 릴리스로 돌릴 때에는 기존 환경을 강제로 덮지 말고 별도 작업 공간을 설치하세요.
+`git pull`은 Git clone 설치에만 사용합니다. ZIP 설치는 기존 소스 변경을 먼저 보존하고 최신 소스 파일을 원래 소스 폴더에 반영한 뒤 마지막 두 명령을 실행합니다. 설치 위치 기록과 작업 공간이 있는 `.nanocofold/`를 덮어쓰거나 삭제하지 마세요. 파일을 옮길 때 기존 입력·결과도 그대로 둡니다.
+
+`update.sh`는 저장된 작업 공간과 GPU 선택을 재사용하고 프로그램만 갱신합니다. 예측·환경 확인 작업이나 GPU 엔진 재설치를 시작하지 않습니다. 실행 중인 웹 서버·작업이 있으면 갱신을 거부합니다. 실패·중단 후에는 같은 `bash update.sh`로 다시 시도하며, 완료 전 `start.sh`는 시작을 차단합니다. 프로그램 재시작 뒤 브라우저를 새로고침합니다.
+
+설치본 버전은 기본 설치에서 `.nanocofold/workspace/.venv-dev/bin/nanocofold --version`으로 확인합니다. 별도 작업 공간이면 `.nanocofold/install-location.json`의 `workspace` 경로를 사용하세요. 소스 폴더의 `python -m nanocofold --version`은 체크아웃 버전이므로 설치본 확인으로 사용하지 않습니다.
+
+**Update the existing application:** finish queued/running jobs, stop its web server, then run the three commands above in the original source folder. ZIP users replace only source files after preserving local changes, keep `.nanocofold/` and all inputs/results, and run the last two commands. `update.sh` reuses the saved workspace/GPU and does not launch predictions or reinstall engines. Retry it after an interruption; startup remains blocked until it completes. Check the installed console executable, rather than `python -m` from the source folder. See [bilingual update instructions](UPGRADING.md).
+
+새 폴더에 새 작업 공간을 설치하는 방법은 **별도 설치가 필요할 때의 선택 사항**입니다. 이전 폴더·작업 공간·원본 결과를 보존하며, 새 작업 공간에서는 이전 작업 목록이 자동으로 보이지 않습니다. 이전 결과만 읽으려면 원본 작업 공간이나 내보낸 전체 보고서 ZIP을 사용하세요. 엔진·모델까지 설치를 바꾸려면 해당 릴리스의 프로필 설치 안내를 별도로 따릅니다.
+
+릴리스 태그와 `CHANGELOG.md`를 함께 기록하세요. 기존 구조·PAE는 자동으로 재예측되지 않습니다. 점수 정책이 바뀌는 릴리스는 변경 기록의 재채점 안내를 따릅니다. 이전 릴리스로 돌아갈 때는 기존 환경을 강제로 덮지 말고 별도 작업 공간을 사용합니다.
 
 ## 설치 범위와 검증 범위
 

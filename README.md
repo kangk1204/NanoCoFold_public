@@ -8,6 +8,12 @@ Predict protein complexes, design new nanobodies, and compare existing candidate
 
 **First time? Use the public example below.** It fills in the sequences and small-run settings for you. Leave advanced settings unchanged.
 
+| Your computer | Use NanoCoFold this way |
+|---|---|
+| Ubuntu x86_64 with NVIDIA GPU | Install and compute here, after checking the requirements below. |
+| Windows or macOS | Open the address of an installed server in your browser, or read an extracted report ZIP. These instructions do not install GPU engines natively on these systems. |
+| Windows with WSL | WSL GPU installation is not certified by this validation record. Use a validated Ubuntu server, or have an administrator validate the exact WSL/GPU/driver setup first. |
+
 | What do you want to do? | Start here |
 |---|---|
 | Install on a new Ubuntu GPU computer | [1. Prepare and install](#1-prepare-and-install) |
@@ -23,6 +29,8 @@ Predict protein complexes, design new nanobodies, and compare existing candidate
 ## 1. Prepare and install
 
 The compute host needs **Ubuntu x86_64**, glibc 2.34 or later, an NVIDIA GPU, and driver 580 or later. `nvidia-smi` must show the GPU correctly. For the four-engine example below, prepare at least 16 GB GPU memory, 32 GB RAM, and 150 GiB of free SSD space. Longer proteins and larger libraries may need more resources. Internet access and `sudo` are also required. Ask your server administrator to check these requirements if needed. The GPU model name alone does not establish enough memory for every engine.
+
+**RTX 3060 or another smaller GPU?** Check its actual GPU memory in `nvidia-smi`; the model name is not enough. If it has less than the 16 GB reference above, do not follow the four-engine example unchanged. Use a validated Ubuntu server or ask your administrator which engines and input sizes have been tested on that GPU. Select only those engines, check the revised planned-model count, and perform the matching environment check. Passing the check confirms prerequisites; it does not guarantee that a prediction will fit in memory.
 
 You do not need to install Python packages, the CUDA Toolkit, Conda, or Docker separately. The installer prepares isolated Python environments, engines, and models. It does not change the NVIDIA driver.
 
@@ -103,6 +111,12 @@ ssh -o ExitOnForwardFailure=yes -L 18765:127.0.0.1:18765 USER@SERVER
 
 Keep both terminals open. If the SSH command reports an occupied local port, it has not connected NanoCoFold; do not open that occupied address. For example, forward local 18766 to server 18765 and open `http://127.0.0.1:18766`. If the server printed a different port, use that server port on the right of `-L`. Then open the forwarded address in your PC browser. Inputs and results are viewed on the PC; computation uses the GPU of the Ubuntu server where you installed NanoCoFold. The public installer normally stores the workspace in `.nanocofold/workspace` under the source folder; `--workspace` can choose another location. `start.sh` reuses the saved installation location.
 
+If the local port is occupied, this example uses another local port. Run it and open **http://127.0.0.1:18766**. If NanoCoFold printed a different server port, replace the last `18765` with that number.
+
+```bash
+ssh -o ExitOnForwardFailure=yes -L 18766:127.0.0.1:18765 USER@SERVER
+```
+
 </details>
 
 <details>
@@ -118,29 +132,32 @@ bash update.sh
 bash start.sh --port 18765
 ```
 
-This updates the installed application while preserving the saved workspace, GPU selection, models, inputs and results. It does not run predictions or reinstall GPU engines. Reload the browser afterward. `git pull` alone does not update the installed application. For a source ZIP, use its complete updated contents in the original source folder, then run the last two commands. Existing exported HTML reports keep their captured appearance; export a new report to use the updated layout.
+This updates the installed application while preserving the saved workspace, GPU selection, models, inputs and results. It does not run predictions or reinstall GPU engines. Reload the browser afterward. `git pull` alone does not update the installed application. For a source ZIP, preserve local source changes, copy the updated source files into the original source folder, and run the last two commands. Keep `.nanocofold/` (the installation record and default workspace), inputs and results unchanged. Existing exported HTML reports keep their captured appearance; export a new report to use the updated layout.
 
 If the update fails or is interrupted, run `bash update.sh` again. Starting the application is blocked until the update finishes successfully. An open web server or active job also blocks the update; close the server after its jobs finish, then retry.
-
-If the local port is occupied, this example uses another local port. Run it and open **http://127.0.0.1:18766**. If NanoCoFold printed a different server port, replace the last `18765` with that number.
-
-```bash
-ssh -o ExitOnForwardFailure=yes -L 18766:127.0.0.1:18765 USER@SERVER
-```
 
 </details>
 
 <details>
-<summary>Updating a source checkout or checking which version starts</summary>
+<summary>Check the installed version (source development is different)</summary>
 
-An older installed command can keep using its old wheel after `git pull`. In this source folder, activate the NanoCoFold environment and check the code that will run:
+`bash start.sh` starts the installed program in the saved workspace. In this source folder, check that same executable. For the default installation:
 
 ```bash
+.nanocofold/workspace/.venv-dev/bin/nanocofold --version
+```
+
+If you chose a custom workspace, replace `.nanocofold/workspace` with the `workspace` value in `.nanocofold/install-location.json`. If the installed version is old, finish all jobs, stop its web server, and follow **Update an existing installation** above using `bash update.sh`. Keep the workspace, models and results.
+
+**For source developers only:** from the source folder, activate the intended Python environment and run the following to inspect the checkout. These commands can report newer source while the installed application is still old; they do not verify what `start.sh` launches.
+
+```bash
+source .nanocofold/workspace/.venv-dev/bin/activate
 python -m nanocofold --version
 python -c "import nanocofold; print(nanocofold.__file__)"
 ```
 
-For source development, launch `python -m nanocofold serve --workspace . --port 18765` from this folder. It uses the current checkout. For a released installation, rerun the documented installer after updating the source. Keep the workspace and results; do not delete the environment to fix a version mismatch. If catalog/retention rejects a symbolic-link path, run `pwd -P` in the workspace and use that real path.
+Use your saved custom workspace path in the activation command when applicable. A developer launch with `python -m nanocofold serve --workspace . --port 18765` uses this checkout and a different workspace from the default public installation. If catalog/retention rejects a symbolic-link path, run `pwd -P` in the workspace and use that real path. Do not delete an environment to fix a version mismatch.
 
 </details>
 
@@ -270,6 +287,21 @@ Then read in this order: **status and counts → candidate/model row → scores,
 
 The **Full original ZIP · For local archiving** includes server paths and execution logs and is for personal recovery / archiving. Send collaborators the entire **Shareable report ZIP**. Recipients extract the whole ZIP and open **`report.html`**. Saved results can be read on macOS, Windows, or other PCs without a GPU or program installation. Newly generated interactive reports also include the English / Korean selector.
 
+### Read the report in six steps
+
+| Section | What to check |
+|---|---|
+| 01 Inputs & settings | Are these the sequences and conditions you intended? |
+| 02 Candidate & model counts | Separate completed, failed and unevaluated models. General complexes have no VHH eligibility filter. |
+| 03 Compare candidates | Select a candidate/model and its prediction engine; read its recorded scores. |
+| 04 Excluded / unevaluated | If selection is zero, distinguish assessed candidates excluded by criteria from candidates that could not be assessed. Neither means a measured absence of binding. |
+| 05 Structure & PAE | Inspect the selected model's structure and residue-placement uncertainty together. |
+| 06 Provenance & artifacts | Check recorded conditions and save the appropriate report/data files. |
+
+Section links move within the report. Browser **Back / Forward** returns to an earlier section or view; it does not submit, cancel or restart analysis. Keep the same selected candidate when comparing languages.
+
+The steps above use the locally installed application's labels. An administrator-hosted Site can instead show **Jobs**, **Reports and provenance**, **Offline HTML**, and **Resume verified stages**. Use **Offline HTML** for the current-language report presentation. A disabled resume control can mean that the old compute agent lacks safe-resume support; read its reason and contact the administrator rather than submitting a duplicate.
+
 <details>
 <summary>File locations, older reports and PyMOL (optional)</summary>
 
@@ -279,7 +311,7 @@ Use the workspace shown in the browser. Each analysis is saved under `<workspace
 
 The detailed worker log is `<workspace>/.nanocofold/jobs/<job_id>/worker.log`, beside the submitted `config.yaml` snapshot. The run folder preserves `run_config.yaml`, `run_state.json` and available engine outputs. An interrupted run can contain partial results; an existing HTML file alone does not prove that the current analysis completed. Read its status and counts.
 
-Use **Language → English / 한국어** in the browser and in newly exported interactive reports. The two languages navigate the same candidates and recorded values. IDs, sequences, coordinates, numeric data, source settings and original execution logs stay as recorded. Existing HTML snapshots keep their original renderer; export a new report to use updated language support.
+Use **Language → English / 한국어** in the browser and in newly exported interactive reports. The two languages navigate the same candidates and recorded values. IDs, sequences, coordinates, numeric data, source settings and original execution logs stay as recorded. Previously saved HTML and report ZIPs keep the renderer and language support they were created with. Downloading a historical ZIP again does not convert it to the current interface. Use the current report viewer/export offered by the application for a current-language presentation; keep the historical archive and scientific records unchanged.
 
 If PyMOL materials are provided, extract the **whole folder** and open `.pml` through PyMOL **File → Open**. Keep the relative folder layout of scripts and referenced coordinates. PyMOL materials are separate from the general report ZIP. See [viewing in PyMOL](docs/RESULTS.md#pymol에서-보기).
 
