@@ -251,15 +251,20 @@ class BatchManager:
             batch["selected"] = selected
             batch["budget_seconds"] = budget
             self._save(batch)
-            for number, row in enumerate(batch["rows"]):
-                if row["id"] not in selected:
-                    continue
-                # Replays resolve to the same ordinary job, including after a lost response.
-                try:
-                    job = self.jobs.create({"config": prepared[row["id"]]["config"], "mode": batch["mode"], "name": f"{batch['name']} · {row['id']}"[:120], "submission_id": f"batch-{identifier}-{number:03d}", "budget_seconds": budget})
-                    row.update(job_id=job["id"], submission_error=None)
-                except (ValueError, OSError) as exc:
-                    row["submission_error"] = public_error(exc)
+            try:
+                for number, row in enumerate(batch["rows"]):
+                    if row["id"] not in selected:
+                        continue
+                    # Each job and its submission link commit atomically. get()
+                    # recovers those links if this batch checkpoint is lost.
+                    try:
+                        job = self.jobs.create({"config": prepared[row["id"]]["config"], "mode": batch["mode"], "name": f"{batch['name']} · {row['id']}"[:120], "submission_id": f"batch-{identifier}-{number:03d}", "budget_seconds": budget})
+                        row.update(job_id=job["id"], submission_error=None)
+                    except (ValueError, OSError) as exc:
+                        row["submission_error"] = public_error(exc)
+            finally:
+                # A batch is one bounded document; rewriting all rows for every
+                # registration makes MAX_BATCH submissions quadratic in bytes.
                 self._save(batch)
             return self.get(identifier)
 

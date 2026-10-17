@@ -71,10 +71,18 @@ If an error occurs, stop before continuing. `Driver/library version mismatch` me
 On the **Ubuntu computer where you installed NanoCoFold**, run this in the **same source folder**. For a remote server, use the two-terminal instructions below:
 
 ```bash
-bash start.sh
+bash start.sh --port 18765
 ```
 
-Open [http://127.0.0.1:8765](http://127.0.0.1:8765). This terminal runs the web server, so it is normal not to see a new command prompt. Keep it open while using the platform.
+**Start NanoCoFold first, then open the URL printed after `NanoCoFold:` in that terminal.** With the command above, it is [http://127.0.0.1:18765](http://127.0.0.1:18765). Check that the page says **NanoCoFold**. A README link does not start the program: `127.0.0.1` refers to the computer running your browser. This terminal runs the web server; keep it open.
+
+**SkinPipe or another app opens?** Keep that app running. Use the NanoCoFold command above on a free port; if 18765 is occupied, run the following and open the new URL it prints:
+
+```bash
+bash start.sh --port 0
+```
+
+For a remote server, open the SSH instructions below before using the link. `--port 0` selects a free **server** port; use the corresponding forwarding command printed by NanoCoFold.
 
 If **Preparing the interface.** appears, wait for the purpose buttons. If preparation fails, read the error and click **Reload interface**. The interface starts in English. Use **Language → 한국어** in the header to switch; the browser remembers your choice. Switching languages preserves inputs and analysis state. Original identifiers, sequences, numerical results, logs, and configuration records are kept as recorded.
 
@@ -84,16 +92,16 @@ If **Preparing the interface.** appears, wait for the purpose buttons. If prepar
 **Terminal 1 · On the installed Ubuntu server:**
 
 ```bash
-bash start.sh --no-browser
+bash start.sh --no-browser --port 18765
 ```
 
 **Terminal 2 · On your own PC:** replace `USER@SERVER` with your server account and address.
 
 ```bash
-ssh -L 8765:127.0.0.1:8765 USER@SERVER
+ssh -o ExitOnForwardFailure=yes -L 18765:127.0.0.1:18765 USER@SERVER
 ```
 
-Keep both terminals open. Then open the address above in your PC browser. Inputs and results are viewed on the PC; computation uses the GPU of the Ubuntu server where you installed NanoCoFold. The public installer normally stores the workspace in `.nanocofold/workspace` under the source folder; `--workspace` can choose another location. `start.sh` reuses the saved installation location.
+Keep both terminals open. If the SSH command reports an occupied local port, it has not connected NanoCoFold; do not open that occupied address. For example, forward local 18766 to server 18765 and open `http://127.0.0.1:18766`. If the server printed a different port, use that server port on the right of `-L`. Then open the forwarded address in your PC browser. Inputs and results are viewed on the PC; computation uses the GPU of the Ubuntu server where you installed NanoCoFold. The public installer normally stores the workspace in `.nanocofold/workspace` under the source folder; `--workspace` can choose another location. `start.sh` reuses the saved installation location.
 
 </details>
 
@@ -107,12 +115,18 @@ When no job is queued or running, stop the web server with **Ctrl+C** in its ter
 ```bash
 git pull --ff-only
 bash update.sh
-bash start.sh
+bash start.sh --port 18765
 ```
 
 This updates the installed application while preserving the saved workspace, GPU selection, models, inputs and results. It does not run predictions or reinstall GPU engines. Reload the browser afterward. `git pull` alone does not update the installed application. For a source ZIP, use its complete updated contents in the original source folder, then run the last two commands. Existing exported HTML reports keep their captured appearance; export a new report to use the updated layout.
 
 If the update fails or is interrupted, run `bash update.sh` again. Starting the application is blocked until the update finishes successfully. An open web server or active job also blocks the update; close the server after its jobs finish, then retry.
+
+If the local port is occupied, this example uses another local port. Run it and open **http://127.0.0.1:18766**. If NanoCoFold printed a different server port, replace the last `18765` with that number.
+
+```bash
+ssh -o ExitOnForwardFailure=yes -L 18766:127.0.0.1:18765 USER@SERVER
+```
 
 </details>
 
@@ -215,7 +229,7 @@ Then read in this order: **status and counts → candidate/model row → scores,
 
 - **Fit entire structure** shows the whole complex. **Select target / Select nanobody**, or **Select reference chain / Select partner**, highlights and focuses the relevant chain. **Clear selection** removes highlighting.
 - Clicking a PAE cell selects and focuses two residues and moves to the structure viewer. PAE describes uncertainty in predicted relative residue placement; it is not a binding measurement.
-- Save CSV / XLSX tables, FASTA, coordinates, and the **report ZIP**. **Save selected display coordinates** saves the coordinates shown in the viewer. **Download original engine coordinates** is available when the original file is preserved and matches its recorded hash. Check the provenance notice for the relationship between original and display coordinates.
+- Save CSV / XLSX tables, FASTA, coordinates, and the **report ZIP**. For Excel, use the exported CSV (UTF-8 BOM) or XLSX; run-folder CSVs are UTF-8 machine records. **Save selected display coordinates** saves the coordinates shown in the viewer. **Download original engine coordinates** is available when the original file is preserved and matches its recorded hash. Check the provenance notice for the relationship between original and display coordinates.
 
 The **Full original ZIP · For local archiving** includes server paths and execution logs and is for personal recovery / archiving. Send collaborators the entire **Shareable report ZIP**. Recipients extract the whole ZIP and open **`report.html`**. Saved results can be read on macOS, Windows, or other PCs without a GPU or program installation. Newly generated interactive reports also include the English / Korean selector.
 

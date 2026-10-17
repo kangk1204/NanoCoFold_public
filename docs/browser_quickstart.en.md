@@ -4,7 +4,7 @@
 
 This guide follows the separate environment check and analysis workflow. Follow the [README installation steps](../README.md#1-prepare-and-install) first. If your server is already installed, start at [Open the browser](../README.md#2-open-the-browser). Use the same source folder and workspace as the installation.
 
-Open `http://127.0.0.1:8765`. For a remote server, keep both the server terminal and your SSH tunnel open. Select **Language → English** to match the screenshots. If **Preparing the interface.** appears, wait for the purpose buttons. If preparation fails, read the error and click **Reload interface**.
+Start NanoCoFold as described in the README, then open the URL printed after `NanoCoFold:` (the documented port is `18765`). The link does not launch the app, and `127.0.0.1` points to your browser computer. If another app appears, keep it running and follow the README port/SSH instructions. For a remote server, keep both the server terminal and your SSH tunnel open. Select **Language → English** to match the screenshots. If **Preparing the interface.** appears, wait for the purpose buttons. If preparation fails, read the error and click **Reload interface**.
 
 **Already looking at “diagnostics · Complete”?** Click **Prepare analysis**, then follow the **Purpose → Input → Settings → Review → Analysis** rows below. An environment check has no protein prediction. If you already ran an analysis, use **Jobs & logs → select that analysis → Open results**; saved runs are also available under **Explore results → Select run**.
 

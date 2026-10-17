@@ -8,6 +8,7 @@ import json
 import math
 import subprocess
 import sys
+import warnings
 from pathlib import Path
 from . import __version__
 
@@ -20,7 +21,7 @@ from . import design_rfantibody, developability, handoff, mature, provenance, ra
 from . import score_complex as scorer
 from .config import (
     PROJECT_ROOT, cfg_get, dump_resolved, load_config, resolve_path, resolve_run_artifact,
-    resolve_run_dir, read_config_yaml,
+    resolve_run_dir, read_config_file, apply_overrides,
 )
 from .utils.atomic import write_csv, write_json
 from .utils.spreadsheet import csv_cell
@@ -81,7 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_setup.add_argument("--yes", action="store_true", help="Run the selected installation profile")
     p_serve = sub.add_parser("serve", help="Start the browser app for setup, analysis and results")
     p_serve.add_argument("--workspace", type=Path, default=Path.cwd())
-    p_serve.add_argument("--port", type=int, default=8765)
+    p_serve.add_argument("--port", type=int, default=18765)
     p_serve.add_argument("--host", default="127.0.0.1", choices=["127.0.0.1", "localhost", "::1"])
     p_serve.add_argument("--no-browser", action="store_true")
     p_catalog = sub.add_parser("catalog", help="Search or index saved results without computation")
@@ -323,6 +324,36 @@ def _normalized_cli_config(cfg: dict, args) -> dict:
     return effective
 
 
+def _preflight_input_files(cfg: dict, args, *, required=False) -> None:
+    """Reject specified unreadable inputs before readiness or target prediction."""
+    if getattr(args, "command", None) not in {"run", "prepare", "design", "screen", "mature"}:
+        return
+    mode = cfg_get(cfg, "run.mode")
+    settings = ["target.fasta", "target.pdb"]
+    if mode == "screen":
+        settings.append("screen.vhh_fasta")
+    elif mode == "mature":
+        settings.append("mature.wt_fasta")
+    for setting in settings:
+        value = cfg_get(cfg, setting)
+        if value in (None, ""):
+            continue
+        path = resolve_path(cfg, value)
+        if not path.is_file():
+            raise FileNotFoundError(f"{setting} 파일을 찾을 수 없습니다: {path}")
+        if setting.endswith("fasta"):
+            records = seq_utils.read_fasta(path, candidate_ids=setting == "screen.vhh_fasta")
+            if setting != "screen.vhh_fasta" and len(records) != 1:
+                raise ValueError(f"{setting}에는 서열을 1개만 넣으세요.")
+            for sequence in records.values():
+                seq_utils.clean_sequence(sequence)
+    if required and getattr(args, "command", None) != "prepare":
+        if mode == "screen" and not cfg_get(cfg, "screen.vhh_fasta") and not _is_mock(cfg):
+            raise FileNotFoundError("screen 모드에는 --vhh-fasta (후보 나노바디 FASTA)가 필요합니다.")
+        if mode == "mature":
+            mature.resolve_wt_sequence(cfg)
+
+
 def _execute_command(args) -> int:
     """Shared readiness, run ownership and durable lifecycle for CLI/HTTP workers."""
     import time
@@ -350,6 +381,7 @@ def _execute_command(args) -> int:
             raise FileNotFoundError(f"기존 실행의 설정·상태 파일이 없습니다: {run_dir}")
     if (run_dir / "retained").exists():
         raise ValueError("정리 보관본은 읽기 전용입니다. 원본 계산이 필요하면 다른 run-id로 새로 실행하세요.")
+    _preflight_input_files(cfg, args)
     catalog, identity = None, None
     if (getattr(args, "reuse_workspace", None) and args.command in {"run", "complex", "screen", "mature"}
             and not _is_dry_run(cfg) and not (run_dir / "run_config.yaml").exists()):
@@ -372,6 +404,7 @@ def _execute_command(args) -> int:
         normalized = _normalized_cli_config(cfg, args)
         cfg.clear()
         cfg.update(normalized)
+        _preflight_input_files(cfg, args, required=True)
         dry = _is_dry_run(cfg)
         legacy_reference = (cfg_get(cfg, "run.mode") == "complex" and any(
             entry.get("copies", 1) > 1 and entry.get("reference_chain") is not None
@@ -508,20 +541,15 @@ def _open_run(cfg: dict, args, new: bool = True) -> tuple[Path, RunState]:
         if saved.exists():
             from .config import _deep_merge, load_config as _load_saved
 
-            import yaml as _yaml
-            from .config import _set_dotted
-
             effective = _load_saved(saved, historical=getattr(args, "command", None) == "report")
             if getattr(args, "config", None):
                 # 부분 config는 "명시된 키만" 덮어쓴다(H10).
-                partial = read_config_yaml(Path(args.config).read_text(encoding="utf-8")) or {}
+                partial = read_config_file(args.config) or {}
                 effective = _deep_merge(effective, partial)
                 partial_target = (partial or {}).get("target", {}) or {}
                 if partial_target.get("fasta") and not partial_target.get("sequence"):
                     effective["target"]["sequence"] = ""  # 새 FASTA가 무시되지 않도록 교체(I07)
-            for override in list(getattr(args, "set", []) or []):
-                key, value = override.split("=", 1)
-                _set_dotted(effective, key.strip(), _yaml.safe_load(value.strip()))
+            apply_overrides(effective, list(getattr(args, "set", []) or []))
             from .config import _validate
 
             effective = _normalized_cli_config(effective, args)
@@ -798,18 +826,34 @@ def _select_boltz_candidates(
 ) -> pd.DataFrame:
     """1차 엔진 예측을 스코어링해 상위 n종을 고른다 (FASTA 입력 순서 사용 금지)."""
     if n <= 0 or predictions.empty:
-        return candidates.iloc[0:0]
+        selected = candidates.iloc[0:0].copy()
+        selected.attrs["boltz2_selection_policy"] = {"sort": [], "all_iptm_unassessed": True,
+            "selected_ids": [], "unavailable_reason": "no_prediction_records" if predictions.empty else "selection_disabled"}
+        return selected
     prelim = _score_candidates(cfg, predictions, target, id_column=id_column)
-    score_column = "iptm" if "iptm" in prelim.columns else None
-    if score_column is None or prelim[score_column].isna().all():
-        ranked = predictions[id_column].tolist()
+    prelim = prelim.copy()
+    iptm = pd.to_numeric(prelim.get("iptm", pd.Series(index=prelim.index, dtype=float)), errors="coerce")
+    prelim["_selection_iptm"] = iptm.where(np.isfinite(iptm))
+    fallback = prelim["_selection_iptm"].isna().all()
+    if fallback:
+        warnings.warn("Boltz-2 재평가 대상의 ipTM이 모두 미평가입니다. 점수 우선순위를 주장하지 않고 후보 ID 순서로 선택합니다.", UserWarning, stacklevel=2)
+        ranked = sorted(set(predictions[id_column]), key=str)
+        sort_policy = [id_column + " ascending; unassessed fallback"]
     else:
-        sort_cols = [score_column]
-        if "ipsae" in prelim.columns and prelim["ipsae"].notna().any():
-            sort_cols.append("ipsae")
-        ranked = prelim.sort_values(sort_cols, ascending=False)[id_column].tolist()
+        sort_cols = ["_selection_iptm"]
+        if "ipsae" in prelim.columns:
+            ipsae = pd.to_numeric(prelim["ipsae"], errors="coerce")
+            prelim["_selection_ipsae"] = ipsae.where(np.isfinite(ipsae))
+            if prelim["_selection_ipsae"].notna().any():
+                sort_cols.append("_selection_ipsae")
+        prelim["_selection_id"] = prelim[id_column].astype(str)
+        ranked = prelim.sort_values(sort_cols + ["_selection_id"], ascending=[False] * len(sort_cols) + [True], kind="stable", na_position="last")[id_column].drop_duplicates().tolist()
+        sort_policy = [column.removeprefix("_selection_") + " descending" for column in sort_cols] + [id_column + " ascending"]
     ranked = ranked[:n]
-    return candidates[candidates[id_column].isin(ranked)].copy()
+    selected = candidates[candidates[id_column].isin(ranked)].copy()
+    selected = selected.sort_values(id_column, key=lambda column: column.map({identifier: position for position, identifier in enumerate(ranked)}), kind="stable")
+    selected.attrs["boltz2_selection_policy"] = {"sort": sort_policy, "all_iptm_unassessed": bool(fallback), "selected_ids": selected[id_column].tolist()}
+    return selected
 
 
 def _predictions_columns(frame: pd.DataFrame, id_column: str) -> pd.DataFrame:
@@ -1488,11 +1532,20 @@ def _tier2_selection(cfg, candidates, tier1_metrics, id_column):
               "calibrated_binding_probability": False}
     if tier1_metrics is not None and not tier1_metrics.empty and "pdockq" in tier1_metrics:
         columns = ["pdockq"]
-        if float(cfg_get(cfg, "rank.weights.hotspot_contact_frac", 0.5)) > 0 and "hotspot_contact_frac" in tier1_metrics:
+        hotspot_weight = float(cfg_get(cfg, "rank.weights.hotspot_contact_frac", 0.5))
+        if hotspot_weight > 0 and "hotspot_contact_frac" in tier1_metrics:
             columns.insert(0, "hotspot_contact_frac")
         policy["sort_columns_descending"] = columns
         # Explicit row-order tie breaking also makes multi-key sorting stable.
         ordered = tier1_metrics.assign(_tier1_row_order=np.arange(len(tier1_metrics)))
+        if "hotspot_contact_frac" in columns:
+            # Preserve the requested-residue diagnostic in the source table,
+            # but do not use an incomplete mapping to prioritize a candidate.
+            unavailable = rank_select._hotspot_mapping_unavailable_rows(
+                ordered, {"rank": {"weights": {"hotspot_contact_frac": hotspot_weight}}})
+            ordered.loc[unavailable, "hotspot_contact_frac"] = np.nan
+            policy.update(hotspot_contact_frac_mapping_policy="incomplete_mapping_contact_fraction_not_used",
+                          incomplete_mapping_count=int(unavailable.sum()))
         ordered = ordered.sort_values(columns + ["_tier1_row_order"], ascending=[False] * len(columns) + [True], na_position="last")
         return ordered[id_column].tolist(), policy
     policy.update(method="candidate_input_order_v1", tie_break="recorded_candidate_row_order", sort_columns_descending=[])
@@ -1547,6 +1600,8 @@ def _tier2_and_finalize(
     boltz_top = int(cfg_get(cfg, "screen.boltz2_rescore_top", 0))
     if boltz_top > 0 and engine != "boltz2":
         boltz_subset = _select_boltz_candidates(cfg, candidates, predictions, target, id_column, boltz_top)
+        if not dry_run:
+            write_json(run_dir / "02c_boltz2" / "selection_policy.json", boltz_subset.attrs["boltz2_selection_policy"])
         print(f"[tier2] Boltz-2 정밀 재평가(1차 지표 상위 {boltz_top}): {len(boltz_subset)}종")
         boltz_predictions = screen.predict_complexes(
             cfg, run_dir / "02c_boltz2", target, boltz_subset, engine="boltz2", mock=mock, dry_run=dry_run,
@@ -1635,7 +1690,10 @@ def cmd_screen(args) -> int:
     if cfg_get(cfg, "specificity.enabled", False) or _is_specificity_resume(args):
         args.mode = "screen"
         return cmd_specificity(args)
+    cfg = _normalized_cli_config(cfg, args)
+    _preflight_input_files(cfg, args)
     run_dir, state = _open_run(cfg, args)
+    _preflight_input_files(cfg, args, required=True)
     mock, dry_run = _is_mock(cfg), _is_dry_run(cfg)
     _set_run_mode(cfg, state, "screen", dry_run)
     target = _target_phase(cfg, run_dir, state, mock, dry_run)
@@ -1688,6 +1746,7 @@ def _screen_flow(cfg, run_dir, state, target, candidates):
     boltz_top = int(cfg_get(cfg, "screen.boltz2_rescore_top", 0))
     if boltz_top > 0 and engine != "boltz2":
         boltz_subset = _select_boltz_candidates(cfg, candidates, predictions, target, "design_id", boltz_top)
+        write_json(run_dir / "02c_boltz2" / "selection_policy.json", boltz_subset.attrs["boltz2_selection_policy"])
         print(f"[screen] Boltz-2 정밀 재평가(1차 지표 상위 {boltz_top}): {len(boltz_subset)}종")
         boltz_predictions = screen.predict_complexes(
             cfg, run_dir / "02c_boltz2", target, boltz_subset, engine="boltz2", mock=mock, dry_run=dry_run
@@ -1709,7 +1768,10 @@ def cmd_mature(args) -> int:
     if cfg_get(cfg, "specificity.enabled", False) or _is_specificity_resume(args):
         args.mode = "mature"
         return cmd_specificity(args)
+    cfg = _normalized_cli_config(cfg, args)
+    _preflight_input_files(cfg, args)
     run_dir, state = _open_run(cfg, args)
+    _preflight_input_files(cfg, args, required=True)
     mock, dry_run = _is_mock(cfg), _is_dry_run(cfg)
     _set_run_mode(cfg, state, "mature", dry_run)
     target = _target_phase(cfg, run_dir, state, mock, dry_run)
@@ -1937,21 +1999,20 @@ def cmd_report(args) -> int:
     run_dir, state = _open_run(cfg, args, new=False)
     saved_config = run_dir / "run_config.yaml"
     if saved_config.is_file():
-        from .config import read_config_yaml
-        saved_cfg = read_config_yaml(saved_config.read_text(encoding="utf-8"))
+        saved_cfg = read_config_file(saved_config)
         if not isinstance(saved_cfg, dict) or not saved_cfg:
             raise ValueError("계산 당시 run_config.yaml이 손상되었습니다. 원본 설정을 복구하세요.")
-        from .config import _deep_merge, _set_dotted
+        from .config import _deep_merge
         report_options = copy.deepcopy(saved_cfg.get("report", cfg.get("report", {})))
         if getattr(args, "config", None):
-            requested_config = read_config_yaml(Path(args.config).read_text(encoding="utf-8")) or {}
+            requested_config = read_config_file(args.config) or {}
             report_options = _deep_merge(report_options, requested_config.get("report", {}))
         ignored = []
         for override in getattr(args, "set", []) or []:
-            key, raw = override.split("=", 1)
+            key = override.split("=", 1)[0]
             if key.strip().startswith("report."):
                 options = {"report": report_options}
-                _set_dotted(options, key.strip(), read_config_yaml(raw.strip()))
+                apply_overrides(options, [override])
                 report_options = options["report"]
             else:
                 ignored.append(key.strip())
@@ -1993,11 +2054,10 @@ def cmd_report(args) -> int:
     if ("tables_committed" in final or "table_sha256" in final) and not tables_available(run_dir, final):
         raise ValueError("최신 계산 표가 확정되지 않았거나 해시가 다릅니다. 이전 표로 보고서를 재발행하지 않았습니다.")
     if final.get("exports_status") in {"pending", "failed"}:
-        from .config import read_config_yaml
         saved_path = run_dir / "run_config.yaml"
         if not saved_path.is_file():
             raise ValueError("내보내기 복구에는 계산 당시 run_config.yaml이 필요합니다. 보고서 설정으로 게이트 기준을 추정하지 않습니다.")
-        export_cfg = read_config_yaml(saved_path.read_text(encoding="utf-8"))
+        export_cfg = read_config_file(saved_path)
         if not isinstance(export_cfg, dict) or not export_cfg:
             raise ValueError("계산 당시 run_config.yaml이 손상되었습니다. 원본 설정을 복구한 뒤 내보내기를 다시 생성하세요.")
         # Renderer/PyMOL options may be changed to recover an export, while all
@@ -2073,7 +2133,10 @@ def cmd_run(args) -> int:
     cfg = _load(args)
     if cfg_get(cfg, "specificity.enabled", False) or _is_specificity_resume(args):
         return cmd_specificity(args)
+    cfg = _normalized_cli_config(cfg, args)
+    _preflight_input_files(cfg, args)
     run_dir, state = _open_run(cfg, args)
+    _preflight_input_files(cfg, args, required=True)
     mode = cfg_get(cfg, "run.mode")
     mock, dry_run = _is_mock(cfg), _is_dry_run(cfg)
     _set_run_mode(cfg, state, mode, dry_run)
@@ -2182,13 +2245,12 @@ def _is_specificity_resume(args) -> bool:
     if not directory:
         return False
     saved = Path(directory) / "run_config.yaml"
-    return saved.exists() and bool(cfg_get(read_config_yaml(saved.read_text()), "specificity.enabled", False))
+    return saved.exists() and bool(cfg_get(read_config_file(saved), "specificity.enabled", False))
 
 
 def cmd_specificity(args) -> int:
     from . import campaign
-    from .config import _deep_merge, _set_dotted, _validate
-    import yaml
+    from .config import _deep_merge, _validate
 
     cfg = _load(args)
     directory = getattr(args, "run_dir", None)
@@ -2198,10 +2260,8 @@ def cmd_specificity(args) -> int:
             raise FileNotFoundError(f"재개할 run_config.yaml 이 없습니다: {saved}")
         cfg = load_config(saved)
         if getattr(args, "config", None):
-            cfg = _deep_merge(cfg, read_config_yaml(Path(args.config).read_text()) or {})
-        for value in getattr(args, "set", []):
-            key, raw = value.split("=", 1)
-            _set_dotted(cfg, key, yaml.safe_load(raw))
+            cfg = _deep_merge(cfg, read_config_file(args.config) or {})
+        apply_overrides(cfg, getattr(args, "set", []))
     cfg.setdefault("specificity", {})["enabled"] = True
     for flag in ("mock", "dry_run"):
         if getattr(args, flag, False):

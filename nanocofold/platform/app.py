@@ -392,13 +392,18 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         return native(inputs.get(identifier))
 
     @app.get("/api/jobs")
-    def job_list(limit: int = 100, before: float | None = None, before_id: str | None = None):
-        history = manager.store.list(limit=limit, before=before, before_id=before_id)
-        jobs = {job["id"]: job for job in history}
-        if before is None:
-            jobs.update({job["id"]: job for job in manager.store.list(states={"queued", "running", "cancelling"})})
-        return {"jobs": sorted(jobs.values(), key=lambda job: (job["created"], job["id"]), reverse=True),
-                "next_cursor": {"before": history[-1]["created"], "before_id": history[-1]["id"]} if len(history) == limit else None}
+    def job_list(limit: int = 100, before: float | None = None, before_id: str | None = None, active: bool = False):
+        active_states = {"queued", "running", "cancelling"}
+        history = manager.store.list(limit=limit, before=before, before_id=before_id,
+                                     states=active_states if active else None)
+        cursor = lambda rows: {"before": rows[-1]["created"], "before_id": rows[-1]["id"]} if len(rows) == limit else None
+        result = {"jobs": history, "next_cursor": cursor(history)}
+        # Keep old active work visible without making a two-second poll return
+        # an unbounded queue. Each stream has its own bounded cursor.
+        if before is None and not active:
+            running = manager.store.list(states=active_states, limit=limit)
+            result.update(active_jobs=running, active_next_cursor=cursor(running))
+        return result
 
     @app.post("/api/jobs")
     async def job_create(request: Request):
@@ -585,22 +590,32 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
     return app
 
 
-def serve(workspace: str | Path, host: str = "127.0.0.1", port: int = 8765, no_browser: bool = False):
+def serve(workspace: str | Path, host: str = "127.0.0.1", port: int = 18765, no_browser: bool = False):
     import uvicorn
     if host not in {"127.0.0.1", "localhost", "::1"}:
         raise ValueError("개인 플랫폼은 loopback에 바인딩합니다. 원격 접속은 SSH 포트포워딩을 사용하세요.")
-    app = create_app(workspace)
     sock = socket.socket(socket.AF_INET6 if host == "::1" else socket.AF_INET, socket.SOCK_STREAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind((host, port))
-    sock.listen(128)
-    actual_port = sock.getsockname()[1]
-    url = f"http://{'[' + host + ']' if host == '::1' else host}:{actual_port}/"
-    print(f"NanoCoFold: {url}\n작업 공간: {Path(workspace).resolve()}\n원격: ssh -L {actual_port}:127.0.0.1:{actual_port} USER@HOST", flush=True)
-    if not no_browser:
-        threading.Timer(.8, lambda: webbrowser.open(url)).start()
-    config = uvicorn.Config(app, host=host, port=actual_port, log_level="warning", access_log=False)
+    timer = None
     try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            sock.bind((host, port))
+        except OSError as exc:
+            if exc.errno == errno.EADDRINUSE:
+                raise ValueError(f"NanoCoFold port {port} is already in use. Keep the other application running; choose --port 0 and open the NanoCoFold URL printed in this terminal.") from exc
+            raise
+        sock.listen(128)
+        actual_port = sock.getsockname()[1]
+        app = create_app(workspace)
+        url = f"http://{'[' + host + ']' if host == '::1' else host}:{actual_port}/"
+        remote_host = "[::1]" if host == "::1" else "127.0.0.1"
+        print(f"NanoCoFold: {url}\n작업 공간: {Path(workspace).resolve()}\n원격: ssh -o ExitOnForwardFailure=yes -L {actual_port}:{remote_host}:{actual_port} USER@HOST", flush=True)
+        if not no_browser:
+            timer = threading.Timer(.8, lambda: webbrowser.open(url))
+            timer.start()
+        config = uvicorn.Config(app, host=host, port=actual_port, log_level="warning", access_log=False)
         uvicorn.Server(config).run(sockets=[sock])
     finally:
+        if timer is not None:
+            timer.cancel()
         sock.close()

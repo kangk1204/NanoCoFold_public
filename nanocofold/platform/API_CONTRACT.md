@@ -13,8 +13,8 @@ All `/api/` requests require `X-Platform-Token` (the initial HTML replaces `__TO
 - `POST /api/inputs`: `{kind:'fasta',content,mode,name?,target_name?,mock?,provider?:'boltz2|chai1',hotspots?:'auto'|array,vhh_fasta?:text,wt_fasta?:text,config?:object}` -> persistent input object. `GET /api/inputs/{id}` retrieves it.
 - `POST /api/jobs`: `{input_id?,config_path?,config?:object,mode?,name?,mock?,gpu?:'0',budget_seconds?}` -> job object.
 - `POST /api/diagnostics`: same config selection -> queued job with `kind:'diagnostics'`; completion adds `diagnostics:{ok,checks,engines,evidence}`. `GET /api/diagnostics` returns `{jobs}`.
-- `POST /api/setup`: `{profile:'core|complex|design|screen|mature|boltzgen|colabfold|opendde|all'}` -> queued job with `kind:'setup'`. `all` excludes the optional `colabfold` and `opendde` environments; add both for four-engine comparison.
-- `GET /api/jobs`: `{jobs}`. `GET /api/jobs/{id}`: job. Fields include `id,kind,state,name,mode,mock,run_dir,result_id,gpu,created,started,finished,elapsed_seconds,phase,progress:{completed,total},error,can_resume,history`. Lifecycle: `queued,running,cancelling,cancelled,interrupted,failed,partial_failure,budget_exhausted,complete`.
+- `POST /api/setup`: `{profile:'core|complex|design|screen|mature|boltzgen|colabfold|opendde|all'}` -> queued job with `kind:'setup'`. `all` includes `antibody`, `boltz2`, `chai1`, `rfantibody`, `boltzgen`, `esm`, `colabfold` and `opendde`; separate installs of the last two are unnecessary after a successful `all` install.
+- `GET /api/jobs?limit=100&before=&before_id=&active=false`: `{jobs,next_cursor,active_jobs?,active_next_cursor?}`. Each stream is bounded by `limit` (1–1,000). `jobs` is the ordinary chronological page; its cursor never skips displaced history. On the first ordinary page, `active_jobs` is a separate bounded preview of queued/running/cancelling jobs. Follow `active_next_cursor` with `active=true` to paginate that stream. The browser merges/deduplicates both previews and fetches the selected job independently. `GET /api/jobs/{id}`: job. Fields include `id,kind,state,name,mode,mock,run_dir,result_id,gpu,created,started,finished,elapsed_seconds,phase,progress:{completed,total},error,can_resume,history`. Lifecycle: `queued,running,cancelling,cancelled,interrupted,failed,partial_failure,budget_exhausted,complete`.
 - `GET /api/jobs/{id}/logs?offset=0`: `{offset,next_offset,text,done}`; offsets are bytes. Poll every 2 seconds. `POST .../cancel` and `POST .../resume` return current job. Resuming validates fixed config/input snapshot hashes; it reuses only the CLI's validated completed steps. Exhausted jobs require resume `{additional_budget_seconds:number}` (positive, maximum 7 days); the budget becomes previous elapsed time plus the requested allowance, with the extension recorded in history and fixed configuration unchanged.
 - `GET /api/results`: `{results:[summary]}`. `POST /api/results/open {path}` registers an existing workspace result read-only and returns summary.
 - `GET /api/results/{id}`: summary `{id,name,path,mode,mock,total,scored_total,eligible_total,selected_total,failed_candidates,zero_eligible,complete,status,execution_state,platform_status,warnings,issues,config,state,conditions,readonly:true}`. Preserved final files do not override a current failed/cancelled/running execution. Worker/supervisor atomically saves `platform_status.json` terminal job provenance (source job, effective budget, resume history); it takes precedence only if its update is at least as recent as the current execution start. Older sidecars remain provenance with `applies:false`. Conditions include `seed,engine,msa,restraint,target`. Never combine scores across conditions.
@@ -41,3 +41,62 @@ Job `eta` is a nullable measured estimate with `scope:'complex_prediction',statu
 Structure responses add `chains[].residues[].ca/atom_ids`, minimum-distance clash `atom_a,atom_b,cutoff,distance_below_cutoff`, `cdr:{ranges:{CDR1|CDR2|CDR3:{start,end,labels}},source,note}`, `cysteines:{residues,missing_sg,pairs:[{a,b,distance,atom_a:'SG',atom_b:'SG'}],note}`, `reference:{available,content?,format?,matched_ca?,rmsd?,reference_sha256?,method?:'target_CA_rigid_fit',note?,reason?}`, and `target_region`. Distances are saved-coordinate geometry, not bonds or a reclassification of eligibility. CDR numbering must match the candidate/structure sequence; explicit saved user ranges are labeled separately. Native reference fitting requires exact unambiguous residue correspondence and at least 3 noncollinear Cα pairs. References are run-contained hash-verified copies or the exact hash-verified snapshot of the same workspace/platform job; YAML paths alone do not authorize external reads. Missing/corrupt references report unavailable without modifying old results.
 
 Export exploration additionally preserves `result_layers:{target|binder|context|hotspots|contacts|clashes|cdr|reference:bool}`, `viewer_display:{sequence:bool,residues:bool}` (both default false), `selected_residues:[label]` and `distance_selection:{a:label,b:label}`. These affect display only. Offline HTML embeds local MolStar JS/CSS and the same result adapter as the browser. No result inference or rescoring occurs in viewer endpoints.
+
+
+## Browser workflow additions
+
+The environment check is separate from input review: `POST /api/environment/check` queues diagnostics for the selected mode/settings; `POST /api/environment/status` reads the matching saved check without launching work. `GET /api/starter-presets` and `GET /api/capabilities` describe available purpose settings and installed capabilities, not successful prediction evidence. Draft GET/POST stores browser input fields; file handles and sequence-transmission consent still require explicit review.
+
+Batch review stores validated per-item inputs and a review hash without inference. Submit accepts that exact review hash, selected item IDs, and an optional per-item time budget; stable submission links deduplicate retries. Cancel reaches already registered children after concurrent submission finishes. Batch row checkpoints are bounded; a lost checkpoint is recovered from durable child submission links without creating new jobs during GET.
+
+`GET /api/result-catalog` pages saved result records. Result retention GET previews a policy and POST applies a confirmed policy; it does not rerun prediction or recompute old eligibility. `GET /api/results/{identifier}/observations` returns recorded model observations. All these endpoints use the same token, loopback, path containment and request-size boundaries described above.
+
+## Complete route inventory
+
+This inventory uses the route variable names in app.py. Detailed payload rules above still apply; an identifier is not an arbitrary filesystem path.
+
+| Method | Route | Handler |
+|---|---|---|
+| POST | `/api/inputs/complex` | `complex_input` |
+| GET | `/api/starter-presets` | `starter_presets` |
+| GET | `/api/capabilities` | `capabilities` |
+| GET | `/api/draft` | `draft_read` |
+| POST | `/api/draft` | `draft_save` |
+| GET | `/api/batches` | `batch_list` |
+| POST | `/api/batches/review` | `batch_review` |
+| GET | `/api/batches/{identifier}` | `batch_get` |
+| POST | `/api/batches/{identifier}/submit` | `batch_submit` |
+| POST | `/api/batches/{identifier}/cancel` | `batch_cancel` |
+| GET | `/api/session` | `session` |
+| GET | `/api/inputs` | `input_list` |
+| GET | `/api/tutorials/{mode}` | `public_tutorial` |
+| POST | `/api/configs/parse` | `parse_config` |
+| POST | `/api/inputs` | `input_create` |
+| POST | `/api/inputs/load` | `input_load` |
+| POST | `/api/inputs/analyze` | `input_analyze` |
+| POST | `/api/inputs/review` | `input_review` |
+| GET | `/api/inputs/{identifier}/structure` | `input_structure` |
+| GET | `/api/inputs/{identifier}` | `input_get` |
+| GET | `/api/jobs` | `job_list` |
+| POST | `/api/jobs` | `job_create` |
+| GET | `/api/jobs/{identifier}` | `job_get` |
+| GET | `/api/jobs/{identifier}/logs` | `job_logs` |
+| POST | `/api/jobs/{identifier}/cancel` | `job_cancel` |
+| POST | `/api/jobs/{identifier}/resume` | `job_resume` |
+| POST | `/api/diagnostics` | `diagnostics` |
+| POST | `/api/environment/check` | `environment_check` |
+| POST | `/api/environment/status` | `environment_status` |
+| GET | `/api/diagnostics` | `diagnostic_list` |
+| POST | `/api/setup` | `setup` |
+| GET | `/api/results` | `results_list` |
+| GET | `/api/result-catalog` | `result_catalog` |
+| POST | `/api/results/open` | `results_open` |
+| GET | `/api/results/{identifier}` | `result_summary` |
+| GET | `/api/results/{identifier}/retention` | `retention_plan` |
+| POST | `/api/results/{identifier}/retention` | `retention_apply` |
+| GET | `/api/results/{identifier}/candidates` | `candidates` |
+| GET | `/api/results/{identifier}/observations` | `observations` |
+| GET | `/api/results/{identifier}/structure` | `structure` |
+| GET | `/api/results/{identifier}/artifacts` | `artifacts` |
+| GET | `/api/results/{identifier}/download` | `download` |
+| POST | `/api/results/{identifier}/export` | `export` |

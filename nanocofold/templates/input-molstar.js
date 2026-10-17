@@ -23,7 +23,8 @@ window.NanoCoFoldChainViewer = class {
     const result = new NanoCoFoldChainViewer(viewer, chains);
     try {
       const plugin = viewer.plugin;
-      const data = await plugin.builders.data.rawData({ data: pdb, label: "검토할 입력 구조" });
+      const data = await plugin.builders.data.rawData({ data: pdb, label: result.text("검토할 입력 구조", "Input structure to review") });
+      result.trackLabel(data, () => result.text("검토할 입력 구조", "Input structure to review"));
       const trajectory = await plugin.builders.structure.parseTrajectory(data, "pdb");
       const model = await plugin.builders.structure.createModel(trajectory);
       // The server has already expanded the requested assembly and normalized IDs.
@@ -36,9 +37,10 @@ window.NanoCoFoldChainViewer = class {
         const component = await plugin.builders.structure.tryCreateComponent(structure, {
           type: { name: "bundle", params: StructureElement.Bundle.fromLoci(loci) },
           nullIfEmpty: true,
-          label: `체인 ${chain.id} · 원본 ${chain.original_id}`,
+          label: result.text("체인 {0} · 원본 {1}", "Chain {0} · original {1}", chain.id, chain.original_id),
         }, `input-chain-${chain.id}`);
-        if (!component) throw Error(`구조에서 체인 ${chain.id}를 찾지 못했습니다.`);
+        if (!component) throw Error(result.text("구조에서 체인 {0}를 찾지 못했습니다", "Chain {0} was not found in the structure", chain.id));
+        result.trackLabel(component, () => result.text("체인 {0} · 원본 {1}", "Chain {0} · original {1}", chain.id, chain.original_id));
         const representation = await plugin.builders.structure.representation.addRepresentation(component, {
           type: chain.length < 4 ? "ball-and-stick" : "cartoon",
           color: "uniform",
@@ -71,6 +73,43 @@ window.NanoCoFoldChainViewer = class {
     this.representations = new Map();
     this.disposed = false;
     this.pending = Promise.resolve();
+    this.labelBindings = [];
+    this.watchLanguage();
+  }
+
+  text(ko, en, ...args) {
+    // Resolve at display time so both the standalone I18N engine and Site's
+    // document language can change without replacing saved coordinate data.
+    const engine = typeof I18N === "undefined" ? null : I18N;
+    const language = engine?.language || (typeof document !== "undefined" ? document.documentElement?.lang : "en");
+    if (engine?.format && engine?.value) {
+      const rendered = engine.value(engine.format(ko, args));
+      if (language === "ko" || !/[가-힣]/.test(rendered.replace(/\{\d+\}/g, ""))) return rendered;
+    }
+    return (language === "ko" ? ko : en).replace(/\{(\d+)\}/g, (_key, index) => String(args[Number(index)] ?? ""));
+  }
+  trackLabel(selector, label) {
+    if (typeof label === "function") this.labelBindings.push({selector, label});
+  }
+  watchLanguage() {
+    this.languageChanged = () => { this.refreshLabels().catch(error => { this.labelError = error; }); };
+    if (typeof document !== "undefined") {
+      document.addEventListener?.("nanocofold:language", this.languageChanged);
+      if (typeof MutationObserver !== "undefined" && document.documentElement) {
+        this.languageObserver = new MutationObserver(this.languageChanged);
+        this.languageObserver.observe(document.documentElement, {attributes:true, attributeFilter:["lang"]});
+      }
+    }
+  }
+  refreshLabels() {
+    this.pending = this.pending.catch(() => {}).then(async () => {
+      if (this.disposed || !this.labelBindings.length) return;
+      const update = this.viewer.plugin.state.data.build();
+      for (const {selector, label} of this.labelBindings)
+        update.to(selector).update(params => ({...params, label:label()}));
+      await update.commit();
+    });
+    return this.pending;
   }
 
   location(loci) {
@@ -115,6 +154,8 @@ window.NanoCoFoldChainViewer = class {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    this.languageObserver?.disconnect();
+    if (typeof document !== "undefined") document.removeEventListener?.("nanocofold:language", this.languageChanged);
     this.viewer.dispose();
   }
 };

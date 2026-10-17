@@ -38,7 +38,9 @@ def resolve_target_sequence(cfg: dict) -> str:
             raise ValueError("target.sequence 가 비어 있습니다.")
         return sequence
     fasta = resolve_path(cfg, cfg_get(cfg, "target.fasta"))
-    if fasta and fasta.exists():
+    if fasta:
+        if not fasta.is_file():
+            raise FileNotFoundError(f"target.fasta 파일을 찾을 수 없습니다: {fasta}")
         records = seq_utils.read_fasta(fasta, candidate_ids=False)
         if not records:
             raise ValueError(f"FASTA에서 서열을 읽지 못했습니다: {fasta}")
@@ -46,11 +48,18 @@ def resolve_target_sequence(cfg: dict) -> str:
             raise ValueError("단일 표적 FASTA에는 서열을 1개만 넣으세요. 여러 표적은 배치 모드를 사용하세요.")
         return seq_utils.clean_sequence(next(iter(records.values())))
     pdb_path = resolve_path(cfg, cfg_get(cfg, "target.pdb"))
-    if pdb_path and pdb_path.exists():
+    if pdb_path:
+        if not pdb_path.is_file():
+            raise FileNotFoundError(f"target.pdb 파일을 찾을 수 없습니다: {pdb_path}")
         chain_id = str(cfg_get(cfg, "target.chain", "A"))
         structure = pdb_io.load_structure(pdb_path)
         chain = pdb_io.get_chain(structure, chain_id)
         pdb_io.validate_polymer_residues(chain)
+        suffix = Path(pdb_path.stem).suffix.lower() if pdb_path.suffix.lower() == ".gz" else pdb_path.suffix.lower()
+        if suffix not in {".cif", ".mmcif"}:
+            numbers = [int(residue.id[1]) for residue in pdb_io.iter_residues(chain)]
+            if any(right < left for left, right in zip(numbers, numbers[1:])):
+                raise ValueError(f"target.pdb 체인 {chain_id}의 원래 잔기 번호 순서가 역행합니다. 원본 구조의 잔기 순서를 확인하세요: {pdb_path}")
         sequence = pdb_io.chain_sequence(chain)
         if sequence:
             return sequence
@@ -663,7 +672,11 @@ def _snapshot_target_msa(target_msa: str | None, phase_dir: Path, dry_run: bool)
 
 def _parse_aux_chains(cfg: dict) -> list[dict]:
     """target.aux_chains: [{name, sequence}] 를 검증해 반환."""
-    entries = cfg_get(cfg, "target.aux_chains", []) or []
+    entries = cfg_get(cfg, "target.aux_chains", [])
+    if entries is None:
+        entries = []
+    if not isinstance(entries, list):
+        raise ValueError("target.aux_chains는 보조 체인 목록이어야 합니다: [{name: ..., sequence: ...}]")
     parsed: list[dict] = []
     for index, entry in enumerate(entries):
         if isinstance(entry, dict):

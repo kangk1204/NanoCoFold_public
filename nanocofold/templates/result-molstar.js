@@ -13,13 +13,13 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     });
     const result = new NanoCoFoldResultViewer(viewer, data);
     try {
-      result.structure = await result.load(data.content, data.format, "Predicted complex");
+      result.structure = await result.load(data.content, data.format, () => result.text("예측 복합체", "Predicted complex"));
       result.addCoordinateChains();
       if (!result.displayChains.length)
-        await result.component(result.structure, {}, "unclassified", "Coordinates", 0x909ea9, "ball-and-stick");
+        await result.component(result.structure, {}, "unclassified", () => result.text("좌표", "Coordinates"), 0x909ea9, "ball-and-stick");
       for (const chain of result.displayChains)
         await result.component(result.structure, {auth_asym_id: chain.id}, chain.unclassified ? "unclassified" : chain.role,
-          chain.unclassified ? `Coordinates · ${chain.id}` : `Chain ${chain.id} · ${chain.role}`,
+          () => chain.unclassified ? result.text("좌표 · {0}", "Coordinates · {0}", chain.id) : result.text("체인 {0} · {1}", "Chain {0} · {1}", chain.id, result.roleLabel(chain.role)),
           chain.role === "target" ? 0x3b82b2 : chain.role === "binder" ? 0xd79a2b : 0x909ea9,
           chain.unclassified || chain.residues.length < 4 ? "ball-and-stick" : "cartoon");
       for (const [key, labels, color, type] of [
@@ -27,13 +27,13 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
         ["contacts", (data.contacts || []).flatMap(p => [p.a, p.b]), 0x16a092, "ball-and-stick"],
         ["clashes", (data.clashes || []).flatMap(p => [p.a, p.b]), 0xd83a31, "ball-and-stick"],
       ]) if (labels.length)
-        await result.component(result.structure, result.schema(labels), key, key, color, type);
+        await result.component(result.structure, result.schema(labels), key, () => result.layerLabel(key), color, type);
       const cdrColors = {CDR1: 0x4376d7, CDR2: 0x199a74, CDR3: 0xb750a5};
       for (const [name, region] of Object.entries(data.cdr?.ranges || {}))
         await result.component(result.structure, result.schema(region.labels), "cdr", name, cdrColors[name], "cartoon");
       if (data.reference?.available) {
-        const reference = await result.load(data.reference.content, data.reference.format, "Input reference · target Cα alignment");
-        await result.component(reference, {}, "reference", "Saved input coordinates", 0x697582, "cartoon", 0.35);
+        const reference = await result.load(data.reference.content, data.reference.format, () => result.text("입력 참조 · 표적 Cα 정렬", "Input reference · target Cα alignment"));
+        await result.component(reference, {}, "reference", () => result.text("저장된 입력 좌표", "Saved input coordinates"), 0x697582, "cartoon", 0.35);
       }
       viewer.subscribe(viewer.plugin.behaviors.interaction.click, event => {
         if (result.disposed) return;
@@ -60,10 +60,52 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     this.metadataIncomplete = !recorded.length || recorded.length !== this.displayChains.length ||
       this.displayChains.some(chain => chain.unclassified) || recorded.some(chain => !Array.isArray(chain?.residues));
     this.disposed = false; this.pending = Promise.resolve();
+    this.labelBindings = [];
+    this.watchLanguage();
     this.activeLayers = {target: true, binder: true, context: true};
     this.displayOptions = {sequence: false, residues: false};
     this.residuesCreated = false;
     this.cameraFocusLabels = null;
+  }
+  text(ko, en, ...args) {
+    // Resolve at display time so both the standalone I18N engine and Site's
+    // document language can change without replacing saved coordinate data.
+    const engine = typeof I18N === "undefined" ? null : I18N;
+    const language = engine?.language || (typeof document !== "undefined" ? document.documentElement?.lang : "en");
+    if (engine?.format && engine?.value) {
+      const rendered = engine.value(engine.format(ko, args));
+      if (language === "ko" || !/[가-힣]/.test(rendered.replace(/\{\d+\}/g, ""))) return rendered;
+    }
+    return (language === "ko" ? ko : en).replace(/\{(\d+)\}/g, (_key, index) => String(args[Number(index)] ?? ""));
+  }
+  trackLabel(selector, label) {
+    if (typeof label === "function") this.labelBindings.push({selector, label});
+  }
+  watchLanguage() {
+    this.languageChanged = () => { this.refreshLabels().catch(error => { this.labelError = error; }); };
+    if (typeof document !== "undefined") {
+      document.addEventListener?.("nanocofold:language", this.languageChanged);
+      if (typeof MutationObserver !== "undefined" && document.documentElement) {
+        this.languageObserver = new MutationObserver(this.languageChanged);
+        this.languageObserver.observe(document.documentElement, {attributes:true, attributeFilter:["lang"]});
+      }
+    }
+  }
+  refreshLabels() {
+    this.pending = this.pending.catch(() => {}).then(async () => {
+      if (this.disposed || !this.labelBindings.length) return;
+      const update = this.viewer.plugin.state.data.build();
+      for (const {selector, label} of this.labelBindings)
+        update.to(selector).update(params => ({...params, label:label()}));
+      await update.commit();
+    });
+    return this.pending;
+  }
+  roleLabel(role) {
+    return role === "target" ? this.text("표적", "target") : role === "binder" ? this.text("파트너", "binder") : this.text("주변 체인", "context");
+  }
+  layerLabel(layer) {
+    return layer === "hotspots" ? this.text("결합 부위", "binding site") : layer === "contacts" ? this.text("접촉", "contacts") : this.text("충돌", "clashes");
   }
   addCoordinateChains() {
     // MolStar's parsed author chain IDs are coordinate labels, not inferred
@@ -83,7 +125,8 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
   }
   async load(content, format, label) {
     const plugin = this.viewer.plugin;
-    const raw = await plugin.builders.data.rawData({data: content, label});
+    const raw = await plugin.builders.data.rawData({data: content, label:typeof label === "function" ? label() : label});
+    this.trackLabel(raw, label);
     const trajectory = await plugin.builders.structure.parseTrajectory(raw, format === "cif" ? "mmcif" : "pdb");
     const model = await plugin.builders.structure.createModel(trajectory);
     return plugin.builders.structure.createStructure(model, {name: "model", params: {}});
@@ -91,7 +134,7 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
   schema(labels, atom) {
     return {items: [...new Set(labels || [])].map(label => {
       const m = String(label).match(/^([^:]+):(-?\d+)([A-Za-z]?)$/);
-      if (!m) throw Error(`잔기 번호 형식 오류: ${label}`);
+      if (!m) throw Error(this.text("잔기 번호 형식 오류: {0}", "Invalid residue label: {0}", label));
       const residue = this.displayChains.find(c => c.id === m[1])?.residues.find(r => r.label === label);
       const atomId = atom && residue?.atom_ids?.[atom];
       return {auth_asym_id: m[1], auth_seq_id: Number(m[2]), pdbx_PDB_ins_code: m[3] || "",
@@ -103,9 +146,10 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     const loci = StructureElement.Loci.fromSchema(structure.obj.data, schema);
     if (StructureElement.Loci.isEmpty(loci)) return;
     const component = await plugin.builders.structure.tryCreateComponent(structure, {
-      type: {name: "bundle", params: StructureElement.Bundle.fromLoci(loci)}, nullIfEmpty: true, label,
+      type: {name: "bundle", params: StructureElement.Bundle.fromLoci(loci)}, nullIfEmpty: true, label:typeof label === "function" ? label() : label,
     }, `result-${key}-${this.representations.get(key)?.length || 0}`);
     if (!component) return;
+    this.trackLabel(component, label);
     const repr = await plugin.builders.structure.representation.addRepresentation(component, {
       type, color: "uniform", colorParams: {value: color}, typeParams: {alpha},
     });
@@ -146,7 +190,7 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
           if (this.disposed) return;
           if (chain.unclassified) continue; // Already drawn as neutral atoms.
           await this.component(this.structure, {auth_asym_id: chain.id}, `residues-${chain.role}`,
-            `Chain ${chain.id} · residues/side chains`, chain.role === "target" ? 0x3b82b2 : chain.role === "binder" ? 0xd79a2b : 0x909ea9,
+            () => this.text("체인 {0} · 잔기/곁사슬", "Chain {0} · residues/side chains", chain.id), chain.role === "target" ? 0x3b82b2 : chain.role === "binder" ? 0xd79a2b : 0x909ea9,
             "ball-and-stick");
         }
         this.residuesCreated = true;
@@ -166,7 +210,7 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
   loci(labels, atom) {
     const {StructureElement} = molstar.lib.structure;
     const loci = StructureElement.Loci.fromSchema(this.structure.obj.data, this.schema(labels, atom));
-    if (StructureElement.Loci.isEmpty(loci)) throw Error("선택한 잔기·원자가 구조에 없습니다.");
+    if (StructureElement.Loci.isEmpty(loci)) throw Error(this.text("선택한 잔기·원자가 구조에 없습니다", "The selected residue or atom is absent from the structure"));
     return loci;
   }
   focus(labels) {
@@ -223,6 +267,8 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     if (!this.disposed) {
       this.disposed = true;
       this.resizeObserver?.disconnect();
+      this.languageObserver?.disconnect();
+      if (typeof document !== "undefined") document.removeEventListener?.("nanocofold:language", this.languageChanged);
       cancelAnimationFrame(this.resizeFrame);
       this.viewer.dispose();
     }

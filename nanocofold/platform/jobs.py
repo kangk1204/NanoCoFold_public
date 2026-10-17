@@ -477,6 +477,8 @@ class JobManager:
             return self._create(payload, kind=kind, identifier=identifier, submission_hash=digest)
 
     def _create(self, payload: dict, *, kind: str = "analysis", identifier=None, submission_hash=None) -> dict:
+        if kind == "setup" and (not isinstance(payload.get("profile"), str) or payload["profile"] not in PROFILES):
+            raise ValueError("설치 프로필은 " + "/".join(sorted(PROFILES)) + " 중 하나입니다.")
         identifier = identifier or uuid.uuid4().hex
         folder = self.store.root / "jobs" / identifier
         override = payload.get("config")
@@ -570,8 +572,6 @@ class JobManager:
                         # Keep source ownership through the alias transaction.
                         # Canonical artifacts/status are never rewritten.
                         return self.store.insert(job)
-        if kind == "setup" and job["profile"] not in PROFILES:
-            raise ValueError("설치 프로필은 " + "/".join(sorted(PROFILES)) + " 중 하나입니다.")
         return self.store.insert(job)
 
     def resume(self, identifier: str, additional_budget_seconds=None, *, action_id=None, action_payload=None) -> dict:

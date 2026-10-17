@@ -722,7 +722,10 @@ def score_complex(
     mapping_failed = bool(missing_hotspots)
     # Keep the canonical count ratio for gates/ranking; only the UI rounds it.
     # For example, 2/3 must not pass a configured 0.6667 contact threshold.
-    hotspot_contact_frac = len(contacted) / len(hotspot_min_dist) if hotspot_min_dist else float("nan")
+    # Missing residue mappings must never increase the apparent contact ratio.
+    # Keep this diagnostic on the requested-site denominator; mapping failure
+    # remains explicit and holds any ranking that weights this assessment.
+    hotspot_contact_frac = len(contacted) / len(requested_labels) if hotspot_min_dist and requested_labels else float("nan")
 
     binder_values = [plddt[key] for key in sorted(plddt) if key.startswith(binder_chain + ":")]
 

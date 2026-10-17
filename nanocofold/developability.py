@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .config import cfg_get, cfg_seed, resolve_path
+from .config import cfg_get, cfg_seed, resolve_path, developability_patterns
 from .utils import seq as seq_utils, shell
 from .utils.atomic import write_csv
 
@@ -42,12 +42,7 @@ def sequence_liabilities(sequence: str, cfg: dict, cdr_ranges: dict[str, tuple[i
     for start, end in normalized_ranges.values():
         cdr_positions.update(range(start, end + 1))
 
-    motif_patterns = {
-        "deamidation": "|".join(dev.get("deamidation", ["NG", "NS", "DG", "DS"])),
-        "isomerization": "|".join(dev.get("isomerization", ["DP", "DG"])),
-        "oxidation": "|".join(dev.get("oxidation", ["M"])),
-        "glycosylation": dev.get("glycosylation", "N[^P][ST]"),
-    }
+    motif_patterns = developability_patterns(cfg)
     hits = seq_utils.find_motif_hits(sequence, motif_patterns)
     in_cdr = {name: [hit for hit in hits if hit["type"] == name and hit["pos"] in cdr_positions] for name in motif_patterns}
 

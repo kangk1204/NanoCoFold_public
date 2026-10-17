@@ -76,16 +76,19 @@ def write_csv(path: Path, frame, *, encoding="utf-8", **kwargs) -> None:
 
     Input IDs must already satisfy the input contract. Text escaping is a final
     output defense, not an ID alias or a transformation of numerical scores.
+    Canonical run tables use UTF-8 without BOM for machine readers. Excel-facing
+    download/synthesis exports explicitly request UTF-8 BOM or use XLSX.
     """
-    from .spreadsheet import csv_cell
+    from .spreadsheet import csv_cell, csv_headers
     from pandas import CategoricalDtype
     from pandas.api.types import is_string_dtype
     safe = frame.copy()
+    headers = csv_headers(safe.columns)
     for column in safe.columns:
         if (safe[column].dtype == object or is_string_dtype(safe[column].dtype)
                 or isinstance(safe[column].dtype, CategoricalDtype)):
             safe[column] = safe[column].map(csv_cell)
-    safe.rename(columns=csv_cell, inplace=True)
+    safe.columns = headers
     # pandas streams into a binary handle; avoid materializing large CSV strings.
     with atomic_writer(path, **kwargs) as handle:
         safe.to_csv(handle, index=False, encoding=encoding)

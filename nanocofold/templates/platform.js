@@ -973,7 +973,9 @@ async function refreshJobs() {
   if (offline || document.hidden || !$("job-list") || state.pollingJobs) return;
   state.pollingJobs = true;
   try {
-    state.jobs = (await api("/api/jobs", undefined, {timeoutMs: 15000})).jobs;
+    const page = await api("/api/jobs", undefined, {timeoutMs: 15000});
+    state.jobs = [...new Map([...(page.jobs || []), ...(page.active_jobs || [])].map(job => [job.id, job])).values()]
+      .sort((a, b) => b.created - a.created || String(b.id).localeCompare(String(a.id)));
     if (state.environmentJob) {
       const checked = state.jobs.find(j => j.id === state.environmentJob);
       if (checked && !["queued", "running", "cancelling"].includes(checked.state)) {

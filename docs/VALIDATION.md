@@ -1,5 +1,7 @@
 # 배포 검증 기록
 
+**Archive paths:** References below to `examples/current_native`, `examples/outputs`, `START_HERE.html` and `validation/status.json` identify files in the separately supplied collaborator delivery ZIP. They are not directories in this GitHub source checkout. The source includes public inputs under `examples/tutorial`; source-only users run those inputs separately. Historical evidence below is preserved as recorded.
+
 ## 0.4.8rc5 — 2026-10-15 대체 GPU 설치·실행·결과 검증
 
 유휴 RTX 5070 Ti 16 GB에서 별도 작업 경로에 전체 프로파일을 설치하고 공개 예제를 실제 실행했습니다. H200·A6000은 사용하지 않았습니다. 기존 시스템 패키지·드라이버를 유지하고 `--skip-system-packages`를 사용했으며, 새 잠금 환경 8개·모델 자산 26개·준비 검사 9항목을 확인했습니다. 공식 RF 가중치 다운로드의 TLS 실패와 자체 설치 중단 기록을 보존하고, 기존 가중치를 고정 SHA256으로 확인해 재사용했습니다. 완전히 빈 OS나 모든 가중치의 최초 다운로드 시험으로 표시하지 않습니다. rc5는 같은 검증에서 만든 엔진 환경과 가중치를 새 코어·작업 경로에서 재사용했습니다.

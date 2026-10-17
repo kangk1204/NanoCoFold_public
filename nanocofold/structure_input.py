@@ -545,6 +545,7 @@ def _inspect_chain(original_chain: Chain, canonical_id: str, residues: list[Resi
         if missing:
             blockers.append(f"체인 {original_chain.id} 원래 잔기 {label}: backbone 원자 누락 {missing}")
         author_gap = last_number is not None and int(residue.id[1]) > last_number + 1
+        author_reverse = last_number is not None and int(residue.id[1]) < last_number
         if last_sequence_position is not None and sequence_position is not None:
             if sequence_position > last_sequence_position + 1:
                 blockers.append(
@@ -560,6 +561,8 @@ def _inspect_chain(original_chain: Chain, canonical_id: str, residues: list[Resi
                 )
         elif author_gap and not str(residue.id[2]).strip():
             blockers.append(f"체인 {original_chain.id}: 내부 잔기 번호 gap {last_number}→{int(residue.id[1])}")
+        elif author_reverse:
+            blockers.append(f"체인 {original_chain.id}: 원래 잔기 번호 순서가 역행합니다: {last_number}→{int(residue.id[1])}")
         last_number = int(residue.id[1])
         last_sequence_position = sequence_position
         ca = None

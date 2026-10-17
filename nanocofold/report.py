@@ -5,6 +5,8 @@ import hashlib
 import html
 import csv
 import json
+import math
+import numbers
 import re
 from collections import Counter
 from html.parser import HTMLParser
@@ -72,7 +74,7 @@ CANDIDATE_COLUMNS = [
     ("pdockq", "pDockQ"),
     ("pdockq2", "pDockQ2 (최소)"),
     ("interface_plddt", "계면 pLDDT"),
-    ("interface_pae", "계면 PAE"),
+    ("interface_pae", "계면 PAE (Å)"),
     ("interface_pae_ab", "PAE 행 표적·열 VHH (Å)"),
     ("interface_pae_ba", "PAE 행 VHH·열 표적 (Å)"),
     ("interface_pae_median", "PAE 중앙값 (Å)"),
@@ -288,8 +290,21 @@ HOTSPOT_COLUMNS = [
     ("kyte_doolittle", "소수성(KD)"),
     ("conservation", "보존도"),
     ("plddt", "pLDDT"),
-    ("dist_to_glycan", "글리칸 거리"),
+    ("dist_to_glycan", "글리칸 거리 (Å)"),
 ]
+
+
+def display_number(value):
+    """Readable display only; exact source/JSON/CSV values remain untouched."""
+    if isinstance(value, numbers.Real) and not isinstance(value, (bool, int)):
+        numeric = float(value)
+        if not math.isfinite(numeric):
+            return "—"
+        if numeric == 0:
+            return "0"
+        # Retain very small nonzero values rather than rounding them to zero.
+        return format(numeric, ".8g")
+    return value
 
 
 def metric_scope_records(rows: list[dict], mode: str) -> list[dict]:
@@ -445,6 +460,7 @@ def generate_report(
     # Only template-owned derived captions use this marker. Raw saved values
     # remain unmarked even when they equal a translation key such as 완료.
     env.globals["report_term"] = lambda value: Markup('<span data-report-i18n>') + escape(str(value)) + Markup('</span>')
+    env.filters["display_number"] = display_number
     template = env.get_template("report.html.j2")
 
     from .platform.results import ResultReader
@@ -547,7 +563,7 @@ def generate_report(
         "title": str(cfg_get(cfg, "report.title", "NanoCoFold")),
         "run_dir": run_dir.name,
         "run_id": run_dir.name,
-        "generated_at": _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "generated_at": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
         "reporting_version": __version__,
         "computation_version": saved_reader.state.get("application_version") if saved_reader else None,
         "population_scope": population_scope,

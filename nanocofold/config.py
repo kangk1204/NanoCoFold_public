@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import copy
 import datetime as _dt
+import difflib
 import json
 import math
 import os
 import re
 import warnings
 from pathlib import Path
+from functools import lru_cache
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -39,6 +41,15 @@ ConfigLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _un
 def read_config_yaml(content):
     return yaml.load(content, Loader=ConfigLoader)
 
+
+def read_config_file(path: str | Path):
+    """Read user settings with a filename-bearing UTF-8 repair message."""
+    path = Path(path)
+    try:
+        return read_config_yaml(path.read_text(encoding="utf-8-sig"))
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"설정 파일을 UTF-8로 다시 저장한 뒤 입력하세요: {path}") from exc
+
 def _resolve_project_root() -> Path:
     """사용자 작업 root(상대 입력/출력 기준). 패키지 내부 자산은 절대 반환하지 않는다(H11)."""
     env_root = os.environ.get("NANOCOFOLD_ROOT")
@@ -67,6 +78,17 @@ PROJECT_ROOT = _resolve_project_root()
 ASSET_ROOT = _resolve_asset_root(PROJECT_ROOT)
 DEFAULT_CONFIG_PATH = ASSET_ROOT / "config" / "default.yaml"
 
+
+@lru_cache(maxsize=2)
+def _parsed_default_config(content: str):
+    return read_config_yaml(content)
+
+
+def _default_config():
+    # Read contents on every call: edits, deletion and corruption must remain
+    # visible. Only parsing is cached, and callers always own an independent copy.
+    return copy.deepcopy(_parsed_default_config(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8")))
+
 def _deep_merge(base: dict, override: dict) -> dict:
     out = copy.deepcopy(base)
     for key, value in (override or {}).items():
@@ -92,6 +114,17 @@ def _parse_scalar(text: str) -> Any:
         return yaml.safe_load(text)
     except yaml.YAMLError:
         return text
+
+
+def apply_overrides(cfg: dict, overrides: list[str] | None) -> None:
+    """Use one override parser for new runs, resumes and campaigns."""
+    for item in overrides or []:
+        if not isinstance(item, str) or "=" not in item:
+            raise ValueError(f"--set 형식은 key=value 입니다: {item}")
+        key, value = item.split("=", 1)
+        if not key.strip():
+            raise ValueError("--set 설정 키가 비어 있습니다.")
+        _set_dotted(cfg, key.strip(), _parse_scalar(value.strip()))
 
 
 def exploration_config() -> dict:
@@ -128,8 +161,8 @@ def load_config(path: str | Path | None = None, overrides: list[str] | None = No
     # A partial substitute changes the scientific/runtime policy silently when a
     # wheel is damaged. User overrides cannot repair a missing installation asset.
     try:
-        base = read_config_yaml(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError) as exc:
+        base = _default_config()
+    except (OSError, UnicodeDecodeError, yaml.YAMLError) as exc:
         raise ValueError(
             f"기본 설치 설정을 불러올 수 없습니다: {DEFAULT_CONFIG_PATH}. "
             "NanoCoFold 설치를 복구하거나 다시 설치하세요."
@@ -142,13 +175,13 @@ def load_config(path: str | Path | None = None, overrides: list[str] | None = No
 
     environment = PROJECT_ROOT / "config" / "environment.yaml"
     if environment.exists():
-        installed = read_config_yaml(environment.read_text(encoding="utf-8")) or {}
+        installed = read_config_file(environment) or {}
         if not isinstance(installed, dict):
             raise ValueError("설치 환경 설정은 YAML 객체여야 합니다.")
         base = _deep_merge(base, installed)
 
     if path:
-        user = read_config_yaml(Path(path).read_text(encoding="utf-8"))
+        user = read_config_file(path)
         if user is None:
             user = {}
         if not isinstance(user, dict):
@@ -157,11 +190,7 @@ def load_config(path: str | Path | None = None, overrides: list[str] | None = No
     else:
         cfg = copy.deepcopy(base)
 
-    for item in overrides or []:
-        if "=" not in item:
-            raise ValueError(f"--set 형식은 key=value 입니다: {item}")
-        key, value = item.split("=", 1)
-        _set_dotted(cfg, key.strip(), _parse_scalar(value.strip()))
+    apply_overrides(cfg, overrides)
 
     _validate(cfg, historical=historical)
     return cfg
@@ -170,7 +199,9 @@ def load_config(path: str | Path | None = None, overrides: list[str] | None = No
 def _validate(cfg: dict, *, historical: bool = False) -> None:
     from .utils.tool_args import BOLTZ_MANAGED, CHAI_MANAGED, validate_extra_args, validate_colabfold_extra_args
 
-    _validate_scalar_shapes(cfg)
+    _validate_scalar_shapes(cfg, historical=historical)
+    if not historical:
+        developability_patterns(cfg)
 
     _external_viewer_url(cfg)
     for dotted in ("run", "target", "structure", "design", "screen", "mature", "score", "rank",
@@ -368,9 +399,9 @@ def _validate(cfg: dict, *, historical: bool = False) -> None:
         colabfold_settings(cfg)
 
 
-def _validate_scalar_shapes(cfg):
+def _validate_scalar_shapes(cfg, *, historical=False):
     """Check downstream numeric/bool settings before any inference runs."""
-    defaults = read_config_yaml(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
+    defaults = _default_config()
     optional = {"run.seed", "screen.opendde.attention_chunk_size"}
     signed = {"mature.prefilter.threshold", "developability.hydrophobic_mean_kd",
               "developability.net_charge_min", "developability.net_charge_max"}
@@ -394,6 +425,10 @@ def _validate_scalar_shapes(cfg):
                     raise ValueError(f"{path}는 유한한 {'정수' if type(expected) is int else '숫자'}여야 합니다.")
                 if value < 0 and path not in signed and not path.startswith("rank.weights."):
                     raise ValueError(f"{path}는 0 이상이어야 합니다.")
+            elif not historical and isinstance(expected, str) and value is not None and path != "target.hotspots" and not isinstance(value, str):
+                raise ValueError(f"{path}는 문자열이어야 합니다. ':'를 포함하는 --set 값은 따옴표로 감싸세요.")
+            elif not historical and isinstance(expected, list) and value is not None and not isinstance(value, list):
+                raise ValueError(f"{path}는 목록이어야 합니다.")
     visit(defaults, cfg)
     # Reject model budgets before an adapter can truncate a float with int()
     # or request an unbounded allocation. Zero is allowed only where it has an
@@ -451,7 +486,7 @@ def _validate_scalar_shapes(cfg):
     for path in ("mature.antifold.model_path", "mature.antifold.sha256", "mature.antifold.antigen_chain",
                  "mature.antifold.nanobody_chain", "screen.chai1.msa_directory",
                  "screen.colabfold.database_manifest", "screen.colabfold.msa_manifest_sha256",
-                 "structure.msa.database_manifest"):
+                 "structure.msa.database_manifest", "target.fasta", "target.pdb", "screen.vhh_fasta", "mature.wt_fasta"):
         value = cfg_get(cfg, path)
         if value is not None and (not isinstance(value, str) or not value.strip()):
             raise ValueError(f"{path}는 경로·식별자 문자열 또는 null이어야 합니다.")
@@ -483,9 +518,15 @@ def _validate_scalar_shapes(cfg):
                 continue
             if not isinstance(value, str) or not re.fullmatch(r"[ACDEFGHIKLMNPQRSTVWY]*", value):
                 raise ValueError(f"expression.{key}는 대문자 아미노산 서열이어야 합니다.")
-    # Warn about typo-shaped keys in fixed scientific sections. Dynamic metric
-    # weights, CDR names, complex entities and campaign definitions stay open.
-    dynamic = {"rank.weights", "mature.cdr.regions", "mature.wt_structure_review", "complex", "specificity"}
+    # Dynamic metrics and metadata remain valid extensions. Warn on near-miss
+    # metric names, while fixed campaign keys use the ordinary warning policy.
+    dynamic = {"mature.cdr.regions", "mature.wt_structure_review"}
+    defaults.setdefault("complex", {key: None for key in (
+        "proteins", "engine", "comparison_engines", "seeds", "recycles", "diffusion_steps",
+        "models_per_seed", "msa", "restraints", "primary_pair", "reference_symmetry",
+        "msa_source", "allow_public_msa_server", "anchor_chain", "interest_positions", "reference_path")})
+    extensions = {"name", "id", "metadata", "case_id", "source", "reference", "api_msa_consent",
+                  "input_review", "hotspots.auto.exclude_positions", "complex.metadata", "specificity.metadata"}
     def unknown(default, current, prefix=""):
         if prefix in dynamic or prefix.endswith(".env_vars") or not isinstance(current, dict):
             return
@@ -494,12 +535,35 @@ def _validate_scalar_shapes(cfg):
             if key not in default:
                 # Explicitly supported extension metadata is consumed outside
                 # the baseline YAML; it is not an unknown analysis option.
-                if path in dynamic or path in {"input_review", "hotspots.auto.exclude_positions"} or key in {"name", "id", "metadata", "case_id", "source", "reference", "api_msa_consent"}:
+                if path in dynamic or path in extensions:
+                    continue
+                if prefix == "rank.weights" and not difflib.get_close_matches(str(key), default, n=1, cutoff=.8):
                     continue
                 warnings.warn(f"기본 설정에 없는 키입니다. 효과가 있는 옵션인지 확인하세요: {path}", UserWarning, stacklevel=3)
             elif isinstance(default[key], dict):
                 unknown(default[key], value, path)
     unknown(defaults, cfg)
+
+
+def developability_patterns(cfg: dict) -> dict[str, str]:
+    """Validate motif collections before joining them into regular expressions."""
+    dev = cfg_get(cfg, "developability", {}) or {}
+    patterns = {}
+    for name, default in (("deamidation", ["NG", "NS", "DG", "DS"]),
+                          ("isomerization", ["DP", "DG"]), ("oxidation", ["M"])):
+        value = dev.get(name, default)
+        if not isinstance(value, (list, tuple)) or any(not isinstance(item, str) or not item for item in value):
+            raise ValueError(f"developability.{name}는 비어 있지 않은 모티프 문자열의 목록이어야 합니다.")
+        patterns[name] = "|".join(value)
+    patterns["glycosylation"] = dev.get("glycosylation", "N[^P][ST]")
+    for name, pattern in patterns.items():
+        if not isinstance(pattern, str):
+            raise ValueError(f"developability.{name}는 정규식 문자열이어야 합니다.")
+        try:
+            re.compile(pattern)
+        except re.error as exc:
+            raise ValueError(f"developability.{name} 정규식이 올바르지 않습니다: {exc}") from exc
+    return patterns
 
 
 def cfg_seed(cfg: dict, dotted: str, default: int = 42) -> int:

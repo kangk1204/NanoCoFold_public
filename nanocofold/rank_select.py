@@ -130,7 +130,9 @@ def composite_score(frame: pd.DataFrame, cfg: dict) -> pd.Series:
         score = score / total
     # Missing CDR-dependent liabilities cannot earn a favorable risk score.
     # Preserve partial flag counts but hold the combined ranking until assessed.
-    return score.round(4).reindex(original_index)
+    # Formatting belongs to the presentation layer. Rounding before sorting
+    # would turn distinct measurements into artificial ID-ordered ties.
+    return score.reindex(original_index)
 
 
 def ranking_policy(cfg: dict, frame: pd.DataFrame | None = None) -> dict:
@@ -155,6 +157,11 @@ def ranking_policy(cfg: dict, frame: pd.DataFrame | None = None) -> dict:
                                      if mixed else "recorded ranking input in the same prediction engine, including controls; rows with unassessed CDR liabilities excluded when developability is weighted"),
         "failed_row_handling": "failed/interrupted prediction rows are preserved with unavailable scores/ranks, excluded before normalization and never selected even under fallback",
         "selection": "filter recorded eligibility and controls, then apply diversity limits without renormalizing",
+        "score_precision": "unrounded_float64; presentation rounding never controls ordering",
+        "rank_tie_break": "exact composite_score descending, then design_id or variant_id ascending; stable input order only when identifiers are absent or identical",
+        "rank_interpretation": "ordinal deterministic record order; equal composite scores do not establish a scientific difference",
+        "hotspot_mapping_gate": "any failed requested-site mapping holds ranking and selection when hotspot_contact_frac has nonzero weight, even when the contact ratio is finite",
+        "plate_scope": "engine-namespaced plate IDs in comparison mode; within-engine wells are not a combined ordering or synthesis authorization",
         "cross_engine_scores_combined": mixed,
         "calibrated_binding_probability": False,
         "affinity_improvement_established": False,
@@ -189,14 +196,18 @@ def ranking_warnings(frame: pd.DataFrame, cfg: dict) -> list[str]:
     if interface_held.any():
         message += (f"이 중 {int(interface_held.sum())}개는 접촉이 없거나 가중 계면 지표가 미평가입니다. "
                     "성공한 무접촉 예측과 측정된 접촉0개 기록은 보존하고 순위·선정은 보류합니다. ")
-    weighted_held = held & _weighted_unavailable_rows(frame, cfg) & ~interface_held
+    hotspot_held = held & _hotspot_mapping_unavailable_rows(frame, cfg)
+    if hotspot_held.any():
+        message += (f"이 중 {int(hotspot_held.sum())}개는 요청한 결합 부위의 구조 대응이 불완전하여 "
+                    "접촉률을 순위에 사용하지 않고 보류합니다. ")
+    weighted_held = held & _weighted_unavailable_rows(frame, cfg) & ~interface_held & ~hotspot_held
     if weighted_held.any():
         applied, _ = _available_weights(frame, cfg)
         missing = [metric for metric, weight in applied.items() if weight and
                    (~np.isfinite(pd.to_numeric(frame.loc[weighted_held, metric], errors="coerce"))).any()]
         message += (f"이 중 {int(weighted_held.sum())}개는 다른 성공 후보에서 평가된 가중 지표 "
                     f"({', '.join(missing)}) 값이 없어 중앙값으로 보충하지 않고 보류합니다. ")
-    elif not cdr_held.any() and not interface_held.any():
+    elif not cdr_held.any() and not interface_held.any() and not hotspot_held.any():
         message += "저장된 종합점수가 없어 순위·선별을 추정하지 않습니다. "
     if cfg_get(cfg, "rank.fallback_to_ineligible", False):
         message += ("fallback_to_ineligible=true는 종합점수가 있는 부적격 후보에만 적용됩니다. "
@@ -247,6 +258,10 @@ def _available_weights(frame: pd.DataFrame, cfg: dict) -> tuple[dict, dict]:
     applied, ignored = {}, {}
     for metric, weight in (cfg_get(cfg, "rank.weights", {}) or {}).items():
         values = pd.to_numeric(measured[metric], errors="coerce") if metric in measured else None
+        if metric == "hotspot_contact_frac" and values is not None:
+            # An incomplete mapping is not evidence that a usable site metric
+            # exists elsewhere in the successful cohort.
+            values = values.mask(_hotspot_mapping_unavailable_rows(measured, cfg))
         target = applied if values is not None and np.isfinite(values).any() else ignored
         target[metric] = weight
     return applied, ignored
@@ -254,12 +269,23 @@ def _available_weights(frame: pd.DataFrame, cfg: dict) -> tuple[dict, dict]:
 
 def _weighted_unavailable_rows(frame: pd.DataFrame, cfg: dict) -> pd.Series:
     """Missing measurements must not acquire a favorable cohort median score."""
-    held = pd.Series(False, index=frame.index)
+    held = _hotspot_mapping_unavailable_rows(frame, cfg)
     for metric, weight in _available_weights(frame, cfg)[0].items():
         if weight:
             values = pd.to_numeric(frame[metric], errors="coerce")
             held |= ~np.isfinite(values).fillna(False)
     return held
+
+
+def _hotspot_mapping_unavailable_rows(frame: pd.DataFrame, cfg: dict) -> pd.Series:
+    """Honor both current booleans and CSV-reloaded failure receipts."""
+    if not cfg_get(cfg, "rank.weights.hotspot_contact_frac", 0) or "hotspot_mapping_failed" not in frame:
+        return pd.Series(False, index=frame.index)
+    return frame["hotspot_mapping_failed"].map(
+        lambda value: (isinstance(value, (bool, np.bool_)) and bool(value))
+        or (isinstance(value, str) and value.strip().lower() in {"true", "1"})
+        or (isinstance(value, (int, float, np.number)) and not isinstance(value, (bool, np.bool_)) and value == 1)
+    )
 
 
 def _interface_unavailable_rows(frame: pd.DataFrame, cfg: dict) -> pd.Series:
@@ -359,6 +385,15 @@ def select_final(
     selected["selection_rank"] = range(1, len(selected) + 1)
     selected["plate_id"] = [f"plate_{index // 96 + 1:02d}" for index in range(len(selected))]
     selected["plate_position"] = [plate_position(index % 96) for index in range(len(selected))]
+    if cfg_get(cfg, "screen.comparison.enabled", False):
+        engine_column = next((key for key in ("predictor_engine", "engine", "ranking_scope") if key in selected), None)
+        if engine_column and not selected.empty:
+            engines = selected[engine_column].astype(str)
+            if engines.nunique() != 1 or engines.str.strip().eq("").any():
+                raise ValueError("Comparison plate allocation requires one recorded prediction engine per selection.")
+            # Preserve the original per-engine plate identifier explicitly.
+            selected["engine_plate_id"] = selected["plate_id"]
+            selected["plate_id"] = engines + "__" + selected["engine_plate_id"]
     return selected
 
 

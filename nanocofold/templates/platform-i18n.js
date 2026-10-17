@@ -1774,7 +1774,49 @@ const NCF_TRANSLATIONS = Object.freeze({
   "소수성(KD)": "Hydrophobicity (Kyte\u2013Doolittle)",
   "보존도": "Conservation",
   "글리칸 거리": "Glycan distance",
-  "복합체 예측 · 처음 실행 추천": "Predict complexes · Recommended first run"
+  "복합체 예측 · 처음 실행 추천": "Predict complexes · Recommended first run",
+  "사용 안 함": "Disabled",
+  "글리칸 거리 (Å)": "Glycan distance (Å)",
+  "복합체 설정은 객체여야 합니다.": "Complex settings must be an object.",
+  "random Cys 보호 설정은 true/false여야 합니다.": "Random cysteine protection must be true or false.",
+  "결합 부위를 지정하지 않았습니다. 결합 위치를 제한하지 않고 탐색합니다.": "No binding site was specified. Exploration is not restricted to a binding location.",
+  "캐시된 MSA가 없습니다: {0}. 서열만 입력으로 단일서열 모드(msa=empty)로 진행합니다. 정확도를 높이려면 structure.msa.backend=colabfold_search 로 MSA를 먼저 생성하세요.": "No cached MSA is available: {0}. Continuing with the input sequence alone (msa=empty). To use an MSA, generate it first with structure.msa.backend=colabfold_search.",
+  "final_eligible 후보가 0종입니다. 합성 목록은 비어 있습니다. 임계값/예측 품질을 점검하세요.": "There are no final_eligible candidates. The synthesis list is empty. Review the thresholds and prediction quality.",
+  "final_eligible 후보가 0종입니다. rank.fallback_to_ineligible=true는 종합점수가 있는 부적격 후보만 포함하며 미평가 보류 후보에는 적용되지 않습니다.": "There are no final_eligible candidates. rank.fallback_to_ineligible=true includes only ineligible candidates with an available composite score; it does not include candidates held as unevaluated.",
+  "전체 성공 후보에서 미평가인 순위 지표: {0}. 해당 가중치를 제외하고 나머지 지표로 순위를 계산했습니다. 미평가를 0점이나 부적격으로 해석하지 마세요.": "Ranking metrics unevaluated across all successful candidates: {0}. These weights were excluded and the remaining metrics were used. Unevaluated does not mean a zero score or ineligibility.",
+  "handoff 게이트 미통과({0}건): 발주 목록은 확정할 수 없습니다. `nanocofold validate-handoff` 로 항목을 확인하세요.": "Handoff validation did not pass ({0} issues). The order list cannot be finalized. Review the issues with `nanocofold validate-handoff`.",
+  "종합점수·기록 순위 보류 {0}/{1}개 모델.": "Composite score and recorded rank are held for {0}/{1} models.",
+  "이 중 {0}개는 CDR 개발가능성이 미평가입니다.": "CDR developability is unevaluated for {0} of these models.",
+  "ANARCI 환경 또는 서열에 맞는 CDR 범위를 확인하세요.": "Check the ANARCI environment or CDR ranges appropriate for the sequence.",
+  "이 중 {0}개는 접촉이 없거나 가중 계면 지표가 미평가입니다.": "{0} of these models have no contacts or an unevaluated weighted interface metric.",
+  "성공한 무접촉 예측과 측정된 접촉0개 기록은 보존하고 순위·선정은 보류합니다.": "Successful no-contact predictions and measured zero-contact records are preserved; their ranking and selection are held.",
+  "이 중 {0}개는 요청한 결합 부위의 구조 대응이 불완전하여 접촉률을 순위에 사용하지 않고 보류합니다.": "The requested binding-site mapping is incomplete for {0} of these models; their contact fraction is excluded from ranking and they remain held.",
+  "이 중 {0}개는 다른 성공 후보에서 평가된 가중 지표 ({1}) 값이 없어 중앙값으로 보충하지 않고 보류합니다.": "{0} of these models lack weighted metrics ({1}) measured in other successful candidates. They remain held without median imputation.",
+  "저장된 종합점수가 없어 순위·선별을 추정하지 않습니다.": "No composite score is recorded; ranking and selection are not inferred.",
+  "fallback_to_ineligible=true는 종합점수가 있는 부적격 후보에만 적용됩니다.": "fallback_to_ineligible=true applies only to ineligible candidates with an available composite score.",
+  "실패 예측이나 가중 CDR 미평가로 보류된 후보는 포함하지 않습니다.": "It excludes failed predictions and candidates held for unevaluated weighted CDR developability.",
+  "mock/dry-run: CDR 의존 liability 는 미평가로 기록됩니다. rank.weights.dev_flags가 0이 아니면 종합 순위와 최종 선별을 보류합니다. 실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. 미평가를 위험 없음으로 처리하지 않습니다.": "mock/dry-run: CDR-dependent liabilities are recorded as unevaluated. When rank.weights.dev_flags is nonzero, composite ranking and final selection are held. For actual analysis, install ANARCI with envs/setup_antibody.sh or specify mature.cdr.source=config and validated 1-based CDR ranges. Unevaluated is not treated as risk-free.",
+  "ANARCI 환경 없음: CDR 의존 liability 는 미평가로 기록됩니다. rank.weights.dev_flags가 0이 아니면 종합 순위와 최종 선별을 보류합니다. 실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. 미평가를 위험 없음으로 처리하지 않습니다.": "ANARCI environment unavailable: CDR-dependent liabilities are recorded as unevaluated. When rank.weights.dev_flags is nonzero, composite ranking and final selection are held. For actual analysis, install ANARCI with envs/setup_antibody.sh or specify mature.cdr.source=config and validated 1-based CDR ranges. Unevaluated is not treated as risk-free.",
+  "CDR 개발가능성 평가가 준비되지 않으면 종합 순위와 최종 선별을 보류합니다. 실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. mock/dry-run은 실제 CDR 평가를 수행하지 않으며 미평가를 위험 없음으로 처리하지 않습니다.": "Composite ranking and final selection are held when CDR developability assessment is unavailable. For actual analysis, install ANARCI with envs/setup_antibody.sh or specify mature.cdr.source=config and validated 1-based CDR ranges. Mock/dry-run does not perform actual CDR assessment or treat unevaluated liabilities as risk-free."
+,
+  "--set 설정 키가 비어 있습니다.": "The --set configuration key is empty.",
+  "developability.{0} 정규식이 올바르지 않습니다: {1}": "Invalid developability.{0} regular expression: {1}",
+  "developability.{0}는 비어 있지 않은 모티프 문자열의 목록이어야 합니다.": "developability.{0} must be a list of nonempty motif strings.",
+  "developability.{0}는 정규식 문자열이어야 합니다.": "developability.{0} must be a regular expression string.",
+  "{0}는 목록이어야 합니다.": "{0} must be a list.",
+  "{0}는 문자열이어야 합니다. ':'를 포함하는 --set 값은 따옴표로 감싸세요.": "{0} must be a string. Quote --set values that contain ':'.",
+  "설정 파일을 UTF-8로 다시 저장한 뒤 입력하세요: {0}": "Save the configuration file as UTF-8 and try again: {0}",
+  "FASTA 파일을 UTF-8로 다시 저장한 뒤 입력하세요: {0}": "Save the FASTA file as UTF-8 and try again: {0}",
+  "체인 {0}: 원래 잔기 번호 순서가 역행합니다: {1}→{2}": "Chain {0}: author residue numbers go backwards: {1}→{2}",
+  "target.aux_chains는 보조 체인 목록이어야 합니다: [{name: ..., sequence: ...}]": "target.aux_chains must be a list of auxiliary chains: [{name: ..., sequence: ...}]",
+  "target.fasta 파일을 찾을 수 없습니다: {0}": "Cannot find target.fasta: {0}",
+  "target.pdb 파일을 찾을 수 없습니다: {0}": "Cannot find target.pdb: {0}",
+  "mature.wt_fasta 파일을 찾을 수 없습니다: {0}": "Cannot find mature.wt_fasta: {0}",
+  "target.pdb 체인 {0}의 원래 잔기 번호 순서가 역행합니다. 원본 구조의 잔기 순서를 확인하세요: {1}": "Author residue numbers go backwards in target.pdb chain {0}. Check the residue order in the original structure: {1}",
+  "Boltz-2 재평가 대상의 ipTM이 모두 미평가입니다. 점수 우선순위를 주장하지 않고 후보 ID 순서로 선택합니다.": "ipTM is unevaluated for all Boltz-2 reassessment candidates. Selection follows candidate ID order without claiming a score priority.",
+  "{0} 파일을 찾을 수 없습니다: {1}": "Cannot find {0}: {1}",
+  "{0}에는 서열을 1개만 넣으세요.": "Provide exactly one sequence in {0}.",
+  "CSV 헤더를 안전한 텍스트로 변환하면 열 이름이 중복됩니다. 원본 표의 열 이름을 구분해 주세요.": "CSV column names collide after spreadsheet text escaping. Give the original table distinct column names."
 });
 /* Explicit presentation bindings; no DOM observer, input rewriting, or API mutation. */
 globalThis.I18N = (() => {
@@ -1801,6 +1843,10 @@ globalThis.I18N = (() => {
     for(const {pattern,keys,en,ko} of patterns){
       if(ko==='진행 {0}'&&!/^진행 (?:\d+|미기록)\/(?:\d+|미기록)$/.test(raw))continue;
       const match=pattern.exec(raw);if(!match)continue;
+      // These parameters are configuration field paths, not arbitrary Korean
+      // prose. Translate full authored descriptions via their explicit keys.
+      if((ko==='{0} 설정은 객체여야 합니다.'||ko==='{0} 설정은 true/false여야 합니다.'||ko==='{0}는 목록이어야 합니다.'||ko==="{0}는 문자열이어야 합니다. ':'를 포함하는 --set 값은 따옴표로 감싸세요.")&&
+          !/^[A-Za-z_][A-Za-z0-9_.\[\]-]*$/.test(match[1]))continue;
       const values=new Map(keys.map((k,i)=>[k,ko==='진행 {0}' ? match[i+1].replace(/미기록/g,'Not recorded') : match[i+1]]));
       // One replacement pass: data containing {0} is not reinterpreted as a placeholder.
       return en.replace(/\{\d+\}/g,key=>values.get(key)??key);
@@ -1810,6 +1856,13 @@ globalThis.I18N = (() => {
   function translate(raw) {
     if(typeof raw!=='string')return raw==null?'':String(raw);
     const translated=lookup(raw);if(translated!==null)return translated;
+    // A ranking notice consists only of these authored diagnostic clauses.
+    // Translate each recognized clause; never translate arbitrary captures,
+    // IDs, settings JSON, logs or saved scientific records recursively.
+    if(raw.startsWith('종합점수·기록 순위 보류 ')){
+      const clauses=raw.split(/(?<=\.)\s+/),rendered=clauses.map(lookup);
+      if(rendered.every(value=>value!==null))return rendered.join(' ');
+    }
     // Candidate/entry IDs are data. Translate only a recognized complete error
     // clause after the prefix, preserving even Korean IDs byte for byte.
     for(let index=raw.indexOf(': ');index>=0;index=raw.indexOf(': ',index+2)){

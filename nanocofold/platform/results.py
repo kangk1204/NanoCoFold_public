@@ -45,7 +45,7 @@ METRIC_HELP = {
     "ipsae_chain_b": "요약 ipSAE의 둘째 체인입니다. 다른 체인 쌍은 pair_metrics에서 확인합니다.",
     "iptm_unavailable_reason": "표적–VHH 쌍 ipTM 미평가의 기록 사유입니다. 미평가를 0 또는 통과로 바꾸지 않습니다.",
     "interface_plddt": "계면 잔기의 예측 구조 신뢰도입니다. 실험 구조의 B-factor와 구분하세요.",
-    "hotspot_contact_frac": "평가 가능한 hotspot 중 접촉 거리 조건을 만족한 비율입니다.",
+    "hotspot_contact_frac": "요청한 결합 부위 중 접촉 거리 조건을 만족한 비율입니다. 구조 대응이 불완전하면 접촉률을 순위에 사용하지 않고 보류합니다.",
     "n_clashes": "고정 거리 기준 이내의 무거운 원자쌍 수입니다. 표적·보존 파트너와 VHH 사이를 합산합니다. 잔기 수나 원소별 반데르발스 충돌 판정이 아닙니다.",
     "n_hbonds": "거리 기준의 N/O 근접 원자쌍 수입니다. 공여·수용체와 각도 검증을 하지 않으므로 확인된 수소결합 수가 아닙니다.",
     "n_salt_bridges": "Lys/Arg 양전하 곁사슬과 Asp/Glu 음전하 곁사슬의 거리 기준 원자쌍 수입니다. His의 양성자화나 중성 Asn/Gln은 가정하지 않습니다. 기존 계산법 미기록 결과는 별도로 읽으세요.",
@@ -609,7 +609,7 @@ class ResultReader:
                 expected = None
             return {**population, "id": self.root.name, "mode": "complex", "name": self.config.get("run", {}).get("name", self.root.name),
                     "total": len(rows), "scored_total": sum(_assessed(r) for r in rows), "failed_candidates": failures, "issues": issues,
-                    "mock": False, "status": status, "complete": status == "complete", "readonly": True,
+                    "mock": bool(self.config.get("run", {}).get("mock")), "status": status, "complete": status == "complete", "readonly": True,
                     "config": self.config, "state": self.state, "conditions": self.config.get("complex", {}),
                     "source_delivery_status": source_delivery_status, "delivery_artifact": delivery_artifact,
                     "source_report_status": source_report_status, "report_artifact": report_artifact,
@@ -1289,10 +1289,10 @@ class ResultReader:
                       **self.provenance()}
         provenance = portable_metadata(provenance, root=self.root)
         def csv_bytes():
-            from ..utils.spreadsheet import csv_cell
+            from ..utils.spreadsheet import csv_cell, csv_headers
             stream = io.StringIO()
             writer = csv.DictWriter(stream, fieldnames=columns)
-            writer.writeheader()
+            writer.writerow(dict(zip(columns, csv_headers(columns))))
             writer.writerows([{key: csv_cell(json.dumps(native(value), ensure_ascii=False, allow_nan=False) if isinstance(value, (dict, list)) else value) for key, value in row.items()} for row in rows])
             return ("\ufeff" + stream.getvalue()).encode()
         if format == "csv":
@@ -1330,11 +1330,9 @@ class ResultReader:
                 chunks = excel_text_chunks(encoded)
                 for index, chunk in enumerate(chunks):
                     manifest.append([key, f"{index + 1}/{len(chunks)}", chunk])
-            stream = io.BytesIO()
-            from ..utils.spreadsheet import force_text
+            from ..utils.spreadsheet import deterministic_xlsx, force_text
             force_text(book)
-            book.save(stream)
-            return stream.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "candidates.xlsx"
+            return deterministic_xlsx(book), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "candidates.xlsx"
         if format == "html":
             payload = self._offline_payload(all_table, allowed, provenance, report_artifact=report_artifact)
             return self._offline_document(payload), "text/html; charset=utf-8", "report_offline.html"
@@ -1445,8 +1443,8 @@ class ResultReader:
         files = {"report.html": self._offline_document(payload, assets)}
         stream = io.StringIO()
         writer = csv.DictWriter(stream, fieldnames=all_table["columns"])
-        writer.writeheader()
-        from ..utils.spreadsheet import csv_cell
+        from ..utils.spreadsheet import csv_cell, csv_headers
+        writer.writerow(dict(zip(all_table["columns"], csv_headers(all_table["columns"]))))
         writer.writerows([{key: csv_cell(json.dumps(native(value), ensure_ascii=False, allow_nan=False) if isinstance(value, (dict, list)) else value)
                           for key, value in row.items()} for row in all_table["rows"]])
         files["candidates.csv"] = ("\ufeff" + stream.getvalue()).encode()

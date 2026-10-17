@@ -65,7 +65,10 @@ def read_fasta(path: str | Path, *, candidate_ids: bool = True) -> dict[str, str
             raise ValueError(f"FASTA 서열이 비어 있습니다: '{name}'")
         records[name] = "".join(chunks)
         folded_ids.add(candidate_id_key(name))
-    text = Path(path).read_text(encoding="utf-8-sig")
+    try:
+        text = Path(path).read_text(encoding="utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"FASTA 파일을 UTF-8로 다시 저장한 뒤 입력하세요: {path}") from exc
     validate_fasta_controls(text)
     for raw in text.splitlines():
         line = raw.strip()
