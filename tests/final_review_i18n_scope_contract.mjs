@@ -16,6 +16,7 @@ function fixture(){
  context.document={getElementById:get,documentElement:{},querySelector:()=>null,addEventListener:(name,fn)=>handlers.set(name,fn),dispatchEvent:event=>handlers.get(event.type)?.()};
  context.CustomEvent=class {constructor(type){this.type=type;}};
  vm.runInContext(source.slice(0,source.indexOf('const decisionCaption')),context);
+ vm.runInContext(source.slice(source.indexOf('function describeResultFigure('),source.indexOf('function mockZeroSelectionNotice(')),context);
  vm.runInContext(source.slice(source.indexOf('function renderScatter()'),source.indexOf('async function selectCandidate(')),context);
  vm.runInContext(source.slice(source.indexOf('function renderDistribution('),source.indexOf('async function loadStructure(')),context);
  vm.runInContext(source.slice(source.indexOf('document.addEventListener("nanocofold:language"'),source.lastIndexOf('startPlatform();')),context);

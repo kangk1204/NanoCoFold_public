@@ -153,7 +153,12 @@ def ranking_policy(cfg: dict, frame: pd.DataFrame | None = None, *, selected: pd
         "normalization_population": "recorded ranking input in the same prediction engine, including controls; rows with unassessed CDR liabilities excluded when developability is weighted",
         "failed_row_handling": "failed/interrupted prediction rows are preserved with unavailable scores/ranks, excluded before normalization and never selected even under fallback",
         "selection": "filter recorded eligibility and controls, then apply diversity limits without renormalizing",
-        "score_precision": "unrounded_float64; presentation rounding never controls ordering",
+        "score_precision": "composite_unrounded_float64; input metric precision as recorded; presentation rounding never controls ordering",
+        "source_metric_precision": {
+            "interface_pae": "stored_rounded_3_decimal_angstrom",
+            "interface_pae_directional_median_p90": "stored_rounded_3_decimal_angstrom",
+            "other_metrics": "as_recorded_by_metric_producer; not asserted universally unrounded",
+        },
         "rank_tie_break": "exact composite_score descending, then design_id or variant_id ascending; stable input order only when identifiers are absent or identical",
         "rank_interpretation": "ordinal deterministic record order; equal composite scores do not establish a scientific difference",
         "hotspot_mapping_gate": "any failed requested-site mapping holds ranking and selection when hotspot_contact_frac has nonzero weight, even when the contact ratio is finite",

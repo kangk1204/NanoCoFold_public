@@ -3,6 +3,16 @@
 영어를 README와 웹 플랫폼의 기본 언어로 사용합니다. README 상단에서 한국어판으로 이동할 수 있고, 플랫폼 및 새 오프라인 보고서는 English/한국어를 즉시 전환하고 선택을 저장합니다. 입력·후보 ID·서열·수치·원본 로그·설정은 번역하거나 변경하지 않습니다. 언어 전환 시 사본 수 입력·체인 체크박스·선택한 모델과 PAE를 유지합니다. (2026-10-15)
 
 
+## 0.4.8rc9 — 2026-10-17
+
+Mobile account/sign-out remains accessible; disconnected status and the 320px step rail fit small screens. Comparison errors, engine labels/colors and empty-state guidance follow the selected language. Chart summaries and raw-data alternatives improve access. Original identifiers, sequences, scores and selection gates are preserved.
+
+Fresh explicit CLI run directories record their computation version under the run lock. Existing results are never relabelled with a newer computation version. The whole-target residue property table is labelled accurately, folded by default and linked to the full CSV. Receipts distinguish recorded PAE metric precision from composite-score precision.
+
+Source-update instructions identify which module runs. Retention still rejects symbolic links and explains how to choose the real path. Local Site database setup uses explicit local migrations. Private CI timeout is 90 minutes; public full tests enable Chromium and retain installed-wheel HTML checks. Exact final qualification results belong to the separate final-commit receipt; see [validation scope](docs/VALIDATION.md).
+
+모바일 계정·로그아웃, 미연결 배지·단계 표시, 한영 오류·엔진 표시·빈 상태를 보완했습니다. 새 CLI 계산 버전 출처, 전체 표적 잔기 표의 의미, 저장된 지표와 종합점수의 정밀도 설명을 구분합니다. 기존 결과·삭제 방어·과학 기준은 유지합니다. 개발용 소스 실행·로컬 DB 초기화·CI 검증 범위를 안내합니다.
+
 ## 0.4.8rc2 — 2026-10-14
 
 Boltz molecules 자료의 반복 무결성 검사를 제한된 프로세스 내 캐시로 재사용합니다. 최초 전내용 검사는 유지하고 파일 정보·링크·목록이 바뀌면 다시 검증합니다. 첫 복합체의 세 프로필 설치와 모든 기능의 `all` 설치 안내를 일치시켰습니다. 최초 전체 설치와 이후 수정 wheel의 준비 상태, 전체 소프트웨어 검사는 [검증 기록](docs/VALIDATION.md)에 별도로 기록합니다.

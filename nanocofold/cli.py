@@ -52,7 +52,8 @@ def new_platform_computation(job: dict):
 def _fresh_computation_origin(run_dir: Path, state: RunState, args, new: bool, had_config: bool) -> dict | None:
     """An input-only directory is fresh only with an explicit new-worker identity."""
     if (not new or getattr(args, "command", None) not in {"run", "complex", "design", "screen", "mature", "prepare"}
-            or getattr(args, "_existing_run_requested", bool(getattr(args, "run_dir", None)))
+            or (getattr(args, "_existing_run_requested", bool(getattr(args, "run_dir", None)))
+                and not getattr(args, "_fresh_empty_explicit_run_dir", False))
             or state.path.exists()):
         return None
     for path in run_dir.iterdir():
@@ -402,6 +403,16 @@ def _execute_command(args) -> int:
         # progress or state writes, if cleanup finished while we were waiting.
         if (run_dir / "retained").exists():
             raise ValueError("정리 보관본은 읽기 전용입니다. 원본 계산이 필요하면 다른 run-id로 새로 실행하세요.")
+        # Only the locked dispatcher can establish a genuinely new explicit
+        # directory. A config, state, artifact or symlink makes it historical;
+        # neither report/score recovery nor a reused directory is backfilled.
+        args._fresh_empty_explicit_run_dir = (
+            bool(getattr(args, "_existing_run_requested", False))
+            and args.command in {"run", "complex", "design", "screen", "mature", "prepare"}
+            and not _is_dry_run(cfg)
+            and all(path.name == ".run.lock" and path.is_file() and not path.is_symlink()
+                    for path in run_dir.iterdir())
+        )
         execution_context.enter_context(ConsoleProgress("NanoCoFold " + args.command, run_dir=run_dir))
         args.run_dir = str(run_dir)
         run_dir, state = _open_run(cfg, args)

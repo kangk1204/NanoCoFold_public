@@ -2,7 +2,7 @@
 
 **English** · [한국어](README.ko.md)
 
-**Build: 0.4.8rc8**
+**Build: 0.4.8rc9**
 
 Predict protein complexes, design new nanobodies, and compare existing candidates or variants. Explore candidate tables, 3D structures, PAE, and shareable HTML reports.
 
@@ -127,6 +127,20 @@ If the local port is occupied, this example uses another local port. Run it and 
 ```bash
 ssh -o ExitOnForwardFailure=yes -L 18766:127.0.0.1:18765 USER@SERVER
 ```
+
+</details>
+
+<details>
+<summary>Updating a source checkout or checking which version starts</summary>
+
+An older installed command can keep using its old wheel after `git pull`. In this source folder, activate the NanoCoFold environment and check the code that will run:
+
+```bash
+python -m nanocofold --version
+python -c "import nanocofold; print(nanocofold.__file__)"
+```
+
+For source development, launch `python -m nanocofold serve --workspace . --port 18765` from this folder. It uses the current checkout. For a released installation, rerun the documented installer after updating the source. Keep the workspace and results; do not delete the environment to fix a version mismatch. If catalog/retention rejects a symbolic-link path, run `pwd -P` in the workspace and use that real path.
 
 </details>
 

@@ -620,7 +620,16 @@ def generate_report(
         "selected_rows": selected_rows,
         "hotspot_columns": _hotspot_columns(context, hotspots_df),
         "hotspot_rows": _frame_records(hotspots_df, limit=200),
+        "target_residue_total": len(hotspots_df) if hotspots_df is not None else 0,
+        "selected_site_residue_total": len({str(value) for value in context.get("hotspots", [])})
+                                       if isinstance(context.get("hotspots"), (list, tuple)) else None,
         "hotspot_set_rows": _frame_records(hotspot_sets_df, limit=100),
+        "mock_zero_selection": cfg_get(recorded_cfg or cfg, "run.mock") is True
+                               and selected is not None and selected_total == 0,
+        "mock_cdr_unassessed": sum(row.get("model_record", True) is True and
+                                   (row.get("dev_cdr_evaluated") is False or
+                                    "developability_unassessed" in str(row.get("exclusion_reason", "")).split(";"))
+                                   for row in all_scored_rows),
         "automatic_hotspots": automatic_hotspots,
         "viewer_structures": viewer_structures,
         "interactive_report_href": interactive_report_href,
@@ -628,6 +637,7 @@ def generate_report(
         "viewer_limit": viewer_max,
         "viewer_script": viewer_script,
         "selected_total": selected_total,
+        "scored_csv_available": (run_dir / "03_score/scored_candidates.csv").is_file(),
         "scored_total": scored_total,
         "thresholds": cfg_get(applied_cfg, "score.thresholds", {}) or {},
         "files": _file_index(run_dir),

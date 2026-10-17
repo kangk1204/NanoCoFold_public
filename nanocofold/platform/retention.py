@@ -74,7 +74,11 @@ def _checked_directory(path):
     path = Path(os.path.abspath(path))
     for current in (path, *path.parents):
         info = current.lstat()
-        if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+        if stat.S_ISLNK(info.st_mode):
+            raise RetentionError(
+                "보존·결과 등록 경로에 심볼릭 링크가 있습니다. 작업 공간에서 pwd -P로 실제 경로를 확인해 다시 지정하세요. "
+                "macOS /var/folders는 /private/var/folders를 사용하세요.")
+        if not stat.S_ISDIR(info.st_mode):
             raise RetentionError("보존 작업은 실제 디렉터리에만 적용할 수 있습니다.")
     if path.stat().st_uid != os.getuid():
         raise RetentionError("다른 사용자의 작업은 정리할 수 없습니다.")

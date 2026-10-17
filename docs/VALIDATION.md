@@ -2,6 +2,19 @@
 
 **Archive paths:** References below to `examples/current_native`, `examples/outputs`, `START_HERE.html` and `validation/status.json` identify files in the separately supplied collaborator delivery ZIP. They are not directories in this GitHub source checkout. The source includes public inputs under `examples/tutorial`; source-only users run those inputs separately. Historical evidence below is preserved as recorded.
 
+## 0.4.8rc9 — 2026-10-17 validation contract / 검증 계약
+
+This release addresses the five v74 findings: mobile account access, disconnected status overflow, fresh explicit CLI computation-version provenance, whole-target residue table labelling, and bilingual comparison errors. Related display, input-recovery, documentation and local-development fixes preserve scientific thresholds and historical artifacts.
+
+- Pin the final code, tests and documentation before the final private whole run. Use `NANOCOFOLD_BROWSER_TEST=1 python -m pytest --junitxml=test-results.xml`; record the actual import path, source hashes, collected/passed/skipped/failed counts and exit status. Run one whole suite at a time.
+- Public CI runs full workflow/Chromium opt-in tests on Ubuntu 22.04 and 24.04, then builds and reinstalls the wheel and checks the supplied HTML in Chromium. These are distinct scopes, not additive pass counts.
+- Site checks cover the actual components, local SQLite boundaries, producer/consumer PAE and viewer parity, types, lint and build. Responsive checks include EN/KO and connected/disconnected states at 320/390/700/701px.
+- Operating verification reads saved results, changes display language, follows result/report sections and history, and verifies downloads. Cancellation, interruption, resume, lost replies and delayed old status are injected only into isolated CPU/mock/Chromium fixtures.
+- Private remote CI remains `USER_APPROVED_EXCEPTION_NOT_PASS`; local whole-suite success does not turn that exception into a remote CI pass. Increasing the time limit does not remove the previous billing block.
+- H200, A6000, SSH, real scientific GPU inference, MSA/ESM/AntiFold/PyMOL execution are excluded. Binding, KD, affinity and biological selectivity remain NOT_ESTABLISHED.
+
+최종 완료 판정은 별도 영수증의 정확한 최종 커밋·전체 검사 종료코드·운영 배포본에 귀속됩니다. 아래 과거 릴리스 수치는 이력이며 현재의 무조건 통과 배지가 아닙니다. 선별 0건의 정상 평가·미평가 구분과 원 결과를 보존하고, 데모 통과를 위해 과학 게이트를 완화하지 않습니다.
+
 ## 0.4.8rc5 — 2026-10-15 대체 GPU 설치·실행·결과 검증
 
 유휴 RTX 5070 Ti 16 GB에서 별도 작업 경로에 전체 프로파일을 설치하고 공개 예제를 실제 실행했습니다. H200·A6000은 사용하지 않았습니다. 기존 시스템 패키지·드라이버를 유지하고 `--skip-system-packages`를 사용했으며, 새 잠금 환경 8개·모델 자산 26개·준비 검사 9항목을 확인했습니다. 공식 RF 가중치 다운로드의 TLS 실패와 자체 설치 중단 기록을 보존하고, 기존 가중치를 고정 SHA256으로 확인해 재사용했습니다. 완전히 빈 OS나 모든 가중치의 최초 다운로드 시험으로 표시하지 않습니다. rc5는 같은 검증에서 만든 엔진 환경과 가중치를 새 코어·작업 경로에서 재사용했습니다.

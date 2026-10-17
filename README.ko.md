@@ -2,7 +2,7 @@
 
 [English](README.md) · **한국어**
 
-**Build: 0.4.8rc8**
+**Build: 0.4.8rc9**
 
 단백질 복합체를 예측하고, 새 나노바디를 설계하거나 보유 후보와 변이를 비교하는 프로그램입니다. 결과는 후보 표, 3D 구조, PAE와 전달용 HTML 보고서로 확인합니다.
 
@@ -129,6 +129,20 @@ bash start.sh --port 18765
 ```bash
 ssh -o ExitOnForwardFailure=yes -L 18766:127.0.0.1:18765 USER@SERVER
 ```
+
+</details>
+
+<details>
+<summary>소스를 업데이트했거나 실행 버전을 확인하려면</summary>
+
+`git pull` 후에도 예전에 설치한 명령은 이전 wheel을 실행할 수 있습니다. 이 소스 폴더에서 NanoCoFold 환경을 활성화한 뒤 실제 실행할 코드와 버전을 확인하세요.
+
+```bash
+python -m nanocofold --version
+python -c "import nanocofold; print(nanocofold.__file__)"
+```
+
+소스 개발 시에는 이 폴더에서 `python -m nanocofold serve --workspace . --port 18765`로 실행하면 현재 체크아웃을 사용합니다. 배포용 설치는 소스 업데이트 후 위의 설치 명령을 다시 실행하세요. 기존 작업 공간과 결과를 유지하고, 버전 차이를 해결하려고 환경을 삭제하지 마세요. 결과 등록·보존에서 링크 경로가 거부되면 작업 공간에서 `pwd -P`로 실제 경로를 확인해 지정하세요.
 
 </details>
 
