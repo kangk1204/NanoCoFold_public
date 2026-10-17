@@ -6,13 +6,13 @@
 
 Predict protein complexes, design new nanobodies, and compare existing candidates or variants. Explore candidate tables, 3D structures, PAE, and shareable HTML reports.
 
-**First time? Use the public example below.** It fills in the sequences and small-run settings for you. Leave advanced settings unchanged.
+**Start with the public example below.** It loads the sequences and a small starter preset.
 
 | Your computer | Use NanoCoFold this way |
 |---|---|
 | Ubuntu x86_64 with NVIDIA GPU | Install and compute here, after checking the requirements below. |
-| Windows or macOS | Open the address of an installed server in your browser, or read an extracted report ZIP. These instructions do not install GPU engines natively on these systems. |
-| Windows with WSL | WSL GPU installation is not certified by this validation record. Use a validated Ubuntu server, or have an administrator validate the exact WSL/GPU/driver setup first. |
+| Windows or macOS | Connect to an installed server in your browser, or open an extracted report ZIP. |
+| Windows with WSL | Ask your server administrator to check WSL, GPU, and driver compatibility before installation. |
 
 | What do you want to do? | Start here |
 |---|---|
@@ -22,17 +22,28 @@ Predict protein complexes, design new nanobodies, and compare existing candidate
 
 **Environment check → prepare input → review settings → run once → Open results.**
 
-**Only seeing “diagnostics · Complete”?** That is an installation check. It does not predict a protein structure. Click **Prepare analysis**, then follow [section 3](#3-try-the-first-public-example).
+**After the environment check, click Prepare analysis.** `diagnostics · Complete` is the environment-check record. Start the analysis in [section 3](#3-try-the-first-public-example).
 
 [English screenshots, step by step](docs/browser_quickstart.en.md#follow-the-screenshots) · [Find and share results](#5-read-and-share-results)
 
 ## 1. Prepare and install
 
-The compute host needs **Ubuntu x86_64**, glibc 2.34 or later, an NVIDIA GPU, and driver 580 or later. `nvidia-smi` must show the GPU correctly. For the four-engine example below, prepare at least 16 GB GPU memory, 32 GB RAM, and 150 GiB of free SSD space. Longer proteins and larger libraries may need more resources. Internet access and `sudo` are also required. Ask your server administrator to check these requirements if needed. The GPU model name alone does not establish enough memory for every engine.
+Requirements for the four-engine example:
 
-**RTX 3060 or another smaller GPU?** Check its actual GPU memory in `nvidia-smi`; the model name is not enough. If it has less than the 16 GB reference above, do not follow the four-engine example unchanged. Use a validated Ubuntu server or ask your administrator which engines and input sizes have been tested on that GPU. Select only those engines, check the revised planned-model count, and perform the matching environment check. Passing the check confirms prerequisites; it does not guarantee that a prediction will fit in memory.
+| Item | Requirement |
+|---|---|
+| Operating system | Ubuntu x86_64, glibc 2.34 or later |
+| GPU | NVIDIA GPU, driver 580 or later |
+| GPU memory | At least 16 GB |
+| System memory | At least 32 GB RAM |
+| Storage | At least 150 GiB free SSD space |
+| Other | Internet access and `sudo` |
 
-You do not need to install Python packages, the CUDA Toolkit, Conda, or Docker separately. The installer prepares isolated Python environments, engines, and models. It does not change the NVIDIA driver.
+Check the GPU and its memory with `nvidia-smi`. Longer proteins and larger libraries need additional resources.
+
+For GPUs with less than 16 GB of memory, ask your server administrator to select suitable engines and input sizes, then run the environment check for that configuration.
+
+The installer prepares the Python environments, engines, and models automatically. Your server administrator installs the NVIDIA driver beforehand.
 
 1. On this GitHub page, click **Code → Download ZIP**, then **extract the entire archive**. If you received a source ZIP, extract it instead. If you cloned the repository, use that checkout.
 2. Open **`NanoCoFold_public`** after a Git clone, or **`NanoCoFold_public-main`** after GitHub **Download ZIP**. Tagged or separately packaged source archives may have a different folder name.
@@ -58,11 +69,11 @@ bash install.sh --profile colabfold --gpu GPU-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx
 bash install.sh --profile opendde --gpu GPU-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 ```
 
-The first installation downloads several engines and large model files and may take time. Follow the stage and download logs until **`[설치 완료]`** appears. Installation alone does not start analysis or transmit input sequences. Resume an interrupted download by running the same command again. Existing files, partial downloads, and failure records are preserved; completion requires file hashes and environment checks to pass.
+The first installation downloads engines and model files. Follow the terminal log until installation completes. If interrupted, rerun the same command in the same folder to continue from the saved downloads and installation records.
 
-The initial uv bootstrap has a waiting deadline. If it times out or you interrupt it with Ctrl-C, follow the retry instructions and rerun the same command in the same folder. This deadline is not a limit on the entire engine and model installation.
+For installation errors and retry instructions, see the terminal message and [installation troubleshooting](docs/installation.md).
 
-To prepare environments for new nanobody design, existing candidate comparison, and variant evaluation, optionally run the following. `bash install.sh` without options also uses `all`. This is not required for the first complex example.
+For nanobody design, candidate comparison, and variant evaluation, install all environments with the command below. `bash install.sh` without options also selects `all`.
 
 ```bash
 bash install.sh --profile all
@@ -70,7 +81,7 @@ bash install.sh --profile all
 
 On a multi-GPU host, add the same `--gpu` UUID to this optional installation. The [validation record](docs/VALIDATION.md) distinguishes installation, software checks, and actual prediction evidence.
 
-If an error occurs, stop before continuing. `Driver/library version mismatch` means the NVIDIA driver and libraries do not match. Ask the administrator whether a reboot is needed, and retry only after `nvidia-smi` works. Reinstalling Python does not fix this error. See [installation troubleshooting](docs/installation.md).
+For `Driver/library version mismatch`, ask the server administrator to check the driver. Retry installation when `nvidia-smi` works. See [installation troubleshooting](docs/installation.md).
 
 </details>
 
@@ -82,17 +93,17 @@ On the **Ubuntu computer where you installed NanoCoFold**, run this in the **sam
 bash start.sh --port 18765
 ```
 
-**Start NanoCoFold first, then open the URL printed after `NanoCoFold:` in that terminal.** With the command above, it is [http://127.0.0.1:18765](http://127.0.0.1:18765). Check that the page says **NanoCoFold**. A README link does not start the program: `127.0.0.1` refers to the computer running your browser. This terminal runs the web server; keep it open.
+Open the **URL printed after `NanoCoFold:`** in the terminal. The command above uses [http://127.0.0.1:18765](http://127.0.0.1:18765). Check that the page says **NanoCoFold** and keep the server terminal open while using it. `127.0.0.1` refers to your current PC; use the instructions below for a remote server.
 
-**SkinPipe or another app opens?** Keep that app running. Use the NanoCoFold command above on a free port; if 18765 is occupied, run the following and open the new URL it prints:
+**If another application uses the same port**, run the command below to select a free port, then open the new URL printed in the terminal.
 
 ```bash
 bash start.sh --port 0
 ```
 
-For a remote server, open the SSH instructions below before using the link. `--port 0` selects a free **server** port; use the corresponding forwarding command printed by NanoCoFold.
+When using `--port 0` on a remote server, set up SSH forwarding with the server port printed in the terminal.
 
-If **Preparing the interface.** appears, wait for the purpose buttons. If preparation fails, read the error and click **Reload interface**. The interface starts in English. Use **Language → 한국어** in the header to switch; the browser remembers your choice. Switching languages preserves inputs and analysis state. Original identifiers, sequences, numerical results, logs, and configuration records are kept as recorded.
+Select an analysis purpose when the interface is ready. For a loading error, click **Reload interface**. The interface opens in English; use **Language → 한국어** to switch. The browser saves your language choice.
 
 <details>
 <summary>Using a remote Ubuntu server from your own PC</summary>
@@ -109,9 +120,11 @@ bash start.sh --no-browser --port 18765
 ssh -o ExitOnForwardFailure=yes -L 18765:127.0.0.1:18765 USER@SERVER
 ```
 
-Keep both terminals open. If the SSH command reports an occupied local port, it has not connected NanoCoFold; do not open that occupied address. For example, forward local 18766 to server 18765 and open `http://127.0.0.1:18766`. If the server printed a different port, use that server port on the right of `-L`. Then open the forwarded address in your PC browser. Inputs and results are viewed on the PC; computation uses the GPU of the Ubuntu server where you installed NanoCoFold. The public installer normally stores the workspace in `.nanocofold/workspace` under the source folder; `--workspace` can choose another location. `start.sh` reuses the saved installation location.
+Keep both terminals open and visit the forwarded address in your PC browser. Enter inputs and view results on the PC; computation runs on the Ubuntu server. If the server uses a different port, update the right-hand port in the SSH command.
 
-If the local port is occupied, this example uses another local port. Run it and open **http://127.0.0.1:18766**. If NanoCoFold printed a different server port, replace the last `18765` with that number.
+The default public workspace is `.nanocofold/workspace` under the source folder. Use `--workspace` to choose another location; `start.sh` reuses the saved location.
+
+If local port 18765 is occupied, use the command below and open **http://127.0.0.1:18766**. Replace the final `18765` if the server uses another port.
 
 ```bash
 ssh -o ExitOnForwardFailure=yes -L 18766:127.0.0.1:18765 USER@SERVER
@@ -132,9 +145,9 @@ bash update.sh
 bash start.sh --port 18765
 ```
 
-This updates the installed application while preserving the saved workspace, GPU selection, models, inputs and results. It does not run predictions or reinstall GPU engines. Reload the browser afterward. `git pull` alone does not update the installed application. For a source ZIP, preserve local source changes, copy the updated source files into the original source folder, and run the last two commands. Keep `.nanocofold/` (the installation record and default workspace), inputs and results unchanged. Existing exported HTML reports keep their captured appearance; export a new report to use the updated layout.
+Reload the browser after updating. The workspace, models, inputs, and results are retained. For a source ZIP, save local changes, copy the new source into the original folder, then run `bash update.sh` and the start command. Keep `.nanocofold/` in place. Export a report again to use the updated interface.
 
-If the update fails or is interrupted, run `bash update.sh` again. Starting the application is blocked until the update finishes successfully. An open web server or active job also blocks the update; close the server after its jobs finish, then retry.
+If an update is interrupted, rerun `bash update.sh`. Finish all jobs and close the web server before updating.
 
 </details>
 
@@ -149,7 +162,7 @@ If the update fails or is interrupted, run `bash update.sh` again. Starting the 
 
 If you chose a custom workspace, replace `.nanocofold/workspace` with the `workspace` value in `.nanocofold/install-location.json`. If the installed version is old, finish all jobs, stop its web server, and follow **Update an existing installation** above using `bash update.sh`. Keep the workspace, models and results.
 
-**For source developers only:** from the source folder, activate the intended Python environment and run the following to inspect the checkout. These commands can report newer source while the installed application is still old; they do not verify what `start.sh` launches.
+**Source developers:** use the commands below to check the checkout version and module path. Use the installation-path command above to check the installed version.
 
 ```bash
 source .nanocofold/workspace/.venv-dev/bin/activate
@@ -157,13 +170,13 @@ python -m nanocofold --version
 python -c "import nanocofold; print(nanocofold.__file__)"
 ```
 
-Use your saved custom workspace path in the activation command when applicable. A developer launch with `python -m nanocofold serve --workspace . --port 18765` uses this checkout and a different workspace from the default public installation. If catalog/retention rejects a symbolic-link path, run `pwd -P` in the workspace and use that real path. Do not delete an environment to fix a version mismatch.
+For a custom workspace, use its saved path when activating the environment. Development launches use the source checkout and the workspace given by `--workspace`. For catalog paths, use `pwd -P` to find the workspace's physical path.
 
 </details>
 
 ## 3. Try the first public example
 
-Start with **Predict protein complexes**. Follow one row at a time; each row tells you when to continue.
+Use the **Predict protein complexes** public example and follow the table in order.
 
 | Step | What to click or check | Ready to continue when… |
 |---|---|---|
@@ -171,20 +184,20 @@ Start with **Predict protein complexes**. Follow one row at a time; each row tel
 | B · Example | **Load public example for this purpose** | Barnase **110 aa** and Barstar **89 aa** appear, with **one copy of each**. |
 | C · Input | Check both sequences, chain order and copies → **Review input & continue** | **Run settings** opens. |
 | D · Settings | **Small starter preset**, **four engines**, **four planned models**. For public MSA, consent to send these public sequences to **api.colabfold.com** → **Review settings & continue** | **Review & run** opens. |
-| E · Final review | **Review input** → read the applied input and settings | **Run analysis** is enabled. Reviewing does not start computation. |
-| F · Analysis | Click **Run analysis** **once** → **Jobs & logs** | Select your **analysis** job and wait for its final status. An environment-check job is a different job. |
+| E · Final review | **Review input** → check the input and settings summary | **Run analysis** is enabled. |
+| F · Analysis | Click **Run analysis** once → **Jobs & logs** | Select the submitted analysis job and wait for completion. |
 | G · Result | On the completed analysis, click **Open results** | A candidate/model table appears. Select a row to see its scores, 3D structure and PAE. |
 
-**After Prepare analysis, the purpose selected in the environment check is already applied.** If **Prepare input** is open, load the example directly; you do not need to return to the purpose screen. If you start from the purpose choices instead, choose **Predict protein complexes · Enter input**. If **Environment ready** is already shown, reuse it instead of checking again.
+**Prepare analysis** opens **Prepare input** for the selected purpose. Load the public example there. From the purpose-selection screen, choose **Predict protein complexes · Enter input**.
 
-If **Run analysis** is disabled because the environment check is missing: **Go to environment check** → complete it → **Prepare analysis**. Your input is kept. Reuse the check while the installation, GPU and selected engine configuration stay the same.
+If prompted for an environment check, follow **Go to environment check → Environment ready → Prepare analysis**. The saved check is reused while the installation, GPU, and selected engines remain the same.
 
-The example uses seed **42** and **one model per engine**. Four planned models do not guarantee four successful models; check completed, failed and unevaluated counts. Loading the example does not submit analysis or grant sequence-transmission consent. Review changed inputs and confirm their consent again.
+The example uses seed **42** and **one model per engine**, for **four planned models**. Check completed, failed, and unevaluated counts in the results. Review the input and MSA consent again after changing sequences.
 
 <details>
 <summary>Step-by-step settings and English screenshots</summary>
 
-For the first example, check these values. **Four planned models do not guarantee four successful predictions**; inspect the actual counts afterward. The screenshots are saved examples; select **Language → English** to match their labels. Exact capture versions are in the [capture record](docs/images/quickstart-flow/README.md).
+Use the settings and English screenshots below. Check completed, failed, and unevaluated model counts in the results. Capture versions are listed in the [capture record](docs/images/quickstart-flow/README.md).
 
 | Step | Key settings to check | Screenshot |
 |---|---|---|
@@ -207,7 +220,7 @@ For the first example, check these values. **Four planned models do not guarante
 <details>
 <summary>Screenshots 3–4: check settings and find the review button</summary>
 
-Leave advanced settings unchanged. Screenshot 3 shows the transmission consent box unchecked. Confirm consent for the current public example before continuing. Screenshot 4 shows a valid input with **no environment check saved**. Complete the separate check once; the run control is then enabled. These captures did not submit predictions.
+Use the starter settings for the first run. In screenshot 3, confirm transmission consent for the public example before continuing. Screenshot 4 shows a pending environment check; complete it to enable the run button.
 
 ![Step 3: four engines and public MSA settings](docs/images/quickstart-flow/en/03-settings.jpg)
 
@@ -218,7 +231,7 @@ Leave advanced settings unchanged. Screenshot 3 shows the transmission consent b
 <details>
 <summary>Screenshot 5: inspect an actual saved GPU result</summary>
 
-This is the previously verified rc5 barnase–barstar run with four actual engine models. General complexes do not use VHH eligibility. Capturing the input and settings screens did not submit another calculation.
+This rc5 Barnase–Barstar example shows four evaluated models and their engine-specific scores.
 
 ![Step 5: compare planned and evaluated model counts](docs/images/quickstart-rc5/en/05-results.jpg)
 
@@ -239,16 +252,16 @@ This is the previously verified rc5 barnase–barstar run with four actual engin
 
 [Settings screenshots for design, screening, and variant evaluation](docs/browser_quickstart.en.md#settings-by-purpose) are included in the same guide.
 
-Use amino-acid sequences. FASTA is a text format with a `>name` line followed by the sequence. A VHH is the full nanobody variable domain; a CDR3 fragment alone is insufficient. DNA/RNA and FASTQ are unsupported. Give entries distinct names that do not start with `=`, `+`, `-`, or `@`. Prepared substitution or insertion variants can be compared in `screen` as **full VHH sequences**.
+Use **amino-acid FASTA**: a `>name` line followed by the sequence. For nanobodies, provide the **full VHH sequence**. Give entries distinct names that do not start with `=`, `+`, `-`, or `@`. Compare prepared substitution or insertion variants in `screen`.
 
-Prepare an input using one method. Selecting a structure file disables the PDB ID alternative; entering a PDB ID disables the file alternative. Use **Change input method** to switch. Paste VHH / WT FASTA or import a file once. The populated FASTA is the actual input; no duplicate file is required. Use **Load another file** to replace it or **Restore previous FASTA** to undo the import. After restoring a draft, reselect structure files and reconfirm transmission consent and input review. A matching installation check is reused.
+Enter a structure by **file upload** or **PDB ID**, and use **Change input method** to switch. Paste VHH / WT FASTA or import a file. **Load another file** replaces it; **Restore previous FASTA** restores it. After loading a draft, reselect structure files and review the input and transmission consent.
 
-For structure files, review chains, residue mappings, missing residues, and the preparation method. Public MSA transmits sequences externally. For private research inputs, check your institution's policy and choose a suitable MSA method. Consent for a public example does not carry over to your own sequences.
+For structure files, check chains, residue numbering, and missing residues. Public MSA sends sequences to an external server. Choose an MSA method that follows your institution's policy for research sequences.
 
 <details>
 <summary>Optional: practice variant evaluation in the terminal without a GPU</summary>
 
-In the NanoCoFold environment prepared by the [installation steps above](#1-prepare-and-install), activate it with `source .nanocofold/workspace/.venv-dev/bin/activate`, open this source folder in the terminal and copy the command below. It uses the included public FASTAs, explicitly samples at most **3 DMS variants**, and evaluates at most **2 variant candidates** after prefiltering. `--mock` generates synthetic structures and synthetic CDR annotations for practicing the workflow. These are not research predictions or orderable candidates.
+In the source folder, activate the environment with `source .nanocofold/workspace/.venv-dev/bin/activate`, then run the command below. It uses public FASTAs to generate **at most 3 DMS variants** and evaluate **at most 2 variant candidates**. `--mock` generates practice structures and CDR annotations.
 
 If you installed with a custom `--workspace`, use that workspace path in place of `.nanocofold/workspace` in the activation command. The saved path is in `.nanocofold/install-location.json`.
 
@@ -264,7 +277,7 @@ nanocofold run --mode mature --mock \
 
 The terminal prints the actual candidate count before prediction, then **candidate n/total** while calculating scores. When it finishes, open the printed **report.html** path. Keep the linked report files together when moving it.
 
-`--mock` alone keeps your chosen library and candidate limits; it does not automatically shrink a research run. The research default can send up to **200** mature candidates to evaluation. Use the two explicit limits above for a short practice run. For research, remove `--mock` and use reviewed inputs and validated CDR annotations; do not reuse synthetic CDR positions.
+For a short practice run, use `max_variants=3` and `top_n=2` as shown above. The mature research default evaluates up to **200** variant candidates. For research, remove `--mock` and use your sequences with checked CDR annotations.
 
 </details>
 
@@ -274,15 +287,15 @@ The terminal prints the actual candidate count before prediction, then **candida
 
 | What you see | What to do next |
 |---|---|
-| **diagnostics / Environment check · Complete** | Click **Prepare analysis** and follow [section 3](#3-try-the-first-public-example). No prediction has run yet. |
+| **diagnostics / Environment check · Complete** | Click **Prepare analysis** and follow [section 3](#3-try-the-first-public-example). |
 | Analysis **Complete** with **Open results** | Open it, check successful/failed/unevaluated counts, then select a model. |
-| Failed, cancelled, interrupted or budget exhausted | Read **Detailed execution log** and [section 6](#6-follow-jobs-cancel-and-resume). Any saved partial result is not proof of completion. |
-| No **Open results** button or no saved run listed | Confirm the same workspace and the selected **analysis** job. Read its status and log; do not submit it again just to find results. |
+| Failed, cancelled, interrupted or budget exhausted | Check **Detailed execution log** for the cause, then continue with [section 6](#6-follow-jobs-cancel-and-resume). |
+| No **Open results** button or no saved run listed | Select the analysis in the workspace used for that run, then check its status and log. |
 
 Then read in this order: **status and counts → candidate/model row → scores, structure and PAE → download**. X/Y selectors compare metrics for the selected view. [Chart example](docs/images/quickstart-flow/en/charts.jpg) · [Report navigation](docs/images/quickstart-flow/en/report-nav.jpg).
 
 - **Fit entire structure** shows the whole complex. **Select target / Select nanobody**, or **Select reference chain / Select partner**, highlights and focuses the relevant chain. **Clear selection** removes highlighting.
-- Clicking a PAE cell selects and focuses two residues and moves to the structure viewer. PAE describes uncertainty in predicted relative residue placement; it is not a binding measurement.
+- Click a PAE cell to select and focus two residues in the structure viewer. PAE shows uncertainty in their predicted relative positions.
 - Save CSV / XLSX tables, FASTA, coordinates, and the **report ZIP**. For Excel, use the exported CSV (UTF-8 BOM) or XLSX; run-folder CSVs are UTF-8 machine records. **Save selected display coordinates** saves the coordinates shown in the viewer. **Download original engine coordinates** is available when the original file is preserved and matches its recorded hash. Check the provenance notice for the relationship between original and display coordinates.
 
 The **Full original ZIP · For local archiving** includes server paths and execution logs and is for personal recovery / archiving. Send collaborators the entire **Shareable report ZIP**. Recipients extract the whole ZIP and open **`report.html`**. Saved results can be read on macOS, Windows, or other PCs without a GPU or program installation. Newly generated interactive reports also include the English / Korean selector.
@@ -292,32 +305,32 @@ The **Full original ZIP · For local archiving** includes server paths and execu
 | Section | What to check |
 |---|---|
 | 01 Inputs & settings | Are these the sequences and conditions you intended? |
-| 02 Candidate & model counts | Separate completed, failed and unevaluated models. General complexes have no VHH eligibility filter. |
+| 02 Candidate & model counts | Check completed, failed, and unevaluated model counts. For general complexes, review chain-pair scores. |
 | 03 Compare candidates | Select a candidate/model and its prediction engine; read its recorded scores. |
-| 04 Excluded / unevaluated | If selection is zero, distinguish assessed candidates excluded by criteria from candidates that could not be assessed. Neither means a measured absence of binding. |
+| 04 Excluded / unevaluated | If selection is zero, check the reasons for exclusions and unevaluated candidates. |
 | 05 Structure & PAE | Inspect the selected model's structure and residue-placement uncertainty together. |
 | 06 Provenance & artifacts | Check recorded conditions and save the appropriate report/data files. |
 
-Section links move within the report. Browser **Back / Forward** returns to an earlier section or view; it does not submit, cancel or restart analysis. Keep the same selected candidate when comparing languages.
+Use section links and browser **Back / Forward** to move through the report while analysis continues. Keep the same candidate selected when comparing languages.
 
-The steps above use the locally installed application's labels. An administrator-hosted Site can instead show **Jobs**, **Reports and provenance**, **Offline HTML**, and **Resume verified stages**. Use **Offline HTML** for the current-language report presentation. A disabled resume control can mean that the old compute agent lacks safe-resume support; read its reason and contact the administrator rather than submitting a duplicate.
+An administrator-hosted Site may use the labels **Jobs**, **Reports and provenance**, **Offline HTML**, and **Resume verified stages**. Download reports with **Offline HTML**. If resume is disabled, read the displayed reason and contact the administrator.
 
 <details>
 <summary>File locations, older reports and PyMOL (optional)</summary>
 
 ### Find the saved files
 
-Use the workspace shown in the browser. Each analysis is saved under `<workspace>/runs/<job_id>/`; the job identifier is in **Jobs & logs**. When report publication succeeds, start with `report.html` in that run folder. If it links to a `report_explorer-<hash>.html` file, keep that file beside the entry page. Older reports can use `report_explorer.html`. Keep the whole report folder or ZIP together; do not rename or delete a linked explorer.
+Each analysis is saved under `<workspace>/runs/<job_id>/`; find the job ID in **Jobs & logs**. Open `report.html` in that folder. Keep linked `report_explorer-<hash>.html` files beside it; older reports may use `report_explorer.html`. Move or archive the whole report folder together.
 
-The detailed worker log is `<workspace>/.nanocofold/jobs/<job_id>/worker.log`, beside the submitted `config.yaml` snapshot. The run folder preserves `run_config.yaml`, `run_state.json` and available engine outputs. An interrupted run can contain partial results; an existing HTML file alone does not prove that the current analysis completed. Read its status and counts.
+The worker log is `<workspace>/.nanocofold/jobs/<job_id>/worker.log`, beside the submitted `config.yaml`. The run folder stores `run_config.yaml`, `run_state.json`, and engine outputs. Check progress and model counts in the job view.
 
-Use **Language → English / 한국어** in the browser and in newly exported interactive reports. The two languages navigate the same candidates and recorded values. IDs, sequences, coordinates, numeric data, source settings and original execution logs stay as recorded. Previously saved HTML and report ZIPs keep the renderer and language support they were created with. Downloading a historical ZIP again does not convert it to the current interface. Use the current report viewer/export offered by the application for a current-language presentation; keep the historical archive and scientific records unchanged.
+Use **Language → English / 한국어** in the browser and newly exported interactive reports. Older reports retain their original interface. For the current bilingual interface, export a new report from the application and keep the older archive.
 
 If PyMOL materials are provided, extract the **whole folder** and open `.pml` through PyMOL **File → Open**. Keep the relative folder layout of scripts and referenced coordinates. PyMOL materials are separate from the general report ZIP. See [viewing in PyMOL](docs/RESULTS.md#pymol에서-보기).
 
 </details>
 
-Prediction completion, selection eligibility, and experimentally confirmed binding are distinct. Unevaluated is not zero; WT is a control. Scores from different engines are not summed into one ranking. Review ipTM, interface pLDDT, interface PAE, and structures together. Binding, KD, and expression require experimental validation. See [metrics and result interpretation](docs/RESULTS.md).
+Select candidates by reviewing engine-specific scores, ipTM, interface pLDDT, interface PAE, and structures together. Use WT controls for variant comparisons, then test selected candidates for binding, KD, and expression. See [metrics and result interpretation](docs/RESULTS.md).
 
 
 [Score cohorts, comparison conditions, and statistical interpretation](docs/STATISTICAL_INTERPRETATION.md).
@@ -326,14 +339,14 @@ Prediction completion, selection eligibility, and experimentally confirmed bindi
 
 | Situation | What to do |
 |---|---|
-| Changed tabs, used Back, switched language or closed the browser | This does not cancel the analysis. Reopen the same workspace and inspect the existing job. Keep the server and compute host running. |
-| Progress seems stuck or the connection dropped | Check **Detailed execution log** and the connection. The last displayed status can be stale; do not submit a duplicate. |
-| Want to stop a job | **Cancel job** → wait for **Cancelling → Cancelled**. A cancellation request alone does not mean cleanup has finished. |
+| Changed tabs, used Back, switched language or closed the browser | Analysis continues. Reopen the existing job in the same workspace. Keep the server and compute host running. |
+| Progress seems stuck or the connection dropped | Check **Detailed execution log** and the connection, then reopen the existing job. |
+| Want to stop a job | Click **Cancel job** and wait for **Cancelling → Cancelled**. |
 | A failed, interrupted or cancelled job offers **Verify and resume** | Resolve the logged cause, then use that action on the **same job**. Saved inputs/configuration and process ownership are checked before restarting. |
 | **Time budget exhausted** | Enter additional minutes when prompted, then **Verify and resume**. |
-| Resume is unavailable | Read the stated reason and the log. A hosted workspace may require a compute-agent update; contact its administrator. Do not create a new run just to bypass this check. |
+| Resume is unavailable | Read the displayed reason and log, then contact the administrator. |
 
-Saved work and results are retained; an interrupted job does not restart automatically. Existing results open without running inference. Partial results must be read as partial.
+Continue interrupted jobs with **Verify and resume**. Saved results remain available. Review partial results together with job status and completed model counts.
 
 [Changelog](CHANGELOG.md) · [Validation record](docs/VALIDATION.md) · [External engine and model terms](LICENSE_MANIFEST.md)
 
