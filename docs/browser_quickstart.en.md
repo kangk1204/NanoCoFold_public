@@ -6,12 +6,14 @@ This guide follows the separate environment check and analysis workflow. Follow 
 
 Open `http://127.0.0.1:8765`. For a remote server, keep both the server terminal and your SSH tunnel open. Select **Language → English** to match the screenshots. If **Preparing the interface.** appears, wait for the purpose buttons. If preparation fails, read the error and click **Reload interface**.
 
+**Already looking at “diagnostics · Complete”?** Click **Prepare analysis**, then follow the **Purpose → Input → Settings → Review → Analysis** rows below. An environment check has no protein prediction. If you already ran an analysis, use **Jobs & logs → select that analysis → Open results**; saved runs are also available under **Explore results → Select run**.
+
 ## Follow the workflow
 
 | Stage | Action | What it means |
 |---|---|---|
 | Environment · once | Check environment once → select analysis → Check environment → Prepare analysis | Installation readiness only; no prediction result |
-| Purpose | Predict protein complexes → Load public example for this purpose | Public barnase–barstar input is filled in |
+| Purpose / example | After Prepare analysis, load the public example directly. If purpose choices are shown, first choose Predict protein complexes. | Public barnase–barstar input is filled in |
 | Input | Check full sequences, chain order and copies → Review input & continue | Required input is valid |
 | Settings | Check engines, planned models and MSA → Review settings & continue | Public MSA needs consent for these sequences |
 | Review | Review input → read the applied input and settings | Reuse a matching environment receipt |
@@ -22,11 +24,11 @@ Input review does not submit analysis. A completed environment check (`diagnosti
 
 ## Follow the screenshots
 
-**0. Check the environment once.** Click **Check environment once** → choose the analysis → **Check environment**. Stay on this page until it passes, then click **Prepare analysis**. This check produces no protein prediction. It is reused for the same installation, GPU and engines. Adding engines or changing the installation requires another check.
+**0. Check the environment once.** If **Environment ready** is already shown, click **Prepare analysis** without checking again. Otherwise, click **Check environment once** → choose the analysis → **Check environment**. Stay on this page until it passes, then click **Prepare analysis**. This check produces no protein prediction. It is reused for the same installation, GPU and engines. Adding engines or changing the installation requires another check.
 
 ![Separate environment check, before it has been run](images/quickstart-flow/en/environment.jpg)
 
-**1. Choose a purpose.** Start with **Predict protein complexes · Enter input**.
+**1. Confirm the purpose.** After **Prepare analysis**, **Prepare input** opens with the selected purpose already applied. Go directly to step 2; do not go back to look for a purpose button. If you started from the purpose-choice screen instead, click **Predict protein complexes · Enter input** as shown below.
 
 ![Choose protein complex prediction](images/quickstart-flow/en/01-purpose.jpg)
 
@@ -107,6 +109,8 @@ The detailed worker log is `<workspace>/.nanocofold/jobs/<job_id>/worker.log`, b
 Use **Language → English / 한국어** in the browser and in newly exported interactive reports. The two languages navigate the same candidates and recorded values. IDs, sequences, coordinates, numeric data, source settings and original execution logs stay as recorded. Existing HTML snapshots keep their original renderer; export a new report to use updated language support.
 
 ## Follow jobs, cancel and resume
+
+Changing tabs, using Back or switching language does not cancel or resubmit analysis. Return to the same job to check its status. A delayed status display is not a reason to click Run again.
 
 In **Jobs & logs**, select the analysis job and open **Detailed execution log**. An environment-check or installation job has no protein prediction to open. A browser disconnect does not create a second submission or automatically stop a detached analysis; reopen the same workspace and inspect the existing job before clicking Run again. Keep the server and compute host available.
 

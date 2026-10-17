@@ -6,28 +6,41 @@
 
 Predict protein complexes, design new nanobodies, and compare existing candidates or variants. Explore candidate tables, 3D structures, PAE, and shareable HTML reports.
 
-**For your first run, follow sections 1 → 2 → 3.** The public example fills in the sequences and settings; leave advanced settings unchanged. A [large-image walkthrough](docs/browser_quickstart.en.md#follow-the-screenshots) is also available in English.
+**First time? Use the public example below.** It fills in the sequences and small-run settings for you. Leave advanced settings unchanged.
 
-**Workflow: check the environment once → prepare inputs and settings → run analysis → follow Jobs & logs → explore results.** An environment check prepares the installation; its completion is not an analysis result.
+| What do you want to do? | Start here |
+|---|---|
+| Install on a new Ubuntu GPU computer | [1. Prepare and install](#1-prepare-and-install) |
+| Use a computer/server where NanoCoFold is already installed | [2. Open the browser](#2-open-the-browser), then [3. Try the example](#3-try-the-first-public-example) |
+| Read a report someone sent you | Extract the **whole Shareable report ZIP** and double-click **report.html**. No installation or GPU is needed. |
 
-**If your server is already installed, start at section 2.** Use the same source folder and workspace as the installation. The source under `source/` in a delivery bundle and a saved `report.html` are different entry points. To read existing results, extract the report ZIP and open `report.html`; no installation is needed.
+**Environment check → prepare input → review settings → run once → Open results.**
+
+**Only seeing “diagnostics · Complete”?** That is an installation check. It does not predict a protein structure. Click **Prepare analysis**, then follow [section 3](#3-try-the-first-public-example).
+
+[English screenshots, step by step](docs/browser_quickstart.en.md#follow-the-screenshots) · [Find and share results](#5-read-and-share-results)
 
 ## 1. Prepare and install
 
-The compute host needs **Ubuntu x86_64**, glibc 2.34 or later, an NVIDIA GPU, and driver 580 or later. `nvidia-smi` must show the GPU correctly. For small examples, prepare at least 16 GB GPU memory, 32 GB RAM, and 150 GiB of free SSD space. Longer proteins and larger libraries may need more resources. Internet access and `sudo` are also required.
+The compute host needs **Ubuntu x86_64**, glibc 2.34 or later, an NVIDIA GPU, and driver 580 or later. `nvidia-smi` must show the GPU correctly. For the four-engine example below, prepare at least 16 GB GPU memory, 32 GB RAM, and 150 GiB of free SSD space. Longer proteins and larger libraries may need more resources. Internet access and `sudo` are also required. Ask your server administrator to check these requirements if needed. The GPU model name alone does not establish enough memory for every engine.
 
 You do not need to install Python packages, the CUDA Toolkit, Conda, or Docker separately. The installer prepares isolated Python environments, engines, and models. It does not change the NVIDIA driver.
 
-1. If you received a ZIP, **extract the entire archive**. If you cloned the repository, use the existing checkout.
+1. On this GitHub page, click **Code → Download ZIP**, then **extract the entire archive**. If you received a source ZIP, extract it instead. If you cloned the repository, use that checkout.
 2. Open **`NanoCoFold_public`** after a Git clone, or **`NanoCoFold_public-main`** after GitHub **Download ZIP**. Tagged or separately packaged source archives may have a different folder name.
 3. Open a terminal inside that folder. You should see `README.md`, `install.sh`, and `start.sh`.
 4. To prepare all four engines for the first complex example, run these **three commands in order, in the same folder**. Wait for each command to finish with **`[설치 완료]`** (installation complete) before starting the next.
+
+If there is more than one GPU, read **Multiple GPUs** below before running these commands.
 
 ```bash
 bash install.sh --profile complex
 bash install.sh --profile colabfold
 bash install.sh --profile opendde
 ```
+
+<details>
+<summary>Multiple GPUs, extra purposes and installation troubleshooting</summary>
 
 `complex` prepares Boltz-2 and Chai-1; the other commands prepare ColabFold and OpenDDE. A single GPU is selected automatically. If the host has multiple GPUs, find the full UUID with `nvidia-smi -L` and use **the same UUID in all three commands**.
 
@@ -51,9 +64,11 @@ On a multi-GPU host, add the same `--gpu` UUID to this optional installation. Th
 
 If an error occurs, stop before continuing. `Driver/library version mismatch` means the NVIDIA driver and libraries do not match. Ask the administrator whether a reboot is needed, and retry only after `nvidia-smi` works. Reinstalling Python does not fix this error. See [installation troubleshooting](docs/installation.md).
 
+</details>
+
 ## 2. Open the browser
 
-Run this in the **same folder** after installation:
+On the **Ubuntu computer where you installed NanoCoFold**, run this in the **same source folder**. For a remote server, use the two-terminal instructions below:
 
 ```bash
 bash start.sh
@@ -63,13 +78,27 @@ Open [http://127.0.0.1:8765](http://127.0.0.1:8765). This terminal runs the web 
 
 If **Preparing the interface.** appears, wait for the purpose buttons. If preparation fails, read the error and click **Reload interface**. The interface starts in English. Use **Language → 한국어** in the header to switch; the browser remembers your choice. Switching languages preserves inputs and analysis state. Original identifiers, sequences, numerical results, logs, and configuration records are kept as recorded.
 
-For a remote Ubuntu server, run `bash start.sh --no-browser` on the server. In a **separate terminal on your own PC**, run the command below and keep both terminals open. Replace `USER@SERVER` with your server account and address.
+<details>
+<summary>Using a remote Ubuntu server from your own PC</summary>
+
+**Terminal 1 · On the installed Ubuntu server:**
+
+```bash
+bash start.sh --no-browser
+```
+
+**Terminal 2 · On your own PC:** replace `USER@SERVER` with your server account and address.
 
 ```bash
 ssh -L 8765:127.0.0.1:8765 USER@SERVER
 ```
 
-Then open the address above in your PC browser. Inputs and results are viewed on the PC; computation uses the GPU of the Ubuntu server where you installed NanoCoFold. The public installer normally stores the workspace in `.nanocofold/workspace` under the source folder; `--workspace` can choose another location. `start.sh` reuses the saved installation location.
+Keep both terminals open. Then open the address above in your PC browser. Inputs and results are viewed on the PC; computation uses the GPU of the Ubuntu server where you installed NanoCoFold. The public installer normally stores the workspace in `.nanocofold/workspace` under the source folder; `--workspace` can choose another location. `start.sh` reuses the saved installation location.
+
+</details>
+
+<details>
+<summary>Update an existing installation (after jobs finish)</summary>
 
 ### Update an existing installation
 
@@ -85,20 +114,32 @@ This updates the installed application while preserving the saved workspace, GPU
 
 If the update fails or is interrupted, run `bash update.sh` again. Starting the application is blocked until the update finishes successfully. An open web server or active job also blocks the update; close the server after its jobs finish, then retry.
 
+</details>
+
 ## 3. Try the first public example
 
-Start with **Predict protein complexes**. You do not need to create sequences or a settings file.
+Start with **Predict protein complexes**. Follow one row at a time; each row tells you when to continue.
 
-1. First, click **Check environment once**. On **Environment & setup**, select your analysis and click **Check environment**. Wait on this page for **Environment ready**, then click **Prepare analysis**. For later inputs with the same installation, GPU and engines, skip this check. Select **Predict protein complexes** for the first example.
-2. Click **Load public example for this purpose**. The barnase–barstar sequences and small-run settings are filled in.
-3. In **Prepare input**, check both protein names, full sequences, chain order, and copy counts. Click **Review input & continue**.
-4. In **Run settings**, check selected engines, the maximum planned model count, and the MSA method. If using the public MSA server, explicitly check consent to send the current sequences to `api.colabfold.com`. Click **Review settings & continue**.
-5. In **Review & run**, click **Review input** and read the applied input and settings. The saved environment check is reused; this button starts neither another environment job nor a prediction. **Run analysis** is enabled when the matching check is available. If a check is missing for the selected engines, use **Go to environment check**, complete it, and click **Prepare analysis** to return to this reviewed input.
-6. Click **Run analysis** once. Follow progress in **Jobs & logs**. When finished, click **Open results**.
+| Step | What to click or check | Ready to continue when… |
+|---|---|---|
+| A · Environment, once | **Check environment once** → select **Predict protein complexes** → **Check environment** | **Environment ready** appears on this page. Click **Prepare analysis**. |
+| B · Example | **Load public example for this purpose** | Barnase **110 aa** and Barstar **89 aa** appear, with **one copy of each**. |
+| C · Input | Check both sequences, chain order and copies → **Review input & continue** | **Run settings** opens. |
+| D · Settings | **Small starter preset**, **four engines**, **four planned models**. For public MSA, consent to send these public sequences to **api.colabfold.com** → **Review settings & continue** | **Review & run** opens. |
+| E · Final review | **Review input** → read the applied input and settings | **Run analysis** is enabled. Reviewing does not start computation. |
+| F · Analysis | Click **Run analysis** **once** → **Jobs & logs** | Select your **analysis** job and wait for its final status. An environment-check job is a different job. |
+| G · Result | On the completed analysis, click **Open results** | A candidate/model table appears. Select a row to see its scores, 3D structure and PAE. |
 
-The public example selects the **Small starter preset**. It is different from the broader **Researcher exploration** preset. Before using your own input, check the visible generation/evaluation limits, planned models and time budget. Loading an example does not submit a run or grant MSA transmission consent.
+**After Prepare analysis, the purpose selected in the environment check is already applied.** If **Prepare input** is open, load the example directly; you do not need to return to the purpose screen. If you start from the purpose choices instead, choose **Predict protein complexes · Enter input**. If **Environment ready** is already shown, reuse it instead of checking again.
 
-For the first example, check these values. **Four planned models do not guarantee four successful predictions**; inspect the actual counts afterward. The screenshots show the current English interface; select **Language → English** to match them.
+If **Run analysis** is disabled because the environment check is missing: **Go to environment check** → complete it → **Prepare analysis**. Your input is kept. Reuse the check while the installation, GPU and selected engine configuration stay the same.
+
+The example uses seed **42** and **one model per engine**. Four planned models do not guarantee four successful models; check completed, failed and unevaluated counts. Loading the example does not submit analysis or grant sequence-transmission consent. Review changed inputs and confirm their consent again.
+
+<details>
+<summary>Step-by-step settings and English screenshots</summary>
+
+For the first example, check these values. **Four planned models do not guarantee four successful predictions**; inspect the actual counts afterward. The screenshots are saved examples; select **Language → English** to match their labels. Exact capture versions are in the [capture record](docs/images/quickstart-flow/README.md).
 
 | Step | Key settings to check | Screenshot |
 |---|---|---|
@@ -138,9 +179,7 @@ This is the previously verified rc5 barnase–barstar run with four actual engin
 
 </details>
 
-After changing inputs or settings, confirm input review and transmission consent again. Repeat the separate environment check only when the installation, GPU or selected engine configuration changes. Advanced settings are available in the relevant step; use defaults for the first example. If a request is slow or the connection drops, check the jobs list for an existing submission before clicking again.
-
-Closing the browser does not cancel an analysis. To stop one, use its cancel control in **Jobs & logs** and wait until cancellation cleanup finishes. Saved results remain available. To continue an interrupted analysis, use its resume control and review the saved inputs and completed-stage checks; opening an existing result never restarts inference. In the hosted workspace, an older compute agent must be updated before resume is enabled.
+</details>
 
 [Step-by-step buttons and result interpretation](docs/browser_quickstart.en.md) · [Example sequence sources and JSON](examples/tutorial/README.md) · [Analysis workflow and selection logic](docs/ANALYSIS_WORKFLOW.md)
 
@@ -163,15 +202,25 @@ For structure files, review chains, residue mappings, missing residues, and the 
 
 ## 5. Read and share results
 
-An **Environment check** job is an installation check, not a prediction. To obtain results, prepare input and click **Run analysis**. Select the completed **analysis** job and click **Open results**. Compare candidates using the X/Y metric selectors and the report navigation. [Chart example](docs/images/quickstart-flow/en/charts.jpg) · [Report navigation](docs/images/quickstart-flow/en/report-nav.jpg).
+**To open your result:** **Jobs & logs → select your analysis job → Open results**. On a small screen, scroll below the job details to find its actions. You can also use **Explore results → Select run** to reopen a saved analysis in the same workspace.
 
-First inspect **run status and counts of successful, failed, and unevaluated models**. Click a candidate row to open its structure and PAE.
+| What you see | What to do next |
+|---|---|
+| **diagnostics / Environment check · Complete** | Click **Prepare analysis** and follow [section 3](#3-try-the-first-public-example). No prediction has run yet. |
+| Analysis **Complete** with **Open results** | Open it, check successful/failed/unevaluated counts, then select a model. |
+| Failed, cancelled, interrupted or budget exhausted | Read **Detailed execution log** and [section 6](#6-follow-jobs-cancel-and-resume). Any saved partial result is not proof of completion. |
+| No **Open results** button or no saved run listed | Confirm the same workspace and the selected **analysis** job. Read its status and log; do not submit it again just to find results. |
+
+Then read in this order: **status and counts → candidate/model row → scores, structure and PAE → download**. X/Y selectors compare metrics for the selected view. [Chart example](docs/images/quickstart-flow/en/charts.jpg) · [Report navigation](docs/images/quickstart-flow/en/report-nav.jpg).
 
 - **Fit entire structure** shows the whole complex. **Select target / Select nanobody**, or **Select reference chain / Select partner**, highlights and focuses the relevant chain. **Clear selection** removes highlighting.
 - Clicking a PAE cell selects and focuses two residues and moves to the structure viewer. PAE describes uncertainty in predicted relative residue placement; it is not a binding measurement.
 - Save CSV / XLSX tables, FASTA, coordinates, and the **report ZIP**. **Save selected display coordinates** saves the coordinates shown in the viewer. **Download original engine coordinates** is available when the original file is preserved and matches its recorded hash. Check the provenance notice for the relationship between original and display coordinates.
 
 The **Full original ZIP · For local archiving** includes server paths and execution logs and is for personal recovery / archiving. Send collaborators the entire **Shareable report ZIP**. Recipients extract the whole ZIP and open **`report.html`**. Saved results can be read on macOS, Windows, or other PCs without a GPU or program installation. Newly generated interactive reports also include the English / Korean selector.
+
+<details>
+<summary>File locations, older reports and PyMOL (optional)</summary>
 
 ### Find the saved files
 
@@ -183,13 +232,22 @@ Use **Language → English / 한국어** in the browser and in newly exported in
 
 If PyMOL materials are provided, extract the **whole folder** and open `.pml` through PyMOL **File → Open**. Keep the relative folder layout of scripts and referenced coordinates. PyMOL materials are separate from the general report ZIP. See [viewing in PyMOL](docs/RESULTS.md#pymol에서-보기).
 
+</details>
+
 Prediction completion, selection eligibility, and experimentally confirmed binding are distinct. Unevaluated is not zero; WT is a control. Scores from different engines are not summed into one ranking. Review ipTM, interface pLDDT, interface PAE, and structures together. Binding, KD, and expression require experimental validation. See [metrics and result interpretation](docs/RESULTS.md).
 
 ## 6. Follow jobs, cancel and resume
 
-In **Jobs & logs**, select the analysis job and open **Detailed execution log**. An environment-check or installation job has no protein prediction to open. A browser disconnect does not create a second submission or automatically stop a detached analysis; reopen the same workspace and inspect the existing job before clicking Run again. Keep the server and compute host available.
+| Situation | What to do |
+|---|---|
+| Changed tabs, used Back, switched language or closed the browser | This does not cancel the analysis. Reopen the same workspace and inspect the existing job. Keep the server and compute host running. |
+| Progress seems stuck or the connection dropped | Check **Detailed execution log** and the connection. The last displayed status can be stale; do not submit a duplicate. |
+| Want to stop a job | **Cancel job** → wait for **Cancelling → Cancelled**. A cancellation request alone does not mean cleanup has finished. |
+| A failed, interrupted or cancelled job offers **Verify and resume** | Resolve the logged cause, then use that action on the **same job**. Saved inputs/configuration and process ownership are checked before restarting. |
+| **Time budget exhausted** | Enter additional minutes when prompted, then **Verify and resume**. |
+| Resume is unavailable | Read the stated reason and the log. A hosted workspace may require a compute-agent update; contact its administrator. Do not create a new run just to bypass this check. |
 
-To stop an active analysis, use **Cancel job** and wait until cleanup changes **Cancelling** to **Cancelled**. Saved work is retained. For an interrupted, failed or cancelled analysis, resolve the logged cause and use **Verify and resume** when that action is offered. It validates the saved input/configuration and previous process ownership before restarting; it does not resume automatically. After **Time budget exhausted**, enter additional minutes when prompted. If resume is unavailable, read the log rather than submitting a duplicate run. Inspect any available partial results as partial, not as a completed analysis.
+Saved work and results are retained; an interrupted job does not restart automatically. Existing results open without running inference. Partial results must be read as partial.
 
 [Changelog](CHANGELOG.md) · [Validation record](docs/VALIDATION.md) · [External engine and model terms](LICENSE_MANIFEST.md)
 
