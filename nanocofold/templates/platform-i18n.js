@@ -44,12 +44,22 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "현재 평가 기준": "Current assessment criteria",
+  "원래 예측 설정": "Original prediction settings",
+  "현재 평가 기준 미확인": "Current assessment criteria are unverified",
+  "현재 평가 기준은 검증된 평가 기록에서 읽습니다. 원래 예측 설정과 구분하며, 평가 기록이 없거나 산출물과 일치하지 않으면 현재 기준을 미확인으로 표시합니다.": "Current assessment criteria are read from a verified assessment receipt, separately from the original prediction settings. If the receipt is missing or does not match the outputs, current criteria are shown as unverified.",
+  "구형 혼합·미확인 엔진 순위의 발주 전달을 보류했습니다. 원본 점수·선별 표는 보존했으며, 새 실행 또는 재분석으로 엔진별 순위를 계산해야 합니다.": "Synthesis handoff is held for historical mixed or unverified engine rankings. Original score and selection tables were preserved. Run a new analysis or reanalyze to compute separate engine rankings.",
+  "동일 후보 서열의 엔진별 재예측은 별도 관측입니다. 새 분석은 엔진별로 순위를 계산합니다. 일부 후보만 재평가한 엔진은 후보 집합이 달라 성능 비교가 아닙니다. 과거 혼합 순위는 저장된 ranking_policy의 범위를 확인하세요. 결합 확률·KD로 해석하지 않습니다.": "Repredictions of the same sequence by different engines are separate observations. New analyses rank within each engine. Partially reevaluated engines have different candidate cohorts and cannot establish engine performance. For historical mixed rankings, inspect the saved ranking_policy. Scores are not binding probabilities or KD.",
+  "부분 재평가 결과는 엔진별로 따로 순위를 계산했습니다. 엔진마다 후보 집합이 달라 엔진 성능·친화도 비교나 통합 순위로 해석할 수 없습니다. rank.final_n은 엔진별 상한이며 통합 발주 목록은 자동 승인하지 않습니다.": "Partial reevaluation results were ranked separately within each engine. The candidate cohorts differ, so these results do not establish engine performance, affinity differences, or a combined ranking. rank.final_n is a per-engine limit; a combined synthesis order is not automatically approved.",
+  "종합점수는 기록된 엔진과 후보 집합 안의 상대 점수입니다. 적용·제외 가중치는 ranking_policy의 엔진별 정책을 확인하세요. 일부 후보만 재평가한 결과는 통합 순위나 엔진 성능 비교가 아닙니다. 과거 혼합 배치 기록은 원래 정규화 범위를 유지합니다. 선별 순위는 적격 게이트와 다양성 제한을 추가 적용합니다. ESM·AntiFold는 서열/폴딩 prior입니다. dev_severe는 심한 5종 게이트, dev_flags는 전체 평가 위험 수 가중치입니다. N/O 근접·반대 전하 접촉·충돌의 단위는 원자쌍이며, 확인된 수소결합 수나 원소별 반데르발스 판정이 아닙니다.": "Composite scores are relative to the recorded engine and candidate cohort. Check per-engine policies in ranking_policy for applied and ignored weights. Partially reevaluated results do not establish a combined ranking or engine performance. Historical mixed-batch records retain their original normalization scope. Selection also applies eligibility gates and diversity limits. ESM / AntiFold are sequence / folding priors. dev_severe is a five-type severe-risk gate; dev_flags weights all assessed risks. Nearby N/O contacts, opposite-charge contacts, and clashes count atom pairs, not confirmed hydrogen bonds or element-specific van der Waals assessments.",
+  "기록된 엔진과 후보 집합 안의 z-score 가중 상대 점수입니다. 적용·제외 가중치는 ranking_policy의 엔진별 정책을 확인하세요. 부분 재평가는 같은 후보의 엔진 성능 비교가 아닙니다. 과거 혼합 순위는 원래 범위를 유지합니다. 선별 순위에는 게이트와 다양성 제한이 추가됩니다. 결합 확률·KD나 검증된 친화도 순위가 아닙니다.": "A weighted z-score relative to the recorded engine and candidate cohort. Check per-engine ranking_policy for applied and ignored weights. Partial reevaluation is not a matched engine-performance comparison. Historical mixed rankings retain their original scope. Selection also applies quality gates and diversity limits. This is not a binding probability, KD, or validated affinity ranking.",
+  "종합점수는 기록된 엔진과 후보 집합 안의 상대 점수입니다. 적용·제외 가중치는 ranking_policy의 엔진별 정책을 확인하세요. 일부 후보만 재평가한 결과는 통합 순위나 엔진 성능 비교가 아닙니다. 과거 혼합 순위는 원래 범위를 유지합니다. 선별 순위는 적격 게이트와 다양성 제한을 추가 적용합니다. ESM·AntiFold는 서열/폴딩 prior입니다. dev_severe는 심한 5종 게이트, dev_flags는 전체 평가 위험 수 가중치입니다. N/O 근접·반대 전하 접촉·충돌은 원자쌍 수이며 확인된 수소결합이나 원소별 반데르발스 판정이 아닙니다.": "Composite scores are relative to the recorded engine and candidate cohort. Check per-engine ranking_policy for applied and ignored weights. Partial reevaluation does not establish a combined ranking or engine performance. Historical mixed rankings retain their original scope. Selection additionally applies eligibility gates and diversity limits. ESM and AntiFold are sequence or folding priors. dev_severe counts five severe gate categories; dev_flags weights all assessed sequence risks. N/O proximity, opposite-charge contacts and clashes count atom pairs; they do not establish hydrogen bonds or element-specific van der Waals interactions.",
   "작업이 취소되었습니다. 저장된 작업과 결과는 보존합니다.": "The job was cancelled. Saved work and results are preserved.",
   "작업이 이미 종료되었거나 상태가 변경되었습니다. 현재 작업 상태와 저장된 결과를 확인하세요.": "The job has already ended or its status changed. Check the current job status and saved results.",
-  "저장 공간이 부족해 요청을 마치지 못했습니다. 서버의 여유 공간을 확보한 뒤 작업·로그를 새로고침해 현재 상태를 확인하세요.": "The request could not finish because storage is full. Free space on the server, then refresh Jobs & logs to check the current status.",
-  "작업 공간의 읽기·쓰기 권한을 확인할 수 없습니다. 서버의 파일 권한을 확인한 뒤 작업·로그를 새로고침해 현재 상태를 확인하세요.": "The workspace could not be read or written. Check file permissions on the server, then refresh Jobs & logs to check the current status.",
-  "다른 저장 요청을 처리 중입니다. 잠시 후 작업·로그를 새로고침해 현재 상태를 확인하세요.": "Another storage request is being processed. Wait a moment, then refresh Jobs & logs to check the current status.",
-  "저장소 요청을 마치지 못했습니다. 서버 로그를 확인한 뒤 작업·로그를 새로고침해 현재 상태를 확인하세요.": "The storage request could not finish. Check the server log, then refresh Jobs & logs to check the current status.",
+  "저장 공간이 부족해 요청을 마치지 못했습니다. 서버의 여유 공간을 확보한 뒤 작업·로그를 새로고침해 현재 상태를 확인하세요.": "The request could not finish because storage is full. Free server space, then refresh Jobs & logs to check the current state.",
+  "작업 공간의 읽기·쓰기 권한을 확인할 수 없습니다. 서버의 파일 권한을 확인한 뒤 작업·로그를 새로고침해 현재 상태를 확인하세요.": "Could not verify workspace read/write permissions. Check server file permissions, then refresh Jobs & logs to check the current state.",
+  "다른 저장 요청을 처리 중입니다. 잠시 후 작업·로그를 새로고침해 현재 상태를 확인하세요.": "Another storage request is in progress. Refresh Jobs & logs shortly to check the current state.",
+  "저장소 요청을 마치지 못했습니다. 서버 로그를 확인한 뒤 작업·로그를 새로고침해 현재 상태를 확인하세요.": "The storage request could not finish. Check server logs, then refresh Jobs & logs to check the current state.",
   "상태 조회 연결이 끊겼거나 응답이 지연됩니다. 마지막 표시 상태이며, 연결이 복구되면 다시 확인합니다. 화면 이동은 분석을 취소하지 않습니다.": "The status connection was lost or the response is delayed. Showing the last received status; it will refresh when the connection recovers. Leaving this screen does not cancel the analysis.",
   "요청의 처리 여부를 확인하지 못했습니다. 작업·로그에서 새로고침으로 현재 상태를 확인한 뒤 다시 요청하세요. 자동으로 다시 요청하지 않습니다.": "Could not confirm whether the request was accepted. Use Refresh in Jobs & logs to check the current status before trying again. The request is not retried automatically.",
   "추가 시간은 0보다 큰 숫자로 입력하세요.": "Enter an additional time greater than zero.",
@@ -107,7 +117,6 @@ const NCF_TRANSLATIONS = Object.freeze({
   "입력 확인을 누른 뒤 적용 조건을 읽고 분석 실행을 누르세요. 환경 확인 기록은 재사용하며, 입력 확인은 계산을 시작하지 않습니다.": "Click Review input, read the applied settings, then click Run analysis. The environment check is reused; reviewing input does not start computation.",
   "검토·실행 · 입력 확인 후 분석 시작": "Review & run · Check your input, then start analysis",
   "초안 입력을 복원했습니다. 구조 파일을 다시 선택하고 전송 동의와 입력을 확인하세요. 설치 환경 확인 기록은 재사용합니다.": "Draft restored. Reselect structure files, confirm transmission consent, and review your input. The installation check is reused.",
-
   "지정 부위 접촉률": "Requested hotspot contact fraction",
   "표적·파트너·서열·입력 준비 방식·hotspot과 경고를 확인했습니다.": "I have reviewed the target, partners, sequences, preparation method, hotspots, and warnings.",
   "서열 입력의 구조와 hotspot은 예측됩니다. 기본 MSA는 empty이며 외부 서버로 서열을 보내지 않습니다.": "Structure and hotspots are predicted from sequence input. The default MSA is empty and sends no sequences to an external server.",
@@ -458,7 +467,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "ESM 서열 prior (친화도 아님)": "ESM sequence prior (not affinity)",
   "배치 상대 종합점수": "Batch-relative composite score",
   "충돌 원자쌍": "Clashing atom pairs",
-  "지정 결합 부위 충족": "Requested hotspot satisfied",
+  "지정 결합 부위 충족": "Requested position satisfied",
   "지정 결합 부위 포함 적격": "Eligibility including requested hotspots",
   "동일 후보 자세 일치": "Pose agreement for the same candidate",
   "자세 일치 엔진 수": "Pose-supporting engines",
@@ -535,7 +544,6 @@ const NCF_TRANSLATIONS = Object.freeze({
   "종료 정리 중": "Cleaning up execution",
   "미측정": "Not measured",
   "결과 DB를 조회하고 있습니다…": "Loading results database…",
-  "분석": "Analysis",
   "모드": "Mode",
   "실행일": "Run date",
   "서열": "Sequences",
@@ -748,7 +756,6 @@ const NCF_TRANSLATIONS = Object.freeze({
   "기록 선별": "Recorded-selected",
   "기록 제외 사유": "Recorded exclusion reasons",
   "결합 부위 접촉 수": "Hotspot contacts",
-  "지정 결합 부위 충족": "Requested position satisfied",
   "생성 엔진": "Generation engine",
   "ipSAE · 표시 체인 쌍": "ipSAE · Displayed chain pair",
   "선별": "Selected",
@@ -1455,7 +1462,6 @@ const NCF_TRANSLATIONS = Object.freeze({
   " / 제외: ": " / Skipped: ",
   "일치하는 원본 표적 잔기를 찾지 못했습니다.": "No matching original target residue was found.",
   "입력 QC 차단 - 해결 전 내보내기 불가": "Blocking input QC — resolve before export",
-  "표적: {0}": "Target: {0}",
   "{0} ({1}, 원본 {2})": "{0} ({1}, original {2})",
   "보존 체인: {0}": "Retained chains: {0}",
   "제거 체인: {0}": "Removed chains: {0}",
@@ -1492,10 +1498,6 @@ const NCF_TRANSLATIONS = Object.freeze({
   "interest_positions는 실제 분석 구간의 중복 없는 원본 잔기 번호 정수 목록이어야 합니다.": "interest_positions must list distinct integer original residue numbers within the actual analysis interval.",
   "결과 목록을 복구 중입니다. 잠시 뒤 재개하세요. 원본 결과는 보존됩니다.": "The result index is being recovered. Resume again shortly. Original results are preserved.",
   "결과 색인 잠금 파일을 확인할 수 없습니다. 서버 로그를 확인하세요.": "Could not verify the result-index lock file. Check the server logs.",
-  "저장 공간이 부족해 요청을 마치지 못했습니다. 서버의 여유 공간을 확보한 뒤 작업·로그를 새로고침해 현재 상태를 확인하세요.": "The request could not finish because storage is full. Free server space, then refresh Jobs & logs to check the current state.",
-  "작업 공간의 읽기·쓰기 권한을 확인할 수 없습니다. 서버의 파일 권한을 확인한 뒤 작업·로그를 새로고침해 현재 상태를 확인하세요.": "Could not verify workspace read/write permissions. Check server file permissions, then refresh Jobs & logs to check the current state.",
-  "다른 저장 요청을 처리 중입니다. 잠시 후 작업·로그를 새로고침해 현재 상태를 확인하세요.": "Another storage request is in progress. Refresh Jobs & logs shortly to check the current state.",
-  "저장소 요청을 마치지 못했습니다. 서버 로그를 확인한 뒤 작업·로그를 새로고침해 현재 상태를 확인하세요.": "The storage request could not finish. Check server logs, then refresh Jobs & logs to check the current state.",
   "빠른 입력 검토는 합계 2,000잔기까지 지원합니다. 필요한 복합체 사본을 선택하세요.": "Quick input review supports at most 2,000 residues in total. Select the required assembly copies.",
   "선택 내용이 바뀌었습니다. 표적과 결합 부위를 다시 확인하세요.": "The selection changed. Check the target and binding sites again.",
   "추천의 한계와 보존·제거 내역을 확인한 뒤 확인란을 선택하세요.": "Review recommendation limits and retained/removed components, then check the confirmation box.",
@@ -1762,7 +1764,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "유지 구간: {0}": "Retained ranges: {0}",
   "누락 결합 부위: {0}": "Missing binding-site residues: {0}",
   "선택한 체인쌍": "Selected chain pair",
-  "선택 표적–VHH 체인쌍": "Selected target\u2013VHH chain pair",
+  "선택 표적–VHH 체인쌍": "Selected target–VHH chain pair",
   "전체 복합체": "Whole complex",
   "이전 기록의 첫 체인쌍": "First chain pair from legacy records",
   "두 체인 복합체의 원본 전체 ipTM": "Native whole-complex ipTM for a two-chain complex",
@@ -1771,7 +1773,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "Chai-1 원본 체인 축에 대응한 방향별 ipTM 최솟값": "Minimum directional ipTM on the native Chai-1 chain axis",
   "OpenDDE 검증된 체인 축에 대응한 방향별 ipTM 최솟값": "Minimum directional ipTM on the verified OpenDDE chain axis",
   "기록된 범위·출처 (원문 확인)": "Recorded scope/source (see original)",
-  "소수성(KD)": "Hydrophobicity (Kyte\u2013Doolittle)",
+  "소수성(KD)": "Hydrophobicity (Kyte–Doolittle)",
   "보존도": "Conservation",
   "글리칸 거리": "Glycan distance",
   "복합체 예측 · 처음 실행 추천": "Predict complexes · Recommended first run",
@@ -1797,8 +1799,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "실패 예측이나 가중 CDR 미평가로 보류된 후보는 포함하지 않습니다.": "It excludes failed predictions and candidates held for unevaluated weighted CDR developability.",
   "mock/dry-run: CDR 의존 liability 는 미평가로 기록됩니다. rank.weights.dev_flags가 0이 아니면 종합 순위와 최종 선별을 보류합니다. 실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. 미평가를 위험 없음으로 처리하지 않습니다.": "mock/dry-run: CDR-dependent liabilities are recorded as unevaluated. When rank.weights.dev_flags is nonzero, composite ranking and final selection are held. For actual analysis, install ANARCI with envs/setup_antibody.sh or specify mature.cdr.source=config and validated 1-based CDR ranges. Unevaluated is not treated as risk-free.",
   "ANARCI 환경 없음: CDR 의존 liability 는 미평가로 기록됩니다. rank.weights.dev_flags가 0이 아니면 종합 순위와 최종 선별을 보류합니다. 실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. 미평가를 위험 없음으로 처리하지 않습니다.": "ANARCI environment unavailable: CDR-dependent liabilities are recorded as unevaluated. When rank.weights.dev_flags is nonzero, composite ranking and final selection are held. For actual analysis, install ANARCI with envs/setup_antibody.sh or specify mature.cdr.source=config and validated 1-based CDR ranges. Unevaluated is not treated as risk-free.",
-  "CDR 개발가능성 평가가 준비되지 않으면 종합 순위와 최종 선별을 보류합니다. 실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. mock/dry-run은 실제 CDR 평가를 수행하지 않으며 미평가를 위험 없음으로 처리하지 않습니다.": "Composite ranking and final selection are held when CDR developability assessment is unavailable. For actual analysis, install ANARCI with envs/setup_antibody.sh or specify mature.cdr.source=config and validated 1-based CDR ranges. Mock/dry-run does not perform actual CDR assessment or treat unevaluated liabilities as risk-free."
-,
+  "CDR 개발가능성 평가가 준비되지 않으면 종합 순위와 최종 선별을 보류합니다. 실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. mock/dry-run은 실제 CDR 평가를 수행하지 않으며 미평가를 위험 없음으로 처리하지 않습니다.": "Composite ranking and final selection are held when CDR developability assessment is unavailable. For actual analysis, install ANARCI with envs/setup_antibody.sh or specify mature.cdr.source=config and validated 1-based CDR ranges. Mock/dry-run does not perform actual CDR assessment or treat unevaluated liabilities as risk-free.",
   "--set 설정 키가 비어 있습니다.": "The --set configuration key is empty.",
   "developability.{0} 정규식이 올바르지 않습니다: {1}": "Invalid developability.{0} regular expression: {1}",
   "developability.{0}는 비어 있지 않은 모티프 문자열의 목록이어야 합니다.": "developability.{0} must be a list of nonempty motif strings.",
@@ -1816,14 +1817,12 @@ const NCF_TRANSLATIONS = Object.freeze({
   "Boltz-2 재평가 대상의 ipTM이 모두 미평가입니다. 점수 우선순위를 주장하지 않고 후보 ID 순서로 선택합니다.": "ipTM is unevaluated for all Boltz-2 reassessment candidates. Selection follows candidate ID order without claiming a score priority.",
   "{0} 파일을 찾을 수 없습니다: {1}": "Cannot find {0}: {1}",
   "{0}에는 서열을 1개만 넣으세요.": "Provide exactly one sequence in {0}.",
-  "CSV 헤더를 안전한 텍스트로 변환하면 열 이름이 중복됩니다. 원본 표의 열 이름을 구분해 주세요.": "CSV column names collide after spreadsheet text escaping. Give the original table distinct column names."
-,
+  "CSV 헤더를 안전한 텍스트로 변환하면 열 이름이 중복됩니다. 원본 표의 열 이름을 구분해 주세요.": "CSV column names collide after spreadsheet text escaping. Give the original table distinct column names.",
   "자동 결합 부위를 요청했지만 hotspot_table.csv 기록 파일이 없습니다. 평가 결과가 0개라는 뜻으로 해석하지 말고 표적 단계의 원본 산출물을 확인하세요.": "Automatic binding sites were requested, but the hotspot_table.csv record is missing. This does not mean that zero sites were evaluated. Check the original target-stage artifacts.",
   "hotspot_table.csv 파일은 있으나 평가 표가 0행입니다(헤더만 보존). 자동 결합 부위의 평가 완료나 결합 부위 없음으로 해석하지 않습니다.": "hotspot_table.csv exists, but the assessment table has zero rows (header only). This establishes neither completed automatic site assessment nor absence of binding sites.",
   "run_config.yaml을 읽지 못했습니다 ({0}). 적용 임계값을 미기록으로 표시합니다.": "Could not read run_config.yaml ({0}). Applied thresholds are shown as not recorded.",
   "{0}을 읽지 못했습니다 ({1}). 해당 결합 부위 표는 미평가이며 원본 파일 복구가 필요합니다.": "Could not read {0} ({1}). This binding-site table is unevaluated; restore the original file.",
-  "명시한 외부 3D 뷰어를 사용합니다. 뷰어 로딩에 인터넷이 필요하며 오프라인 보고서가 아닙니다.": "The specified external 3D viewer is used. Loading it requires internet access; this report is not fully offline."
-,
+  "명시한 외부 3D 뷰어를 사용합니다. 뷰어 로딩에 인터넷이 필요하며 오프라인 보고서가 아닙니다.": "The specified external 3D viewer is used. Loading it requires internet access; this report is not fully offline.",
   "선별 미기록": "Selection not recorded",
   "선별 순위 미기록·대응 모호": "Selection rank not recorded or mapping ambiguous"
 });
@@ -1865,6 +1864,8 @@ globalThis.I18N = (() => {
   function translate(raw) {
     if(typeof raw!=='string')return raw==null?'':String(raw);
     const translated=lookup(raw);if(translated!==null)return translated;
+    const engineNotice=/^((?:colabfold|boltz2|chai1|opendde|mock): )((?:종합점수·기록 순위 보류 |전체 성공 후보에서 미평가인 순위 지표: )[\s\S]+)$/.exec(raw);
+    if(engineNotice)return engineNotice[1]+translate(engineNotice[2]);
     // A ranking notice consists only of these authored diagnostic clauses.
     // Translate each recognized clause; never translate arbitrary captures,
     // IDs, settings JSON, logs or saved scientific records recursively.

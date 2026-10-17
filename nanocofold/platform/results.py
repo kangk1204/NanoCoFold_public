@@ -58,7 +58,7 @@ METRIC_HELP = {
     "interface_pae_p90": "양방향 접촉 쌍 PAE의 90백분위(Å)입니다. 높은 오차 구간을 요약합니다.",
     "dev_severe": "free_cys·glycosylation·deamidation_cdr·isomerization_cdr·hydrophobic_patch_cdr의 5종 심한 위험 수입니다. 선별 게이트에 사용하며 전체 위험 dev_flags와 다릅니다.",
     "dev_flags": "평가된 True 위험 플래그의 전체 수입니다. 심한 5종에 oxidation_cdr·pi_out_of_range·charge_out_of_range가 추가되며 종합점수 가중치에 사용됩니다. CDR 미평가는 위험 없음이 아닙니다.",
-    "composite_score": "실행 당시 배치의 지표를 z-score 가중합한 상대 점수입니다. 정규화 범위는 ranking_policy를 확인하세요. 독립 비교는 엔진별이며 기존 부분 재평가 경로는 혼합 배치일 수 있습니다. 선별 순위에는 게이트와 다양성 제한이 추가됩니다. 결합 확률·KD나 검증된 친화도 순위가 아닙니다.",
+    "composite_score": "기록된 엔진과 후보 집합 안의 z-score 가중 상대 점수입니다. 적용·제외 가중치는 ranking_policy의 엔진별 정책을 확인하세요. 부분 재평가는 같은 후보의 엔진 성능 비교가 아닙니다. 과거 혼합 순위는 원래 범위를 유지합니다. 선별 순위에는 게이트와 다양성 제한이 추가됩니다. 결합 확률·KD나 검증된 친화도 순위가 아닙니다.",
     "esm_score": "서열/폴딩 적합도 prior입니다. esm_llr가 기록된 성숙화는 단일 치환 ΔLLR를 사용합니다. ΔLLR가 없는 랜덤 성숙화와 design/screen은 예측 후 계산한 평균 로그확률의 배치 내 z-score를 사용합니다. 미평가는 0점이 아니며 실측 결합·친화도 판별값이 아닙니다.",
     "site_selection_eligible": "실행 당시 기록 적격에 지정 결합 부위 접촉을 별도로 확인한 값입니다. 기존 final_eligible와 선별 목록은 보존합니다.",
     "pose_supporting_engines": "표적만 정렬한 뒤 같은 정확한 후보 서열의 자세가 일치하는 서로 다른 엔진 수입니다. 독립 실험 횟수나 점수 평균이 아닙니다.",
@@ -221,6 +221,63 @@ class ResultReader:
                 self.config = copy.deepcopy(self.retained["config"])
                 self.state = copy.deepcopy(self.retained["state"])
                 self.platform_status = copy.deepcopy(self.retained.get("platform_status", {}))
+        self.assessment = self._specificity_assessment()
+
+    def _specificity_assessment(self):
+        """Verify current derived criteria separately from original prediction settings."""
+        if not self.config.get("specificity", {}).get("enabled"):
+            return None
+        relative = "06_specificity/assessment.json"
+        def unknown(reason):
+            return {"status": "not_established", "reason": reason, "source": relative,
+                    "assessment_config": None, "prediction_config_source": "run_config.yaml"}
+        path = self._path(relative)
+        if not path.is_file():
+            return unknown("assessment_receipt_missing")
+        try:
+            receipt = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(receipt, dict) or receipt.get("schema") != "specificity_assessment_v1":
+                return unknown("assessment_receipt_invalid")
+            content = {key: value for key, value in receipt.items() if key != "fingerprint"}
+            digest = hashlib.sha256(json.dumps(content, sort_keys=True, default=str).encode()).hexdigest()
+            if receipt.get("fingerprint") != digest:
+                return unknown("assessment_receipt_invalid")
+            prediction = receipt.get("prediction", {})
+            config_path = self._path("run_config.yaml")
+            if (not isinstance(prediction, dict) or not config_path.is_file()
+                    or prediction.get("config_sha256") != sha256(config_path)):
+                return unknown("assessment_receipt_source_mismatch")
+            outputs = receipt.get("outputs")
+            expected = {"03_score/scored_candidates.csv", "06_specificity/comparison.csv",
+                        "05_final/selected_candidates.csv", "03_score/ranking_policy.json",
+                        "06_specificity/results.json", "06_specificity/observations.csv"}
+            if not isinstance(outputs, dict) or set(outputs) != expected:
+                return unknown("assessment_receipt_table_mismatch")
+            if any(not self._path(name).is_file() or sha256(self._path(name)) != value
+                   for name, value in outputs.items()):
+                return unknown("assessment_receipt_table_mismatch")
+            raw_results = json.loads(self._path("06_specificity/results.json").read_text(encoding="utf-8"))
+            if prediction.get("comparison_provenance_fingerprint") != raw_results.get("comparison_provenance_fingerprint"):
+                return unknown("assessment_receipt_source_mismatch")
+            settings = receipt.get("assessment_config", {})
+            policy = json.loads(self._path("03_score/ranking_policy.json").read_text(encoding="utf-8"))
+            if (policy.get("assessment_config") != settings or policy.get("method") != receipt.get("method")
+                    or receipt.get("method") != "specificity_eligible_lexicographic_then_CDR3_diversity_v1"):
+                return unknown("assessment_receipt_settings_invalid")
+            thresholds = settings.get("score", {}).get("thresholds")
+            maximum = settings.get("rank", {}).get("max_dev_severe")
+            final_n = settings.get("specificity", {}).get("final_n")
+            finite = lambda value: isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+            if (not isinstance(thresholds, dict) or not all(finite(value) for value in thresholds.values())
+                    or not finite(maximum) or type(final_n) is not int or final_n < 1
+                    or not re.fullmatch(r"[0-9a-f]{64}", str(receipt.get("source_sha256", "")))):
+                return unknown("assessment_receipt_settings_invalid")
+            return {"status": "verified", "reason": None, "source": relative,
+                    "fingerprint": digest, "assessment_config": settings,
+                    "prediction_config_source": "run_config.yaml", "prediction": prediction,
+                    "reporting_version": receipt.get("reporting_version"), "source_sha256": receipt["source_sha256"]}
+        except (OSError, ValueError, TypeError, AttributeError):
+            return unknown("assessment_receipt_invalid")
 
     def _path(self, relative):
         return contained(self.root, relative)
@@ -296,9 +353,14 @@ class ResultReader:
     def all_rows(self):
         from ..result_schema import model_observation_record
         mode = self.config.get("run", {}).get("mode", "unknown")
+        if self.assessment:
+            self.assessment = self._specificity_assessment()
         if self.retained:
-            return [model_observation_record(_geometry_metadata(row), mode=mode)
-                    for row in copy.deepcopy(self.retained["candidates"]["rows"])]
+            rows = copy.deepcopy(self.retained["candidates"]["rows"])
+            if self.assessment:
+                for row in rows:
+                    row.update(self._assessment_details(row))
+            return [model_observation_record(_geometry_metadata(row), mode=mode) for row in rows]
         if self.config.get("run", {}).get("mode") == "complex":
             recorded = self._json("complex_results.json")
             rows = recorded.get("rows", [])
@@ -490,9 +552,12 @@ class ResultReader:
 
     def _assessment_details(self, row):
         """Explain recorded assessments without rescoring read-only results."""
-        thresholds = self.config.get("score", {}).get("thresholds", {})
-        rank = self.config.get("rank", {})
-        recorded_checks = row.get("threshold_checks")
+        settings = (self.assessment.get("assessment_config") or {}) if self.assessment else self.config
+        thresholds = settings.get("score", {}).get("thresholds", {})
+        rank = settings.get("rank", {})
+        source_name = (self.assessment["source"] if self.assessment["status"] == "verified"
+                       else self.assessment["reason"]) if self.assessment else "run_config"
+        recorded_checks = None if self.assessment else row.get("threshold_checks")
         checks = copy.deepcopy(recorded_checks) if isinstance(recorded_checks, list) else []
         for metric, threshold_key, flag, operator in (
                 ("ipsae", "ipsae", "pass_ipsae", ">="),
@@ -508,7 +573,7 @@ class ResultReader:
             checks.append({"metric": metric, "value": row.get(metric), "operator": operator,
                            "threshold": source[threshold_key] if recorded else None,
                            "passed": row.get(flag) if flag else None,
-                           "threshold_source": "run_config" if recorded else "not_recorded"})
+                           "threshold_source": source_name if recorded or self.assessment else "not_recorded"})
         cdr = self.config.get("mature", {}).get("cdr", {})
         if not isinstance(cdr, dict):
             cdr = {}
@@ -518,6 +583,8 @@ class ResultReader:
         def reasons(key):
             return [value for value in str(row.get(key) or "").split(";") if value]
         return {"threshold_checks": checks,
+                **({"assessment_status": self.assessment["status"], "assessment_source": source_name}
+                   if self.assessment else {}),
                 "cdr_details": {"evaluated": row.get("dev_cdr_evaluated"),
                                 "missing_regions": reasons("dev_cdr_missing_regions"),
                                 "configured_source": cdr.get("source"), "scheme": cdr.get("scheme"),
@@ -567,6 +634,9 @@ class ResultReader:
             summary = copy.deepcopy(self.retained["summary"])
             summary.update(retention="minimal", full_execution_available=False,
                            capabilities=self.retained.get("capabilities", {}))
+            if self.assessment:
+                self.assessment = self._specificity_assessment()
+                summary["assessment"] = self.assessment
             return summary
         recorded_engines = self.engine_provenance()
         rows = self.all_rows()
@@ -653,6 +723,7 @@ class ResultReader:
                 "execution_state": execution_state, "warnings": warnings,
                 "platform_status": {**self.platform_status, "applies": status_applies} if self.platform_status else None,
                 "issues": issues, "config": self.config, "state": self.state,
+                **({"assessment": self.assessment} if self.assessment else {}),
                 "source_delivery_status": source_delivery_status, "delivery_artifact": delivery_artifact,
                 "source_report_status": source_report_status, "report_artifact": report_artifact,
                 "expected_total": comparison.get("expected_rows"),
@@ -1197,7 +1268,8 @@ class ResultReader:
         authoritative = []
         for relative in ("run_config.yaml", "run_state.json", "complex_results.json", "03_score/scored_candidates.csv",
                          "05_final/selected_candidates.csv", "03_score/ranking_policy.json", "retained/manifest.json",
-                         "02_comparison/comparison_identity.json", "02_comparison/comparison_status.json", "preflight.json"):
+                         "02_comparison/comparison_identity.json", "02_comparison/comparison_status.json", "preflight.json",
+                         "06_specificity/assessment.json"):
             path = self._path(relative)
             if path.is_file():
                 path = self.artifact_path(relative)
@@ -1407,7 +1479,8 @@ class ResultReader:
         source_paths = ("run_config.yaml", "run_state.json", "complex_results.json", "models.csv",
                         *TABLES, "05_final/selected_candidates.csv", "03_score/ranking_policy.json", "01_target/residue_mapping.csv",
                         "retained/manifest.json", "retained/record.json", "preflight.json",
-                        "02_comparison/comparison_identity.json", "02_comparison/comparison_status.json")
+                        "02_comparison/comparison_identity.json", "02_comparison/comparison_status.json",
+                        "06_specificity/assessment.json")
         sources = []
         for relative in source_paths:
             path = self._path(relative)

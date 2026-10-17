@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import hashlib
+import json
 from collections import Counter
 
 import numpy as np
@@ -106,6 +108,8 @@ def _zscore(series: pd.Series, higher_is_better: bool = True) -> pd.Series:
 
 
 def composite_score(frame: pd.DataFrame, cfg: dict) -> pd.Series:
+    if len(recorded_prediction_engines(frame)) > 1:
+        raise ValueError("Mixed prediction engines require separate ranking cohorts; use engine_comparison.rank_and_select.")
     weights, ignored = _available_weights(frame, cfg)
     for metric in (key for key, weight in ignored.items() if weight):
         _warnings.warn(
@@ -113,10 +117,7 @@ def composite_score(frame: pd.DataFrame, cfg: dict) -> pd.Series:
             RuntimeWarning, stacklevel=2,
         )
     original_index = frame.index
-    frame = frame.loc[~(_interface_unavailable_rows(frame, cfg) | _weighted_unavailable_rows(frame, cfg))]
-    if cfg_get(cfg, "rank.weights.dev_flags", 0) and "dev_cdr_evaluated" in frame:
-        assessed = frame["dev_cdr_evaluated"].map(lambda value: isinstance(value, (bool, np.bool_)) and bool(value))
-        frame = frame.loc[assessed]
+    frame = frame.loc[_normalization_rows(frame, cfg)]
     score = pd.Series(0.0, index=frame.index)
     total = 0.0
     scale = max((abs(float(weight)) for metric, weight in weights.items()
@@ -135,34 +136,29 @@ def composite_score(frame: pd.DataFrame, cfg: dict) -> pd.Series:
     return score.reindex(original_index)
 
 
-def ranking_policy(cfg: dict, frame: pd.DataFrame | None = None) -> dict:
+def ranking_policy(cfg: dict, frame: pd.DataFrame | None = None, *, selected: pd.DataFrame | None = None) -> dict:
     """Describe the configured relative ordering; this is not an affinity model."""
     weights = cfg_get(cfg, "rank.weights", {}) or {}
-    engines = []
-    if frame is not None:
-        column = next((key for key in ("predictor_engine", "engine") if key in frame), None)
-        if column:
-            engines = sorted({str(value) for value in frame[column].dropna() if str(value).strip()})
-    mixed = len(engines) > 1 and not cfg_get(cfg, "screen.comparison.enabled", False)
+    engines = recorded_prediction_engines(frame) if frame is not None else []
+    mixed = len(engines) > 1
     applied, ignored = _available_weights(frame, cfg) if frame is not None else (weights, {})
-    return {
-        "method": "mixed_engine_batch_weighted_zscore_legacy" if mixed else "within_engine_batch_weighted_zscore_v1",
+    policy = {
+        "method": "within_engine_batch_weighted_zscore_v1",
         "recorded_prediction_engines": engines,
         "weights": weights,
         "applied_weights": applied,
         "ignored_weights": ignored,
         "cdr3_similarity": "normalized_levenshtein_v2; frequency-descending, length-descending, lexical-ascending greedy representatives",
         "normalization": "batch z-score; no-contact rows and rows missing a nonzero-weighted metric measured in other successful candidates excluded/held; globally absent or entirely unmeasured metrics are recorded as ignored; fewer than two values or constant columns contribute zero",
-        "normalization_population": ("recorded mixed prediction-engine input, including controls; rows with unassessed CDR liabilities excluded when developability is weighted; legacy partial-rescore path"
-                                     if mixed else "recorded ranking input in the same prediction engine, including controls; rows with unassessed CDR liabilities excluded when developability is weighted"),
+        "normalization_population": "recorded ranking input in the same prediction engine, including controls; rows with unassessed CDR liabilities excluded when developability is weighted",
         "failed_row_handling": "failed/interrupted prediction rows are preserved with unavailable scores/ranks, excluded before normalization and never selected even under fallback",
         "selection": "filter recorded eligibility and controls, then apply diversity limits without renormalizing",
         "score_precision": "unrounded_float64; presentation rounding never controls ordering",
         "rank_tie_break": "exact composite_score descending, then design_id or variant_id ascending; stable input order only when identifiers are absent or identical",
         "rank_interpretation": "ordinal deterministic record order; equal composite scores do not establish a scientific difference",
         "hotspot_mapping_gate": "any failed requested-site mapping holds ranking and selection when hotspot_contact_frac has nonzero weight, even when the contact ratio is finite",
-        "plate_scope": "engine-namespaced plate IDs in comparison mode; within-engine wells are not a combined ordering or synthesis authorization",
-        "cross_engine_scores_combined": mixed,
+        "plate_scope": "engine-namespaced plate IDs whenever ranking is engine-scoped; within-engine wells are not a combined ordering or synthesis authorization",
+        "cross_engine_scores_combined": False,
         "calibrated_binding_probability": False,
         "affinity_improvement_established": False,
         "sequence_priors": {key: weight for key, weight in weights.items() if key in {"esm_score", "antifold"}},
@@ -171,12 +167,151 @@ def ranking_policy(cfg: dict, frame: pd.DataFrame | None = None) -> dict:
         "developability_weight": "dev_flags: all evaluated True risk flags; incomplete CDR assessment holds composite_score/rank and selection",
         "fallback_scope": "recorded ineligible rows with available composite scores only; failed predictions, unavailable interfaces and unassessed weighted CDR liabilities stay held",
     }
+    if frame is None:
+        return policy
+    if mixed or "ranking_scope" in frame:
+        labels = prediction_engine_labels(frame)
+        scoped = engine_scopes_recorded(frame)
+        groups = {}
+        for engine in engines:
+            group = frame.loc[labels.eq(engine)].copy()
+            if scoped and group["ranking_scope"].isna().all():
+                continue
+            engine_selected = selected.loc[prediction_engine_labels(selected).eq(engine)] if selected is not None else None
+            groups[engine] = ranking_policy(cfg, group.drop(columns="ranking_scope", errors="ignore"), selected=engine_selected)
+            groups[engine].update(final_n=int(cfg_get(cfg, "rank.final_n", 30)), final_n_scope="this_prediction_engine_cohort")
+        policy.update(
+            method="per_engine_batch_weighted_zscore_v2" if scoped else "mixed_engine_ranking_requires_separation_v2",
+            calculation_status="engine_scoped" if scoped else "not_applied_to_combined_input",
+            per_engine_policies=groups,
+            applied_weights={key: value for key, value in weights.items()
+                             if groups and all(group["applied_weights"].get(key) == value and key in group["applied_weights"] for group in groups.values())},
+            ignored_weights={key: value for key, value in weights.items()
+                             if groups and all(group["ignored_weights"].get(key) == value and key in group["ignored_weights"] for group in groups.values())},
+            weight_summary_scope="common_to_all_engine_cohorts; per_engine_policies are authoritative",
+            combined_ranking_available=False,
+            combined_synthesis_order_authorized=False,
+            final_n_scope="per_prediction_engine_cohort; total may exceed rank.final_n",
+            selected_observations_total=int(len(selected)) if selected is not None else None,
+            unrecorded_engine_observations=int(labels.isna().sum()),
+            unrecorded_engine_handling="preserved_unranked_unselected; no engine inferred from configuration",
+            unrecognized_engine_observations=int(frame.get("ranking_unavailable_reason", pd.Series(None, index=frame.index, dtype=object)).eq("prediction_engine_unrecognized").sum()),
+            unrecognized_engine_handling="preserved_unranked_unselected; unsupported engine label is not reassigned",
+            normalization_population="separate recorded prediction-engine cohorts; no cross-engine normalization or combined ordering",
+        )
+        if not cfg_get(cfg, "screen.comparison.enabled", False):
+            policy["partial_rescore_limitation"] = "engine assignment depends on first-stage selection; candidate subsets differ and engine performance, affinity and cross-engine ranks cannot be compared"
+        return policy
+    policy.update(_cohort_policy(frame, cfg, engines[0] if engines else None))
+    policy["selected_observation_count"] = int(len(selected)) if selected is not None else None
+    return policy
+
+
+def prediction_engine_labels(frame: pd.DataFrame) -> pd.Series:
+    """Use only recorded row provenance, never infer engines from configuration."""
+    labels = pd.Series(None, index=frame.index, dtype=object)
+    for key in ("predictor_engine", "engine"):
+        if key in frame:
+            values = frame[key].map(lambda value: value.strip() if isinstance(value, str) and value.strip() else None)
+            labels = labels.where(labels.notna(), values)
+    return labels
+
+
+def recorded_prediction_engines(frame: pd.DataFrame) -> list[str]:
+    return sorted(set(prediction_engine_labels(frame).dropna()))
+
+
+def engine_scopes_recorded(frame: pd.DataFrame, *, allow_held: bool = True) -> bool:
+    """A saved scope must match explicit provenance; unknown rows stay held."""
+    if "ranking_scope" not in frame:
+        return False
+    from .engine_comparison import ENGINES
+    labels = prediction_engine_labels(frame)
+    valid = frame["ranking_scope"].eq(labels) & labels.isin([*ENGINES, "mock"])
+    if allow_held:
+        held = (frame.get("rank", pd.Series(np.nan, index=frame.index)).isna()
+                & frame.get("composite_score", pd.Series(np.nan, index=frame.index)).isna())
+        valid |= frame["ranking_scope"].isna() & held
+    return bool(valid.all())
+
+
+def _normalization_rows(frame: pd.DataFrame, cfg: dict) -> pd.Series:
+    available = ~(_failed_prediction_rows(frame) | _interface_unavailable_rows(frame, cfg)
+                  | _weighted_unavailable_rows(frame, cfg))
+    if cfg_get(cfg, "rank.weights.dev_flags", 0) and "dev_cdr_evaluated" in frame:
+        available &= frame["dev_cdr_evaluated"].map(lambda value: isinstance(value, (bool, np.bool_)) and bool(value))
+    return available
+
+
+def _cohort_policy(frame: pd.DataFrame, cfg: dict, engine: str | None) -> dict:
+    from .cascade import control_flags
+    failed = _failed_prediction_rows(frame)
+    normalized = _normalization_rows(frame, cfg)
+    applied, ignored = _available_weights(frame, cfg)
+    identifier = next((key for key in ("design_id", "variant_id") if key in frame), None)
+    controls = control_flags(frame, identifier) if identifier else pd.Series(False, index=frame.index)
+    eligible = frame.get("final_eligible", pd.Series(False, index=frame.index)).map(
+        lambda value: isinstance(value, (bool, np.bool_)) and bool(value))
+    members = sorted(frame[identifier].astype(str).tolist()) if identifier else []
+    normalized_members = sorted(frame.loc[normalized, identifier].astype(str).tolist()) if identifier else []
+    cohort_key = json.dumps({"engine": engine, "identifier_column": identifier, "members": members,
+                             "observation_count": len(frame)}, ensure_ascii=False, sort_keys=True)
+    normalization_key = json.dumps({"engine": engine, "identifier_column": identifier, "members": normalized_members,
+                                    "observation_count": int(normalized.sum())}, ensure_ascii=False, sort_keys=True)
+    reasons = {}
+    for metric in ignored:
+        if metric not in frame:
+            reasons[metric] = "metric_column_absent"
+        else:
+            values = pd.to_numeric(frame.loc[~failed, metric], errors="coerce")
+            reasons[metric] = ("no_valid_requested_site_mapping" if metric == "hotspot_contact_frac" and np.isfinite(values).any()
+                               else "no_finite_measurement_in_successful_prediction_cohort")
+    # Ratios are computed after the same max-weight scaling used by the score.
+    scale = max((abs(float(value)) for value in applied.values()), default=0.)
+    denominator = sum(abs(float(value)) / scale for value in applied.values()) if scale else 0.
+    normalized_weights = {key: (float(value) / scale / denominator if denominator else 0.) for key, value in applied.items()}
+    metric_counts = {}
+    for metric, weight in (cfg_get(cfg, "rank.weights", {}) or {}).items():
+        values = pd.to_numeric(frame[metric], errors="coerce") if metric in frame else pd.Series(np.nan, index=frame.index)
+        if metric == "hotspot_contact_frac":
+            values = values.mask(_hotspot_mapping_unavailable_rows(frame, cfg))
+        observations = values.loc[normalized & np.isfinite(values)]
+        metric_counts[metric] = {"finite_successful_observations": int((~failed & np.isfinite(values)).sum()),
+                                 "finite_normalization_observations": int(len(observations)),
+                                 "contribution_status": ("zero_weight" if not weight else "ignored" if metric in ignored
+                                                         else "fewer_than_two_values_zero_contribution" if len(observations) < 2
+                                                         else "constant_zero_contribution" if observations.nunique() <= 1 else "weighted_zscore")}
+    return {"cohort_id": "prediction-engine-cohort:" + hashlib.sha256(cohort_key.encode()).hexdigest(),
+            "prediction_engine": engine, "prediction_engine_id": "prediction-engine:" + hashlib.sha256(str(engine).encode()).hexdigest() if engine is not None else None,
+            "normalization_cohort_id": "normalization-cohort:" + hashlib.sha256(normalization_key.encode()).hexdigest(),
+            "cohort_identifier_semantics": "engine and observation-ID multiset membership; exact metric bytes are sealed by the final table SHA256 receipt",
+            "cohort_identifier_column": identifier,
+            "cohort_observation_ids": members, "ignored_weight_reasons": reasons,
+            "normalization_observation_ids": normalized_members,
+            "normalized_weights": normalized_weights,
+            "metric_observation_counts": metric_counts,
+            "cohort_counts": {"input_observations": int(len(frame)), "prediction_failed": int(failed.sum()),
+                              "successful_predictions": int((~failed).sum()), "normalization_observations": int(normalized.sum()),
+                              "held_observations": int((~normalized).sum()), "control_observations": int(controls.sum()),
+                              "normalization_control_observations": int((controls & normalized).sum()),
+                              "quality_eligible_observations": int((eligible & ~controls & ~failed).sum()),
+                              "rank_available_eligible_observations": int((eligible & ~controls & normalized).sum())},
+            "held_reason_counts": {"prediction_failed": int(failed.sum()),
+                                   "interface_metrics_unavailable": int((~failed & _interface_unavailable_rows(frame, cfg)).sum()),
+                                   "weighted_metrics_unavailable": int((~failed & _weighted_unavailable_rows(frame, cfg)).sum()),
+                                   "weighted_cdr_assessment_unavailable": int((~failed & ~normalized & ~_interface_unavailable_rows(frame, cfg) & ~_weighted_unavailable_rows(frame, cfg)).sum())},
+            "held_reason_counts_may_overlap": True,
+            "controls_in_normalization": True, "controls_excluded_from_selection": True}
 
 
 def ranking_warnings(frame: pd.DataFrame, cfg: dict) -> list[str]:
     """Explain held rankings while preserving conservative selection and all saved values."""
     if frame.empty or "composite_score" not in frame:
         return []
+    if len(recorded_prediction_engines(frame)) > 1:
+        labels = prediction_engine_labels(frame)
+        return [f"{engine}: {notice}" for engine in recorded_prediction_engines(frame)
+                for notice in ranking_warnings(frame.loc[labels.eq(engine)], cfg)]
     _, ignored = _available_weights(frame, cfg)
     notices = (["전체 성공 후보에서 미평가인 순위 지표: " + ", ".join(ignored)
                 + ". 해당 가중치를 제외하고 나머지 지표로 순위를 계산했습니다. 미평가를 0점이나 부적격으로 해석하지 마세요."]
@@ -216,6 +351,8 @@ def ranking_warnings(frame: pd.DataFrame, cfg: dict) -> list[str]:
 
 
 def rank_candidates(frame: pd.DataFrame, cfg: dict, cdr_ranges: dict | None = None, sequence_column: str = "sequence") -> pd.DataFrame:
+    if len(recorded_prediction_engines(frame)) > 1:
+        raise ValueError("Mixed prediction engines require separate ranking cohorts; use engine_comparison.rank_and_select.")
     ranked = frame.copy().reset_index(drop=True)
     if "cluster_id" not in ranked.columns:
         ranked["cluster_id"] = cluster_cdr3(
@@ -322,6 +459,8 @@ def select_final(
     allow_fallback: bool | None = None,
     pre_ranked: bool = False,
 ) -> pd.DataFrame:
+    if len(recorded_prediction_engines(frame)) > 1:
+        raise ValueError("Mixed prediction engines require separate ranking cohorts; use engine_comparison.rank_and_select.")
     if pre_ranked:
         if not {"rank", "composite_score", "cluster_id"} <= set(frame.columns):
             raise ValueError("pre_ranked selection requires rank, composite_score and cluster_id")
@@ -385,7 +524,7 @@ def select_final(
     selected["selection_rank"] = range(1, len(selected) + 1)
     selected["plate_id"] = [f"plate_{index // 96 + 1:02d}" for index in range(len(selected))]
     selected["plate_position"] = [plate_position(index % 96) for index in range(len(selected))]
-    if cfg_get(cfg, "screen.comparison.enabled", False):
+    if cfg_get(cfg, "screen.comparison.enabled", False) or "ranking_scope" in selected:
         engine_column = next((key for key in ("predictor_engine", "engine", "ranking_scope") if key in selected), None)
         if engine_column and not selected.empty:
             engines = selected[engine_column].astype(str)

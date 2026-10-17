@@ -861,7 +861,19 @@ def _predictions_columns(frame: pd.DataFrame, id_column: str) -> pd.DataFrame:
         frame = frame.copy()
         frame[id_column] = pd.Series(dtype="object")
     keep = [id_column] + [c for c in ("pred_dir", "engine", "target_chain", "binder_chain", "model_index") if c in frame.columns]
-    return frame[keep].copy()
+    recorded = frame[keep].copy()
+    recorded["predictor_engine"] = rank_select.prediction_engine_labels(frame)
+    return recorded
+
+
+def _preserve_input_predictor_engine(frame: pd.DataFrame) -> pd.DataFrame:
+    """A candidate's prior model provenance cannot label its new prediction."""
+    if "predictor_engine" not in frame:
+        return frame.copy()
+    previous = "input_predictor_engine"
+    while previous in frame:
+        previous = "previous_" + previous
+    return frame.rename(columns={"predictor_engine": previous}).copy()
 
 
 def _score_candidates(cfg: dict, pred_frame: pd.DataFrame, target: dict, id_column: str = "design_id") -> pd.DataFrame:
@@ -1311,7 +1323,7 @@ def _finalize(
                else "합성 목록은 비어 있습니다. 임계값/예측 품질을 점검하세요.")
         )
     from . import engine_comparison
-    if engine_comparison.enabled(cfg):
+    if engine_comparison.separate_ranking_required(merged, cfg):
         ranked, selected = engine_comparison.rank_and_select(merged, cfg, cdr_ranges, sequence_column)
         # composite_score/rank have meaning only inside their recorded engine.
         scored_sorted = ranked.reset_index(drop=True)
@@ -1345,13 +1357,14 @@ def _finalize(
     final_record["ranking_policy_status"] = "pending"
     state.set_phase("final", final_record)
     try:
-        applied_ranking_policy = rank_select.ranking_policy(cfg, frame=scored_sorted)
+        applied_ranking_policy = rank_select.ranking_policy(cfg, frame=scored_sorted, selected=selected)
         write_json(score_dir / "ranking_policy.json", applied_ranking_policy, root=run_dir)
         final_record["ranking_policy_status"] = "complete"
         state.set_phase("final", final_record)
-        if applied_ranking_policy["cross_engine_scores_combined"]:
-            state.add_warnings("일부 후보만 Boltz-2로 재평가하는 기존 경로에서 여러 엔진의 관측을 함께 정규화했습니다. "
-                               "이 순위는 엔진 간 독립 비교가 아닙니다. 독립 비교는 screen.comparison.enabled=true로 실행하세요.")
+        if applied_ranking_policy.get("partial_rescore_limitation"):
+            state.add_warnings("부분 재평가 결과는 엔진별로 따로 순위를 계산했습니다. 엔진마다 후보 집합이 달라 "
+                               "엔진 성능·친화도 비교나 통합 순위로 해석할 수 없습니다. rank.final_n은 엔진별 상한이며 "
+                               "통합 발주 목록은 자동 승인하지 않습니다.")
         exports = _final_exports(cfg, run_dir, state, scored_sorted, selected, id_column, sequence_column)
     except Exception as exc:
         if final_record["ranking_policy_status"] == "pending":
@@ -1411,9 +1424,22 @@ def _final_exports(cfg, run_dir, state, scored_sorted, selected, id_column="desi
     from . import engine_comparison
     final_dir = run_dir / "05_final"
 
-    if engine_comparison.enabled(cfg):
+    separate_engines = engine_comparison.separate_ranking_required(scored_sorted, cfg)
+    scoped_tables = (rank_select.engine_scopes_recorded(scored_sorted) and "predictor_engine" in selected
+                     and rank_select.engine_scopes_recorded(selected, allow_held=False))
+    historical_engine_hold = (separate_engines or "ranking_scope" in scored_sorted) and not scoped_tables
+    if scoped_tables:
         synthesis = engine_comparison.write_synthesis_by_engine(selected, cfg, final_dir, sequence_column)
         state.add_warnings("엔진별 추천 목록을 따로 저장했습니다. 통합 발주 목록은 연구자가 서열을 선택한 뒤 작성해야 합니다.")
+    elif historical_engine_hold:
+        # Report recovery is read-only with respect to the committed score and
+        # selection tables. Never reinterpret an old global selection as new
+        # per-engine recommendations, or silently authorize it for handoff.
+        synthesis = handoff.write_synthesis_sheet(selected.iloc[:0], cfg, final_dir, sequence_column=sequence_column)
+        synthesis.update(status="historical_engine_ranking_requires_reanalysis", requires_reanalysis=True,
+                         ranking_scope="held_historical_engine_provenance", raw_tables_preserved=True)
+        state.add_warnings("구형 혼합·미확인 엔진 순위의 발주 전달을 보류했습니다. 원본 점수·선별 표는 보존했으며, "
+                           "새 실행 또는 재분석으로 엔진별 순위를 계산해야 합니다.")
     else:
         synthesis = handoff.write_synthesis_sheet(selected, cfg, final_dir, sequence_column=sequence_column)
     pymol_script = None
@@ -1436,6 +1462,10 @@ def _final_exports(cfg, run_dir, state, scored_sorted, selected, id_column="desi
     # The computation commits run_config.yaml with the score tables. Derived
     # export recovery reads that receipt and cannot introduce report-time gates.
     gate = handoff.validate_handoff(run_dir)
+    if historical_engine_hold:
+        gate = {**gate, "ok": False, "errors": [*gate.get("errors", []),
+            {"code": "historical_engine_ranking_requires_reanalysis",
+             "message": "Historical mixed or unrecorded engine rankings require engine-specific reanalysis before synthesis handoff."}]}
     gate_summary = {"ok": bool(gate.get("ok")), "n_errors": len(gate.get("errors", [])),
                     "n_warnings": len(gate.get("warnings", []))}
     write_json(final_dir / "handoff_gate.json", {"ok": gate_summary["ok"], "errors": gate.get("errors", []),
@@ -1610,7 +1640,7 @@ def _tier2_and_finalize(
         predictions = pd.concat([predictions, boltz_predictions], ignore_index=True)
         predictions = predictions.drop_duplicates(subset=[id_column], keep="last")
 
-    final_candidates = candidates.drop(columns=[c for c in ("pred_dir", "engine", "target_chain", "binder_chain", "model_index") if c in candidates.columns])
+    final_candidates = _preserve_input_predictor_engine(candidates).drop(columns=[c for c in ("pred_dir", "engine", "target_chain", "binder_chain", "model_index") if c in candidates.columns])
     final_candidates = final_candidates.merge(
         _predictions_columns(predictions, id_column),
         on=id_column,
@@ -1740,8 +1770,8 @@ def _screen_flow(cfg, run_dir, state, target, candidates):
     if dry_run:
         print("[dry-run] 스코어링/리포트를 건너뜁니다.")
         return 0
-    merged_candidates = candidates.merge(
-        predictions[["design_id", "pred_dir", "engine", "target_chain", "binder_chain"]], on="design_id", how="inner"
+    merged_candidates = _preserve_input_predictor_engine(candidates).merge(
+        _predictions_columns(predictions, "design_id"), on="design_id", how="inner"
     )
     boltz_top = int(cfg_get(cfg, "screen.boltz2_rescore_top", 0))
     if boltz_top > 0 and engine != "boltz2":
@@ -1752,12 +1782,13 @@ def _screen_flow(cfg, run_dir, state, target, candidates):
             cfg, run_dir / "02c_boltz2", target, boltz_subset, engine="boltz2", mock=mock, dry_run=dry_run
         )
         merged_candidates = merged_candidates.merge(
-            boltz_predictions[["design_id", "pred_dir", "engine", "target_chain", "binder_chain"]],
+            _predictions_columns(boltz_predictions, "design_id"),
             on="design_id", how="left", suffixes=("", "_boltz"),
         )
         has_boltz = merged_candidates["pred_dir_boltz"].notna()
         merged_candidates.loc[has_boltz, "pred_dir"] = merged_candidates.loc[has_boltz, "pred_dir_boltz"]
-        merged_candidates.loc[has_boltz, "engine"] = "boltz2"
+        merged_candidates.loc[has_boltz, "engine"] = merged_candidates.loc[has_boltz, "engine_boltz"]
+        merged_candidates.loc[has_boltz, "predictor_engine"] = merged_candidates.loc[has_boltz, "predictor_engine_boltz"]
         merged_candidates = merged_candidates.drop(columns=[c for c in merged_candidates.columns if c.endswith("_boltz")])
     _finalize(cfg, run_dir, state, merged_candidates, target, None)
     return 0

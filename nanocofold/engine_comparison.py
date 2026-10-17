@@ -465,31 +465,47 @@ def run(cfg, run_dir, state, target, candidates, cdr_ranges=None, *, predict, fi
 def rank_and_select(frame, cfg, cdr_ranges=None, sequence_column="sequence", is_control=None):
     """Rank independently per engine and retain every observation in the report."""
     from . import rank_select
+    working = frame.copy()
+    # Legacy partial-rescore tables record ``engine`` instead. Fill only from
+    # that explicit row provenance; absent provenance is retained and held.
+    working["predictor_engine"] = rank_select.prediction_engine_labels(frame)
     ranked, selected = [], []
-    for engine, group in frame.groupby("predictor_engine", sort=False):
-        failures = group.get("error", pd.Series(None, index=group.index, dtype=object)).notna()
-        failures |= group.get("prediction_status", pd.Series("complete", index=group.index)).eq("failed")
-        values = rank_select.rank_candidates(group[~failures], cfg, cdr_ranges, sequence_column)
+    for engine, group in working.groupby("predictor_engine", sort=True, dropna=False):
+        if pd.isna(engine) or engine not in {*ENGINES, "mock"}:
+            held = group.copy()
+            held["composite_score"], held["rank"], held["engine_rank"] = float("nan"), float("nan"), float("nan")
+            held["ranking_scope"] = None
+            held["ranking_status"] = "held"
+            held["ranking_unavailable_reason"] = "prediction_engine_unrecorded" if pd.isna(engine) else "prediction_engine_unrecognized"
+            ranked.append(held)
+            continue
+        values = rank_select.rank_candidates(group, cfg, cdr_ranges, sequence_column)
         values["engine_rank"] = values["rank"]
         values["ranking_scope"] = engine
         from .cascade import control_flags
-        controls = control_flags(values)
+        identifier = next((key for key in ("design_id", "variant_id") if key in values), "design_id")
+        controls = control_flags(values, identifier)
         pool = values[~controls]
         picks = rank_select.select_final(pool, cfg, cdr_ranges, sequence_column,
                                         allow_fallback=bool(cfg_get(cfg, "rank.fallback_to_ineligible", False)),
                                         pre_ranked=True)
         picks["ranking_scope"] = engine
         ranked.append(values)
-        unranked = group[failures].copy()
-        unranked["composite_score"] = float("nan")
-        unranked["rank"] = float("nan")
-        unranked["engine_rank"] = float("nan")
-        unranked["ranking_scope"] = engine
-        ranked.append(unranked)
         selected.append(picks)
     if not ranked:
         return frame.copy(), frame.iloc[:0].copy()
-    return pd.concat(ranked, ignore_index=True), pd.concat(selected, ignore_index=True)
+    combined = pd.concat(ranked, ignore_index=True)
+    picks = pd.concat(selected, ignore_index=True) if selected else combined.iloc[:0].copy()
+    return combined, picks
+
+
+def separate_ranking_required(frame, cfg):
+    """Partition every explicitly heterogeneous or incomplete engine record."""
+    from . import rank_select
+    labels = rank_select.prediction_engine_labels(frame)
+    recorded_columns = any(key in frame for key in ("predictor_engine", "engine"))
+    return (enabled(cfg) or labels.nunique() > 1 or (recorded_columns and labels.isna().any())
+            or (~labels.dropna().isin([*ENGINES, "mock"])).any())
 
 
 def write_synthesis_by_engine(selected, cfg, final_dir, sequence_column="sequence"):

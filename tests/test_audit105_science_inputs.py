@@ -174,19 +174,19 @@ def test_zero_contact_prediction_remains_complete_specificity_evidence(cfg):
         for state in ("cleaved", "full"):
             rows.append({"design_id": "candidate", "sequence_sha256": hashlib.sha256(sequence.encode()).hexdigest(),
                          "target_state": state, "seed": seed, "engine": "boltz2", "status": "complete", "context": "isolated",
-                         "comparison_conditions": "same", "restraint": "none", "evidence_type": "real",
+                         "comparison_conditions": "a" * 64, "restraint": "none", "evidence_type": "real",
                          "ipsae": .8 if state == "cleaved" else 0., "iptm": .9 if state == "cleaved" else .1,
                          "interface_plddt": 90. if state == "cleaved" else np.nan,
                          "interface_pae": 3. if state == "cleaved" else np.nan,
                          "n_contacts": 10 if state == "cleaved" else 0,
                          "hotspot_contact_frac": 1. if state == "cleaved" else 0., "n_clashes": 0})
     candidates = pd.DataFrame([{"design_id": "candidate", "sequence": sequence}])
-    result = specificity.aggregate(candidates, pd.DataFrame(rows), cfg, [1, 2, 3]).iloc[0]
+    result = specificity.aggregate(candidates, pd.DataFrame(rows), cfg, [1, 2, 3], expected_conditions="a" * 64).iloc[0]
     assert result.specificity_complete and result.positive_quality_pass
     assert result.delta_ipsae == .8 and pd.isna(result.full_interface_pae)
     failed = pd.DataFrame(rows)
     failed.loc[1, "status"] = "failed"
-    assert not specificity.aggregate(candidates, failed, cfg, [1, 2, 3]).iloc[0].specificity_complete
+    assert not specificity.aggregate(candidates, failed, cfg, [1, 2, 3], expected_conditions="a" * 64).iloc[0].specificity_complete
 
 
 @pytest.mark.parametrize("unassessed", [None, np.nan, "True", 1])

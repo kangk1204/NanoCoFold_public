@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import json
 import math
+import re
 import pandas as pd
 
 from .config import cfg_get, resolve_path
@@ -17,6 +19,27 @@ from .utils import pdb_io, seq
 STATES = ("cleaved", "full")
 METRICS = ("ipsae", "iptm", "interface_plddt", "interface_pae", "hotspot_contact_frac", "n_clashes")
 REQUIRED_METRICS = ("ipsae", "iptm", "hotspot_contact_frac", "n_clashes")
+
+
+def comparison_conditions(cfg: dict, provenance: dict) -> str:
+    """Identify the producer's declared prediction conditions, not observed metadata."""
+    value = {"engine": cfg_get(cfg, "specificity.engine", "boltz2"), "restraint": "none",
+             "context": cfg_get(cfg, "specificity.context"), "screen": cfg_get(cfg, "screen"),
+             "score": cfg_get(cfg, "score"), "provenance": provenance}
+    return hashlib.sha256(json.dumps(value, sort_keys=True, default=str).encode()).hexdigest()
+
+
+def _conditions_status(records: pd.DataFrame, expected: str | None) -> str:
+    """A unanimous observed value cannot establish its own approved provenance."""
+    valid_hash = lambda value: isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+    if not valid_hash(expected):
+        return "comparison_conditions_unverified"
+    values = records.get("comparison_conditions", pd.Series(dtype=object))
+    if values.empty or not values.map(valid_hash).all():
+        return "comparison_conditions_missing_or_invalid"
+    if not values.eq(expected).all():
+        return "comparison_conditions_mismatch"
+    return "verified"
 
 
 def observation_metrics_complete(record: dict) -> bool:
@@ -174,8 +197,14 @@ def residue_mapping(cfg: dict, definition: dict) -> pd.DataFrame:
     ])
 
 
-def aggregate(candidates: pd.DataFrame, records: pd.DataFrame, cfg: dict, seeds: list[int]) -> pd.DataFrame:
-    """Require every paired observation; missing/low confidence is not nonbinding."""
+def aggregate(candidates: pd.DataFrame, records: pd.DataFrame, cfg: dict, seeds: list[int], *,
+              expected_conditions: str | None = None) -> pd.DataFrame:
+    """Require every pair and an independently approved producer condition hash.
+
+    Without expected_conditions, historical observations remain readable but
+    unverified; observed unanimity cannot grant eligibility. Low confidence is
+    never interpreted as nonbinding.
+    """
     rows = []
     expected = {(state, seed) for state in STATES for seed in seeds}
     engine = cfg_get(cfg, "specificity.engine", "boltz2")
@@ -186,8 +215,8 @@ def aggregate(candidates: pd.DataFrame, records: pd.DataFrame, cfg: dict, seeds:
         found = set(zip(subset.get("target_state", []), subset.get("seed", [])))
         complete = found == expected and len(subset) == len(expected)
         complete = complete and subset.status.eq("complete").all()
-        paired_conditions = subset.get("comparison_conditions", pd.Series(dtype=str))
-        complete = complete and paired_conditions.nunique() == 1 and subset.restraint.eq("none").all()
+        conditions_status = _conditions_status(subset, expected_conditions)
+        complete = complete and conditions_status == "verified" and subset.restraint.eq("none").all()
         sequence_hash = hashlib.sha256(str(row["sequence"]).encode()).hexdigest()
         for key, expected_value in (("sequence_sha256", sequence_hash), ("context", cfg_get(cfg, "specificity.context")),
                                      ("evidence_type", "mock" if cfg_get(cfg, "run.mock") else "real")):
@@ -195,6 +224,7 @@ def aggregate(candidates: pd.DataFrame, records: pd.DataFrame, cfg: dict, seeds:
                 complete = False
         complete = complete and all(observation_metrics_complete(r) for r in subset.to_dict("records"))
         row.update(specificity_complete=bool(complete), comparison_status="insufficient",
+                   comparison_conditions_status=conditions_status,
                    terminal_modeling_status="unassessed" if cfg_get(cfg, "specificity.epitope_mode", "both") != "exposed" else "not_applicable",
                    evidence_type="mock" if cfg_get(cfg, "run.mock", False) else "real", review_status="pending")
         for state in STATES:

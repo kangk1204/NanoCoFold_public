@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import re
 import subprocess
 import time
 from contextlib import contextmanager
@@ -200,6 +201,51 @@ def _matches_job(record: dict, candidate: pd.Series, state: str, seed: int, engi
     return all(record.get(key) == value for key, value in expected.items()) and _valid_record(record, root)
 
 
+def _comparison_fingerprint(cfg: dict, definition: dict, identity: dict) -> str:
+    canonical = copy.deepcopy(cfg)
+    canonical["target"].update(sequence=definition["full_sequence"], fasta=None)
+    canonical["run"].pop("outdir", None)
+    canonical["specificity"].pop("budget_hours", None)
+    return _key({"config": canonical, "definition": definition, "provenance": identity})
+
+
+def _saved_comparison_conditions(root: Path, definition: dict, fingerprint=None) -> tuple[str | None, str | None]:
+    """Verify the original prediction declaration without consulting observation claims.
+
+    Current score thresholds and the installed source version may legitimately
+    differ during reanalysis. The saved, fully resolved config and original
+    provenance are instead bound to the original work directory's fingerprint.
+    Legacy runs without an explicit pointer are accepted only if unambiguous.
+    """
+    from .config import read_config_file
+
+    base = root / "06_specificity"
+    try:
+        saved_cfg = read_config_file(root / "run_config.yaml")
+        if not isinstance(saved_cfg, dict):
+            return None, None
+        if fingerprint is not None:
+            if not isinstance(fingerprint, str) or re.fullmatch(r"[0-9a-f]{64}", fingerprint) is None:
+                return None, None
+            directories = [base / fingerprint]
+        else:
+            directories = [p for p in base.iterdir() if p.is_dir() and re.fullmatch(r"[0-9a-f]{64}", p.name)]
+        matches = []
+        for directory in directories:
+            if directory.resolve().parent != base.resolve():
+                continue
+            identity = _read_cache(directory / "provenance.json")
+            if not isinstance(identity.get("source_sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", identity["source_sha256"]):
+                continue
+            if not all(isinstance(identity.get(key), dict) for key in ("inputs", "environments", "weights")):
+                continue
+            if _comparison_fingerprint(saved_cfg, definition, identity) == directory.name:
+                matches.append((specificity.comparison_conditions(saved_cfg, identity), directory.name))
+        return matches[0] if len(matches) == 1 else (None, None)
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return None, None
+
+
 def _prediction(cfg: dict, root: Path, directory: Path, target: dict, candidate: pd.DataFrame,
                 state: str, seed: int, engine: str, conditions: str) -> dict:
     from .cli import _score_candidates
@@ -314,9 +360,15 @@ def _initial_pool(frame: pd.DataFrame, n: int) -> pd.DataFrame:
 
 
 def write_outputs(cfg: dict, root: Path, definition: dict, candidates: pd.DataFrame,
-                  records: list[dict], run_status: str) -> dict:
+                  records: list[dict], run_status: str, *, expected_conditions: str | None = None,
+                  comparison_fingerprint: str | None = None, invalid_record_indices: set[int] | None = None) -> dict:
     frame = pd.DataFrame(records)
-    summary = specificity.aggregate(candidates, frame, cfg, definition["seeds"])
+    assessed = frame.copy(deep=True)
+    if invalid_record_indices:
+        # Artifact validation is a derived assessment; never edit raw observations.
+        assessed.loc[list(invalid_record_indices), "status"] = "failed"
+    summary = specificity.aggregate(candidates, assessed, cfg, definition["seeds"],
+                                    expected_conditions=expected_conditions)
     if not summary.empty:
         summary["final_eligible"] = (summary.specificity_complete & summary.positive_quality_pass &
                                      summary.comparison_status.eq("complete") & summary.dev_cdr_evaluated &
@@ -324,6 +376,7 @@ def write_outputs(cfg: dict, root: Path, definition: dict, candidates: pd.DataFr
                                      ~summary.design_id.eq("WT") & summary.evidence_type.eq("real"))
         summary["exclusion_reason"] = summary.apply(lambda r: ";".join([
             reason for condition, reason in ((not r.specificity_complete, "incomplete_comparison"),
+                (r.comparison_conditions_status != "verified", r.comparison_conditions_status),
                 (not r.positive_quality_pass, "positive_quality"), (r.comparison_status == "cross_binding_risk", "cross_binding_risk"),
                 (not r.dev_cdr_evaluated, "developability_unassessed"),
                 (r.dev_severe > float(cfg_get(cfg, "rank.max_dev_severe", 1)), "developability"),
@@ -348,12 +401,16 @@ def write_outputs(cfg: dict, root: Path, definition: dict, candidates: pd.DataFr
               "biological_validation": "not_performed", "outputs_status": "pending",
               "report_status": "pending", "report": None}
     _save(root / "06_specificity" / "results.json", {"records": records, "candidates": candidates.to_dict("records"),
-        "candidate_columns": list(candidates.columns), "definition": definition, "status": run_status})
+        "candidate_columns": list(candidates.columns), "definition": definition, "status": run_status,
+        "comparison_provenance_fingerprint": comparison_fingerprint})
     _save(root / "06_specificity" / "status.json", status)
     _save_csv(frame.drop(columns=["artifacts"], errors="ignore"), root / "06_specificity" / "observations.csv")
     _save_csv(summary, root / "03_score" / "scored_candidates.csv")
     _save_csv(summary, root / "06_specificity" / "comparison.csv")
     _save_csv(selected, root / "05_final" / "selected_candidates.csv")
+    assessment_config = {"score": {"thresholds": copy.deepcopy(cfg_get(cfg, "score.thresholds", {}))},
+                         "rank": {"max_dev_severe": cfg_get(cfg, "rank.max_dev_severe", 1)},
+                         "specificity": {"final_n": cfg_get(cfg, "specificity.final_n", 24)}}
     _save(root / "03_score" / "ranking_policy.json", {
         "method": "specificity_eligible_lexicographic_then_CDR3_diversity_v1",
         "sort_columns": ["cleaved_hotspot_contact_frac_min", "cleaved_ipsae_min", "full_ipsae_max", "design_id"],
@@ -366,7 +423,28 @@ def write_outputs(cfg: dict, root: Path, definition: dict, candidates: pd.DataFr
             "selection": "one representative per threshold cluster, then deferred rows up to initial cap"},
         "cross_engine_scores_combined": False, "calibrated_binding_probability": False,
         "affinity_improvement_established": False,
+        "assessment_config": assessment_config,
     })
+    # The original prediction declaration remains immutable on reanalysis.
+    # Bind the current derived selection settings to the actual exported tables
+    # before any report/reader can describe their applied thresholds.
+    prediction_config = root / "run_config.yaml"
+    assessment = {
+        "schema": "specificity_assessment_v1",
+        "prediction": {"config_sha256": _hash(prediction_config) if prediction_config.is_file() else None,
+                       "comparison_provenance_fingerprint": comparison_fingerprint},
+        "assessment_config": assessment_config,
+        "method": "specificity_eligible_lexicographic_then_CDR3_diversity_v1",
+        "reporting_version": __version__,
+        "source_sha256": _key({str(p.relative_to(Path(__file__).parent)): _hash(p)
+                               for p in sorted(Path(__file__).parent.rglob("*.py"))}),
+        "outputs": {relative: _hash(root / relative) for relative in (
+            "03_score/scored_candidates.csv", "06_specificity/comparison.csv",
+            "05_final/selected_candidates.csv", "03_score/ranking_policy.json",
+            "06_specificity/results.json", "06_specificity/observations.csv")},
+    }
+    assessment["fingerprint"] = _key(assessment)
+    _save(root / "06_specificity" / "assessment.json", assessment)
     seq.write_fasta(dict(zip(selected.design_id, selected.sequence)), root / "05_final" / "selected_candidates.fasta")
     synthesis = handoff.write_synthesis_sheet(selected, cfg, root / "05_final")
     warnings = ["계산 결과는 실험 우선순위입니다. 낮은 전장형 점수는 비결합 증거가 아닙니다.",
@@ -461,15 +539,29 @@ def reanalyze(cfg: dict, root: Path) -> dict:
                 "specificity.secondary_chai"):
         if cfg_get(cfg, key) != cfg_get(stored, key):
             raise ValueError(f"재분석에서 예측/서열 조건을 변경할 수 없습니다: {key}")
+    original_score = {key: value for key, value in cfg_get(stored, "score", {}).items() if key != "thresholds"}
+    current_score = {key: value for key, value in cfg_get(cfg, "score", {}).items() if key != "thresholds"}
+    if current_score != original_score:
+        raise ValueError("재분석에서 예측/서열 조건을 변경할 수 없습니다: score")
     if specificity.resolve_definition(cfg) != payload["definition"]:
         raise ValueError("타깃 정의가 변경되었습니다. 새 캠페인이 필요합니다.")
     records = payload["records"]
-    for record in records:
-        if record.get("status") == "complete" and not _valid_record(record, root):
-            record.update(status="failed", error="예측 산출물 누락/손상. 실제 캠페인을 재개하세요.")
-    status = "partial_failure" if any(r["status"] == "failed" for r in records) else payload["status"]
+    invalid_indices = {index for index, record in enumerate(records)
+                       if record.get("status") == "complete" and not _valid_record(record, root)}
+    expected_conditions, fingerprint = _saved_comparison_conditions(
+        root, payload["definition"], payload.get("comparison_provenance_fingerprint"))
+    _save(root / "06_specificity" / "reanalysis_validation.json", {
+        "comparison_provenance_fingerprint": fingerprint,
+        "comparison_provenance_status": "verified" if expected_conditions else "comparison_conditions_unverified",
+        "invalid_artifact_record_indices": sorted(invalid_indices),
+        "raw_observations_modified": False,
+    })
+    status = "partial_failure" if invalid_indices or any(r["status"] == "failed" for r in records) else payload["status"]
     candidates = pd.DataFrame(payload["candidates"], columns=payload.get("candidate_columns"))
-    return write_outputs(cfg, root, payload["definition"], candidates, records, status)
+    return write_outputs(cfg, root, payload["definition"], candidates, records, status,
+                         expected_conditions=expected_conditions,
+                         comparison_fingerprint=fingerprint or payload.get("comparison_provenance_fingerprint"),
+                         invalid_record_indices=invalid_indices)
 
 
 def run_campaign(cfg: dict, root: Path, dry_run: bool = False) -> dict:
@@ -517,11 +609,8 @@ def _run_locked(cfg: dict, root: Path, definition: dict, mapping: pd.DataFrame) 
         identity["runtime"] = {name: {"weights": value.get("weights"),
                                       "imports": value.get("imports", {}).get("imports", {})}
                                for name, value in runtime.get("engines", {}).items()}
-    canonical = copy.deepcopy(cfg)
-    canonical["target"].update(sequence=definition["full_sequence"], fasta=None)
-    canonical["run"].pop("outdir", None)
-    canonical["specificity"].pop("budget_hours", None)
-    fingerprint = _key({"config": canonical, "definition": definition, "provenance": identity})
+    fingerprint = _comparison_fingerprint(cfg, definition, identity)
+    conditions = specificity.comparison_conditions(cfg, identity)
     work = root / "06_specificity" / fingerprint
     work.mkdir(parents=True, exist_ok=True)
     _save(work / "provenance.json", identity)
@@ -573,8 +662,6 @@ def _run_locked(cfg: dict, root: Path, definition: dict, mapping: pd.DataFrame) 
             if cfg_get(cfg, "run.mode") == "mature" and "WT" in candidates.design_id.values and "WT" not in pool.design_id.values:
                 pool = pd.concat([pool, candidates[candidates.design_id.eq("WT")]], ignore_index=True)
             engine = cfg_get(cfg, "specificity.engine", "boltz2")
-            conditions = _key({"engine": engine, "restraint": "none", "context": definition["context"],
-                               "screen": cfg_get(cfg, "screen"), "score": cfg_get(cfg, "score"), "provenance": identity})
             for seed_index, seed in enumerate(definition["seeds"]):
                 for _, row in pool.iterrows():
                     for state in specificity.STATES:
@@ -589,7 +676,7 @@ def _run_locked(cfg: dict, root: Path, definition: dict, mapping: pd.DataFrame) 
                         records.append(record)
                         print(f"[specificity] {row.design_id} {state} seed={seed}: {record['status']}")
                 if seed_index == 0:
-                    initial = specificity.aggregate(pool, pd.DataFrame(records), cfg, [seed])
+                    initial = specificity.aggregate(pool, pd.DataFrame(records), cfg, [seed], expected_conditions=conditions)
                     qualifying = initial[initial.specificity_complete & initial.positive_quality_pass & initial.comparison_status.eq("complete")]
                     selected = _diverse(qualifying, int(cfg_get(cfg, "specificity.stage2_n", 32)))
                     ids = set(selected.design_id)
@@ -606,7 +693,7 @@ def _run_locked(cfg: dict, root: Path, definition: dict, mapping: pd.DataFrame) 
                     _save(root / "secondary_diagnostics.json", secondary_diagnostic)
                     if not secondary_diagnostic["ok"]:
                         raise RuntimeError("보조 Chai-1 실제 smoke 검증 실패")
-                primary = specificity.aggregate(pool, pd.DataFrame(records), cfg, definition["seeds"])
+                primary = specificity.aggregate(pool, pd.DataFrame(records), cfg, definition["seeds"], expected_conditions=conditions)
                 top = _diverse(primary[primary.specificity_complete & primary.positive_quality_pass], 8)
                 for _, row in pool[pool.design_id.isin(top.design_id)].iterrows():
                     for state in specificity.STATES:
@@ -642,7 +729,8 @@ def _run_locked(cfg: dict, root: Path, definition: dict, mapping: pd.DataFrame) 
         ledger["seconds"] += time.monotonic() - start
         ledger["started_at"] = None
         _save(ledger_path, ledger)
-    status = write_outputs(cfg, root, definition, candidates, records, run_status)
+    status = write_outputs(cfg, root, definition, candidates, records, run_status,
+                           expected_conditions=conditions, comparison_fingerprint=fingerprint)
     status["fingerprint"] = fingerprint
     if interrupted is not None and isinstance(interrupted, (shell.ExecutionCancelled, KeyboardInterrupt)):
         raise interrupted

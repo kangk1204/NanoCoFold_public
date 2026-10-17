@@ -1251,7 +1251,9 @@ async function loadResult(id) {
   const counts = reportModelCounts(state.rows, summary.mode, summary.config);
   const msaCaption = resultMsaCaption(summary);
   $("result-input").replaceChildren(el("p", I18N.format("실행: {0} · 모드: {1} · {2}", [(summary.name || summary.id ? (summary.name ? summary.name : summary.id) : I18N.term("미기록")), (summary.mode ? summary.mode : I18N.term("미기록")), I18N.term(msaCaption)])));
-  I18N.text($("result-input-config"), JSON.stringify({conditions: summary.conditions, config: summary.config}, null, 2));
+  I18N.text($("result-input-config"), JSON.stringify(summary.assessment
+    ? {conditions: summary.conditions, current_assessment: summary.assessment, prediction_config: summary.config}
+    : {conditions: summary.conditions, config: summary.config}, null, 2));
   $("result-summary").replaceChildren(el("h2", I18N.term("02 후보·모델 수")), el("p", I18N.format("분석: {0}", [(summary.name || summary.id ? (summary.name ? summary.name : summary.id) : I18N.term("미기록"))]), "muted"));
   if (summary.retention === "minimal") $("result-summary").append(el("p", I18N.term("핵심 보관본 · 서열·점수·모든 최종 구조를 유지했습니다. PAE 배열·MSA·중간 파일은 용량 정리로 삭제되어, 이 상세 자료가 필요하면 전체 분석을 새로 실행해야 합니다."), "report-interpretation"));
   const stats = el("div", "", "report-stats");
@@ -1273,7 +1275,7 @@ async function loadResult(id) {
     const models=state.rows.filter(r=>r.predictor_engine===engine),card=el("div"), engineCounts=reportModelCounts(models, summary.mode, summary.config);
     card.append(el("b",(names[engine] ? names[engine] : engine)),el("span",I18N.format("평가 {0}/{1} · 오류 {2}{3}", [engineCounts.evaluated_total, engineCounts.model_total, models.filter(r=>recordedEvaluationError(r)).length, generalComplex ? '' : I18N.format(" · 기록 적격 {0} · 판정 미평가 {1}", [engineCounts.eligible_total === null ? I18N.term("미평가") : engineCounts.eligible_total, engineCounts.eligibility_missing])])));engineSummary.append(card);
   }
-  $("result-summary").append(engineSummary,el("p",I18N.term("동일 후보 서열의 엔진별 재예측은 별도 관측입니다. 상대 점수의 정규화 범위는 기록된 ranking_policy를 확인하세요. 기존 부분 재평가 경로는 혼합 배치일 수 있으며, 독립 비교에서는 엔진별로 순위를 매깁니다. 결합 확률·KD로 해석하지 않습니다."),"report-interpretation"));
+  $("result-summary").append(engineSummary,el("p",I18N.term("동일 후보 서열의 엔진별 재예측은 별도 관측입니다. 새 분석은 엔진별로 순위를 계산합니다. 일부 후보만 재평가한 엔진은 후보 집합이 달라 성능 비교가 아닙니다. 과거 혼합 순위는 저장된 ranking_policy의 범위를 확인하세요. 결합 확률·KD로 해석하지 않습니다."),"report-interpretation"));
   renderReportReasons(state.rows, summary.mode);
   const guide=el("details","","report-guide");guide.append(el("summary",I18N.term("지표 읽는 법과 평가 한계")));
   const list=el("ul");
@@ -1751,12 +1753,16 @@ async function selectCandidate(id) {
     detail.append(methods);
   }
   detail.append(el("p", I18N.term("PAE는 Å 단위입니다. pDockQ2는 CA 8 Å 접촉과 방향별 PAE를 사용하며 두 체인 중 최소값을 표시합니다. AlphaFold-Multimer에서 보정됐고 Boltz·Chai·OpenDDE 값은 탐색용입니다. 예측 지표는 실제 결합이나 KD를 입증하지 않습니다."), "muted"));
-  detail.append(el("p", I18N.term("종합점수는 실행 당시 배치의 상대 점수입니다. 정규화 범위는 저장된 ranking_policy를 확인하세요. 독립 비교는 엔진별로 계산하며, 일부 후보만 다른 엔진으로 재평가하는 기존 경로는 혼합 배치로 기록됩니다. 선별 순위는 적격 게이트와 다양성 제한을 추가 적용합니다. ESM·AntiFold는 서열/폴딩 prior입니다. dev_severe는 심한 5종 게이트, dev_flags는 전체 평가 위험 수 가중치입니다. N/O 근접·반대 전하 접촉·충돌의 단위는 원자쌍이며, 확인된 수소결합 수나 원소별 반데르발스 판정이 아닙니다."), "muted"));
+  detail.append(el("p", I18N.term("종합점수는 기록된 엔진과 후보 집합 안의 상대 점수입니다. 적용·제외 가중치는 ranking_policy의 엔진별 정책을 확인하세요. 일부 후보만 재평가한 결과는 통합 순위나 엔진 성능 비교가 아닙니다. 과거 혼합 배치 기록은 원래 정규화 범위를 유지합니다. 선별 순위는 적격 게이트와 다양성 제한을 추가 적용합니다. ESM·AntiFold는 서열/폴딩 prior입니다. dev_severe는 심한 5종 게이트, dev_flags는 전체 평가 위험 수 가중치입니다. N/O 근접·반대 전하 접촉·충돌의 단위는 원자쌍이며, 확인된 수소결합 수나 원소별 반데르발스 판정이 아닙니다."), "muted"));
   detail.append(el("p", I18N.term("같은 seed라도 엔진·장치 전체의 비트 단위 재현을 보장하지 않습니다. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에 한정됩니다. 생성 단계의 결합 부위 OFF/ON을 동일 난수 상태로 가정하지 않습니다."), "muted"));
   if (row.threshold_checks !== undefined) {
     const facts = el("details"),
-      caption = el("summary", I18N.term("지표 해석·실행 당시 선별 기준"));
+      caption = el("summary", I18N.term(row.assessment_status ? "현재 평가 기준" : "지표 해석·실행 당시 선별 기준"));
     facts.append(caption);
+    if (row.assessment_status) {
+      if (row.assessment_status !== "verified") facts.append(el("p", I18N.term("현재 평가 기준 미확인")));
+      facts.append(el("code", row.assessment_source));
+    }
     table(
       facts.appendChild(el("div", undefined, "scroll")),
       (Array.isArray(row.threshold_checks)?row.threshold_checks:[]).filter(c=>c&&typeof c==="object"&&!Array.isArray(c)).map((c) => ({

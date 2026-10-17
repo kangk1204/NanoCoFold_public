@@ -422,6 +422,12 @@ def _report_i18n_runtime(document: str) -> str:
     captions = Captions()
     captions.feed(document)
     captions.values.update(match[1] for match in re.findall(r"I18N\.term\(([\"'])(.*?)\1\)", document))
+    # A scoped ranking warning keeps its recorded engine prefix as data. Only
+    # these authored notice bodies participate in catalog/clause selection.
+    for value in tuple(captions.values):
+        notice = re.match(r"^(?:colabfold|boltz2|chai1|opendde|mock): ((?:종합점수·기록 순위 보류 |전체 성공 후보에서 미평가인 순위 지표: )[\s\S]+)$", value)
+        if notice:
+            captions.values.add(notice[1])
     # The translator composes this one authored warning from diagnostic
     # clauses. Select its clause keys as well as the whole message, matching
     # the runtime's sentence boundary exactly. Never split arbitrary captions,
@@ -537,6 +543,13 @@ def generate_report(
         except (ValueError, OSError, UnicodeError, yaml.YAMLError) as exc:
             warnings.append(f"run_config.yaml을 읽지 못했습니다 ({type(exc).__name__}). 적용 임계값을 미기록으로 표시합니다.")
             recorded_cfg = {}
+    assessment = saved_reader.assessment if saved_reader else None
+    applied_cfg = (assessment.get("assessment_config") or {}) if assessment else recorded_cfg
+    threshold_rows = [row for row in scored_rows if row.get("model_record", True) is True]
+    if assessment and saved_reader:
+        # Rebuild presentation checks from the verified current assessment only;
+        # original prediction settings remain a separate immutable declaration.
+        threshold_rows = [{**row, **saved_reader._assessment_details(row)} for row in threshold_rows]
     if population is not None:
         ranking_population = (population.loc[population["model_record"].eq(True)]
                               if "model_record" in population else population)
@@ -590,8 +603,10 @@ def generate_report(
         "reason_summary": presentation["reasons"],
         "known_reason_codes": list(REASON_LABELS),
         "metric_method_rows": presentation["metric_methods"],
-        "threshold_check_rows": _threshold_check_rows([row for row in scored_rows if row.get("model_record", True) is True], recorded_cfg),
-        "thresholds_source": "run_config.yaml" if recorded_cfg else "not_recorded",
+        "threshold_check_rows": _threshold_check_rows(threshold_rows, applied_cfg),
+        "thresholds_source": (assessment["source"] if assessment["status"] == "verified" else assessment["reason"])
+                             if assessment else "run_config.yaml" if recorded_cfg else "not_recorded",
+        "assessment": assessment,
         "engine_provenance": engine_provenance,
         "expected_models": expected_models,
         "expected_models_source": expected_source,
@@ -614,7 +629,7 @@ def generate_report(
         "viewer_script": viewer_script,
         "selected_total": selected_total,
         "scored_total": scored_total,
-        "thresholds": cfg_get(recorded_cfg, "score.thresholds", {}) or {},
+        "thresholds": cfg_get(applied_cfg, "score.thresholds", {}) or {},
         "files": _file_index(run_dir),
         "warnings": list(dict.fromkeys(warnings)),
     }

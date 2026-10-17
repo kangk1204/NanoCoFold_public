@@ -250,6 +250,9 @@ If PyMOL materials are provided, extract the **whole folder** and open `.pml` th
 
 Prediction completion, selection eligibility, and experimentally confirmed binding are distinct. Unevaluated is not zero; WT is a control. Scores from different engines are not summed into one ranking. Review ipTM, interface pLDDT, interface PAE, and structures together. Binding, KD, and expression require experimental validation. See [metrics and result interpretation](docs/RESULTS.md).
 
+
+[Score cohorts, comparison conditions, and statistical interpretation](docs/STATISTICAL_INTERPRETATION.md).
+
 ## 6. Follow jobs, cancel and resume
 
 | Situation | What to do |
