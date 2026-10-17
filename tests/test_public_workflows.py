@@ -60,9 +60,12 @@ def test_cpu_workflow_preserves_mock_boundaries_and_delivers_report(tmp_path, mo
     if mode == 'complex':
         assert not list(run.rglob('complex_results.json'))
         assert not list(run.rglob('*.pdb')) and not list(run.rglob('*.cif'))
-    summary = ResultReader(run).summary()
-    # General complexes reject simulation, so they contain no mock model.
-    assert summary['mock'] is (mode != 'complex')
+    reader = ResultReader(run)
+    assert reader.config['run']['mock'] is True
+    summary = reader.summary()
+    # Preserve the requested simulation provenance even when computation is
+    # rejected. Failure, absent coordinates, and absent delivery remain required.
+    assert summary['mock'] is True
     assert summary['complete'] is (mode != 'complex')
     assert summary['mode'] == mode
     archives = list(run.rglob('report_delivery.zip'))

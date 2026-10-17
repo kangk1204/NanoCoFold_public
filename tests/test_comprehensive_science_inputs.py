@@ -205,7 +205,10 @@ def test_cli_help_is_english_and_wizard_has_distinct_port():
         texts.extend(action.help or '' for action in sub._actions)
     assert not any('\uac00' <= char <= '\ud7a3' for text in texts for char in text)
     assert parser.parse_args(['wizard']).port == 8766
-    assert parser.parse_args(['serve']).port == 8765
+    assert parser.parse_args(['serve']).port == 18765
+    assert parser.parse_args(['serve']).port != parser.parse_args(['wizard']).port
+    assert parser.parse_args(['serve', '--port', '8765']).port == 8765
+    assert parser.parse_args(['serve', '--port', '0']).port == 0
 
 
 def test_priority_tiers_include_every_returned_priority():
