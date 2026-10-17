@@ -53,7 +53,7 @@
 <script id="report-i18n-runtime">{{ report_i18n_script|safe }}</script>
 </head>
 <body>
-<p data-terminology="binding-site"><span data-report-i18n>결합 부위(hotspot)는 나노바디 설계·접촉 평가에 지정한 표적 잔기입니다. 일반 복합체의 관심 잔기는 참조 구조 비교용입니다. 두 설정 모두 실제 결합의 실험적 증거를 뜻하지 않습니다.</span></p>
+<p data-terminology="binding-site"><span data-report-i18n>결합 부위(hotspot)는 나노바디 설계와 접촉 평가에 사용할 표적 잔기입니다. 일반 복합체의 관심 잔기는 참조 구조 비교에 사용합니다.</span></p>
 <div class="wrap">
   <div class="report-language"><label for="language-select">Language / 언어</label> <select id="language-select" aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div>
   <p role="status" aria-live="polite" class="muted"><span data-report-i18n>보존된 분석 결과입니다. 구조·점수·미평가 기록을 확인하고 필요한 파일을 저장하세요.</span></p>
@@ -61,8 +61,8 @@
   <div class="sub"><span data-report-i18n>실행 ID:</span> {{ run_id }} <span data-report-i18n>· 모드:</span> <b>{{ mode }}</b> · {{ report_term("기준 단백질" if mode == "complex" else "표적") }}: <b>{{ target_name }}</b> <span data-report-i18n>· 생성:</span> {{ generated_at }} <span data-report-i18n>· 보고서 버전:</span> {{ reporting_version|default(report_term("미기록"), true) }} <span data-report-i18n>· 계산 버전:</span> {{ computation_version|default(report_term("미기록"), true) }}</div>
 
   <nav class="report-nav" aria-label="보고서 내 탐색" data-report-i18n-attributes="aria-label"><a href="#report-target"><span data-report-i18n>01 입력·설정</span></a><a href="#report-counts"><span data-report-i18n>02 후보·모델 수</span></a><a href="#report-models"><span data-report-i18n>03 후보 비교</span></a><a href="#report-exclusions"><span data-report-i18n>04 제외·미평가</span></a><a href="#report-structure"><span data-report-i18n>05 구조·PAE</span></a><a href="#report-files"><span data-report-i18n>06 출처·산출물</span></a></nav>
-  <p class="interpretation"><span data-report-i18n>이 보고서는 계산 결과와 선별 근거를 정리합니다. 예측 점수는 실제 결합·친화도 향상·KD를 확정하지 않습니다. 미평가 항목은 0점으로 취급하지 않습니다.</span></p>
-  {% if mock_zero_selection %}<div id="mock-zero-selection" class="interpretation" role="note"><strong><span data-report-i18n>합성 mock 연습 · 기록 선별 0건</span></strong><p><span data-report-i18n>선별 0건만으로 실행 실패를 뜻하지 않습니다. mock 점수·구조는 사용법 연습용이며 실제 후보의 품질이나 결합을 검증하지 않습니다. 아래 제외·미평가 사유와 실행 상태를 확인하세요.</span></p>{% if mock_cdr_unassessed %}<p><span data-report-i18n>CDR 평가가 기록되지 않은 모델:</span> {{ mock_cdr_unassessed }}<span data-report-i18n>건. CDR 미평가는 평가된 0점이 아니며 최종 적격을 통과하지 않습니다. 이 연습에서는 점수·구조 탐색과 파일 저장까지 확인하세요.</span></p>{% endif %}</div>{% endif %}
+  <p class="interpretation"><span data-report-i18n>이 보고서는 실행 조건, 후보별 평가와 선별 근거를 정리합니다. 미평가 항목은 사유와 함께 확인하세요.</span></p>
+  {% if mock_zero_selection %}<div id="mock-zero-selection" class="interpretation" role="note"><strong><span data-report-i18n>합성 mock 연습 · 기록 선별 0건</span></strong><p><span data-report-i18n>이 연습의 선별 결과는 0건입니다. 아래에서 제외·미평가 사유와 실행 상태를 확인하고, 점수·구조 탐색과 파일 저장을 연습하세요.</span></p>{% if mock_cdr_unassessed %}<p><span data-report-i18n>CDR 미평가 모델:</span> {{ mock_cdr_unassessed }}<span data-report-i18n>건. CDR 범위와 평가 도구를 확인하세요. 점수·구조 탐색과 파일 저장은 계속할 수 있습니다.</span></p>{% endif %}</div>{% endif %}
 
   {% if warnings %}
   <h2><span data-report-i18n>주의 사항</span></h2>
@@ -77,7 +77,7 @@
   <div class="warnbox{% if context.handoff_gate.ok is sameas false %} blocked{% endif %}">
     {% if context.handoff_gate.ok is sameas true %}
     <b><span data-report-i18n>handoff 게이트 통과 —</span> {{ report_term(('오류 ' ~ context.handoff_gate.n_errors ~ '건') if context.handoff_gate.n_errors is not none else '오류 개수 미기록') }} · {{ report_term(('경고 ' ~ context.handoff_gate.n_warnings ~ '건') if context.handoff_gate.n_warnings is not none else '경고 개수 미기록') }}</b>
-    <p><span data-report-i18n>파일·필수 기록 검증 결과입니다. 실제 결합·KD의 실험 검증을 의미하지 않습니다.</span></p>
+    <p><span data-report-i18n>전달 파일과 필수 실행 기록의 검사 결과입니다.</span></p>
     {% else %}
     <b><span data-report-i18n>handoff 게이트 미통과 —</span> {{ report_term(('오류 ' ~ context.handoff_gate.n_errors ~ '건') if context.handoff_gate.n_errors is not none else '오류 개수 미기록') }} · {{ report_term(('경고 ' ~ context.handoff_gate.n_warnings ~ '건') if context.handoff_gate.n_warnings is not none else '경고 개수 미기록') }}</b>
     <p><span data-report-i18n>합성 발주 목록은 아직 확정할 수 없습니다. 항목별 이유는</span>
@@ -90,8 +90,7 @@
   {% if context.specificity %}
   <h2><span data-report-i18n>절단형 특이성 캠페인</span></h2>
   <div class="warnbox">
-    <span data-report-i18n>실행 상태:</span> {{ context.campaign_status }}<span data-report-i18n>. 이 목록은 실험 우선순위이며 특이적 결합이 입증된 목록이 아닙니다.
-    전장형의 낮은 점수는 비결합 증거가 아닙니다. 말단 원자·전하에 의한 인식은 별도 실험 확인이 필요합니다.</span>
+    <span data-report-i18n>실행 상태:</span> {{ context.campaign_status }}<span data-report-i18n>. 절단형·전장형 비교 결과로 실험 검토 우선순위를 제시합니다. 특이성과 말단 원자·전하에 의한 인식은 후속 실험에서 확인하세요.</span>
     <p><span data-report-i18n>전체 반복 결과:</span> <a href="06_specificity/observations.csv"><span data-report-i18n>관측표</span></a> ·
     <a href="06_specificity/comparison.csv"><span data-report-i18n>후보 비교표</span></a> ·
     <a href="06_specificity/residue_mapping.csv"><span data-report-i18n>잔기 번호 대응표</span></a> ·
@@ -194,21 +193,21 @@
   {% endmacro %}
 
   <h2 id="report-models"><span data-report-i18n>03 후보 비교 · 표시</span> {{ scored_rows|length }} <span data-report-i18n>/ 전체</span> {{ scored_total }} <span data-report-i18n>후보·모델 기록</span></h2>
-  <p id="report-precision" class="muted"><span data-report-i18n>정적 보고서의 실수는 최대 유효숫자 8자리, 결과 탐색기는 소수 3자리로 표시합니다. 작은 값이 0.000으로 보일 수 있습니다. 숫자 셀의 원값 툴팁과 CSV에서 저장 정밀도를 확인하세요. 표시 반올림은 저장값·순위·적격 판정을 바꾸지 않습니다.</span> {% if scored_csv_available %}<a href="03_score/scored_candidates.csv"><span data-report-i18n>전체 점수 CSV</span></a>{% endif %}</p>
-  <p><span data-report-i18n>예측 신뢰도와 지정 결합 부위 충족은 별개입니다. 결합 부위 미접촉·미지정·미평가를 구분합니다. PAE는 참조 구조와의 실측 거리 오차가 아니며 pDockQ2는 실측 DockQ가 아닙니다. 지정 결합 부위 진단은 기존 점수와 선별 기록을 바꾸지 않습니다.</span></p>
+  <p id="report-precision" class="muted"><span data-report-i18n>숫자는 정적 보고서에서 최대 유효숫자 8자리, 결과 탐색기에서 소수 3자리로 표시합니다. 원값은 숫자 셀의 툴팁과 CSV에서 확인하세요. 순위와 적격 판정은 저장된 값을 사용합니다.</span> {% if scored_csv_available %}<a href="03_score/scored_candidates.csv"><span data-report-i18n>전체 점수 CSV</span></a>{% endif %}</p>
+  <p><span data-report-i18n>예측 신뢰도와 지정 결합 부위 접촉을 함께 확인하세요. 결합 부위 상태는 미접촉·미지정·미평가로 구분합니다. PAE는 상대 위치의 불확실성, pDockQ2는 구조 품질 추정값입니다.</span></p>
   <p><span data-report-i18n>일반 복합체의 요약 ipSAE는 기본적으로 검토한 체인 순서의 첫 쌍이며, 체인쌍을 명시한 실행에서는 해당 쌍입니다. 전체 평균·최솟값과 구분합니다. 적용 체인·범위 출처와 모든 체인 쌍의 표·CSV를 함께 확인합니다.</span></p>
-  <p><span data-report-i18n>엔진별 표의 순위와 종합점수는 기록된 엔진 안에서만 비교합니다. 엔진 간 점수를 합산하거나 통합 순위를 만들지 않습니다. RF·BG 별칭은 후보를 찾기 위한 표시명이며 원본 ID와 수치는 보존됩니다.</span></p>
+  <p><span data-report-i18n>순위와 종합점수는 같은 엔진 안에서 비교하세요. RF·BG는 후보 표시명이며, 원본 ID는 상세 기록에서 확인할 수 있습니다.</span></p>
   {% if pose_assessments_available %}
-  <div class="interpretation" id="pose-assessment-guide"><h3><span data-report-i18n>세 가지 별도 확인</span></h3><p><span data-report-i18n>예측 신뢰도는 ipTM·ipSAE 및 실행 당시 기록 적격, 지정 결합 부위 충족은 결합 부위 접촉, 자세 일관성은 동일 후보의 엔진별 자세와 설계·재예측 일치를 뜻합니다. 탐색적 검토 우선순위는 이 기록을 함께 확인하는 값이며 기존 적격·선별 기록을 변경하지 않습니다.</span></p><p><span data-report-i18n>검토 순위는 표적·조건·실행 범위 안의 후보 순서이며 동률을 허용합니다. 1위도 보류일 수 있으므로 검토 판정과 이유를 함께 읽으세요. 표적만 정렬하여 같은 후보 서열의 자세를 비교합니다. 엔진 지지 수는 독립 실험 횟수가 아니며 점수를 평균하지 않습니다. 새 VHH를 기존 VHH의 자세에 맞춰 선별하지 않습니다. 설계 구조가 없거나 대응이 불가능하면 미평가로 남습니다. 우선 검토는 실제 결합·KD의 입증이 아닙니다.</span></p><p><span data-report-i18n>검토 정책 v2는 품질·지정 결합 부위를 충족한 엔진별 단독 유망 예측과 같은 자세의 다중 엔진 지지를 구분합니다. 한 엔진만 유망해도 합의 부족을 실패로 간주하지 않습니다. 엔진 간 자세 차이와 설계·재예측 불일치는 별도 진단이며 자동 비결합·탈락 사유가 아닙니다. 이전 정책의 판정은 기록된 버전과 함께 읽으세요.</span></p></div>
+  <div class="interpretation" id="pose-assessment-guide"><h3><span data-report-i18n>세 가지 별도 확인</span></h3><p><span data-report-i18n>세 가지를 함께 검토합니다. 예측 신뢰도는 ipTM·ipSAE와 적격 판정, 결합 부위 접촉은 지정 잔기와의 접촉, 자세 일관성은 엔진별 구조와 설계·재예측 구조의 일치를 확인합니다.</span></p><p><span data-report-i18n>검토 순위와 함께 판정·사유를 읽으세요. 같은 후보의 구조는 표적을 기준으로 정렬해 비교합니다. 구조가 없거나 잔기 대응이 어려우면 미평가로 표시합니다.</span></p><p><span data-report-i18n>검토 정책 v2는 엔진별 유망 예측과 여러 엔진의 자세 일치를 구분합니다. 엔진 간 자세 차이와 설계·재예측 차이는 별도 진단에서 확인하세요. 이전 결과는 기록된 정책 버전으로 읽습니다.</span></p></div>
   {% endif %}
-  <p class="muted"><span data-report-i18n>지표 순위·종합점수 순위·기록 선별 순위는 다릅니다. 선별은 적격 게이트와 CDR3 다양성 제한을 적용하므로 높은 ipSAE 후보도 제외될 수 있습니다. ESM·AntiFold는 서열/폴딩 prior이며 친화도 예측값이 아닙니다. 심한 위험 수(dev_severe)는 5종 게이트, 전체 위험 수(dev_flags)는 종합점수 가중치입니다.</span></p>
-  <p class="muted"><span data-report-i18n>충돌·N/O 근접·반대 전하 접촉은 원자쌍 수입니다. N/O 근접은 각도를 확인한 수소결합이 아니며, 고정 거리 충돌은 원소별 반데르발스 판정이 아닙니다.</span></p>
-  <p class="muted"><span data-report-i18n>같은 seed라도 모든 엔진·장치에서 비트 단위 재현을 보장하지 않습니다. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에 한정됩니다. RFantibody·BoltzGen 생성 단계의 난수 통제는 제한적이므로 결합 부위 OFF/ON의 동일 난수 상태나 인과효과를 가정하지 않습니다.</span></p>
+  <p class="muted"><span data-report-i18n>선별에는 적격 기준과 CDR3 다양성 제한을 적용합니다. ESM·AntiFold는 서열·폴딩 평가에 사용합니다. dev_severe는 심한 위험 5종의 적격 기준, dev_flags는 종합점수에 반영하는 전체 위험 수입니다.</span></p>
+  <p class="muted"><span data-report-i18n>충돌·N/O 근접·반대 전하 접촉은 거리 기준으로 센 원자쌍 수입니다. 수소결합 각도와 원소별 반데르발스 반경은 별도 평가 항목입니다.</span></p>
+  <p class="muted"><span data-report-i18n>재현성 확인에는 엔진·장치·환경·seed를 함께 기록하세요. 엄격한 CUDA 결정론 설정은 Chai 경로에 적용됩니다. RFantibody·BoltzGen 생성 결과는 반복 실행으로 확인합니다.</span></p>
   {% for group in scored_groups %}<h3>{{ group.engine }}</h3>{{ candidate_table(group.rows) }}<details><summary><span data-report-i18n>상세 지표·원본 기록 펼치기</span></summary>{{ candidate_table(group.rows, true) }}</details>{% else %}<p class="muted"><span data-report-i18n>평가 모델 기록이 없습니다.</span></p>{% endfor %}
   <p class="muted"><span data-report-i18n>보고서의 표는 설정한 표시 범위입니다. 전체 평가 기록은 산출물의 CSV에서 확인하세요.</span></p>
   {% if metric_method_rows %}
   <details id="metric-method-provenance"><summary><span data-report-i18n>pDockQ·pDockQ2 계산법과 기존 저장값</span></summary>
-    <p><span data-report-i18n>계산법은 모델별 기록으로 구분합니다. 기존 점수와 선별 순위는 유지하며, 계산법이 다른 값은 동일한 저자 구현으로 간주하지 않습니다.</span></p>
+    <p><span data-report-i18n>모델별 계산법과 구현 기록을 확인하고, 같은 방법으로 계산한 값을 비교하세요.</span></p>
     <div class="scroll" tabindex="0" role="region" aria-label="보고서 표" data-report-i18n-attributes="aria-label"><table><caption><span data-report-i18n>지표 계산법·해석·출처</span></caption><thead><tr><th scope="col"><span data-report-i18n>모델</span></th><th scope="col"><span data-report-i18n>지표</span></th><th scope="col"><span data-report-i18n>기록 계산법</span></th><th scope="col"><span data-report-i18n>해석·한계</span></th><th scope="col"><span data-report-i18n>출처</span></th></tr></thead><tbody>
     {% for row in metric_method_rows %}<tr><td><code>{{ row.candidate_id }}</code></td><td>{{ row.metric }}</td><td><code>{{ row.recorded_method if row.recorded_method else report_term('미기록') }}</code></td><td class="original-id">{{ row.caveat if row.caveat else report_term('저자 원자 신뢰도 방식으로 기록됨') }}{% if row.status == 'legacy_variant' %}<br><code>{{ row.effective_method }}</code>{% endif %}</td><td><a href="{{ row.source }}"><span data-report-i18n>저자 코드</span></a></td></tr>{% endfor %}
     </tbody></table></div>
@@ -217,14 +216,14 @@
   <details id="report-selection"><summary><span data-report-i18n>기록 선별 목록 ·</span> {{ selected_total }} <span data-report-i18n>모델</span></summary>
     <p class="muted"><span data-report-i18n>표시</span> {{ selected_rows|length }} <span data-report-i18n>/ 전체</span> {{ selected_total }} <span data-report-i18n>모델. 전체 선별 기록은</span> <code>05_final/selected_candidates.csv</code><span data-report-i18n>에서 확인하세요.</span></p>
     {% for group in selected_groups %}<h3>{{ group.engine }}</h3>{{ candidate_table(group.rows) }}{% endfor %}
-    {% if not selected_rows %}<p><span data-report-i18n>현재 선별 목록은 0건입니다. 제외 사유와 미평가 항목을 확인하세요. 선별 0건만으로 실행 실패나 비결합을 결론내리지 않습니다.</span></p>{% endif %}
+    {% if not selected_rows %}<p><span data-report-i18n>선별 결과가 0건입니다. 아래에서 제외 사유와 미평가 항목을 확인하세요.</span></p>{% endif %}
   </details>
 
   <h2 id="report-exclusions"><span data-report-i18n>04 제외·미평가 이유</span></h2>
   <p class="muted"><span data-report-i18n>저장된 후보·모델 기록에서 각 사유를 기록당 한 번 집계합니다. 예측 전 준비·미선정은 실제 모델 평가와 구분합니다. 한 기록에 여러 사유가 있을 수 있으므로 합계는 기록 수와 다를 수 있습니다. 기준 미통과와 계산 오류·미평가를 구분해 읽으세요.</span></p>
   {% if reason_summary %}<div class="scroll" tabindex="0" role="region" aria-label="보고서 표" data-report-i18n-attributes="aria-label"><table><caption><span data-report-i18n>제외·미평가 이유 집계</span></caption><thead><tr><th scope="col"><span data-report-i18n>이유</span></th><th scope="col"><span data-report-i18n>기록 수</span></th><th scope="col"><span data-report-i18n>기록 코드</span></th></tr></thead><tbody>
   {% for reason in reason_summary %}<tr><td>{{ report_term(reason.label) if reason.code in known_reason_codes else reason.label }}</td><td>{{ reason.count }}</td><td><code>{{ reason.code }}</code></td></tr>{% endfor %}
-  </tbody></table></div>{% else %}<p class="muted"><span data-report-i18n>기록된 제외·미평가 사유가 없습니다. 사유 미기록만으로 판정 통과를 추정하지 않습니다.</span></p>{% endif %}
+  </tbody></table></div>{% else %}<p class="muted"><span data-report-i18n>제외·미평가 사유가 기록되지 않았습니다. 작업 상태와 실행 로그를 확인하세요.</span></p>{% endif %}
 
   <h2 id="report-structure"><span data-report-i18n>05 구조·PAE</span></h2>
   {% if interactive_report_href %}
@@ -282,15 +281,15 @@
   {% endif %}
 
   <h3 id="report-guide"><span data-report-i18n>지표 읽는 법</span></h3>
-  <p class="muted"><span data-report-i18n>dev_flags 가중치는 종합점수에만 적용됩니다. CDR 미평가는 가중치가 0이어도 최종 적격을 통과하지 않습니다. fallback_to_ineligible=true로 만든 부적격 진단 목록은 발주 승인이 아닙니다.</span></p>
+  <p class="muted"><span data-report-i18n>dev_flags는 종합점수 가중치입니다. 최종 적격 판정에는 CDR 평가가 필요합니다. fallback_to_ineligible=true는 부적격 후보의 진단 목록을 만듭니다.</span></p>
   <details open><summary><span data-report-i18n>지표 해석과 한계</span></summary>
     <ul>
-      <li><span data-report-i18n>ipSAE와 ipTM은 기록된 계면·배치 신뢰도 지표입니다. 적용 기준과 통과 여부는 아래 기록 게이트 표에서 확인하세요. 낮은 점수는 비결합의 실험 증거가 아닙니다.</span></li>
-      <li><span data-report-i18n>계면 pLDDT와 계면 PAE를 함께 확인합니다. 보고서 생성 시 바꾼 설정으로 기존 적격 판정을 다시 계산하지 않습니다.</span></li>
+      <li><span data-report-i18n>ipSAE와 ipTM은 계면·배치 신뢰도 지표입니다. 아래 게이트 표에서 적용 기준과 통과 여부를 확인하세요.</span></li>
+      <li><span data-report-i18n>계면 pLDDT와 계면 PAE를 함께 확인하고, 실행 당시 기록된 적격 판정과 비교하세요.</span></li>
       <li><span data-report-i18n>VHH 점수의 ipTM은 선택 표적–VHH 쌍의 native 방향값 최솟값입니다. 정확히 두 체인일 때만 native 전체 ipTM을 대신 사용할 수 있습니다. 3체인 이상에서 쌍 값이나 검증된 체인 축이 없으면 미평가입니다. 일반 복합체 요약 ipTM은 전체 값이며 체인 쌍 상세와 구분합니다.</span></li>
       <li><span data-report-i18n>clash는 선택 표적뿐 아니라 유지한 파트너와 VHH 사이의 충돌도 포함합니다. CSV의 n_target_clashes와 n_context_clashes에서 구분할 수 있습니다. 항원끼리의 충돌은 이 값에 포함하지 않습니다.</span></li>
-      <li><span data-report-i18n>결합 부위 접촉률은 지정 잔기에 예측상 접촉하는 비율입니다. 알려진 전체 에피토프·같은 자세·실제 결합의 검증은 아닙니다.</span></li>
-      <li><b>clash</b> <span data-report-i18n>0은 현재 거리 기준에서 충돌이 없다는 뜻이며 실험 성공을 보장하지 않습니다. H-bond/염다리 수는 거리 기반 근사치입니다.</span></li>
+      <li><span data-report-i18n>결합 부위 접촉률은 지정 잔기 중 예측 구조에서 접촉하는 잔기의 비율입니다.</span></li>
+      <li><b>clash</b> <span data-report-i18n>0은 현재 거리 기준에서 충돌 원자쌍이 없음을 뜻합니다. N/O 근접과 염다리는 거리 기반으로 집계합니다.</span></li>
       <li><span data-report-i18n>개발가능성 경고(dev_severe): free Cys, N-글리코실화 서열, CDR 탈아미드/이성화, CDR 소수성 패치.</span></li>
       <li><span data-report-i18n>구조 기반 지표는 상대 순위용입니다. 최종 판단은 SPR/BLI 실험으로 수행하세요.</span></li>
     </ul>

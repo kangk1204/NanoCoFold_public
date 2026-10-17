@@ -111,12 +111,12 @@ def test_lost_job_operation_response_is_explained_and_not_replayed(exception_app
         page.locator('[data-view="jobs"]').click()
         button = page.locator('#job-actions button', has_text='작업 취소' if operation == 'cancel' else '검증 후 재개')
         button.click()
-        expect(page.locator('#notice')).to_contain_text('요청의 처리 여부를 확인하지 못했습니다')
+        expect(page.locator('#notice')).to_contain_text('처리 상태를 확인하지 못했습니다')
         expect(page.locator('#notice')).to_contain_text('새로고침')
         page.locator('#refresh-jobs').click()
         assert posts == ['/' + 'a' * 32 + '/' + operation]
         page.locator('#language-select').select_option('en')
-        expect(page.locator('#notice')).to_contain_text('Could not confirm')
+        expect(page.locator('#notice')).to_contain_text('The operation status could not be confirmed')
         browser.close()
 
 

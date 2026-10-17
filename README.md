@@ -24,6 +24,8 @@ Predict protein complexes, design new nanobodies, and compare existing candidate
 
 **After the environment check, click Prepare analysis.** `diagnostics · Complete` is the environment-check record. Start the analysis in [section 3](#3-try-the-first-public-example).
 
+[Collaborator guide: workflow, installation, and results](docs/collaborator-guide.en.md)
+
 [English screenshots, step by step](docs/browser_quickstart.en.md#follow-the-screenshots) · [Find and share results](#5-read-and-share-results)
 
 ## 1. Prepare and install

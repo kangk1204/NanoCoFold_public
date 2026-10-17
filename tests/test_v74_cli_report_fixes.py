@@ -117,7 +117,7 @@ def test_whole_target_table_is_folded_counted_and_explicitly_truncated(tmp_path,
     assert re.search(r'선택한 결합 부위 잔기 수:</span> 6 ', body)
     assert 'title="0.7080264101234567"' in text and ">0.70802641<" in text
     assert 'title="4e-05"' in text
-    assert "표시 반올림은 저장값·순위·적격 판정을 바꾸지 않습니다." in text
+    assert "순위와 적격 판정은 저장된 값을 사용합니다." in text
     assert 'href="03_score/scored_candidates.csv"' not in text  # No invented/broken CSV link.
     runtime = re.search(r'<script id="report-i18n-runtime">([\s\S]*?)</script>', text)[1]
     from test_audit126_report_warnings import execute_subset
@@ -137,9 +137,9 @@ def test_mock_zero_notice_requires_recorded_zero_and_keeps_unassessed_distinctio
     shown = re.search(r'<div id="mock-zero-selection"[\s\S]*?</div>', text)
     assert bool(shown) is notice
     if shown:
-        assert ("CDR 평가가 기록되지 않은 모델:" in shown[0]) is cdr_notice
+        assert ("CDR 미평가 모델:" in shown[0]) is cdr_notice
         assert text.index(shown[0]) < text.index('id="report-target"')
-        assert "선별 0건만으로 실행 실패를 뜻하지 않습니다." in shown[0]
+        assert "이 연습의 선별 결과는 0건입니다." in shown[0]
 
 
 @pytest.mark.parametrize("reason,cdr,unassessed", [
@@ -155,7 +155,7 @@ def test_cdr_explanation_recognizes_complete_reason_tokens_only(tmp_path, reason
     path = report.generate_report(tmp_path, {"run": {"mode": "screen", "mock": True},
                                 "report": {"viewer": "none"}}, {}, rows, rows.iloc[:0])
     notice = re.search(r'<div id="mock-zero-selection"[\s\S]*?</div>', path.read_text())[0]
-    assert ("CDR 평가가 기록되지 않은 모델:" in notice) is unassessed
+    assert ("CDR 미평가 모델:" in notice) is unassessed
     pd.testing.assert_frame_equal(rows, original)
 
 
@@ -210,7 +210,7 @@ def test_shared_explorer_summaries_raw_values_locale_empty_and_selection(tmp_pat
         expect(page.locator('#scatter-summary')).to_contain_text('1 of 2')
         expect(page.locator('#distribution-summary')).to_contain_text('2 observations')
         expect(page.locator('#distribution-summary')).to_contain_text('1 unevaluated')
-        expect(page.locator('#structure-view-summary')).to_contain_text('No structure is selected')
+        expect(page.locator('#structure-view-summary')).to_contain_text('Select a candidate and observation')
         assert page.locator('#structure-view').bounding_box()['height'] < 180
         assert page.locator('#distribution-summary a').get_attribute('href') == '#candidate-detail'
         initial = page.evaluate('JSON.stringify(window.NANOCOFOLD_OFFLINE)')
@@ -227,7 +227,7 @@ def test_shared_explorer_summaries_raw_values_locale_empty_and_selection(tmp_pat
         assert page.locator('#scatter').bounding_box()['height'] <= 170
         expect(page.locator('#distribution-summary')).to_contain_text('no candidate is selected')
         page.locator('#candidate-table tbody button').first.click()
-        expect(page.locator('#distribution-summary')).to_contain_text('unevaluated')
+        expect(page.locator('#distribution-summary')).to_contain_text('has not been evaluated')
         assert page.evaluate("mockZeroSelectionNotice({mock:false,selected_total:0,config:{run:{mock:true}}},[]) === null")
         assert page.evaluate("mockZeroSelectionNotice({mock:true,selected_total:1},[]) === null")
         assert page.evaluate("mockZeroSelectionNotice({mock:true},[]) === null")

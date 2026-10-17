@@ -42,7 +42,7 @@ def test_actual_report_sentence_units_have_english_word_boundaries_and_original_
     for language in ['en','ko']:
         iterator=iter(translated[language]);text=''.join(next(iterator) if owned else fragment for fragment,owned in fragments)
         if language=='en':
-            assert 'ipSAE and ipTM are' in text
+            assert 'ipSAE and ipTM describe' in text
             assert 'interface pLDDT and interface PAE' in text
             assert 'contact fraction is' in text
             assert not re.search(r'ipSAEand|ipTMare|pLDDTand|fractionis|experimentsthrough',text)

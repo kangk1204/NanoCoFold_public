@@ -41,7 +41,7 @@ test('bounded API reads abort a stalled request and release its timer',async()=>
  I18N:{term:s=>s},fetch:(_path,options)=>new Promise((_resolve,reject)=>options.signal?.addEventListener('abort',()=>reject(new Error('aborted'))))};
  vm.createContext(c);vm.runInContext(source.slice(source.indexOf('async function api('),source.indexOf('function action(')),c);
  const pending=c.api('/api/jobs',undefined,{timeoutMs:10});
- assert.equal(timers.length,1);timers[0]();await assert.rejects(pending,/상태 조회/);
+ assert.equal(timers.length,1);timers[0]();await assert.rejects(pending,/상태 응답/);
 });
 
 function batchFixture(){
@@ -82,7 +82,7 @@ test('read-only status POST times out as a read and never replays the request',a
  fetch:(_path,options)=>{requests++;return new Promise((_resolve,reject)=>options.signal?.addEventListener('abort',()=>reject(new Error('aborted'))));}};
  vm.createContext(c);vm.runInContext(source.slice(source.indexOf('async function api('),source.indexOf('function action(')),c);
  const pending=c.api('/api/environment/status',{input_id:'input'}, {timeoutMs:10,readOnly:true});
- assert.equal(timers.length,1);timers[0]();await assert.rejects(pending,/상태 조회/);assert.equal(requests,1);
+ assert.equal(timers.length,1);timers[0]();await assert.rejects(pending,/상태 응답/);assert.equal(requests,1);
 });
 
 test('a cancelled queued batch job does not advertise nonexistent partial output',()=>{
