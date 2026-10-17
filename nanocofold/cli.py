@@ -398,7 +398,12 @@ def _execute_command(args) -> int:
                     print(json.dumps({"reused": True, "result_id": source["id"], "run_dir": source["run_root"],
                                       "reuse_kind": source["reuse_kind"], "new_compute_seconds": 0}, ensure_ascii=False, indent=2))
                     return 0
-    with RunLock(run_dir), ConsoleProgress("NanoCoFold " + args.command, run_dir=run_dir):
+    with RunLock(run_dir), contextlib.ExitStack() as execution_context:
+        # Cleanup uses this same lock. Recheck after acquiring it, before
+        # progress or state writes, if cleanup finished while we were waiting.
+        if (run_dir / "retained").exists():
+            raise ValueError("정리 보관본은 읽기 전용입니다. 원본 계산이 필요하면 다른 run-id로 새로 실행하세요.")
+        execution_context.enter_context(ConsoleProgress("NanoCoFold " + args.command, run_dir=run_dir))
         args.run_dir = str(run_dir)
         run_dir, state = _open_run(cfg, args)
         normalized = _normalized_cli_config(cfg, args)

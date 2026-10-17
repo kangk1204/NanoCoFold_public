@@ -47,7 +47,7 @@
     "nanocofold/binding_site_assessment.py": "e17cfaaf78751321164afb45e398b7202cffb651272fe07fa593a9678f8f6a22",
     "nanocofold/campaign.py": "28052f7c7bfc223be5fa83a67ffd1be2d96c22eac9bf7f9aa3bf7c1abe152dec",
     "nanocofold/cascade.py": "9df36b300efb9766d628383d7ab23e0de9df7332393c5f3ef1e86dfc74a6703f",
-    "nanocofold/cli.py": "e49e2d94d68f52295a3c13eb210d983f5796298fac32ebd8047be52576e813ec",
+    "nanocofold/cli.py": "360ab35c4a3698d910b0b6ca5eb4610d37d8cf0fbe26cc9be18c50ae3a6fdfbe",
     "nanocofold/colabfold.py": "337882321be6d7eb1f955962c1625a5e707112b09e40dc0db1ee360548bc4cc2",
     "nanocofold/colabfold_msa.py": "6935d322533fd8099113ee017badd57a0e0bb575f6b9b761104ada0406290efa",
     "nanocofold/colabfold_msa_acquire.py": "0ceb884cd1550ff09e7760c9cfdb0a261d982bd045f2d71ae05dc2304502eb83",
