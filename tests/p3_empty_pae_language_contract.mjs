@@ -56,6 +56,7 @@ function fixture(source,{status='not_assessed',heatmap=false,missing=false,delay
     URLSearchParams,location:{search:''},NodeFilter:{SHOW_TEXT:4},localStorage:{getItem:()=>null,setItem(){}},
     CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail;}}};
   vm.createContext(c);vm.runInContext(catalog,c);
+  vm.runInContext(source.slice(source.indexOf('function describeResultFigure('),source.indexOf('function mockZeroSelectionNotice(')),c);
   vm.runInContext(source.slice(source.indexOf('function renderDistribution('),source.indexOf('function labelSelection(')),c);
   vm.runInContext(source.slice(source.indexOf('async function renderStructure('),source.indexOf('async function exportResult(')),c);
   c.renderDistribution=()=>{};

@@ -73,6 +73,9 @@ def test_delayed_history_restore_respects_latest_navigation(navigation_app, late
         expect(page.locator('body')).to_have_attribute('data-startup', 'ready')
         page.evaluate('window.__testIntervals.forEach(clearInterval)')
         page.wait_for_function('() => !state.pollingJobs')
+        # Start this history scenario from the intended resumable job.
+        page.locator('#job-list button', has_text='Alpha').click()
+        expect(page.locator('#job-title')).to_have_text('Alpha')
         field = page.locator('#job-actions input')
         field.fill('17')
         # Native history: jobs Alpha -> results Alpha -> jobs Beta -> results Beta.

@@ -212,6 +212,9 @@ def test_resume_minutes_survive_polling_and_job_navigation_and_submit_exact_budg
         page.route('**/api/jobs**', route)
         page.goto(url + '?view=jobs')
         expect(page.locator('body')).to_have_attribute('data-startup', 'ready')
+        # Exercise the resumable job explicitly, regardless of list ordering.
+        page.locator('#job-list button', has_text='Alpha').click()
+        expect(page.locator('#job-title')).to_have_text('Alpha')
         minutes = page.locator('#job-actions input')
         minutes.fill('17')
         minutes.focus()
