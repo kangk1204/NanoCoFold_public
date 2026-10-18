@@ -81,7 +81,7 @@
     "nanocofold/platform/__init__.py": "b80e5b881f97fa10121b439055fe1ba5a56c8af5875a40326669ac72f31db6a9",
     "nanocofold/platform/app.py": "2fb4e102170f3e309625be40ab5ae41fe5eb6cc7f52c664085d08ac1883a12da",
     "nanocofold/platform/batches.py": "7435ecd6575cb780c9d70c777cc36dd01fd4887e7df1ffc9e6484a56b4093879",
-    "nanocofold/platform/cloud_agent.py": "4bfbd630022fd7ac0cf1fa43d70833c6c5b88c716dde0914c00610e1d296cb3b",
+    "nanocofold/platform/cloud_agent.py": "236eda56d88398819b6a61a31ba186f9930ecbec71455e58197d2baa4df29ecf",
     "nanocofold/platform/cloud_results.py": "9c2c41264948a66ec7d54d486fa06e079e522766e4aa6dba4867da71c407160a",
     "nanocofold/platform/environment.py": "9c3b3ffea7e5fbd2afc814c539ace3ea790579e100585a057279ce9b599a6244",
     "nanocofold/platform/errors.py": "6bd076245bdd1ff93b949fea173261c88b78c1bd680b05f211de7b41e099c247",

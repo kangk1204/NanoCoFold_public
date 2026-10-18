@@ -5,6 +5,7 @@ import copy
 from datetime import datetime, timezone
 import hashlib
 import http.client
+import io
 import json
 import mimetypes
 import os
@@ -14,6 +15,7 @@ import threading
 import tempfile
 import time
 import urllib.request
+import urllib.error
 from pathlib import Path
 from urllib.parse import urlsplit, quote
 
@@ -75,7 +77,11 @@ class Client:
                 or parsed.password is not None or parsed.query or parsed.fragment or parsed.port not in (None,443)):
             raise ValueError('승인된 HTTPS Sites 주소가 필요합니다.')
         self.url='https://'+parsed.hostname
+        self.hostname=parsed.hostname
         self.opener=urllib.request.build_opener(_NoSiteRedirects())
+        self.use_proxy=bool(urllib.request.getproxies().get('https')) and not urllib.request.proxy_bypass(self.hostname)
+        # Queue, heartbeat and export threads never share an in-flight socket.
+        self.connections=threading.local()
         self.requested_agent_id=os.environ.get('NANOCOFOLD_AGENT_ID') if 'NANOCOFOLD_AGENT_ID' in os.environ else config.get('agent_id')
         self.headers = {'OAI-Sites-Authorization': 'Bearer '+config['service_token'], 'Authorization': 'Bearer '+config['agent_token']}
         self.set_agent_id(self.requested_agent_id if self.requested_agent_id is not None else 'legacy')
@@ -84,9 +90,46 @@ class Client:
         self.headers['X-NanoCoFold-Agent-ID']=self.agent_id
     def request(self, path, payload=None):
         data = json.dumps(payload, ensure_ascii=False, allow_nan=False).encode() if payload is not None else None
-        req = urllib.request.Request(self.url+'/api/'+path, data=data, headers={**self.headers,'Content-Type':'application/json'})
-        with self.opener.open(req, timeout=30) as response:
-            return json.load(response)
+        headers={**self.headers,'Content-Type':'application/json'}
+        if self.use_proxy:
+            # Preserve configured proxy routing and its redirect protection.
+            req=urllib.request.Request(self.url+'/api/'+path,data=data,headers=headers)
+            with self.opener.open(req,timeout=30) as response:return json.load(response)
+        return json.loads(self.exchange('GET' if data is None else 'POST','/api/'+path,
+                                        body=data,headers=headers,timeout=30))
+    def discard_connection(self,connection):
+        try:connection.close()
+        except OSError:pass
+        finally:
+            if getattr(self.connections,'connection',None) is connection:
+                del self.connections.connection
+    def exchange(self,method,path,*,body,headers,timeout,upload=False):
+        connection=getattr(self.connections,'connection',None)
+        if connection is None:
+            connection=http.client.HTTPSConnection(self.hostname,timeout=timeout)
+            self.connections.connection=connection
+        try:
+            connection.timeout=timeout
+            if getattr(connection,'sock',None) is not None:connection.sock.settimeout(timeout)
+            connection.request(method,path,body=body,headers=headers)
+            response=connection.getresponse()
+            if 300<=response.status<400:
+                raise ValueError('인증된 Sites 요청의 리다이렉트는 허용하지 않습니다.')
+            if (response.status!=200 if upload else not 200<=response.status<300):
+                data=response.read(65536)
+                if upload:raise RuntimeError(f'파일 동기화 실패 HTTP {response.status}: '+data.decode(errors='replace')[:300])
+                raise urllib.error.HTTPError(self.url+path,response.status,getattr(response,'reason',''),
+                                             getattr(response,'headers',{}),io.BytesIO(data))
+            # Fully consume successful responses before socket reuse. Upload
+            # acknowledgements are bounded; discard an unexpectedly large one.
+            data=response.read(65537) if upload else response.read()
+            if upload and len(data)>65536:self.discard_connection(connection)
+            return data
+        except Exception:
+            self.discard_connection(connection)
+            # Never replay a POST/PUT after an ambiguous acknowledgement.
+            # The next agent tick retries using durable operation/job receipts.
+            raise
     def upload(self, key, path):
         if path.stat().st_size<=self.UPLOAD_LIMIT:return self._upload(key,path)
         original=sha256(path);parts=[];combined=hashlib.sha256()
@@ -101,15 +144,10 @@ class Client:
         if combined.hexdigest()!=original:raise ValueError('파일이 전송 중 바뀌었습니다.')
         self.request('agent/multipart',{'key':key,'sha256':original,'size':sum(p['size'] for p in parts),'content_type':mimetypes.guess_type(path.name)[0] or 'application/octet-stream','parts':parts})
     def _upload(self, key, path):
-        parsed = urlsplit(self.url)
         with path.open('rb') as file:
-            conn = http.client.HTTPSConnection(parsed.hostname, timeout=120)
-            try:
-                conn.request('PUT','/api/agent/files/'+quote(key,safe='/'),body=file,headers={**self.headers,'Content-Length':str(path.stat().st_size),
-                    'Content-Type':mimetypes.guess_type(path.name)[0] or 'application/octet-stream','X-Content-SHA256':sha256(path)})
-                response=conn.getresponse(); data=response.read(65536)
-                if response.status != 200: raise RuntimeError(f'파일 동기화 실패 HTTP {response.status}: '+data.decode(errors='replace')[:300])
-            finally: conn.close()
+            self.exchange('PUT','/api/agent/files/'+quote(key,safe='/'),body=file,timeout=120,upload=True,
+                          headers={**self.headers,'Content-Length':str(path.stat().st_size),
+                              'Content-Type':mimetypes.guess_type(path.name)[0] or 'application/octet-stream','X-Content-SHA256':sha256(path)})
 
 
 class Agent:
@@ -557,6 +595,14 @@ class Agent:
                     print(f'[export] {identifier}: {type(exc).__name__}: {exc}',flush=True)
             self.export_thread=threading.Thread(target=transfer,name='sites-result-upload',daemon=True)
             self.export_thread.start()
+    def submitted_job(self,identifier):
+        # JobManager commits a deterministic submission before cloud_sync is
+        # written. Recover that independent snapshot after a synchronizer crash.
+        import uuid
+        local_id=uuid.uuid5(uuid.NAMESPACE_URL,'nanocofold-sites:'+identifier).hex
+        try:job=self.manager.store.get(local_id)
+        except KeyError:return None
+        return job if job.get('submission_id')==identifier else None
     def tick(self):
         queue=self.client.request('agent/queue')
         if queue.get('agent_id',self.agent_id)!=self.agent_id:raise ValueError('Sites 응답의 agent ID가 현재 서버와 다릅니다.')
@@ -575,18 +621,21 @@ class Agent:
         for cloud in ids.values():
             identifier=cloud['id']
             with self.manager.store.connect() as db:existing=db.execute('SELECT * FROM cloud_sync WHERE id=?',(identifier,)).fetchone()
+            job=None
             try:
                 if existing:job=self.manager.store.get(existing['remote_id'])
                 else:
-                    request=json.loads(cloud['request'])
-                    # Repeat the same frozen-input validation used by readiness.
-                    # Existing jobs retain their independent execution snapshots;
-                    # only a new submission must have a current review receipt.
-                    cfg,_=self.reviewed_diagnostics_config({'input_id':request['input_id'],'mode':request['mode']})
-                    # Cloud result prefixes are owned by the cloud submission.
-                    # Enable canonical alias reuse only after both agent and
-                    # Site support an ownership-checked source-result resolver.
-                    job=self.manager.create({'config':cfg,'mode':request['mode'],'name':request['name'],'budget_seconds':request['budget_seconds'],'submission_id':identifier,'reuse_results':False})
+                    job=self.submitted_job(identifier)
+                    if job is None:
+                        request=json.loads(cloud['request'])
+                        # Repeat frozen-input validation only for new submissions.
+                        # Committed jobs retain their independent snapshots even
+                        # if the synchronizer stopped before writing cloud_sync.
+                        cfg,_=self.reviewed_diagnostics_config({'input_id':request['input_id'],'mode':request['mode']})
+                        # Cloud result prefixes are owned by the cloud submission.
+                        # Enable canonical alias reuse only after both agent and
+                        # Site support an ownership-checked source-result resolver.
+                        job=self.manager.create({'config':cfg,'mode':request['mode'],'name':request['name'],'budget_seconds':request['budget_seconds'],'submission_id':identifier,'reuse_results':False})
                     with self.manager.store.connect() as db:db.execute('INSERT INTO cloud_sync(id,remote_id) VALUES(?,?)',(identifier,job['id']))
                 action_id=cloud.get('action_id')
                 if cloud.get('action'):
@@ -612,8 +661,11 @@ class Agent:
                 if job['state'] in TERMINAL and job.get('run_dir') and Path(job['run_dir']).exists() and (not existing or not existing['result_synced']):self.schedule_result(identifier,job)
                 self.sync_errors.pop(identifier,None)
             except Exception as exc:
-                # Preserve remote state on transport errors; never restart inference.
-                if not existing:self.client.request('agent/status',{'id':identifier,'status':{'id':None,'state':'failed','agent_id':self.agent_id,'error':public_error(exc)}})
+                # Once a local submission exists, mapping/log/transport errors
+                # affect synchronization only. A failed status must never hide
+                # a worker that is already queued, running, or complete.
+                if job is None and not existing:job=self.submitted_job(identifier)
+                if not existing and job is None:self.client.request('agent/status',{'id':identifier,'status':{'id':None,'state':'failed','agent_id':self.agent_id,'error':public_error(exc)}})
                 else:
                     self.sync_errors[identifier]=f'{type(exc).__name__}: {exc}'
                     print(f'[sync] {identifier}: {type(exc).__name__}: {exc}',flush=True)
