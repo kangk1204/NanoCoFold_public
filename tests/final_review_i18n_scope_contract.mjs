@@ -32,7 +32,7 @@ test('language events preserve selected candidate, score arrays, observation cou
    assert.deepEqual(JSON.parse(JSON.stringify(chart.data.map(trace=>trace.y))),[[value]]);
    assert.equal(chart.layout.yaxis.title.text,language==='en'?'Whole-complex ipTM':'전체 복합체 ipTM');
    assert.deepEqual(JSON.parse(JSON.stringify(chart.layout.xaxis.ticktext)),[language==='en'?'Condition 1':'조건 1']);
-   assert.match(get('observation-note').textContent,language==='en'?/^1 observations for this candidate/:/^현재 후보 1개 관측/);
+   assert.match(get('observation-note').textContent,language==='en'?/^Observations for this candidate: 1\./:/^현재 후보 1개 관측/);
    assert.equal(c.state.candidate.candidate_id,id);assert.equal(JSON.stringify(c.state.observations),raw);
   }
  }
