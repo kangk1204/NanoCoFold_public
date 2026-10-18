@@ -347,10 +347,12 @@ Select candidates by reviewing engine-specific scores, ipTM, interface pLDDT, in
 |---|---|
 | Changed tabs, used Back, switched language or closed the browser | Analysis continues. Reopen the existing job in the same workspace. Keep the server and compute host running. |
 | Progress seems stuck or the connection dropped | Check **Detailed execution log** and the connection, then reopen the existing job. |
-| Want to stop a job | Click **Cancel job** and wait for **Cancelling → Cancelled**. |
+| Want to stop a job | Click **Cancel job**, check the target in the dialog, then confirm. Wait for **Cancelling → Cancelled**. **Keep running** or Esc closes the dialog without requesting cancellation. |
 | A failed, interrupted or cancelled job offers **Verify and resume** | Resolve the logged cause, then use that action on the **same job**. Saved inputs/configuration and process ownership are checked before restarting. |
 | **Time budget exhausted** | Enter additional minutes when prompted, then **Verify and resume**. |
 | Resume is unavailable | Read the displayed reason and log, then contact the administrator. |
+
+While cancelling, NanoCoFold stops the worker and its tools and releases their resources. Saved results remain available; unfinished models may be recalculated when resumed. In a batch, confirm cancellation of one item or all unfinished jobs.
 
 Continue interrupted jobs with **Verify and resume**. Saved results remain available. Review partial results together with job status and completed model counts.
 

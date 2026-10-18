@@ -102,6 +102,13 @@ def _command_process(argv, *, cwd, env, stdin, output, inherited, cancellation, 
     status_read, status_write = os.pipe()
     process = None
     stamp = None
+
+    def close_lifeline():
+        nonlocal lifeline_write
+        if lifeline_write is not None:
+            descriptor, lifeline_write = lifeline_write, None
+            os.close(descriptor)
+
     try:
         with tempfile.TemporaryFile(mode="w+b") as request:
             payload = {"argv": argv, "env": dict(os.environ) if env is None else env}
@@ -113,6 +120,9 @@ def _command_process(argv, *, cwd, env, stdin, output, inherited, cancellation, 
                  str(request.fileno()), *(str(descriptor) for descriptor in inherited)],
                 cwd=cwd, env=env, stdin=stdin, stdout=output, stderr=subprocess.STDOUT,
                 start_new_session=True, pass_fds=(*inherited, lifeline_read, status_write, request.fileno()))
+            # Managed cleanup closes the owner pipe and waits for the guardian
+            # to reap adopted/session-escaping children before killing itself.
+            process._nanocofold_close_lifeline = close_lifeline
             os.close(lifeline_read)
             lifeline_read = None
             os.close(status_write)
@@ -132,7 +142,7 @@ def _command_process(argv, *, cwd, env, stdin, output, inherited, cancellation, 
     finally:
         # Closing the only write end is also the worker-death fallback. Never
         # let Popen.__exit__ wait on a helper still blocked at its launch gate.
-        os.close(lifeline_write)
+        close_lifeline()
         try:
             if process is not None and process.returncode is None:
                 _kill_process_group(process)
@@ -257,6 +267,13 @@ def _exit_ready(process):
 
 
 def _kill_process_group(process):
+    close_lifeline = getattr(process, "_nanocofold_close_lifeline", None)
+    if close_lifeline is not None:
+        # SIGKILLing the guardian first would lose orphan adoption authority.
+        # Its private lifeline requests child cleanup; wait for actual exit.
+        close_lifeline()
+        process.wait()
+        return
     try:
         os.killpg(process.pid, signal.SIGKILL)
     except ProcessLookupError:

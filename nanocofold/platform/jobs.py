@@ -25,6 +25,45 @@ ACTIVE = {"queued", "running", "cancelling"}
 PROFILES = set(INSTALL_PROFILES)
 
 
+def cancellation_snapshot(job):
+    """Stable attempt identity reviewed by a cancellation confirmation."""
+    return {"job_id": job["id"], "state": job["state"], "pid": job.get("pid"),
+            "process_stamp": job.get("process_stamp"), "started": job.get("started"),
+            "resume": job.get("resume") is True, "history_length": len(job.get("history") or [])}
+
+
+def _check_cancellation_snapshot(job, expected):
+    if expected is None:  # Older API callers remain compatible.
+        return
+    snapshot = cancellation_snapshot(job)
+    if (not isinstance(expected, dict) or set(expected) != set(snapshot)
+            or type(expected.get("resume")) is not bool
+            or type(expected.get("history_length")) is not int
+            or expected["history_length"] < 0
+            or (expected.get("pid") is not None and type(expected["pid"]) is not int)
+            or (expected.get("started") is not None and type(expected["started"]) not in (int, float))
+            or job["state"] not in ACTIVE or expected != snapshot):
+        raise ValueError("작업 상태가 바뀌었습니다. 현재 상태를 확인한 뒤 취소를 다시 선택하세요.")
+
+
+def _private_process_guard(pid, stamp):
+    """Recognize our owned cleanup guardian, never an arbitrary process group."""
+    if not pid or not stamp or process_stamp(pid) != stamp:
+        return False
+    guard = str(Path(__file__).resolve().parents[1] / "utils/process_guard.py")
+    try:
+        if Path("/proc").is_dir():
+            command = Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")
+            found = os.fsencode(guard) in command
+        else:
+            command = subprocess.run(["ps", "-p", str(pid), "-o", "command="],
+                                     capture_output=True, text=True, timeout=2).stdout
+            found = guard in command
+        return found and process_stamp(pid) == stamp
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def _resume_action_json(action_id, payload):
     if not isinstance(action_id, str) or not action_id.strip() or len(action_id) > 200:
         raise ValueError("A stable cloud action ID of 1–200 characters is required.")
@@ -359,6 +398,12 @@ class JobStore:
             if any(process_stamp(pid) == stamp for pid, stamp in self.registered_processes(identifier, connection)):
                 return job  # Never publish terminal state before owned-command cleanup.
             if job["state"] == "cancelling":
+                if (job.get("pid") and job.get("process_stamp")
+                        and process_stamp(job["pid"]) == job["process_stamp"]):
+                    # A late cancellation may win a worker's completion write.
+                    # Only the supervisor observing actual worker exit may
+                    # publish cancellation and release the next attempt.
+                    return job
                 state = "budget_exhausted" if job.get("budget_exceeded") else "cancelled"
                 changes.update(exit_code=130, can_resume=job["kind"] == "analysis",
                                error="실행 시간 한도에 도달했습니다." if state == "budget_exhausted" else "사용자가 작업을 취소했습니다.")
@@ -662,15 +707,25 @@ class JobManager:
             self.store.forget_process(identifier, pid, stamp)
         registered = self.store.registered_processes(identifier, owner=(job.get("pid"), job.get("process_stamp")))
         targets = list(dict.fromkeys((pid, stamp) for pid, stamp in [*targets, *registered]))
+        guards = {pid for pid, stamp in registered if _private_process_guard(pid, stamp)}
         for pid, stamp in reversed(targets):
             if stamp and process_stamp(pid) == stamp:
                 with contextlib.suppress(ProcessLookupError):
-                    os.killpg(os.getpgid(pid), signal.SIGKILL)
+                    if pid in guards:
+                        # The private subreaper must reap detached descendants
+                        # before it releases inherited core/GPU reservations.
+                        os.kill(pid, signal.SIGUSR1)
+                    else:
+                        group = os.getpgid(pid)
+                        if group in guards:
+                            os.kill(pid, signal.SIGKILL)
+                        else:
+                            os.killpg(group, signal.SIGKILL)
         for pid, stamp in registered:
             self.store.forget_process(identifier, pid, stamp)
         return [(pid, stamp) for pid, stamp in targets if stamp and process_stamp(pid) == stamp]
 
-    def cancel(self, identifier: str) -> dict:
+    def cancel(self, identifier: str, *, expected_cancel=None) -> dict:
         # Dispatch and worker completion can happen between an API read and
         # write. Decide the transition from the current row under the same
         # transaction that persists it, keeping a live worker cancellable.
@@ -681,6 +736,7 @@ class JobManager:
             if row is None:
                 raise KeyError("작업이 없습니다.")
             job = json.loads(row["payload"])
+            _check_cancellation_snapshot(job, expected_cancel)
             if job["state"] == "queued":
                 job.update(state="cancelled", phase="cancelled", finished=time.time(),
                            cancel_requested=True,
@@ -695,6 +751,52 @@ class JobManager:
                                (job["state"], job["updated"], json.dumps(job), identifier))
         write_platform_status(job)
         return job
+
+    def cancel_many(self, expected_jobs, *, batch_job_ids=None):
+        """Validate all reviewed attempts before cancelling any batch member."""
+        if (not isinstance(expected_jobs, list) or not 1 <= len(expected_jobs) <= 200
+                or any(not isinstance(item, dict) or not isinstance(item.get("job_id"), str)
+                       for item in expected_jobs)
+                or len({item["job_id"] for item in expected_jobs}) != len(expected_jobs)):
+            raise ValueError("작업 상태가 바뀌었습니다. 현재 상태를 확인한 뒤 취소를 다시 선택하세요.")
+        current = []
+        with self.store.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            if batch_job_ids is not None:
+                if (not isinstance(batch_job_ids, list) or not 1 <= len(batch_job_ids) <= 200
+                        or any(not isinstance(item, str) for item in batch_job_ids)
+                        or len(set(batch_job_ids)) != len(batch_job_ids)):
+                    raise ValueError("작업 상태가 바뀌었습니다. 현재 상태를 확인한 뒤 취소를 다시 선택하세요.")
+                # Single-job resume does not take the batch document lock.
+                # Read the entire batch's active set under this write lock,
+                # so a concurrent resume cannot bypass full-set approval.
+                placeholders = ",".join("?" for _ in batch_job_ids)
+                rows = connection.execute(f"SELECT id,state FROM jobs WHERE id IN ({placeholders})", batch_job_ids).fetchall()
+                active_ids = {row["id"] for row in rows if row["state"] in ACTIVE}
+                if (len(rows) != len(batch_job_ids)
+                        or active_ids != {item["job_id"] for item in expected_jobs}):
+                    raise ValueError("작업 상태가 바뀌었습니다. 현재 상태를 확인한 뒤 취소를 다시 선택하세요.")
+            for expected in expected_jobs:
+                row = connection.execute("SELECT payload FROM jobs WHERE id=?", (expected["job_id"],)).fetchone()
+                if row is None:
+                    raise ValueError("작업 상태가 바뀌었습니다. 현재 상태를 확인한 뒤 취소를 다시 선택하세요.")
+                job = json.loads(row["payload"])
+                _check_cancellation_snapshot(job, expected)
+                current.append(job)
+            now = time.time()
+            for job in current:
+                if job["state"] == "queued":
+                    job.update(state="cancelled", phase="cancelled", finished=now, cancel_requested=True,
+                               can_resume=job["kind"] == "analysis",
+                               catalog_pending=bool(job.get("run_dir") and Path(job["run_dir"]).is_dir()))
+                else:
+                    job.update(state="cancelling", phase="cancelling", cancel_requested=True)
+                job["updated"] = now
+                connection.execute("UPDATE jobs SET state=?,updated=?,payload=? WHERE id=?",
+                                   (job["state"], now, json.dumps(job), job["id"]))
+        for job in current:
+            write_platform_status(job)
+        return current
 
     def logs(self, identifier: str, offset: int = 0) -> dict:
         job = self.store.get(identifier)
@@ -867,7 +969,9 @@ class JobManager:
         started, targets = self.pending_kills[identifier]
         if time.monotonic() - started < 3:
             return
-        remaining = self._cleanup_commands(job, targets)
+        # A worker stuck inside an extension may not react to SIGTERM. Include
+        # its birth identity in hard cleanup and wait for its death as well.
+        remaining = self._cleanup_commands(job, [*targets, (job.get("pid"), job.get("process_stamp"))])
         if remaining:
             self.pending_kills[identifier] = (started, remaining)
             return

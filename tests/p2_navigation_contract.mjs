@@ -16,7 +16,7 @@ function fixture({offline = false} = {}) {
     window: {location, history: Object.fromEntries(['pushState', 'replaceState'].map(method => [method, (_state, _title, url) => {
       writes.push({method, url: String(url)}); location.href = String(url);
     }]))},
-    refreshJobs() {}, refreshResults() {},
+    dismissCancellation() {}, refreshJobs() {}, refreshResults() {},
     selectJob: async id => { context.state.job = id; await pending.promise; },
   };
   vm.createContext(context);

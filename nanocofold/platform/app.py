@@ -235,8 +235,9 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         return await asyncio.to_thread(batches.submit, identifier, await body(request))
 
     @app.post("/api/batches/{identifier}/cancel")
-    async def batch_cancel(identifier: str):
-        return await asyncio.to_thread(batches.cancel, identifier)
+    async def batch_cancel(identifier: str, request: Request):
+        payload = await body(request) if await request.body() else {}
+        return await asyncio.to_thread(batches.cancel, identifier, expected_cancel=payload.get("expected_cancel"))
 
     def effective(payload):
         cfg = payload.get("config", {})
@@ -420,8 +421,9 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         return {**result, "text": public_log(result["text"])}
 
     @app.post("/api/jobs/{identifier}/cancel")
-    def job_cancel(identifier: str):
-        return manager.cancel(identifier)
+    async def job_cancel(identifier: str, request: Request):
+        payload = await body(request) if await request.body() else {}
+        return await asyncio.to_thread(manager.cancel, identifier, expected_cancel=payload.get("expected_cancel"))
 
     @app.post("/api/jobs/{identifier}/resume")
     async def job_resume(identifier: str, request: Request):

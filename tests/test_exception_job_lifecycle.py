@@ -41,7 +41,12 @@ def test_cancel_before_worker_entry_does_not_run_diagnostics(tmp_path, monkeypat
     assert worker.execute(tmp_path, job["id"]) == 130
     assert not called
     current = manager.store.get(job["id"])
-    assert current["state"] == "cancelled" and current["exit_code"] == 130
+    assert current["state"] == "cancelling" and current["exit_code"] == 130
+    # execute() normally exits a separate process. Only the queue may publish
+    # terminal cancellation after that birth-identified worker has disappeared.
+    monkeypatch.setattr(jobs, "process_stamp", lambda _pid: None)
+    manager._tick()
+    assert manager.store.get(job["id"])["state"] == "cancelled"
 
 
 @pytest.mark.parametrize("budget", [False, True])
@@ -70,6 +75,10 @@ def test_worker_completion_cannot_overwrite_cancel_after_its_last_read(tmp_path,
     monkeypatch.setattr(diagnostics, "doctor", diagnosis)
     monkeypatch.setattr(jobs.JobStore, "get", stale_get)
     assert worker.execute(tmp_path, job["id"]) == 130
+    current = original_get(manager.store, job["id"])
+    assert current["state"] == "cancelling"
+    monkeypatch.setattr(jobs, "process_stamp", lambda _pid: None)
+    manager._tick()
     current = original_get(manager.store, job["id"])
     assert current["state"] == ("budget_exhausted" if budget else "cancelled")
     assert current["exit_code"] == 130 and current["error"]

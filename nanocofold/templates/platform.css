@@ -523,3 +523,11 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
 
 .offline-header{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px 24px;align-items:center}.offline-brand{min-width:0}.offline-brand strong{display:block;font-size:22px;line-height:1.4}.offline-brand span{margin-top:6px;font-size:14px;overflow-wrap:anywhere}
 @media(max-width:600px){.offline-header{grid-template-columns:1fr;gap:12px}.offline-header .language-switch{justify-self:end}.offline-brand strong{font-size:20px}}
+
+/* Cancellation is an explicit decision, with the safe action focused first. */
+.cancel-confirmation{box-sizing:border-box;width:min(560px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:24px;border:1px solid #9baeb2;border-radius:12px;color:#1c2c38;background:#fff;box-shadow:0 16px 64px #0003}
+.cancel-confirmation::backdrop{background:rgba(15,35,45,.5)}
+.cancel-confirmation h2{margin:0 0 16px;font-size:22px;line-height:1.4}
+.cancel-confirmation p{line-height:1.6}.cancel-confirmation-target{font-weight:600;overflow-wrap:anywhere}.cancel-confirmation-target code{display:block;font-size:13px;font-weight:400;overflow-wrap:anywhere}
+.cancel-confirmation-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:12px;margin-top:24px}.cancel-confirmation-actions button{min-height:48px;margin:0}.cancel-confirmation-submit{background:#a43125;color:#fff;border-color:#a43125}.cancel-confirmation button:focus-visible{outline:3px solid #85601e;outline-offset:3px}
+@media(max-width:480px){.cancel-confirmation{padding:20px}.cancel-confirmation-actions{flex-direction:column}.cancel-confirmation-actions button{width:100%}}

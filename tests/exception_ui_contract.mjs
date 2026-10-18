@@ -11,10 +11,13 @@ function fixture(){
  const context={state,$:node,offline:false,document:{hidden:false},window:{location:{href:'http://localhost/'}},
  I18N:{term:s=>s,text:(n,s)=>n.textContent=s,concat:a=>a.join(''),format:(s,args)=>s.replace(/\{(\d+)\}/g,(_,i)=>args[i])},
  states:{running:'실행 중',interrupted:'중단',cancelling:'취소 중'},phaseLabel:x=>x,jobPhaseCaption:j=>j.phase,etaText:()=>'',
+ // These operation regressions represent an explicitly accepted confirmation.
+ confirmCancellation:async()=>true,
  el:(tag,text)=>{const n=node(Symbol(tag));n.tag=tag;n.textContent=text||'';return n;},notice:m=>context.lastNotice=m,
  api:async path=>path==='/api/jobs'?{jobs:[{id:'a',name:'Alpha',kind:'analysis',state:'running',progress:{}}]}:path.includes('/logs')?{text:'saved\n',next_offset:6}:{id:'a',name:'Alpha',kind:'analysis',state:'running',progress:{}},
  URL,URLSearchParams,Number,Math,Boolean,Date,setTimeout,clearTimeout,AbortController};
  vm.createContext(context);
+ vm.runInContext(source.slice(source.indexOf('function cancellationExpectation('),source.indexOf('/* CANCEL_CONFIRMATION_END */')),context);
  vm.runInContext(source.slice(source.indexOf('async function selectJob('),source.indexOf('async function refreshResults(')),context);
  context.rememberLocation=()=>{};return context;
 }
@@ -23,6 +26,7 @@ test('cancel is single flight, including a periodic rerender during the request'
  const previous=f.api;f.api=(path,body)=>body!==undefined?(posts++,post.promise):previous(path);
  await f.refreshJobs();let button=f.$('job-actions').children.find(n=>n.textContent==='작업 취소');
  const first=button.onclick();const second=button.onclick();
+ await new Promise(resolve=>setImmediate(resolve));
  await f.refreshJobs();button=f.$('job-actions').children.find(n=>n.textContent==='작업 취소');
  assert.equal(button.disabled,true);assert.equal(posts,1);
  post.resolve({id:'a',state:'cancelling'});await Promise.all([first,second]);

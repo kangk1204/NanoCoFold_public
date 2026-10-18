@@ -49,7 +49,9 @@ test('rich metadata keeps payload identity, recorded roles, components and layer
  const before=JSON.stringify(data),f=fixture(data),viewer=await f.Class.create({},data,()=>{});
  assert.equal(viewer.data,data);assert.equal(viewer.metadataIncomplete,false);
  assert.deepEqual(f.components.map(component=>[component.key,component.type]),[['target','ball-and-stick'],['binder','cartoon']]);
- assert.deepEqual(f.components.map(component=>component.label),['Chain A · target','Chain B · binder']);
+ // Labels resolve at display time so a language switch preserves coordinates.
+ assert.ok(f.components.every(component=>typeof component.label==='function'));
+ assert.deepEqual(f.components.map(component=>component.label()),['Chain A · target','Chain B · binder']);
  await viewer.layers({target:false,binder:true,context:false});
  for(const [ref,hidden]of f.visibility)assert.equal(hidden,ref.startsWith('target:'));
  assert.equal(JSON.stringify(data),before);

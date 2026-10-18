@@ -268,13 +268,26 @@ class BatchManager:
                 self._save(batch)
             return self.get(identifier)
 
-    def cancel(self, identifier):
+    def cancel(self, identifier, *, expected_cancel=None):
         self.get(identifier)
         # A cancellation waits for any in-flight registration to finish, so it
         # cannot miss the later rows of a concurrently submitted batch.
         with (self.jobs.store.root / f"batch-{identifier}.lock").open("a+") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
             batch = self.get(identifier)
+            if expected_cancel is not None:
+                current_ids = {row["job_id"] for row in batch["rows"]
+                               if row.get("job") and row["job"]["state"] not in TERMINAL}
+                if (not isinstance(expected_cancel, dict) or set(expected_cancel) != {"batch_id", "jobs"}
+                        or expected_cancel.get("batch_id") != identifier
+                        or not isinstance(expected_cancel.get("jobs"), list)
+                        or any(not isinstance(item, dict) or not isinstance(item.get("job_id"), str)
+                               for item in expected_cancel["jobs"])
+                        or {item["job_id"] for item in expected_cancel["jobs"]} != current_ids):
+                    raise ValueError("작업 상태가 바뀌었습니다. 현재 상태를 확인한 뒤 취소를 다시 선택하세요.")
+                self.jobs.cancel_many(expected_cancel["jobs"],
+                                      batch_job_ids=[row["job_id"] for row in batch["rows"] if row.get("job_id")])
+                return self.get(identifier)
             for row in batch["rows"]:
                 if row.get("job") and row["job"]["state"] not in TERMINAL:
                     self.jobs.cancel(row["job_id"])

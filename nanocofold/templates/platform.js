@@ -210,6 +210,7 @@ const phaseLabel = (phase) => ({
   design: "새 후보 생성", screen: "후보 비교", mature: "변이 후보 준비",
   tier2: "최종 복합체 평가", engine_comparison: "엔진별 비교",
   final: "결과·보고서 저장", complete: "완료", resume_validation: "재개 조건 확인",
+  cancelling: "종료 정리 중", cancelled: "취소",
   colabfold_screen: "ColabFold 예측", boltz_rescore: "Boltz-2 재평가",
 }[phase] || phase || "준비");
 function jobPhaseCaption(job) {
@@ -360,6 +361,7 @@ async function restoreNavigation() {
 }
 function view(name, remember = true) {
   if (!$("view-" + name)) return;
+  if (state.currentView !== name) dismissCancellation();
   state.currentView = name;
   if (remember) {
     ++state.navigationRequest;
@@ -953,6 +955,105 @@ async function submitDiagnostic() {
   }
   // Stay on the separate environment page. Input review never submits this job.
 }
+/* CANCEL_CONFIRMATION_START */
+let pendingCancellation = null;
+function dismissCancellation() {
+  pendingCancellation?.(false);
+}
+function confirmCancellation({name, id, batch = false, pendingResume = false}) {
+  // One confirmation at a time; the displayed target never follows polling/selection.
+  if (pendingCancellation) return Promise.resolve(false);
+  return new Promise(resolve => {
+    const previousFocus = document.activeElement;
+    const dialog = el("dialog", undefined, "cancel-confirmation");
+    dialog.id = "cancel-confirmation";
+    dialog.setAttribute("aria-labelledby", "cancel-confirmation-title");
+    dialog.setAttribute("aria-describedby", "cancel-confirmation-target cancel-confirmation-detail");
+    const title = el("h2", I18N.term(batch ? "배치의 미완료 분석을 모두 취소할까요?" : pendingResume ? "대기 중인 재개를 취소할까요?" : "이 작업을 취소할까요?"));
+    title.id = "cancel-confirmation-title";
+    const target = el("p", undefined, "cancel-confirmation-target");
+    target.textContent = String(name || id);
+    target.id = "cancel-confirmation-target";
+    // User-supplied names/IDs remain literal in either language.
+    target.setAttribute("data-i18n-ignore", "");
+    const identity = el("code");
+    identity.textContent = String(id);
+    target.append(identity);
+    const detail = el("p", I18N.term(pendingResume
+      ? "이 재개 요청을 취소합니다. 저장된 결과는 보존합니다. 나중에 다시 재개할 수 있으며, 미완료 모델은 다시 계산할 수 있습니다."
+      : batch
+        ? "이 배치의 미완료 작업에 취소를 요청합니다. 완료된 작업과 저장된 결과는 보존합니다. 다시 재개할 때 미완료 모델은 다시 계산할 수 있습니다."
+        : "이 작업에 취소를 요청합니다. 저장된 결과는 보존합니다. 다시 재개할 때 미완료 모델은 다시 계산할 수 있습니다."));
+    detail.id = "cancel-confirmation-detail";
+    const actions = el("div", undefined, "cancel-confirmation-actions");
+    const keep = el("button", I18N.term(pendingResume ? "재개 계속 대기" : "계속 진행"), "secondary");
+    const confirm = el("button", I18N.term(batch ? "미완료 작업 취소" : pendingResume ? "재개 요청 취소" : "작업 취소"), "cancel-confirmation-submit");
+    keep.type = confirm.type = "button";
+    keep.id = "cancel-confirmation-keep";
+    confirm.id = "cancel-confirmation-submit";
+    keep.autofocus = true;
+    let settled = false;
+    const finish = accepted => {
+      if (settled) return;
+      settled = true;
+      confirm.disabled = keep.disabled = true;
+      pendingCancellation = null;
+      window.removeEventListener("popstate", dismissCancellation);
+      window.removeEventListener("hashchange", dismissCancellation);
+      window.removeEventListener("pagehide", dismissCancellation);
+      if (dialog.open) dialog.close();
+      dialog.remove();
+      if (previousFocus?.isConnected) previousFocus.focus();
+      resolve(accepted === true);
+    };
+    pendingCancellation = finish;
+    keep.onclick = () => finish(false);
+    confirm.onclick = () => finish(true);
+    dialog.oncancel = event => { event.preventDefault(); finish(false); };
+    dialog.onclose = () => finish(false);
+    dialog.onclick = event => { if (event.target === dialog) finish(false); };
+    dialog.onkeydown = event => {
+      // There is no form/default submit. Enter only confirms after explicitly
+      // focusing the destructive button, never from the initial safe focus.
+      if (event.key === "Enter" && document.activeElement !== confirm && document.activeElement !== keep) event.preventDefault();
+    };
+    actions.append(keep, confirm);
+    dialog.append(title, target, detail, actions);
+    document.body.append(dialog);
+    window.addEventListener("popstate", dismissCancellation);
+    window.addEventListener("hashchange", dismissCancellation);
+    window.addEventListener("pagehide", dismissCancellation);
+    try { dialog.showModal(); keep.focus(); }
+    catch { finish(false); notice("취소 확인창을 열지 못했습니다. 페이지를 새로고침한 뒤 다시 시도하세요.", true); }
+  });
+}
+function cancellationExpectation(job) {
+  return {job_id:job.id,state:job.state,pid:job.pid??null,
+    process_stamp:job.process_stamp??null,started:job.started??null,
+    resume:job.resume===true,history_length:(job.history||[]).length};
+}
+function cancellationGeneration(job) {
+  return JSON.stringify(cancellationExpectation(job));
+}
+function cancellationIsCurrent(before, latest) {
+  return ["queued", "running"].includes(latest?.state) &&
+    cancellationGeneration(before) === cancellationGeneration(latest);
+}
+function cancellationChanged() {
+  notice("작업 상태가 바뀌었습니다. 현재 상태를 확인한 뒤 취소를 다시 선택하세요.", true);
+}
+async function verifyCancellationTarget(job) {
+  const latest = await api("/api/jobs/" + job.id, undefined, {timeoutMs: 15000});
+  if (cancellationIsCurrent(job, latest)) return true;
+  cancellationChanged();
+  return false;
+}
+function batchCancellationGeneration(batch) {
+  return JSON.stringify(batch.rows.filter(row => row.job && ["queued", "running", "cancelling"].includes(row.job.state))
+    .map(row => [row.job_id, cancellationGeneration({...row.job, id: row.job_id}), row.job.state === "cancelling"])
+    .sort((a, b) => String(a[0]).localeCompare(String(b[0]))));
+}
+/* CANCEL_CONFIRMATION_END */
 async function selectJob(identifier, remember = true) {
   if (remember) ++state.navigationRequest;
   state.jobSelectionVersion = (state.jobSelectionVersion || 0) + 1;
@@ -1062,7 +1163,7 @@ async function refreshJobs() {
         $("job-detail").append(el("span", I18N.term("MOCK · 합성 결과"), "badge"));
       if (job.error)
         $("job-detail").append(el("div", I18N.term(job.error), "warning error"));
-      const actionKey = JSON.stringify([job.id, job.state, Boolean(job.can_resume), job.kind, job.result_id || null]);
+      const actionKey = JSON.stringify([job.id, job.state, Boolean(job.can_resume), job.kind, job.result_id || null, cancellationGeneration(job)]);
       const rebuildActions = state.jobActionKey !== actionKey;
       if (rebuildActions) {
         // Keep an edited budget input and its focus intact during ordinary polling.
@@ -1095,7 +1196,10 @@ async function refreshJobs() {
         button.disabled = Boolean(state.jobOperations[job.id]);
         button.onclick = async () => {
           if (state.jobOperations[job.id]) return;
-          const body = extension ? {additional_budget_seconds: Number(extension.value) * 60} : {};
+          const cancelTarget = operation === "cancel" ? JSON.parse(JSON.stringify(job)) : null;
+          if (operation === "cancel" && !await confirmCancellation({name: job.name, id: job.id, pendingResume: job.state === "queued" && (job.resume || job.phase === "resume_validation")})) return;
+          if (state.jobOperations[job.id]) return;
+          const body = cancelTarget ? {expected_cancel:cancellationExpectation(cancelTarget)} : extension ? {additional_budget_seconds: Number(extension.value) * 60} : {};
           if (extension && (!Number.isFinite(body.additional_budget_seconds) || body.additional_budget_seconds <= 0)) {
             notice("추가 시간은 0보다 큰 숫자로 입력하세요.", true);
             return;
@@ -1103,6 +1207,7 @@ async function refreshJobs() {
           state.jobOperations[job.id] = operation;
           button.disabled = true;
           try {
+            if (cancelTarget && !await verifyCancellationTarget(cancelTarget)) return;
             const updated = await api(`/api/jobs/${job.id}/${operation}`, body, {timeoutMs: 30000});
             notice(operation !== "cancel"
               ? "재개를 요청했습니다. 기록과 입력을 검증한 뒤 실행합니다. 작업 상태를 확인하세요."
@@ -2582,7 +2687,23 @@ function renderBatch(batch) {
     check.type="checkbox";I18N.attribute(check, "aria-label", I18N.concat([row.id, I18N.term(" 실행 선택")]));check.checked=batchSelected.includes(row.id);check.disabled=batchBusy||!!batch.selected||!!row.error;
     check.onchange=()=>{batchSelected=check.checked?[...batchSelected,row.id]:batchSelected.filter(id=>id!==row.id);renderBatch(activeBatch);};choice.append(check);
     if(row.error||row.submission_error){line.style.background="#fff1ef";I18N.attribute(line, "aria-label", I18N.concat([row.id, I18N.term(" 오류")]));}
-    for(const action of row.job?.can_resume?["resume"]:row.job&&['queued','running','cancelling'].includes(row.job.state)?["cancel"]:[]){const button=el("button",action==="resume" ? I18N.term("항목 재개") : I18N.term("항목 취소"));button.disabled=batchBusy;button.onclick=()=>batchAction("항목 요청 처리 중",async()=>{await api("/api/jobs/"+row.job_id+"/"+action,{additional_budget_seconds:36000},{timeoutMs:30000});renderBatch(await api("/api/batches/"+batch.id,undefined,{timeoutMs:15000}));});status.append(button);}
+    for(const action of row.job?.can_resume?["resume"]:row.job&&['queued','running'].includes(row.job.state)?["cancel"]:[]){
+      const button=el("button",action==="resume" ? I18N.term("항목 재개") : I18N.term("항목 취소"));
+      button.disabled=batchBusy;
+      // Capture identifiers before opening the dialog; polling may replace activeBatch.
+      const batchId=batch.id, jobId=row.job_id, rowName=row.id;
+      button.onclick=async()=>{
+        if(batchBusy)return;
+        const cancelTarget=action==="cancel"?JSON.parse(JSON.stringify({...row.job,id:jobId})):null;
+        if(action==="cancel"&&!await confirmCancellation({name:rowName,id:jobId,pendingResume:row.job.state==="queued"&&(row.job.resume||row.job.phase==="resume_validation")}))return;
+        await batchAction("항목 요청 처리 중",async()=>{
+          if(cancelTarget&&!await verifyCancellationTarget(cancelTarget))return;
+          await api("/api/jobs/"+jobId+"/"+action,cancelTarget?{expected_cancel:cancellationExpectation(cancelTarget)}:{additional_budget_seconds:36000},{timeoutMs:30000});
+          if(activeBatch?.id===batchId)renderBatch(await api("/api/batches/"+batchId,undefined,{timeoutMs:15000}));
+        });
+      };
+      status.append(button);
+    }
     line.append(choice,el("td",row.id),el("td",(row.error ? row.error : I18N.term("검토 완료"))),status);
     const result=el("td");if(row.job?.result_available===true&&["complete","failed","partial_failure","cancelled","interrupted","budget_exhausted"].includes(row.job.state)){const partial=row.job.state!=="complete",link=el("a",I18N.term(partial?"부분 결과 열기":"결과 열기"));link.href="/?result="+encodeURIComponent(row.job_id);link.target="_blank";link.rel="noopener";result.append(link);if(partial)result.append(el("p",I18N.term("중단 전 저장된 부분 결과입니다. 전체 분석 완료를 뜻하지 않습니다.")));}else I18N.text(result, "—");line.append(result);body.append(line);
   }
@@ -2591,7 +2712,7 @@ function renderBatch(batch) {
   $("batch-submit").disabled=batchBusy||(Boolean(batch.selected)&&!retryMissing)||!batchSelected.length||batch.rows.some(r=>batchSelected.includes(r.id)&&r.error);
   I18N.text($("batch-submit"), batch.selected ? I18N.term(retryMissing ? "미제출 항목 다시 제출" : "이미 제출된 분석") : I18N.concat([I18N.concat([I18N.term("3. 선택한 "), batchSelected.length]), I18N.term("개 분석 실행")]));
   I18N.text($("batch-next-step"), batch.selected && retryMissing ? I18N.term("일부 항목을 제출하지 못했습니다. 항목별 오류를 확인한 뒤 미제출 항목 다시 제출을 누르세요. 이미 등록된 작업은 같은 작업으로 연결됩니다.") : batch.selected ? I18N.term("4단계 · 계산을 제출했습니다. 완료된 행의 결과 열기를 누르세요. 실행 중 상태는 자동으로 갱신됩니다.") : batch.rows.some(row => row.error) ? I18N.term("2단계 · 검토 오류가 있습니다. 아래 항목별 오류를 확인하고 입력을 수정한 뒤 다시 검토하세요.") : I18N.term("3단계 · 입력 검토 완료, 계산 미제출입니다. 실행할 항목을 확인하고 선택한 분석 실행을 누르세요."));
-  $("batch-cancel").disabled=batchBusy||!batch.rows.some(r=>r.job&&!['complete','failed','cancelled','partial_failure','budget_exhausted','interrupted'].includes(r.job.state));
+  $("batch-cancel").disabled=batchBusy||!batch.rows.some(r=>r.job&&['queued','running'].includes(r.job.state));
 }
 async function refreshBatchHistory(){const data=await api("/api/batches");const node=$("batch-history");node.replaceChildren();for(const batch of data.batches){const button=el("button",I18N.concat([batch.name+" · "+batch.rows.length, I18N.term("개")]));button.onclick=async()=>renderBatch(await api("/api/batches/"+batch.id,undefined,{timeoutMs:15000}));node.append(button);}if(!data.batches.length)I18N.text(node, I18N.term("아직 검토한 배치가 없습니다."));}
 async function batchAction(message, fn) {
@@ -2638,7 +2759,18 @@ function initBatch(){
   $("batch-review").onclick=()=>batchAction("배치 입력을 검토하고 있습니다. 계산은 시작하지 않습니다",async()=>{let payload;if($("batch-format").value==="json")payload=JSON.parse($("batch-content").value);else payload={version:1,mode:$("batch-mode").value,name:$("batch-name").value,targets_fasta:$("batch-content").value,...($("batch-mode").value==="screen"?{vhh_fasta:$("batch-library").value}:{}),...($("batch-mode").value==="mature"?{wt_fasta:$("batch-wt").value}:{}),...($("batch-mode").value==="complex"?{partners_fasta:$("batch-partners").value}:{})};if($("batch-use-config").checked){if(!state.input)throw Error("단일 분석에서 조건을 먼저 검토하세요.");payload.config=state.input.config;}payload.api_consent=$("batch-api-consent").checked;renderBatch(await api("/api/batches/review",payload));$("batch-content").removeAttribute("aria-invalid");await refreshBatchHistory();});
   $("batch-submit").onclick=()=>batchAction("검토한 배치를 제출하고 있습니다",async()=>{if(!activeBatch)throw Error("배치를 먼저 검토하세요.");renderBatch(await api("/api/batches/"+activeBatch.id+"/submit",{review_sha256:activeBatch.review_sha256,selected:activeBatch.selected||batchSelected,...(activeBatch.budget_seconds!==undefined?{budget_seconds:activeBatch.budget_seconds}:{})},{timeoutMs:30000}));});
   $("batch-refresh").onclick=async()=>{try{if(activeBatch)renderBatch(await api("/api/batches/"+activeBatch.id));await refreshBatchHistory();}catch(e){notice(e.message,true);}};
-  $("batch-cancel").onclick=()=>batchAction("미완료 작업 취소 요청 중",async()=>renderBatch(await api("/api/batches/"+activeBatch.id+"/cancel",{},{timeoutMs:30000})));
+  $("batch-cancel").onclick=async()=>{
+    if(batchBusy||!activeBatch)return;
+    const batchId=activeBatch.id, batchName=activeBatch.name, generation=batchCancellationGeneration(activeBatch);
+    const expectedCancel={batch_id:batchId,jobs:activeBatch.rows.filter(row=>row.job&&['queued','running','cancelling'].includes(row.job.state)).map(row=>cancellationExpectation({...row.job,id:row.job_id}))};
+    if(!await confirmCancellation({name:batchName,id:batchId,batch:true}))return;
+    await batchAction("미완료 작업 취소 요청 중",async()=>{
+      const latest=await api("/api/batches/"+batchId,undefined,{timeoutMs:15000});
+      if(latest.id!==batchId||batchCancellationGeneration(latest)!==generation){cancellationChanged();return;}
+      const updated=await api("/api/batches/"+batchId+"/cancel",{expected_cancel:expectedCancel},{timeoutMs:30000});
+      if(activeBatch?.id===batchId)renderBatch(updated);
+    });
+  };
 }
 
 function platformStartup(status, error = "") {

@@ -206,11 +206,32 @@ def execute(workspace: Path, identifier: str) -> int:
         observed = refresh_complex_job({**job, "state": state})
         extra["progress"] = observed["progress"]
         extra["eta"] = observed["eta"]
+    if state in {"cancelled", "budget_exhausted"}:
+        # The worker still holds its RSS and inherited GPU/core reservations.
+        # Persist the outcome, then exit without hashing/registering artifacts.
+        # The queue publishes terminal cancellation only after it observes this
+        # birth-identified worker and all owned commands gone. Its catalog
+        # recovery thread subsequently indexes the preserved partial results.
+        cancelling = store.update(identifier, expected_states={"running", "cancelling"},
+                                  expected_attempt=(job.get("pid"), job.get("process_stamp")),
+                                  state="cancelling", phase="cancelling", error=error,
+                                  exit_code=code, elapsed_seconds=elapsed, can_resume=False,
+                                  budget_exceeded=state == "budget_exhausted",
+                                  catalog_pending=job["kind"] == "analysis" and Path(job["run_dir"]).is_dir(), **extra)
+        from .jobs import write_platform_status
+        write_platform_status(cancelling)
+        print(f"[platform] state=cancelling; process cleanup pending elapsed={elapsed:.1f}s", flush=True)
+        return code
     terminal = store.finish(identifier, state=state, expected_attempt=(job.get("pid"), job.get("process_stamp")), error=error, exit_code=code, finished=time.time(),
                             elapsed_seconds=elapsed, can_resume=job["kind"] == "analysis" and state != "complete", **extra)
     state, code = terminal["state"], terminal.get("exit_code", code)
     from .jobs import write_platform_status
     write_platform_status(terminal)
+    if state in {"cancelling", "cancelled", "budget_exhausted"}:
+        # Cancellation can win the completion transaction after the last read.
+        # Never retain a cancelled worker's reservations for catalog hashing.
+        print(f"[platform] state={state}; process cleanup pending elapsed={elapsed:.1f}s", flush=True)
+        return 130
     if job["kind"] == "analysis" and Path(job["run_dir"]).is_dir():
         try:
             from .result_catalog import ResultCatalog, build_identity

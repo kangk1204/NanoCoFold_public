@@ -44,6 +44,17 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "작업 상태가 바뀌었습니다. 현재 상태를 확인한 뒤 취소를 다시 선택하세요.": "The job status changed. Check the current status and choose cancel again.",
+  "배치의 미완료 분석을 모두 취소할까요?": "Cancel all unfinished analyses in this batch?",
+  "대기 중인 재개를 취소할까요?": "Cancel this queued resume?",
+  "이 작업을 취소할까요?": "Cancel this job?",
+  "이 재개 요청을 취소합니다. 저장된 결과는 보존합니다. 나중에 다시 재개할 수 있으며, 미완료 모델은 다시 계산할 수 있습니다.": "This cancels the queued resume. Saved results are kept. You can resume again later; unfinished models may be recalculated.",
+  "이 배치의 미완료 작업에 취소를 요청합니다. 완료된 작업과 저장된 결과는 보존합니다. 다시 재개할 때 미완료 모델은 다시 계산할 수 있습니다.": "This requests cancellation of unfinished jobs in this batch. Completed jobs and saved results are kept. Unfinished models may be recalculated when you resume.",
+  "이 작업에 취소를 요청합니다. 저장된 결과는 보존합니다. 다시 재개할 때 미완료 모델은 다시 계산할 수 있습니다.": "This requests cancellation of this job. Saved results are kept. Unfinished models may be recalculated when you resume.",
+  "재개 계속 대기": "Keep resume queued",
+  "계속 진행": "Keep running",
+  "재개 요청 취소": "Cancel resume request",
+  "취소 확인창을 열지 못했습니다. 페이지를 새로고침한 뒤 다시 시도하세요.": "The cancellation dialog could not be opened. Refresh the page and try again.",
   "엔진별 추천 목록을 따로 저장했습니다. 통합 발주 목록은 연구자가 서열을 선택한 뒤 작성해야 합니다.": "Recommendations were saved separately for each engine. Compile a combined order list only after a researcher selects the sequences.",
   "관리 설치 기록을 확인할 수 없습니다. 원래 bash install.sh 명령을 다시 실행하세요. / Cannot verify installation; rerun the original bash install.sh command.": "Cannot verify installation; rerun the original bash install.sh command.",
   "관리 설치 위치가 일치하지 않습니다. 기존 파일을 보존하고 bash install.sh 설정을 확인하세요. / Managed installation identity differs; check bash install.sh settings.": "Managed installation identity differs; check bash install.sh settings.",
