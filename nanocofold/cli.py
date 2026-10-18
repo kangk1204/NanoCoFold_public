@@ -194,14 +194,17 @@ def main(argv: list[str] | None = None) -> int:
 def _main(argv: list[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     help_language = "en"
-    if arguments and arguments[0] == "validate-handoff":
-        # argparse processes --help before the ordinary command dispatch. Read
-        # only this command's language option first so explicit Korean help uses
-        # the same language as its diagnostics. The full parser still validates
-        # all options and language choices, preserving its normal error contract.
-        language_probe = argparse.ArgumentParser(add_help=False)
+    command_arguments = arguments[1:]
+    help_arguments = command_arguments[:command_arguments.index("--")] if "--" in command_arguments else command_arguments
+    if arguments and arguments[0] == "validate-handoff" and any(value in {"-h", "--help"} for value in help_arguments):
+        # Probe only help presentation; the full parser owns ordinary validation
+        # and malformed-option diagnostics, including their command-specific usage.
+        language_probe = argparse.ArgumentParser(add_help=False, exit_on_error=False)
         language_probe.add_argument("--lang", default="en")
-        help_language = language_probe.parse_known_args(arguments[1:])[0].lang
+        try:
+            help_language = language_probe.parse_known_args(command_arguments)[0].lang
+        except argparse.ArgumentError:
+            pass
     args = build_parser(handoff_help_language=help_language).parse_args(arguments)
     try:
         if args.command == "init":

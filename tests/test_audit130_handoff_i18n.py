@@ -200,6 +200,30 @@ def test_handoff_help_explains_language_option_in_selected_language(capsys, argu
         assert not re.search('[가-힣]', output)
 
 
+@pytest.mark.parametrize('arguments', [['--lang'], ['--lang', '--help'], ['--lang', '-h']])
+def test_missing_language_value_keeps_full_command_parser_diagnostics(capsys, arguments):
+    with pytest.raises(SystemExit) as error:
+        cli.main(['validate-handoff', *arguments])
+    assert error.value.code == 2
+    captured = capsys.readouterr()
+    assert not captured.out
+    assert captured.err.startswith('usage: nanocofold validate-handoff ')
+    assert 'argument --lang: expected one argument' in captured.err
+    assert 'usage: - ' not in captured.err
+
+
+@pytest.mark.parametrize('help_flag', ['-h', '--help'])
+def test_help_before_missing_language_value_keeps_argparse_order(capsys, help_flag):
+    with pytest.raises(SystemExit) as error:
+        cli.main(['validate-handoff', help_flag, '--lang'])
+    assert error.value.code == 0
+    captured = capsys.readouterr()
+    assert not captured.err
+    assert captured.out.startswith('usage: nanocofold validate-handoff ')
+    assert 'Diagnostic language' in captured.out
+    assert not re.search('[가-힣]', captured.out)
+
+
 def test_candidate_id_containing_diagnostic_delimiters_is_preserved(tmp_path):
     row = _valid_row()
     row['design_id'] = '후보: construct_dna contains non-ACGT bases: B.'
