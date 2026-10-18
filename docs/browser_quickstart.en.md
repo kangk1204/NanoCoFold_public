@@ -26,35 +26,35 @@ Input review checks your sequences and settings. **Run analysis** submits the ca
 
 **0. Check the environment once.** If **Environment ready** is already shown, click **Prepare analysis** without checking again. Otherwise, click **Check environment once** → choose the analysis → **Check environment**. Stay on this page until it passes, then click **Prepare analysis**. The check is reused for the same installation, GPU and engines. Adding engines or changing the installation requires another check.
 
-![Separate environment check, before it has been run](images/quickstart-flow/en/environment.jpg)
+![Separate environment check, before it has been run](images/quickstart-rc9/en/environment.jpg)
 
 **1. Confirm the purpose.** After **Prepare analysis**, **Prepare input** opens with the selected purpose already applied. Continue to step 2. If you started from the purpose-choice screen instead, click **Predict protein complexes · Enter input** as shown below.
 
-![Choose protein complex prediction](images/quickstart-flow/en/01-purpose.jpg)
+![Choose protein complex prediction](images/quickstart-rc9/en/01-purpose.jpg)
 
 **2. Load the public input.** Click **Load public example for this purpose**. The full sequences are filled in automatically. Check **Barnase: 110 aa**, **Barstar: 89 aa**, and **one copy of each**, then click **Review input & continue**.
 
-![Check both full sequences, chain order and copy counts](images/quickstart-flow/en/02-input.jpg)
+![Check both full sequences, chain order and copy counts](images/quickstart-rc9/en/02-input.jpg)
 
 **3. Check the settings.** Keep the small starter preset, **all four engines**, and **four planned models**. This preset uses seed **42**, **one model per engine**, **3 recycles**, and **200 diffusion steps**. Leave advanced settings unchanged for your first run. To use public MSA, give consent to send the current public sequences and click **Review settings & continue**. The screenshot shows consent **before checking the box**.
 
-![Four engines, planned model count and MSA consent](images/quickstart-flow/en/03-settings.jpg)
+![Four engines, planned model count and MSA consent](images/quickstart-rc9/en/03-settings.jpg)
 
 **4. Review before running.** Click **Review input**, read the applied inputs and settings, then click **Run analysis** once. A saved environment check is reused without leaving this page. If it is missing for these engines, click **Go to environment check**, complete the separate check, and click **Prepare analysis** to return to this input. The screenshot illustrates this missing-check state; no prediction was submitted. Input changes require another input review and fresh transmission consent.
 
-![Review inputs and follow the explicit next action](images/quickstart-flow/en/04-review.jpg)
+![Review inputs and follow the explicit next action](images/quickstart-rc9/en/04-review.jpg)
 
 **5. Read the result.** Follow **Jobs & logs → completion → Open results**. Check evaluated, failed and unevaluated counts first, then select a model. The screenshot shows four evaluated models from an earlier four-engine GPU run. **Not applicable** for VHH eligibility is normal for a general protein complex.
 
-![Planned and evaluated model counts in an actual GPU result](images/quickstart-rc5/en/05-results.jpg)
+![Planned and evaluated model counts in an actual GPU result](images/quickstart-rc9/en/05-results.jpg)
 
 **6. Explore and share.** Use **Fit entire structure**, chain selection and PAE cell selection. Read each model's metrics, structure and PAE together. Save the entire **Shareable report ZIP** for collaborators. Recipients extract the whole ZIP and open **report.html** without installing NanoCoFold or using a GPU.
 
-![The selected actual model and its metrics](images/quickstart-rc5/en/06-structure-pae.jpg)
+![The selected actual model and its metrics](images/quickstart-rc9/en/06-structure-pae.jpg)
 
-![The same model's PAE](images/quickstart-rc5/en/07-pae.jpg)
+![The same model's PAE](images/quickstart-rc9/en/07-pae.jpg)
 
-Screenshots 1 and 4 show version 0.4.8rc7, captured on 16 October 2026. The result and purpose-specific settings screenshots are from rc5. Capture dates, conditions and original results are listed in the [capture record](images/quickstart-flow/README.md) and [rc5 record](images/quickstart-rc5/en/README.md).
+All screenshots show the **0.4.8rc9** interface from commit `26925c3`, captured on **18 October 2026**. The result screenshots use the current offline report viewer with the preserved rc5 GPU result; no prediction or scoring was rerun. Both languages show the same Chai-1 model and its 199 × 199 PAE matrix. See the [capture record and file hashes](images/quickstart-rc9/README.md).
 
 ## Settings by purpose
 
@@ -74,21 +74,21 @@ These small counts apply to the loaded public example. The general **Researcher 
 <details>
 <summary>Design new nanobodies: settings screenshot</summary>
 
-![Two design generators and four evaluation engines](images/quickstart-rc5/en/settings-design.jpg)
+![Two design generators and four evaluation engines](images/quickstart-rc9/en/settings-design.jpg)
 
 </details>
 
 <details>
 <summary>Compare existing nanobodies: settings screenshot</summary>
 
-![All input VHH candidates and four evaluation engines](images/quickstart-rc5/en/settings-screen.jpg)
+![All input VHH candidates and four evaluation engines](images/quickstart-rc9/en/settings-screen.jpg)
 
 </details>
 
 <details>
 <summary>Evaluate nanobody variants: settings screenshot</summary>
 
-![Variant cap, WT control and maximum planned models](images/quickstart-rc5/en/settings-mature.jpg)
+![Variant cap, WT control and maximum planned models](images/quickstart-rc9/en/settings-mature.jpg)
 
 </details>
 
@@ -98,7 +98,7 @@ These web starter settings can differ from the preserved CLI conditions in `exam
 
 Choose either a structure file or a PDB ID; use **Change input method** to switch. Paste VHH/WT FASTA or import a file once. The populated FASTA is the actual input. Use **Load another file** or **Restore previous FASTA** to replace or undo an import. After restoring a draft, reselect structure files and reconfirm consent and input review. A matching installation check is reused. If you edit FASTA while a file is loading, the current input is retained and a notice is shown.
 
-In results, select a candidate to inspect its structure. Use **Show detailed metric columns** when needed. **Save selected display coordinates** saves the displayed coordinates; **Download original engine coordinates** is available only when the original is preserved and matches its recorded hash. Preparation and preselection have separate records from prediction failures. Unevaluated values remain missing. Check low-confidence predictions separately from failed calculations. The full original ZIP includes server paths/logs and is intended for personal archiving; share the report ZIP with collaborators.
+In results, select a candidate to inspect its structure. Use **Expand detailed metric columns** when needed. **Save selected display coordinates** saves the displayed coordinates; **Download original engine coordinates** is available only when the original is preserved and matches its recorded hash. Preparation and preselection have separate records from prediction failures. Unevaluated values remain missing. Check low-confidence predictions separately from failed calculations. The full original ZIP includes server paths/logs and is intended for personal archiving; share the report ZIP with collaborators.
 
 ## Read the report in six steps
 

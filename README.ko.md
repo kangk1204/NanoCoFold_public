@@ -205,23 +205,23 @@ python -c "import nanocofold; print(nanocofold.__file__)"
 <details>
 <summary>각 단계 핵심 설정과 한글 스크린샷 보기</summary>
 
-단계별 설정과 한글 화면입니다. 결과에서 완료·실패·미평가 모델 수를 확인하세요.
+단계별 설정과 한글 화면입니다. 모든 그림은 **0.4.8rc9**(`26925c3`) 화면을 **2026년 10월 18일**에 촬영했습니다. 결과에서 완료·실패·미평가 모델 수를 확인하세요. [촬영 기록](docs/images/quickstart-rc9/README.md)
 
 | 단계 | 확인할 핵심 설정 | 저장된 화면 예시 |
 |---|---|---|
-| 환경 확인 · 처음 한 번 | 분석 목적 → 환경 확인 시작 → 분석 준비하기 | [그림 0](docs/images/quickstart-flow/ko/environment.jpg) |
-| 목적 선택 | 단백질 복합체 예측 | [그림 1](docs/images/quickstart-flow/ko/01-purpose.jpg) |
-| 입력 준비 | Barnase 110 aa + Barstar 89 aa, 사본 각 1개 | [그림 2](docs/images/quickstart-flow/ko/02-input.jpg) |
-| 실행 조건 | 작은 시작 설정, 네 엔진, Seed 42, 엔진당 1모델 → 계획 4모델 | [그림 3](docs/images/quickstart-flow/ko/03-settings.jpg) |
-| 검토·실행 | 현재 서열 전송 동의 → 입력 확인 → 환경 기록 재사용 → 분석 실행 한 번 | [그림 4 · 환경 확인이 필요한 경우](docs/images/quickstart-flow/ko/04-review.jpg) |
-| 결과 확인 | 평가 완료·실패·미평가 수 → 후보 선택 → 구조·PAE | [그림 5](docs/images/quickstart-rc5/05-results.jpg) · [구조](docs/images/quickstart-rc5/06-structure-pae.jpg) · [PAE](docs/images/quickstart-rc5/07-pae.jpg) |
+| 환경 확인 · 처음 한 번 | 분석 목적 → 환경 확인 시작 → 분석 준비하기 | [그림 0](docs/images/quickstart-rc9/ko/environment.jpg) |
+| 목적 선택 | 단백질 복합체 예측 | [그림 1](docs/images/quickstart-rc9/ko/01-purpose.jpg) |
+| 입력 준비 | Barnase 110 aa + Barstar 89 aa, 사본 각 1개 | [그림 2](docs/images/quickstart-rc9/ko/02-input.jpg) |
+| 실행 조건 | 작은 시작 설정, 네 엔진, Seed 42, 엔진당 1모델 → 계획 4모델 | [그림 3](docs/images/quickstart-rc9/ko/03-settings.jpg) |
+| 검토·실행 | 현재 서열 전송 동의 → 입력 확인 → 환경 기록 재사용 → 분석 실행 한 번 | [그림 4 · 환경 확인이 필요한 경우](docs/images/quickstart-rc9/ko/04-review.jpg) |
+| 결과 확인 | 평가 완료·실패·미평가 수 → 후보 선택 → 구조·PAE | [그림 5](docs/images/quickstart-rc9/ko/05-results.jpg) · [구조](docs/images/quickstart-rc9/ko/06-structure-pae.jpg) · [PAE](docs/images/quickstart-rc9/ko/07-pae.jpg) |
 
 <details>
 <summary>그림 1–2 · 목적을 고르고 공개 입력 확인하기</summary>
 
-![단계 1: 단백질 복합체 예측 선택](docs/images/quickstart-flow/ko/01-purpose.jpg)
+![단계 1: 단백질 복합체 예측 선택](docs/images/quickstart-rc9/ko/01-purpose.jpg)
 
-![단계 2: 공개 서열 2개와 사본 수 확인](docs/images/quickstart-flow/ko/02-input.jpg)
+![단계 2: 공개 서열 2개와 사본 수 확인](docs/images/quickstart-rc9/ko/02-input.jpg)
 
 </details>
 
@@ -230,18 +230,18 @@ python -c "import nanocofold; print(nanocofold.__file__)"
 
 첫 실행에서는 기본 설정을 사용하세요. 그림 3에서 공개 예제의 서열 전송에 동의한 뒤 다음으로 이동합니다. 그림 4는 환경 확인이 필요한 상태이며, 환경 확인을 마치면 분석을 실행할 수 있습니다.
 
-![단계 3: 네 엔진과 공용 MSA 설정 확인](docs/images/quickstart-flow/ko/03-settings.jpg)
+![단계 3: 네 엔진과 공용 MSA 설정 확인](docs/images/quickstart-rc9/ko/03-settings.jpg)
 
-![단계 4: 입력 확인과 다음 행동 안내](docs/images/quickstart-flow/ko/04-review.jpg)
+![단계 4: 입력 확인과 다음 행동 안내](docs/images/quickstart-rc9/ko/04-review.jpg)
 
 </details>
 
 <details>
 <summary>그림 5 · 실제 GPU 결과에서 무엇을 확인하는지 보기</summary>
 
-rc5에서 실행한 Barnase–Barstar 네 엔진의 결과 예시입니다. 평가된 모델 4개와 각 엔진의 점수를 확인할 수 있습니다.
+rc5에서 계산한 Barnase–Barstar GPU 결과를 rc9 오프라인 보고서 화면으로 연 예시입니다. 평가된 모델 4개와 각 엔진의 점수를 확인할 수 있습니다. 화면을 다시 촬영하면서 예측을 재실행하거나 저장된 데이터를 바꾸지 않았습니다.
 
-![단계 5: 계획과 실제 평가 모델 수 비교](docs/images/quickstart-rc5/05-results.jpg)
+![단계 5: 계획과 실제 평가 모델 수 비교](docs/images/quickstart-rc9/ko/05-results.jpg)
 
 </details>
 
@@ -300,11 +300,11 @@ nanocofold run --mode mature --mock \
 | 실패·취소·중단·시간 소진 | **상세 실행 로그**에서 원인을 확인하고 [6번](#6-작업-확인중단재개)에 따라 이어서 진행합니다. |
 | **결과 열기**가 없거나 저장 실행이 안 보임 | 사용한 작업 공간에서 분석 작업을 선택하고 상태·로그를 확인합니다. |
 
-**상태·모델 수 → 후보·모델 행 선택 → 점수·구조·PAE → 다운로드** 순서로 봅니다. X·Y 선택기로 현재 표시할 비교 지표를 고릅니다. [차트 예시](docs/images/quickstart-flow/ko/charts.jpg) · [보고서 목차](docs/images/quickstart-flow/ko/report-nav.jpg).
+**상태·모델 수 → 후보·모델 행 선택 → 점수·구조·PAE → 다운로드** 순서로 봅니다. X·Y 선택기로 현재 표시할 비교 지표를 고릅니다. [차트 예시](docs/images/quickstart-rc9/ko/charts.jpg) · [보고서 목차](docs/images/quickstart-rc9/ko/report-nav.jpg).
 
 - **전체 구조 보기/맞춤**: 복합체 전체를 봅니다. **표적 선택/나노바디 선택** 또는 **기준 체인 선택/파트너 선택**: 해당 체인을 강조하고 확대합니다. **선택 해제**: 강조를 지웁니다.
 - PAE 히트맵의 셀을 누르면 두 잔기를 선택·확대하고 구조 뷰어로 이동합니다. PAE는 예측한 잔기 사이 상대 위치의 불확실성을 나타냅니다.
-- CSV/XLSX 표, FASTA, 좌표와 **보고서 ZIP**을 저장합니다. Excel에서는 UTF-8 BOM이 포함된 내보내기 CSV 또는 XLSX를 사용하세요. 실행 폴더의 CSV는 기계 처리용 UTF-8 기록입니다. **선택 예측 구조 저장**은 표시 좌표를 저장합니다. **원본 엔진 좌표 다운로드**는 기록된 해시와 일치하는 원본이 보존됐을 때 사용할 수 있습니다. 출처 안내에서 원본과 표시 좌표의 관계를 확인하세요.
+- CSV/XLSX 표, FASTA, 좌표와 **보고서 ZIP**을 저장합니다. Excel에서는 UTF-8 BOM이 포함된 내보내기 CSV 또는 XLSX를 사용하세요. 실행 폴더의 CSV는 기계 처리용 UTF-8 기록입니다. **선택한 표시 좌표 저장**은 표시 좌표를 저장합니다. **원본 엔진 좌표 다운로드**는 기록된 해시와 일치하는 원본이 보존됐을 때 사용할 수 있습니다. 출처 안내에서 원본과 표시 좌표의 관계를 확인하세요.
 
 **전체 원본 ZIP · 로컬 보관용**은 서버 경로와 실행 로그를 포함하므로 개인 복구·보관에 사용합니다. 공동연구자에게는 **전달용 보고서 ZIP** 전체를 전달하세요. 받는 사람은 ZIP 전체를 풀고 `report.html`을 엽니다. macOS·Windows·일반 PC에서도 GPU나 프로그램 설치 없이 저장된 결과를 읽을 수 있습니다.
 

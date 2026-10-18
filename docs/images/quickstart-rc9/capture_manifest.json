@@ -1,0 +1,296 @@
+{
+  "schema_version": 1,
+  "ui_version": "0.4.8rc9",
+  "ui_source_commit": "26925c3311be3deff388aa9ccc473f398bd9ecb9",
+  "capture_date": "2026-10-18",
+  "method": "Native browser JPEG screenshots; full-page or section capture; no image or data editing",
+  "public_examples_only": true,
+  "workers_started": false,
+  "predictions_executed": 0,
+  "remote_msa_requests": 0,
+  "result_preservation": {
+    "source_sha256": "71a81e954c535cde654961629720b623c5a10665ac9699da9ed70f410f36802a",
+    "rendered_sha256": "7c11ea24c1444b854e7a8199a051b4e3083b73103ac9f9de0d223d0528436467",
+    "result_payload_sha256": "38d8ee1c9b1d69de44c602743386f3488ee9f3441a267e16f33a2bd1851ba6af",
+    "result_payload_equal": true,
+    "source_unchanged": true,
+    "predictions_executed": 0,
+    "workers_started": false
+  },
+  "source_files": [
+    {
+      "path": "nanocofold/templates/platform.html",
+      "sha256": "aa0a1c64da16300f1bcb8b49d6e68755c9bacfa7521b17922ce73a683d6af1a4"
+    },
+    {
+      "path": "nanocofold/templates/platform_offline.html",
+      "sha256": "f42ddca8c3fc5f12e05988c05421fd73841598857fa5e2a7a7291aa2dbc9f636"
+    },
+    {
+      "path": "nanocofold/platform/results.py",
+      "sha256": "0a585051db638fbf7dd5cd81a8d2cd98ca32b8ee6fb48b33739c9cd5caffc2ff"
+    }
+  ],
+  "images": [
+    {
+      "path": "en/01-purpose.jpg",
+      "language": "en",
+      "captured_at_utc": "2026-10-18T10:26:33+00:00",
+      "width": 1265,
+      "height": 1204,
+      "bytes": 126653,
+      "sha256": "f79dc7f6df28b1b56b60b220a1a5390e75d646d456e5ae6a689cf6874d4da926",
+      "view": "local_application"
+    },
+    {
+      "path": "en/02-input.jpg",
+      "language": "en",
+      "captured_at_utc": "2026-10-18T10:27:00+00:00",
+      "width": 1265,
+      "height": 1613,
+      "bytes": 155583,
+      "sha256": "29a7cfc55a88025f45b04a7b5c176f963a26e9f0b0d7b64afedaae9e2650c309",
+      "view": "local_application"
+    },
+    {
+      "path": "en/03-settings.jpg",
+      "language": "en",
+      "captured_at_utc": "2026-10-18T10:27:09+00:00",
+      "width": 1265,
+      "height": 1276,
+      "bytes": 144242,
+      "sha256": "6ecc8e11d1eb79e7d4047e0803485138d42c1f1ff88a5368e35044f560d3933f",
+      "view": "local_application"
+    },
+    {
+      "path": "en/04-review.jpg",
+      "language": "en",
+      "captured_at_utc": "2026-10-18T10:27:24+00:00",
+      "width": 1265,
+      "height": 1378,
+      "bytes": 131263,
+      "sha256": "18e5f97dca0df308d724a85f2fd7f3e9896e57668e97d0750ba8fc7ef1a4a96c",
+      "view": "local_application"
+    },
+    {
+      "path": "en/05-results.jpg",
+      "language": "en",
+      "captured_at_utc": "2026-10-18T10:30:05+00:00",
+      "width": 1280,
+      "height": 924,
+      "bytes": 109461,
+      "sha256": "11185a0a5d2fd379c9727275946d27d540b5e578d7819a987d23f857bb0642e2",
+      "view": "offline_report"
+    },
+    {
+      "path": "en/06-structure-pae.jpg",
+      "language": "en",
+      "captured_at_utc": "2026-10-18T10:32:05+00:00",
+      "width": 1280,
+      "height": 1425,
+      "bytes": 162201,
+      "sha256": "64b84fefee82063665b29b59841e26bee97270a5b77e1cfba170eb58ce98a97b",
+      "view": "offline_report"
+    },
+    {
+      "path": "en/07-pae.jpg",
+      "language": "en",
+      "captured_at_utc": "2026-10-18T10:30:07+00:00",
+      "width": 1280,
+      "height": 760,
+      "bytes": 111973,
+      "sha256": "dffe622fcebc8e11cccb5809c9f4eaf5f6d9f2f70185527190d4b5c8d6a00ab6",
+      "view": "offline_report"
+    },
+    {
+      "path": "en/charts.jpg",
+      "language": "en",
+      "captured_at_utc": "2026-10-18T10:30:29+00:00",
+      "width": 1280,
+      "height": 760,
+      "bytes": 112071,
+      "sha256": "a716cd7d47164bd7f74930cc66d5e04aae0be98db48879ef2af07330d9aac27b",
+      "view": "offline_report"
+    },
+    {
+      "path": "en/environment.jpg",
+      "language": "en",
+      "captured_at_utc": "2026-10-18T10:26:43+00:00",
+      "width": 1265,
+      "height": 1012,
+      "bytes": 99407,
+      "sha256": "1cc1332d871a7481dc90b9a4278226bc6d4bf6239cad55010a57c15b73ae207e",
+      "view": "local_application"
+    },
+    {
+      "path": "en/report-nav.jpg",
+      "language": "en",
+      "captured_at_utc": "2026-10-18T10:28:18+00:00",
+      "width": 1265,
+      "height": 712,
+      "bytes": 57458,
+      "sha256": "f4495300f715d281930aa4e05e1f499ca27250451e1eddbb87b0149fa1e7dbad",
+      "view": "offline_report"
+    },
+    {
+      "path": "en/settings-design.jpg",
+      "language": "en",
+      "captured_at_utc": "2026-10-18T10:27:51+00:00",
+      "width": 1265,
+      "height": 1276,
+      "bytes": 145550,
+      "sha256": "9edf2780ae355eebdea3a31dd2c71fc11a2b681f36cbb7600140976773c59438",
+      "view": "local_application"
+    },
+    {
+      "path": "en/settings-mature.jpg",
+      "language": "en",
+      "captured_at_utc": "2026-10-18T10:28:09+00:00",
+      "width": 1265,
+      "height": 1276,
+      "bytes": 147216,
+      "sha256": "00ce4ecedac2cc16ad50ef95402edadac5105ef7b27f32b4b7606dc55cd1261e",
+      "view": "local_application"
+    },
+    {
+      "path": "en/settings-screen.jpg",
+      "language": "en",
+      "captured_at_utc": "2026-10-18T10:27:58+00:00",
+      "width": 1265,
+      "height": 1276,
+      "bytes": 143945,
+      "sha256": "6ac7451b81ad3e79de45c4585a6752f7b176815ac28b31263fea395ddf25246e",
+      "view": "local_application"
+    },
+    {
+      "path": "ko/01-purpose.jpg",
+      "language": "ko",
+      "captured_at_utc": "2026-10-18T10:26:36+00:00",
+      "width": 1265,
+      "height": 1188,
+      "bytes": 104555,
+      "sha256": "8827d62b00c3837fe63abd89b01fe75d3df3da80c980b5563aa8e55fec3c0932",
+      "view": "local_application"
+    },
+    {
+      "path": "ko/02-input.jpg",
+      "language": "ko",
+      "captured_at_utc": "2026-10-18T10:27:01+00:00",
+      "width": 1265,
+      "height": 1613,
+      "bytes": 139656,
+      "sha256": "642a29919a3d2107c89887de19c063757012d95ce1da2f485fb324d4b33ab1d5",
+      "view": "local_application"
+    },
+    {
+      "path": "ko/03-settings.jpg",
+      "language": "ko",
+      "captured_at_utc": "2026-10-18T10:27:08+00:00",
+      "width": 1265,
+      "height": 1276,
+      "bytes": 116002,
+      "sha256": "0cff623239366168025dea8e990b2f8589084f9bb0f833b9106a85dad3f10241",
+      "view": "local_application"
+    },
+    {
+      "path": "ko/04-review.jpg",
+      "language": "ko",
+      "captured_at_utc": "2026-10-18T10:27:26+00:00",
+      "width": 1265,
+      "height": 1378,
+      "bytes": 108573,
+      "sha256": "fc48a40ff20320143a3f5a4bd76586169561ae917f8c4b8f9d6f5e02d6b70b18",
+      "view": "local_application"
+    },
+    {
+      "path": "ko/05-results.jpg",
+      "language": "ko",
+      "captured_at_utc": "2026-10-18T10:30:49+00:00",
+      "width": 1280,
+      "height": 844,
+      "bytes": 82546,
+      "sha256": "4016f630d338e49ee1eebf7b3b5d276daeb2ad96579185067edd2acaa375287d",
+      "view": "offline_report"
+    },
+    {
+      "path": "ko/06-structure-pae.jpg",
+      "language": "ko",
+      "captured_at_utc": "2026-10-18T10:31:05+00:00",
+      "width": 1280,
+      "height": 1395,
+      "bytes": 132596,
+      "sha256": "855848b6118a7448beb0c8937fcade5440f92a900386fe4db65edf02b867b187",
+      "view": "offline_report"
+    },
+    {
+      "path": "ko/07-pae.jpg",
+      "language": "ko",
+      "captured_at_utc": "2026-10-18T10:30:47+00:00",
+      "width": 1280,
+      "height": 734,
+      "bytes": 93878,
+      "sha256": "a002cd3a5875b16cb16bef0ccf5cb371ffccab865990d36d70bfd3356134cb0d",
+      "view": "offline_report"
+    },
+    {
+      "path": "ko/charts.jpg",
+      "language": "ko",
+      "captured_at_utc": "2026-10-18T10:30:33+00:00",
+      "width": 1280,
+      "height": 734,
+      "bytes": 93791,
+      "sha256": "fcc29e1b35ed33e39975ccb7c45cee98e0c95a6c4c4f218ce3716644f0fa7626",
+      "view": "offline_report"
+    },
+    {
+      "path": "ko/environment.jpg",
+      "language": "ko",
+      "captured_at_utc": "2026-10-18T10:26:43+00:00",
+      "width": 1265,
+      "height": 964,
+      "bytes": 76855,
+      "sha256": "c4b4e6921988c85fccff582233c47c316502525235d43c138c9614e199f7a766",
+      "view": "local_application"
+    },
+    {
+      "path": "ko/report-nav.jpg",
+      "language": "ko",
+      "captured_at_utc": "2026-10-18T10:31:25+00:00",
+      "width": 1265,
+      "height": 712,
+      "bytes": 47651,
+      "sha256": "4ac1dab80ca30a4611ed0c2f63742db1f46ce700224e68f595c83746a284821c",
+      "view": "offline_report"
+    },
+    {
+      "path": "ko/settings-design.jpg",
+      "language": "ko",
+      "captured_at_utc": "2026-10-18T10:27:49+00:00",
+      "width": 1265,
+      "height": 1276,
+      "bytes": 117902,
+      "sha256": "074d45a5f8c0c0ff525bdefcff8fc5b53ca2812d1820cbd5ecd32211f3aedfb2",
+      "view": "local_application"
+    },
+    {
+      "path": "ko/settings-mature.jpg",
+      "language": "ko",
+      "captured_at_utc": "2026-10-18T10:28:08+00:00",
+      "width": 1265,
+      "height": 1276,
+      "bytes": 118698,
+      "sha256": "c5238d61988e3c7e9d66dc8a427dc81087f07d52381b6bf31ba7458b0bff2b57",
+      "view": "local_application"
+    },
+    {
+      "path": "ko/settings-screen.jpg",
+      "language": "ko",
+      "captured_at_utc": "2026-10-18T10:28:00+00:00",
+      "width": 1265,
+      "height": 1276,
+      "bytes": 117120,
+      "sha256": "c5768cf146de242d8c93a4c485adf88fcea1240dc29c2ee3b040c24f8d3f7638",
+      "view": "local_application"
+    }
+  ]
+}

@@ -205,23 +205,23 @@ The example uses seed **42** and **one model per engine**, for **four planned mo
 <details>
 <summary>Step-by-step settings and English screenshots</summary>
 
-Use the settings and English screenshots below. Check completed, failed, and unevaluated model counts in the results. Capture versions are listed in the [capture record](docs/images/quickstart-flow/README.md).
+Use the settings and English screenshots below. All screenshots show **0.4.8rc9** (`26925c3`), captured on **18 October 2026**. Check completed, failed, and unevaluated model counts in the results. See the [capture record](docs/images/quickstart-rc9/README.md).
 
 | Step | Key settings to check | Screenshot |
 |---|---|---|
-| Environment · once | Select analysis → Check environment → Prepare analysis | [0](docs/images/quickstart-flow/en/environment.jpg) |
-| Purpose | Predict protein complexes | [1](docs/images/quickstart-flow/en/01-purpose.jpg) |
-| Input | Barnase 110 aa + Barstar 89 aa, one copy of each | [2](docs/images/quickstart-flow/en/02-input.jpg) |
-| Settings | Small starter preset, four engines, seed 42, one model per engine → four planned models | [3](docs/images/quickstart-flow/en/03-settings.jpg) |
-| Review & run | Current-sequence consent → Review input → reuse environment check → Run analysis once | [4 · a check is needed](docs/images/quickstart-flow/en/04-review.jpg) |
-| Results | Completed, failed and unevaluated counts → select a model → structure and PAE | [5](docs/images/quickstart-rc5/en/05-results.jpg) · [structure](docs/images/quickstart-rc5/en/06-structure-pae.jpg) · [PAE](docs/images/quickstart-rc5/en/07-pae.jpg) |
+| Environment · once | Select analysis → Check environment → Prepare analysis | [0](docs/images/quickstart-rc9/en/environment.jpg) |
+| Purpose | Predict protein complexes | [1](docs/images/quickstart-rc9/en/01-purpose.jpg) |
+| Input | Barnase 110 aa + Barstar 89 aa, one copy of each | [2](docs/images/quickstart-rc9/en/02-input.jpg) |
+| Settings | Small starter preset, four engines, seed 42, one model per engine → four planned models | [3](docs/images/quickstart-rc9/en/03-settings.jpg) |
+| Review & run | Current-sequence consent → Review input → reuse environment check → Run analysis once | [4 · a check is needed](docs/images/quickstart-rc9/en/04-review.jpg) |
+| Results | Completed, failed and unevaluated counts → select a model → structure and PAE | [5](docs/images/quickstart-rc9/en/05-results.jpg) · [structure](docs/images/quickstart-rc9/en/06-structure-pae.jpg) · [PAE](docs/images/quickstart-rc9/en/07-pae.jpg) |
 
 <details>
 <summary>Screenshots 1–2: choose a purpose and check the public input</summary>
 
-![Step 1: choose protein complex prediction](docs/images/quickstart-flow/en/01-purpose.jpg)
+![Step 1: choose protein complex prediction](docs/images/quickstart-rc9/en/01-purpose.jpg)
 
-![Step 2: check both full sequences and copy counts](docs/images/quickstart-flow/en/02-input.jpg)
+![Step 2: check both full sequences and copy counts](docs/images/quickstart-rc9/en/02-input.jpg)
 
 </details>
 
@@ -230,18 +230,18 @@ Use the settings and English screenshots below. Check completed, failed, and une
 
 Use the starter settings for the first run. In screenshot 3, confirm transmission consent for the public example before continuing. Screenshot 4 shows a pending environment check; complete it to enable the run button.
 
-![Step 3: four engines and public MSA settings](docs/images/quickstart-flow/en/03-settings.jpg)
+![Step 3: four engines and public MSA settings](docs/images/quickstart-rc9/en/03-settings.jpg)
 
-![Step 4: review inputs and see the next action](docs/images/quickstart-flow/en/04-review.jpg)
+![Step 4: review inputs and see the next action](docs/images/quickstart-rc9/en/04-review.jpg)
 
 </details>
 
 <details>
 <summary>Screenshot 5: inspect an actual saved GPU result</summary>
 
-This rc5 Barnase–Barstar example shows four evaluated models and their engine-specific scores.
+The rc9 offline report viewer shows the preserved rc5 Barnase–Barstar GPU result: four evaluated models and their engine-specific scores. The screenshot refresh did not rerun prediction or change the saved data.
 
-![Step 5: compare planned and evaluated model counts](docs/images/quickstart-rc5/en/05-results.jpg)
+![Step 5: compare planned and evaluated model counts](docs/images/quickstart-rc9/en/05-results.jpg)
 
 </details>
 
@@ -300,7 +300,7 @@ For a short practice run, use `max_variants=3` and `top_n=2` as shown above. The
 | Failed, cancelled, interrupted or budget exhausted | Check **Detailed execution log** for the cause, then continue with [section 6](#6-follow-jobs-cancel-and-resume). |
 | No **Open results** button or no saved run listed | Select the analysis in the workspace used for that run, then check its status and log. |
 
-Then read in this order: **status and counts → candidate/model row → scores, structure and PAE → download**. X/Y selectors compare metrics for the selected view. [Chart example](docs/images/quickstart-flow/en/charts.jpg) · [Report navigation](docs/images/quickstart-flow/en/report-nav.jpg).
+Then read in this order: **status and counts → candidate/model row → scores, structure and PAE → download**. X/Y selectors compare metrics for the selected view. [Chart example](docs/images/quickstart-rc9/en/charts.jpg) · [Report navigation](docs/images/quickstart-rc9/en/report-nav.jpg).
 
 - **Fit entire structure** shows the whole complex. **Select target / Select nanobody**, or **Select reference chain / Select partner**, highlights and focuses the relevant chain. **Clear selection** removes highlighting.
 - Click a PAE cell to select and focus two residues in the structure viewer. PAE shows uncertainty in their predicted relative positions.
