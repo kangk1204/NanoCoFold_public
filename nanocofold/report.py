@@ -640,14 +640,12 @@ def generate_report(
         "scored_csv_available": (run_dir / "03_score/scored_candidates.csv").is_file(),
         "scored_total": scored_total,
         "thresholds": cfg_get(applied_cfg, "score.thresholds", {}) or {},
-        "files": _file_index(run_dir),
+        "file_groups": _file_groups(run_dir, all_scored_rows,
+                                    saved_reader.provenance().get("source_artifacts", []) if saved_reader else []),
         "warnings": list(dict.fromkeys(warnings)),
     }
     # Sanitize only presentation metadata. Original computation receipts,
     # coordinates and encoded scientific payloads remain byte-exact.
-    file_total = len(render_context["files"])
-    render_context["files"] = render_context["files"][:200]
-    render_context["files_omitted"] = max(0, file_total - 200)
     render_context = portable_metadata(render_context, root=run_dir)
     # Trusted packaged presentation code is self-contained. Add it after
     # metadata masking so catalog literals are not mistaken for saved paths.
@@ -974,14 +972,18 @@ def _file_index(run_dir: Path) -> list[dict]:
     entries: list[dict] = []
     if not run_dir.exists():
         return entries
+    root = run_dir.resolve()
     for path in sorted(run_dir.rglob("*")):
         if (path.is_dir() or path.name.endswith(".lock")
                 or path.name.startswith("report") and path.suffix.lower() in {".html", ".zip"}):
             continue
         try:
+            # Listing a copied or preserved run must not inspect external
+            # files through a symlink in its artifact tree.
+            path.resolve().relative_to(root)
             size_bytes = path.stat().st_size
             size_kb = round(size_bytes / 1024.0, 1)
-        except OSError:
+        except (OSError, ValueError, RuntimeError):
             continue
         entries.append({
             "path": str(path.relative_to(run_dir)),
@@ -990,6 +992,56 @@ def _file_index(run_dir: Path) -> list[dict]:
             "kind": path.suffix.lower().lstrip("."),
         })
     return entries
+
+
+def _file_groups(run_dir: Path, rows: list[dict], source_artifacts: list[dict]) -> list[dict]:
+    """Separate referenced results from other files without changing the run.
+
+    The second group is deliberately not called "old": shared inputs and
+    diagnostic files may lack a reference in a legacy result. Candidate IDs
+    or basenames alone cannot establish an artifact's execution provenance.
+    """
+    root = run_dir.resolve()
+    referenced, directories = set(), set()
+    archived = {".history", ".compact", "source_snapshot"}
+
+    def reference(value, *, directory=False):
+        if not isinstance(value, (str, Path)) or not str(value).strip():
+            return
+        try:
+            path = resolve_run_artifact(root, value)
+            if path is None:
+                return
+            relative = path.resolve().relative_to(root)
+            if archived.intersection(relative.parts):
+                return
+            if directory:
+                # Never let a root/stage-level path label unrelated candidates
+                # as current. Individual model folders have at least 2 parts.
+                if len(relative.parts) >= 2 and path.is_dir():
+                    directories.add(relative)
+            elif path.is_file():
+                referenced.add(relative)
+        except (OSError, ValueError, TypeError, RuntimeError):
+            return
+
+    for artifact in source_artifacts:
+        if isinstance(artifact, dict):
+            reference(artifact.get("path"))
+    for row in rows:
+        for key in ("cif_path", "structure_file", "source_table"):
+            reference(row.get(key))
+        reference(row.get("pred_dir"), directory=True)
+
+    grouped = {"referenced": [], "other": []}
+    for entry in _file_index(run_dir):
+        relative = Path(entry["path"])
+        current = not archived.intersection(relative.parts) and (
+            relative in referenced or any(parent in directories for parent in relative.parents))
+        grouped["referenced" if current else "other"].append(entry)
+    return [{"key": key, "label": label, "files": grouped[key][:200],
+             "total": len(grouped[key]), "omitted": max(0, len(grouped[key]) - 200)}
+            for key, label in (("referenced", "현재 결과에서 참조한 파일"), ("other", "추가 보존 파일"))]
 
 
 def escape(value) -> str:

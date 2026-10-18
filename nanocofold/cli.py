@@ -165,8 +165,10 @@ def build_parser() -> argparse.ArgumentParser:
     p_doctor.add_argument("--set", action="append", default=[])
     p_doctor.add_argument("--json", action="store_true", help="Machine-readable diagnostics")
     p_doctor.add_argument("--smoke", action="store_true", help="Run a small real inference using local weights")
-    p_handoff = sub.add_parser("validate-handoff", help="Check sequences, constructs, comparisons and review status before ordering")
-    p_handoff.add_argument("--run", required=True, type=Path)
+    p_handoff = sub.add_parser("validate-handoff", help="Check sequences and reviews before ordering / 주문 전 서열·검토 상태 확인")
+    p_handoff.add_argument("--run", required=True, type=Path, help="Saved run directory / 저장된 실행 폴더")
+    p_handoff.add_argument("--lang", choices=("ko", "en"), default="en",
+                           help="Diagnostic language (default: en) / 안내 언어: ko 또는 en (기본: en)")
     p_license = sub.add_parser("license", help="Print the license manifest or audit installed packages")
     p_license.add_argument("--audit", action="store_true", help="Audit installed package licenses in each environment")
     return parser
@@ -294,7 +296,8 @@ def _main(argv: list[str] | None = None) -> int:
             with ConsoleProgress("실행 환경·GPU·모델 점검"):
                 return cmd_doctor(args)
         if args.command == "validate-handoff":
-            result = handoff.validate_handoff(args.run)
+            from .handoff_i18n import localize_handoff
+            result = localize_handoff(handoff.validate_handoff(args.run), args.lang)
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0 if result["ok"] else 1
         if args.command == "specificity":

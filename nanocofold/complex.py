@@ -99,7 +99,7 @@ def validate_settings(settings):
         if (not isinstance(primary_pair, list) or len(primary_pair) != 2
                 or any(not isinstance(c, str) or len(c) != 1 or not 'A' <= c <= 'Y' for c in primary_pair)
                 or primary_pair[0] == primary_pair[1]):
-            raise ValueError("primary_pair는 서로 다른 분석 체인 ID2개의 목록이어야 합니다.")
+            raise ValueError("primary_pair는 서로 다른 분석 체인 ID 2개의 목록이어야 합니다.")
         result["primary_pair"] = list(primary_pair)
     symmetry = settings.get('reference_symmetry', True)
     if type(symmetry) is not bool:
@@ -116,6 +116,16 @@ def validate_settings(settings):
             raise ValueError("이 복합체의 정확한 서열을 공용 MSA 서버로 전송하는 데 동의하세요.")
         result.update(comparison_engines=list(comparison), msa_source=source, allow_public_msa_server=consent)
     return result
+
+
+def validate_analysis_chains(entries, settings, *, historical=False):
+    """Check selections against canonical analysis IDs after copy expansion."""
+    chain_ids = {entry["id"] for entry in entries}
+    if settings.get("primary_pair") and not set(settings["primary_pair"]) <= chain_ids:
+        raise ValueError("primary_pair가 실제 분석 체인에 없습니다.")
+    anchor = settings.get("anchor_chain", "A")
+    if not historical and (not isinstance(anchor, str) or anchor not in chain_ids):
+        raise ValueError("anchor_chain은 실제 분석 체인 ID여야 합니다.")
 
 
 def pair_summary(pair_metrics, settings):
@@ -485,8 +495,7 @@ def run(cfg, root, state):
         raise ValueError("일반 복합체는 합성 좌표를 생성하지 않습니다. 저장된 예제 결과를 열거나 실제 분석을 실행하세요.")
     entries = proteins(cfg_get(cfg, "complex.proteins"))
     settings = validate_settings(cfg_get(cfg, "complex", {}))
-    if settings.get("primary_pair") and not set(settings['primary_pair']) <= {p['id'] for p in entries}:
-        raise ValueError("primary_pair가 실제 분석 체인에 없습니다.")
+    validate_analysis_chains(entries, cfg_get(cfg, "complex", {}))
     records = {p["id"]: p["sequence"] for p in entries}
     comparison = settings.get("comparison_engines")
     engines = comparison or [settings["engine"]]

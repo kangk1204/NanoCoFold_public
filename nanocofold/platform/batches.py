@@ -175,7 +175,7 @@ class BatchManager:
         # Consent covers this exact manifest, never an earlier single-analysis draft.
         requires_api = any(cfg.get("screen", {}).get("allow_public_msa_server") or cfg.get("complex", {}).get("allow_public_msa_server") for cfg in configs)
         if requires_api and payload.get("api_consent") is not True:
-            raise ValueError("이 배치의 표적과 후보 서열을 외부 MSA 서비스로 보내는 데 동의하세요.")
+            raise ValueError("표적·후보 서열의 외부 MSA 전송에 동의하면 배치 설정에 api_consent: true를 추가한 뒤 다시 검토하세요.")
         batch = {"id": uuid.uuid4().hex, "name": str(payload.get("name", "배치 분석"))[:120], "mode": payload["mode"], "created": time.time(), "manifest_sha256": digest(payload), "rows": [], "predictions_executed": False}
         folder = self.jobs.store.root / "batches" / batch["id"]
         folder.mkdir(parents=True)

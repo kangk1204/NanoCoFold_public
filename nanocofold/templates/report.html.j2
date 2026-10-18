@@ -301,17 +301,20 @@
     </tbody></table></div>{% else %}<p><span data-report-i18n>모델 게이트 기록이 없습니다.</span></p>{% endif %}
   </details>
 
-  <h2 id="report-files"><span data-report-i18n>06 출처·산출물</span></h2><p class="muted"><span data-report-i18n>생성 시점의 보존 파일입니다. 이 보고서와 후속 전달 ZIP, 내부 잠금 파일은 제외하며 최종 파일 크기·해시는 전달 manifest를 확인하세요.</span></p>
-  {% if files_omitted %}<p data-file-list-omitted="{{ files_omitted }}"><span data-report-i18n>파일 목록은 처음 200개만 표시합니다. 나머지</span> {{ files_omitted }}<span data-report-i18n>개는 전체 원본과 manifest에서 확인하세요.</span></p>{% endif %}
+  <h2 id="report-files"><span data-report-i18n>06 출처·산출물</span></h2><p class="muted"><span data-report-i18n>현재 결과의 기록에서 참조한 파일과 추가 보존 파일을 나누어 표시합니다. 추가 보존 파일에는 공통 입력과 이전 실행의 산출물이 포함될 수 있습니다.</span></p>
+  <p class="muted"><span data-report-i18n>파일은 변경하지 않습니다. 이 보고서와 후속 전달 ZIP, 내부 잠금 파일은 목록에서 제외합니다. 전달 파일의 최종 크기·해시는 전달 manifest를 확인하세요.</span></p>
   <p class="muted"><span data-report-i18n>실행 경로:</span> {{ run_dir }} <span data-report-i18n>· 보고서 생성:</span> {{ generated_at }}<span data-report-i18n>. 로컬 MSA와 별도 API 비교 실행은 각 실행의 설정·출처에서 확인하며 이 보고서의 모델 순위에 합산하지 않습니다.</span></p>
   <details><summary><span data-report-i18n>실행 당시 기록과 출처 원문</span></summary><pre>{{ context|tojson(indent=2) }}</pre></details>
   <details id="recorded-engine-provenance"><summary><span data-report-i18n>예측 엔진 버전·가중치·실행 출처</span></summary>
     {% for engine in engine_provenance %}<h3>{{ engine.engine }}</h3><p><span data-report-i18n>버전 출처:</span> {{ engine.version_source }} <span data-report-i18n>· 실행 식별 출처:</span> {{ engine.runtime_source }}</p><pre>{{ engine|tojson(indent=2) }}</pre>{% else %}<p><span data-report-i18n>저장된 엔진 버전·가중치 영수증이 없습니다. 현재 설치 환경으로 과거 실행을 추정하지 않습니다.</span></p>{% endfor %}
   </details>
-  <div class="scroll" tabindex="0" role="region" aria-label="보고서 표" data-report-i18n-attributes="aria-label"><table><caption><span data-report-i18n>보존된 다운로드 파일</span></caption>
-    <tr><th scope="col"><span data-report-i18n>경로</span></th><th scope="col"><span data-report-i18n>크기(KB)</span></th><th scope="col"><span data-report-i18n>형식</span></th></tr>
-    {% for f in files %}<tr><td><code>{{ f.path }}</code></td><td>{{ (f.size_bytes|string ~ ' B') if f.size_bytes < 1024 else (f.size_kb|string ~ ' KB') }}</td><td>{{ f.kind }}</td></tr>{% endfor %}
-  </table></div>
+  {% for group in file_groups %}
+  <div class="scroll" tabindex="0" role="region" aria-label="보고서 표" data-report-i18n-attributes="aria-label"><table data-file-scope="{{ group.key }}"><caption>{{ report_term(group.label) }} ({{ group.total }})</caption>
+    <thead><tr><th scope="col"><span data-report-i18n>경로</span></th><th scope="col"><span data-report-i18n>크기(KB)</span></th><th scope="col"><span data-report-i18n>형식</span></th></tr></thead><tbody>
+    {% for f in group.files %}<tr><td><code>{{ f.path }}</code></td><td>{{ (f.size_bytes|string ~ ' B') if f.size_bytes < 1024 else (f.size_kb|string ~ ' KB') }}</td><td>{{ f.kind }}</td></tr>{% else %}<tr><td colspan="3"><span data-report-i18n>해당 파일이 없습니다.</span></td></tr>{% endfor %}
+  </tbody></table></div>
+  {% if group.omitted %}<p data-file-list-omitted="{{ group.omitted }}"><span data-report-i18n>각 목록은 처음 200개까지 표시합니다. 나머지 파일은 실행 폴더와 전체 원본 ZIP에서 확인하세요.</span></p>{% endif %}
+  {% endfor %}
 
   <footer>
     <span data-report-i18n>NanoCoFold · 상업적 이용 가능 도구만 사용 (LICENSE_MANIFEST.md 참조) · 모든 수치는 예측값이며 실험 검증이 필요합니다.</span>

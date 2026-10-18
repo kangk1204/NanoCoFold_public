@@ -279,13 +279,12 @@ def _validate(cfg: dict, *, historical: bool = False) -> None:
     if not isinstance(mode, str) or mode not in {"complex", "design", "screen", "mature"}:
         raise ValueError(f"run.mode 는 complex|design|screen|mature 중 하나여야 합니다: {mode}")
     if mode == "complex":
-        from .complex import proteins, validate_settings
+        from .complex import proteins, validate_analysis_chains, validate_settings
         complex_config = cfg_get(cfg, "complex", {})
-        checked_settings = validate_settings(complex_config)
+        validate_settings(complex_config)
         if "proteins" in complex_config:
             entries = proteins(complex_config["proteins"], historical=historical)
-            if checked_settings.get("primary_pair") and not set(checked_settings["primary_pair"]) <= {p["id"] for p in entries}:
-                raise ValueError("primary_pair가 실제 분석 체인에 없습니다.")
+            validate_analysis_chains(entries, complex_config, historical=historical)
     if cfg["target"].get("fasta") and cfg["target"].get("sequence"):
         raise ValueError("target.sequence 와 target.fasta 를 동시에 지정할 수 없습니다.")
     if not isinstance(cfg.get("rank", {}).get("require_hotspot", False), bool):
@@ -427,6 +426,9 @@ def _validate_scalar_shapes(cfg, *, historical=False):
     optional = {"run.seed", "screen.opendde.attention_chunk_size"}
     signed = {"mature.prefilter.threshold", "developability.hydrophobic_mean_kd",
               "developability.net_charge_min", "developability.net_charge_max"}
+    # These positive counts have dedicated range messages below; a generic
+    # nonnegative error would incorrectly suggest that zero is accepted.
+    positive_counts = {"design.num_designs", "mature.prefilter.top_n", "rank.final_n"}
     def visit(default, current, prefix=""):
         if not isinstance(current, dict):
             raise ValueError(f"{prefix or '설정'}은 객체여야 합니다.")
@@ -445,7 +447,8 @@ def _validate_scalar_shapes(cfg, *, historical=False):
                 if (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
                         or (type(expected) is int and not float(value).is_integer())):
                     raise ValueError(f"{path}는 유한한 {'정수' if type(expected) is int else '숫자'}여야 합니다.")
-                if value < 0 and path not in signed and not path.startswith("rank.weights."):
+                if (value < 0 and path not in signed and not path.startswith("rank.weights.")
+                        and path not in positive_counts):
                     raise ValueError(f"{path}는 0 이상이어야 합니다.")
             elif not historical and isinstance(expected, str) and value is not None and path != "target.hotspots" and not isinstance(value, str):
                 message = f"{path}는 문자열이어야 합니다."
