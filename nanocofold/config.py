@@ -205,6 +205,9 @@ def _validate(cfg: dict, *, historical: bool = False) -> None:
         screen_engine = cfg_get(cfg, "screen.engine")
         if not isinstance(screen_engine, str) or screen_engine not in {"chai1", "boltz2", "colabfold", "opendde"}:
             raise ValueError("screen.engine은 chai1, boltz2, colabfold, opendde 중 하나여야 합니다.")
+        specificity_engine = cfg_get(cfg, "specificity.engine", "boltz2")
+        if not isinstance(specificity_engine, str) or specificity_engine not in {"boltz2", "chai1"}:
+            raise ValueError("specificity.engine은 boltz2 또는 chai1이어야 합니다.")
         # Keep supported aliases/case handling and deliberately unset template
         # values. Historical reports retain their original metadata verbatim.
         for dotted, allowed, message in (

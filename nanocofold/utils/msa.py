@@ -83,7 +83,7 @@ def ensure_a3m(
         produced[0].rename(target)
         return str(target), warnings
 
-    raise ValueError(f"지원하지 않는 MSA backend: {backend}")
+    raise ValueError(f"지원하지 않는 MSA backend: {backend}. 허용값: cache, mmseqs, colabfold_search, empty.")
 
 
 def _ensure_a3m_mmseqs(
