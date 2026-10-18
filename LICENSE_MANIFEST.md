@@ -5,6 +5,8 @@ NanoCoFold 자체 코드에는 별도 공개 라이선스를 부여하지 않습
 개별 이용 허가는 저장소 소유자에게 문의하세요. 아래 외부 구성 요소에는 각각의
 원래 라이선스가 적용됩니다.
 
+**English:** NanoCoFold itself has no general public software license. Agree the intended research use with the repository owner; the installation instructions do not add a license grant. External libraries, engines, model weights and data retain their separate terms. Their notices, pinned sources and hashes are listed below. Keep the `licenses/` directory and `delivery_manifest.json` when sharing an exported report. See [GitHub's repository licensing guidance](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository) for the distinction between public visibility and a software license.
+
 ## 저장소에 포함된 브라우저 라이브러리
 
 | 구성 요소 | 라이선스 고지 | 배포 파일 |

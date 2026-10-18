@@ -1,5 +1,9 @@
 # 설치와 업데이트
 
+[English](installation.en.md) · **한국어**
+
+전달받은 공개 소스의 커밋·태그와 그 안의 README를 함께 사용하세요. GitHub의 **Latest release**는 현재 `main`보다 이전 버전일 수 있습니다. 버전 문자열만으로 소스 리비전을 식별할 수 없으므로 정확한 커밋 또는 ZIP 다운로드 주소를 설치 기록에 남깁니다.
+
 ## 컴퓨터 준비
 
 - Ubuntu **x86_64**, **glibc 2.34 이상**인 NVIDIA 컴퓨터.
@@ -80,6 +84,7 @@ CPU 화면만 준비하려면 `--profile core`를 사용합니다. core는 GPU �
 | `screen` | antibody, Boltz-2, Chai-1 |
 | `design` | antibody, Boltz-2, Chai-1, RFantibody, BoltzGen |
 | `mature` | antibody, Boltz-2, Chai-1, ESM-2/AntiFold |
+| `boltzgen` | antibody, BoltzGen |
 | `all` | 위의 모든 환경 |
 
 관리자가 이미 기본 패키지를 준비했다면 `--skip-system-packages`로 apt 단계만 건너뛸 수 있습니다. 이 옵션은 Python·curl·빌드 도구를 자동 준비하지 않습니다.

@@ -1318,6 +1318,14 @@ class ResultReader:
                             "runtime_source": "02_comparison/comparison_identity.json" if native_runtime else "not_recorded"})
         return records
 
+    def _fasta(self, rows):
+        """Use the same complete sequence set for API and offline downloads."""
+        if self.config.get("run", {}).get("mode") == "complex":
+            from ..complex import proteins
+            entries = proteins(self.config["complex"]["proteins"], historical=True)
+            return "".join(f">{p['id']} {' '.join(p['name'].split())} original_positions={','.join(map(str, p['original_positions']))}\n{p['sequence']}\n" for p in entries)
+        return "".join(f">{row['candidate_id']}\n{row['sequence']}\n" for row in rows if row.get("sequence"))
+
     def export_to_file(self, format: str, filters: dict | None = None):
         """Spool a full archive for HTTP delivery; caller removes the temp file.
 
@@ -1373,12 +1381,7 @@ class ResultReader:
         if format == "csv":
             return csv_bytes(), "text/csv; charset=utf-8", "candidates.csv"
         if format == "fasta":
-            content = "".join(f">{row['candidate_id']}\n{row['sequence']}\n" for row in rows if row.get("sequence"))
-            if self.config.get("run", {}).get("mode") == "complex":
-                from ..complex import proteins
-                entries = proteins(self.config["complex"]["proteins"], historical=True)
-                content = "".join(f">{p['id']} {' '.join(p['name'].split())} original_positions={','.join(map(str,p['original_positions']))}\n{p['sequence']}\n" for p in entries)
-            return content.encode(), "text/plain; charset=utf-8", "candidates.fasta"
+            return self._fasta(rows).encode(), "text/plain; charset=utf-8", "candidates.fasta"
         if format == "xlsx":
             from openpyxl import Workbook
             book = Workbook()
@@ -1440,8 +1443,18 @@ class ResultReader:
                 structures.append(_pack_offline_pae(self.structure(observation["candidate_id"], observation["observation_id"]), pae_arrays))
             except (OSError, ValueError, KeyError) as exc:
                 self.issues.append(f"{observation['observation_id']}: {exc}")
+        # Complex model rows contain scores, not the input protein sequences.
+        # Expand copies and analyzed ranges once with the same authoritative
+        # serializer used by API FASTA and the shareable ZIP.
+        try:
+            sequences_fasta = self._fasta(all_table["rows"])
+        except (KeyError, TypeError, ValueError):
+            # A historical/malformed config must not prevent viewing saved
+            # scores and structures, or fabricate an empty sequence download.
+            sequences_fasta = None
         from ..utils.presentation import portable_metadata
         return portable_metadata({"summary": self.summary(delivery_artifact=delivery_artifact, report_artifact=report_artifact), "candidates": all_table, "observations": observations,
+                                  "sequences_fasta": sequences_fasta,
                                   "structures": structures, "pae_arrays": pae_arrays,
                                   "filters": filters, "provenance": provenance}, root=self.root)
 
@@ -1524,13 +1537,7 @@ class ResultReader:
         writer.writerows([{key: csv_cell(json.dumps(native(value), ensure_ascii=False, allow_nan=False) if isinstance(value, (dict, list)) else value)
                           for key, value in row.items()} for row in all_table["rows"]])
         files["candidates.csv"] = ("\ufeff" + stream.getvalue()).encode()
-        if self.config.get("run", {}).get("mode") == "complex":
-            from ..complex import proteins
-            entries = proteins(self.config["complex"]["proteins"], historical=True)
-            fasta = "".join(f">{p['id']} {' '.join(p['name'].split())} original_positions={','.join(map(str, p['original_positions']))}\n{p['sequence']}\n" for p in entries)
-        else:
-            fasta = "".join(f">{row['candidate_id']}\n{row['sequence']}\n" for row in all_table["rows"] if row.get("sequence"))
-        files["sequences.fasta"] = fasta.encode()
+        files["sequences.fasta"] = self._fasta(all_table["rows"]).encode()
         retained_note = ("핵심 보관본입니다. 서열·지표·모든 최종 구조를 유지하며, PAE 배열·MSA·중간 파일은 용량 정리로 삭제됐습니다.\n"
                          "이 상세 자료가 필요하면 별도 새 분석에서 전체 계산을 다시 실행하세요. 원래 미평가와 삭제된 자료는 구분합니다.\n") if self.retained else ""
         viewer_features = "표 정렬, MolStar 구조 탐색과 선택 예측 구조 저장" if self.retained else "표 정렬, MolStar 구조 탐색, PAE와 선택 예측 구조 저장"

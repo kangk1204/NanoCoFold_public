@@ -155,7 +155,7 @@ def test_batch_partial_submission_retry_preserves_review_selection_and_budget(ex
         expect(page.locator('#batch-submit')).to_have_text('미제출 항목 다시 제출')
         expect(page.locator('#batch-submit')).to_be_enabled()
         expect(page.locator('#batch-rows')).to_contain_text('부분 결과 열기')
-        expect(page.locator('#batch-rows')).to_contain_text('전체 분석 완료를 뜻하지 않습니다')
+        expect(page.locator('#batch-rows')).to_contain_text('중단 전까지 저장된 부분 결과입니다. 완료·미완료 항목을 확인하세요.')
         page.locator('#batch-submit').click()
         expect(page.locator('#batch-submit')).to_be_disabled()
         assert submissions == [{'review_sha256': 'unchanged-review', 'selected': ['one', 'two'], 'budget_seconds': 120}]

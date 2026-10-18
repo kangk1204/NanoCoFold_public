@@ -225,7 +225,7 @@ def test_shared_explorer_summaries_raw_values_locale_empty_and_selection(tmp_pat
         page.locator('#engine-filter').select_option('chai1')
         expect(page.locator('#scatter-summary')).to_contain_text('No evaluated values')
         assert page.locator('#scatter').bounding_box()['height'] <= 170
-        expect(page.locator('#distribution-summary')).to_contain_text('no candidate is selected')
+        expect(page.locator('#distribution-summary')).to_contain_text('Select a candidate in the table to view its observation distribution.')
         page.locator('#candidate-table tbody button').first.click()
         expect(page.locator('#distribution-summary')).to_contain_text('has not been evaluated')
         assert page.evaluate("mockZeroSelectionNotice({mock:false,selected_total:0,config:{run:{mock:true}}},[]) === null")

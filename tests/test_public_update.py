@@ -14,6 +14,34 @@ from start_server import start
 from nanocofold.platform.maintenance import maintenance_lock
 
 
+@pytest.mark.parametrize("arguments, expected", [
+    (["--help"], 0), (["-h"], 0), (["--dry-run"], 2),
+    (["--workspace", "elsewhere"], 2), (["--help", "unexpected"], 2),
+])
+def test_update_shell_help_and_unknown_arguments_never_enter_updater(tmp_path, arguments, expected):
+    """Exercise the real wrapper with a harmless mutation sentinel as updater."""
+    script = tmp_path / "update.sh"
+    script.write_bytes((ROOT / "update.sh").read_bytes())
+    backend = tmp_path / "scripts/update_runtime.py"
+    backend.parent.mkdir()
+    backend.write_text("from pathlib import Path\nPath(__file__).with_suffix('.called').write_text('entered')\n")
+    before = {path.relative_to(tmp_path): path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
+    completed = subprocess.run(["bash", str(script), *arguments], capture_output=True, text=True, timeout=10)
+    assert completed.returncode == expected
+    assert "Usage: bash update.sh" in completed.stdout + completed.stderr
+    assert {path.relative_to(tmp_path): path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()} == before
+
+
+def test_update_shell_without_arguments_still_invokes_updater(tmp_path):
+    script = tmp_path / "update.sh"
+    script.write_bytes((ROOT / "update.sh").read_bytes())
+    backend = tmp_path / "scripts/update_runtime.py"
+    backend.parent.mkdir()
+    backend.write_text("import sys\nprint('updater called')\nsys.exit(37)\n")
+    completed = subprocess.run(["bash", str(script)], capture_output=True, text=True, timeout=10)
+    assert completed.returncode == 37 and completed.stdout.strip() == "updater called"
+
+
 @pytest.fixture
 def installed_workspace(tmp_path):
     repo = tmp_path / "repo"

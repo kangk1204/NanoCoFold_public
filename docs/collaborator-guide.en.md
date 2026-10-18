@@ -36,7 +36,7 @@ Depending on the settings, you can add CDR substitution candidates or use ESM/An
 
 ## 1. Download the software
 
-On GitHub, click **Code → Download ZIP** and extract the entire archive. Open the folder containing `README.md`, `install.sh`, and `start.sh`, then open a terminal inside that folder.
+Use the [public repository](https://github.com/kangk1204/NanoCoFold_public) at the commit or tag shared with you. GitHub’s **Latest release** may contain an older build than `main`. On the chosen source page, click **Code → Download ZIP** and extract the entire archive. Open the folder containing `README.md`, `install.sh`, and `start.sh`, then open a terminal inside that folder.
 
 Install on Ubuntu x86_64 with an NVIDIA GPU. The first four-engine example requires at least 16 GB GPU memory, 32 GB RAM, and 150 GiB free SSD space. Check the operating system and driver requirements in the [README](../README.md#1-prepare-and-install). On Windows or macOS, connect to an installed server or open a report someone sent you.
 
@@ -110,6 +110,30 @@ GitHub's **Download ZIP** contains the source for installation. The sample ZIPs 
 | Complex sample ZIP | Open `START_HERE.html` to read the mock-run refusal record |
 | Shareable report ZIP downloaded after analysis | `report.html` |
 
-The supplied samples are CPU/mock examples. Use **Language** at the top of the report to switch between English and Korean. Keep the extracted folder structure intact, including the files alongside the report. Saved reports also open in web browsers on Windows and macOS.
+If you received the separately supplied sample archives described above, those archives are CPU/mock examples. No precomputed result ZIP is included in the GitHub source download. Other reports may contain real GPU results; check each report’s recorded execution mode and provenance. Use **Language** at the top of the report to switch between English and Korean. Keep the extracted folder structure intact, including the files alongside the report. Saved reports also open in web browsers on Windows and macOS.
 
 To share your own analysis, download **Shareable report ZIP** and send the entire archive. You can also save tables as CSV/XLSX, sequences as FASTA, and structures as coordinate files.
+
+The **Shareable report ZIP** retains all stored candidates and sequences, including failed and unevaluated rows, and available structures/PAE. Filtering the table does not reduce the shared contents. Check the full contents before sending confidential research results. MSA, execution logs, model weights and intermediate files are omitted; keep **Full original ZIP · For local archiving** separately if you need to rerun or audit the calculation. Keep `delivery_manifest.json` with the extracted report so its recorded hashes and provenance remain available.
+
+Offline 3D viewing requires WebGL in a current Chrome, Edge or Firefox browser. A retained/minimal archive can intentionally omit PAE arrays; check the report's retention and capability notices if a view is unavailable.
+
+## 6. Record the handoff
+
+Send the exact public GitHub commit or tag together with the instructions. A version such as `0.4.8rc9` can cover several source revisions. For a Git checkout, record its full commit before installation:
+
+```bash
+git rev-parse HEAD
+```
+
+For a source ZIP, retain the commit/tag download URL and the archive. After installing the public package, record the installed version from the original source folder:
+
+```bash
+.nanocofold/workspace/.venv-dev/bin/nanocofold --version
+```
+
+If you chose a custom workspace, replace `.nanocofold/workspace` with the `workspace` path in `.nanocofold/install-location.json`. A source checkout's `python -m nanocofold --version` can differ from the installed command. Keep the job ID, input/configuration and execution mode with the report; its recorded computation version and rendering version can also differ after an update.
+
+An environment-check pass confirms readiness for the checked configuration. A CPU/mock result tests the software workflow. Neither demonstrates successful GPU prediction or binding. Interpret scores within the same engine, chain pair and conditions; missing/unevaluated values are not negative binding results. Confirm binding, affinity/KD, expression and specificity experimentally. See [statistical interpretation](STATISTICAL_INTERPRETATION.md).
+
+NanoCoFold does not grant a general public software license. Agree the intended research use with the owner and retain the [external component notices](../LICENSE_MANIFEST.md); a repository link or installation instruction does not expand those permissions. A hosted Site or private compute server also needs its own access from the administrator.

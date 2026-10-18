@@ -4,6 +4,8 @@
 
 **Build: 0.4.8rc9**
 
+**Source version:** this README describes the source build above. GitHub’s **Latest release** may be older than `main`; install the commit or tag shared with you and keep its own README. [Record the source and installed versions](docs/collaborator-guide.en.md#6-record-the-handoff).
+
 Predict protein complexes, design new nanobodies, and compare existing candidates or variants. Explore candidate tables, 3D structures, PAE, and shareable HTML reports.
 
 **Start with the public example below.** It loads the sequences and a small starter preset.
@@ -73,7 +75,7 @@ bash install.sh --profile opendde --gpu GPU-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
 The first installation downloads engines and model files. Follow the terminal log until installation completes. If interrupted, rerun the same command in the same folder to continue from the saved downloads and installation records.
 
-For installation errors and retry instructions, see the terminal message and [installation troubleshooting](docs/installation.md).
+For installation errors and retry instructions, see the terminal message and [installation troubleshooting](docs/installation.en.md).
 
 For nanobody design, candidate comparison, and variant evaluation, install all environments with the command below. `bash install.sh` without options also selects `all`.
 
@@ -83,7 +85,7 @@ bash install.sh --profile all
 
 On a multi-GPU host, add the same `--gpu` UUID to this optional installation. The [validation record](docs/VALIDATION.md) distinguishes installation, software checks, and actual prediction evidence.
 
-For `Driver/library version mismatch`, ask the server administrator to check the driver. Retry installation when `nvidia-smi` works. See [installation troubleshooting](docs/installation.md).
+For `Driver/library version mismatch`, ask the server administrator to check the driver. Retry installation when `nvidia-smi` works. See [installation troubleshooting](docs/installation.en.md).
 
 </details>
 
@@ -305,6 +307,8 @@ Then read in this order: **status and counts → candidate/model row → scores,
 - Save CSV / XLSX tables, FASTA, coordinates, and the **report ZIP**. For Excel, use the exported CSV (UTF-8 BOM) or XLSX; run-folder CSVs are UTF-8 machine records. **Save selected display coordinates** saves the coordinates shown in the viewer. **Download original engine coordinates** is available when the original file is preserved and matches its recorded hash. Check the provenance notice for the relationship between original and display coordinates.
 
 The **Full original ZIP · For local archiving** includes server paths and execution logs and is for personal recovery / archiving. Send collaborators the entire **Shareable report ZIP**. Recipients extract the whole ZIP and open **`report.html`**. Saved results can be read on macOS, Windows, or other PCs without a GPU or program installation. Newly generated interactive reports also include the English / Korean selector.
+
+**The shareable ZIP contains all stored candidates, sequences and available structures/PAE, including failed or unevaluated records. Display filters do not restrict its contents.** Check that the whole analysis is appropriate for the recipient. It omits MSA, logs, weights and intermediate files; retain the full native archive separately for reruns. Offline 3D viewing needs WebGL in a current Chrome, Edge or Firefox browser.
 
 ### Read the report in six steps
 

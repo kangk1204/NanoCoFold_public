@@ -67,7 +67,7 @@ test('interrupted batch rows expose saved partial output with its limitation',()
  function all(n){return [n,...n.children.flatMap(all)];}
  const nodes=all(f.$('batch-rows'));
  assert.ok(nodes.some(n=>n.tag==='a'&&n.textContent==='부분 결과 열기'&&n.href==='/?result=job-one'));
- assert.ok(nodes.some(n=>n.textContent.includes('전체 분석 완료를 뜻하지 않습니다')));
+ assert.ok(nodes.some(n=>n.textContent.includes('중단 전까지 저장된 부분 결과입니다. 완료·미완료 항목을 확인하세요.')));
 });
 
 for(const [returned,caption] of [['complete','이미 종료'],['cancelled','작업이 취소되었습니다']]) {

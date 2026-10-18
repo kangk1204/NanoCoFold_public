@@ -44,17 +44,25 @@ def _conditions_status(records: pd.DataFrame, expected: str | None) -> str:
 
 def observation_metrics_complete(record: dict) -> bool:
     """Undefined interface values are valid only for an observed zero-contact pose."""
-    def finite(value):
+    def valid(key):
+        return math.isfinite(score_complex.quality_metric_value(key, record.get(key)))
+
+    def missing(value):
+        # A no-contact pose may have undefined interface metrics, but it does
+        # not license negative PAE, out-of-range confidence, or corrupt text.
+        if value is None or value is pd.NA:
+            return True
         try:
-            return value is not None and not isinstance(value, bool) and math.isfinite(float(value))
+            return math.isnan(float(value))
         except (TypeError, ValueError, OverflowError):
             return False
-    if not all(finite(record.get(key)) for key in REQUIRED_METRICS):
+
+    if not all(valid(key) for key in REQUIRED_METRICS):
         return False
-    if all(finite(record.get(key)) for key in ("interface_plddt", "interface_pae")):
+    if all(valid(key) for key in ("interface_plddt", "interface_pae")):
         return True
-    contacts = record.get("n_contacts")
-    return finite(contacts) and float(contacts) == 0
+    return (score_complex.quality_metric_value("n_contacts", record.get("n_contacts")) == 0
+            and all(valid(key) or missing(record.get(key)) for key in ("interface_plddt", "interface_pae")))
 
 
 def _position(value, name: str) -> int:

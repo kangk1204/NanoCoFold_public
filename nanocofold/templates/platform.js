@@ -2435,17 +2435,13 @@ async function exportResult() {
   const format = $("export-format").value;
   if (offline) {
     const data = window.NANOCOFOLD_OFFLINE;
+    if (format === "fasta" && data.summary.mode === "complex" && typeof data.sequences_fasta !== "string")
+      throw Error("저장된 복합체 서열을 확인할 수 없습니다. 전달용 ZIP의 sequences.fasta 또는 원본 설정을 확인하세요.");
     const blob =
       format === "fasta"
-        ? new Blob(
-            [
-              state.rows
-                .filter((r) => r.sequence)
-                .map((r) => `>${r.candidate_id}\n${r.sequence}\n`)
-                .join(""),
-            ],
-            { type: "text/plain" },
-          )
+        ? new Blob([data.sequences_fasta ?? state.rows.filter(r => r.sequence)
+            .map(r => `>${r.candidate_id}\n${r.sequence}\n`).join("")],
+            { type: "text/plain;charset=utf-8" })
         : new Blob([JSON.stringify({ ...data, filters: filters(), provenance: {
             ...data.provenance, filters: filters(), filtered_ids: state.filtered.map(r => r.candidate_id),
           } }, null, 2)], {

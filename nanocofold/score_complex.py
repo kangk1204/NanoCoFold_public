@@ -861,24 +861,41 @@ def score_complex(
     return metrics
 
 
+def quality_metric_value(key: str, raw) -> float:
+    """Read a quality-gate measurement without accepting impossible values.
+
+    Saved observations may be reanalysed independently of native parsers. Keep
+    their original values intact, but never let an invalid range or a boolean
+    count become positive evidence at a quality threshold.
+    """
+    if isinstance(raw, (bool, np.bool_)):
+        return float("nan")
+    try:
+        number = float(raw)
+    except (TypeError, ValueError, OverflowError):
+        return float("nan")
+    if not math.isfinite(number) or number < 0:
+        return float("nan")
+    upper = {"ipsae": 1.0, "iptm": 1.0, "hotspot_contact_frac": 1.0,
+             "interface_plddt": 100.0}.get(key)
+    if upper is not None and number > upper:
+        return float("nan")
+    if key in {"n_contacts", "n_clashes"} and not number.is_integer():
+        return float("nan")
+    return number
+
+
 def pass_flags(metrics: dict, cfg: dict) -> dict:
     thresholds = cfg.get("score", {}).get("thresholds", {})
 
-    def value(key, default=float("nan")):
-        raw = metrics.get(key, default)
-        if isinstance(raw, (bool, np.bool_)):
-            return float("nan")
-        try:
-            number = float(raw)
-            return number if math.isfinite(number) else float("nan")
-        except (TypeError, ValueError):
-            return float("nan")
+    def value(key):
+        return quality_metric_value(key, metrics.get(key))
 
     raw_hotspot = metrics.get("hotspot_contact_frac")
     try:
         hotspot_missing = raw_hotspot is None or (
             not isinstance(raw_hotspot, (bool, np.bool_)) and math.isnan(float(raw_hotspot)))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         hotspot_missing = False
     hotspot_optional = (hotspot_missing and
                         metrics.get("n_hotspots_requested", metrics.get("n_hotspots", 0)) == 0)

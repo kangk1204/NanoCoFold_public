@@ -2448,7 +2448,7 @@ def _audit_licenses() -> int:
             rows.append(row)
     if not rows:
         print("[audit] 수집된 라이선스 정보가 없습니다. 설치 방법:")
-        print("  uv pip install --python envs/<env>/bin/python piplicenses")
+        print("  uv pip install --python envs/<env>/bin/python pip-licenses")
         return 0
     out_path = PROJECT_ROOT / "license_audit.csv"
     fieldnames = ["env"] + [key for key in rows[0] if key != "env"]
