@@ -374,7 +374,7 @@ class JobStore:
                                (job["state"], job["updated"], json.dumps(job), int(bool(job.get("descendants"))), identifier))
         return job
 
-    def finish(self, identifier: str, *, state: str, expected_attempt=None, expected_history_length=None, **changes) -> dict:
+    def finish(self, identifier: str, *, state: str, expected_attempt=None, expected_history_length=None, launch_failure=False, **changes) -> dict:
         """Finish only the current running attempt; a persisted cancel wins.
 
         The worker's last read and the HTTP cancellation request are independent
@@ -404,9 +404,15 @@ class JobStore:
                     # Only the supervisor observing actual worker exit may
                     # publish cancellation and release the next attempt.
                     return job
-                state = "budget_exhausted" if job.get("budget_exceeded") else "cancelled"
-                changes.update(exit_code=130, can_resume=job["kind"] == "analysis",
-                               error="실행 시간 한도에 도달했습니다." if state == "budget_exhausted" else "사용자가 작업을 취소했습니다.")
+                # Failed registration uses SIGTERM to reap the owned worker,
+                # which records "cancelling" even without a user request. Decide
+                # the cause under this same transaction: an actual concurrent
+                # cancellation or budget limit must still win over launch failure.
+                if not (launch_failure and state == "failed" and not job.get("cancel_requested")
+                        and not job.get("budget_exceeded")):
+                    state = "budget_exhausted" if job.get("budget_exceeded") else "cancelled"
+                    changes.update(exit_code=130, can_resume=job["kind"] == "analysis",
+                                   error="실행 시간 한도에 도달했습니다." if state == "budget_exhausted" else "사용자가 작업을 취소했습니다.")
             if job.get("kind") == "analysis" and job.get("run_dir") and not job.get("reused_result_id"):
                 # Commit recovery intent with the terminal state. SIGKILL during
                 # subsequent artifact hashing cannot lose the result from the index.
@@ -847,7 +853,7 @@ class JobManager:
                                              state="failed", phase="launch_failed", error=message,
                                              finished=time.time(), can_resume=job["kind"] == "analysis")
             else:
-                terminal = self.store.finish(job["id"], state="failed", expected_history_length=generation, expected_attempt=(current.get("pid"), current.get("process_stamp")),
+                terminal = self.store.finish(job["id"], state="failed", launch_failure=True, expected_history_length=generation, expected_attempt=(current.get("pid"), current.get("process_stamp")),
                                              error=message, finished=time.time(), can_resume=job["kind"] == "analysis")
             write_platform_status(terminal)
             return False

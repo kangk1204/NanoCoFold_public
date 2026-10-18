@@ -87,7 +87,7 @@
     "nanocofold/platform/errors.py": "6bd076245bdd1ff93b949fea173261c88b78c1bd680b05f211de7b41e099c247",
     "nanocofold/platform/eta.py": "79a4e92d4afe7ecad5087caee0ccaade70c82c5d2c44dd8b9c9ad15f877375b2",
     "nanocofold/platform/inputs.py": "888b4789c861a47abc290366f2c2c6f4cd2bc037f5dbd44926e5cad58603e166",
-    "nanocofold/platform/jobs.py": "82f1e328f60a57938fd6a74ba31900055675e40d960b64c178d66c0c174e9e1f",
+    "nanocofold/platform/jobs.py": "753813f9c08e9b2e42e50b4c2c7cb17ac880ca9b1bda4072ee67d2ce5f2a9d96",
     "nanocofold/platform/maintenance.py": "86d0fc93c2eca4b45ac7b440a6f144907cbe347ea31b1d85656c5b513b56c291",
     "nanocofold/platform/paths.py": "e0cf72a8fde54380b3016925bcf75a03acd44caed76885ffaabab7470f8660c0",
     "nanocofold/platform/regions.py": "23409fe174f211e332b9350dee02872eeb595d0954dedb34bd135531ec1a45a8",
