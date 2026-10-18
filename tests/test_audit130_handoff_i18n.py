@@ -180,13 +180,24 @@ def test_unrecognized_external_diagnostics_and_user_values_are_not_rewritten():
     assert localize_handoff(result, 'ko') == result
 
 
-def test_handoff_help_explains_language_option_in_both_languages(capsys):
+@pytest.mark.parametrize('arguments,language', [
+    ([], 'en'), (['--lang', 'en'], 'en'), (['--lang=en'], 'en'),
+    (['--lang', 'ko'], 'ko'), (['--lang=ko'], 'ko'),
+])
+def test_handoff_help_explains_language_option_in_selected_language(capsys, arguments, language):
     with pytest.raises(SystemExit) as error:
-        cli.main(['validate-handoff', '--help'])
+        cli.main(['validate-handoff', *arguments, '--help'])
     assert error.value.code == 0
-    output = capsys.readouterr().out
-    assert '--lang {ko,en}' in output
-    assert 'Diagnostic language' in output and '안내 언어' in output
+    captured = capsys.readouterr()
+    assert not captured.err
+    output = captured.out
+    assert '--lang {ko,en}' in output and '--run RUN' in output
+    if language == 'ko':
+        assert '안내 언어' in output and '저장된 실행 폴더' in output
+        assert 'Diagnostic language' not in output
+    else:
+        assert 'Diagnostic language' in output and 'Saved run directory' in output
+        assert not re.search('[가-힣]', output)
 
 
 def test_candidate_id_containing_diagnostic_delimiters_is_preserved(tmp_path):

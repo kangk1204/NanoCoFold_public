@@ -199,9 +199,10 @@ def test_region_csv_escapes_formula_without_changing_original(tmp_path):
 
 def test_cli_help_is_english_and_wizard_has_distinct_port():
     parser = cli.build_parser()
-    texts = [parser.description]
+    texts = [parser.description, parser.format_help()]
     actions = parser._subparsers._group_actions[0].choices
     for sub in actions.values():
+        texts.append(sub.format_help())
         texts.extend(action.help or '' for action in sub._actions)
     assert not any('\uac00' <= char <= '\ud7a3' for text in texts for char in text)
     assert parser.parse_args(['wizard']).port == 8766

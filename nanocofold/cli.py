@@ -67,7 +67,7 @@ def _fresh_computation_origin(run_dir: Path, state: RunState, args, new: bool, h
     return None
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser(*, handoff_help_language: str = "en") -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="nanocofold",
         description="Target and binding-site nanobody design, screening and maturation pipeline (commercially compatible licenses only)",
@@ -165,10 +165,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_doctor.add_argument("--set", action="append", default=[])
     p_doctor.add_argument("--json", action="store_true", help="Machine-readable diagnostics")
     p_doctor.add_argument("--smoke", action="store_true", help="Run a small real inference using local weights")
-    p_handoff = sub.add_parser("validate-handoff", help="Check sequences and reviews before ordering / 주문 전 서열·검토 상태 확인")
-    p_handoff.add_argument("--run", required=True, type=Path, help="Saved run directory / 저장된 실행 폴더")
+    korean_handoff_help = handoff_help_language == "ko"
+    p_handoff = sub.add_parser("validate-handoff", help=("주문 전 서열·검토 상태 확인" if korean_handoff_help else "Check sequences and reviews before ordering"))
+    p_handoff.add_argument("--run", required=True, type=Path,
+                          help="저장된 실행 폴더" if korean_handoff_help else "Saved run directory")
     p_handoff.add_argument("--lang", choices=("ko", "en"), default="en",
-                           help="Diagnostic language (default: en) / 안내 언어: ko 또는 en (기본: en)")
+                           help="안내 언어: ko 또는 en (기본: en)" if korean_handoff_help else "Diagnostic language (default: en)")
     p_license = sub.add_parser("license", help="Print the license manifest or audit installed packages")
     p_license.add_argument("--audit", action="store_true", help="Audit installed package licenses in each environment")
     return parser
@@ -190,7 +192,17 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    help_language = "en"
+    if arguments and arguments[0] == "validate-handoff":
+        # argparse processes --help before the ordinary command dispatch. Read
+        # only this command's language option first so explicit Korean help uses
+        # the same language as its diagnostics. The full parser still validates
+        # all options and language choices, preserving its normal error contract.
+        language_probe = argparse.ArgumentParser(add_help=False)
+        language_probe.add_argument("--lang", default="en")
+        help_language = language_probe.parse_known_args(arguments[1:])[0].lang
+    args = build_parser(handoff_help_language=help_language).parse_args(arguments)
     try:
         if args.command == "init":
             from .install import init_workspace
