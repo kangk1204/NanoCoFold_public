@@ -65,7 +65,7 @@ METRIC_HELP = {
     "pose_quality_supporting_engines": "자세가 일치하고 기록 적격·지정 결합 부위를 함께 충족한 서로 다른 엔진 수입니다.",
     "design_binder_rmsd_A": "동일 후보의 생성 구조와 독립 재예측 구조를 표적만 정렬한 후 계산한 VHH Cα RMSD입니다. 기존 VHH 참조 구조와의 RMSD가 아닙니다.",
     "review_rank": "동일 표적·조건·실행 범위 안의 탐색적 후보 검토 순위입니다. 동률을 허용하며 1위도 보류일 수 있습니다. 결합 확률이나 엔진 점수 평균이 아닙니다.",
-    "review_priority": "검토 정책 v3는 품질·지정 결합 부위를 충족한 엔진별 단독 유망 예측과 같은 자세의 다중 엔진 지지를 구분합니다. 엔진 간 자세 차이와 설계 재현은 별도 진단이며 자동 탈락 사유가 아닙니다. 실제 결합·KD를 입증하지 않습니다.",
+    "review_priority": "검토 정책 v3는 엔진별 단독 유망 예측과 같은 자세의 다중 엔진 지지를 구분합니다. 두 경우 모두 품질·지정 결합 부위를 확인합니다. 엔진 간 자세 차이와 설계 재현은 별도 진단이며 자동 탈락 조건에 포함되지 않습니다. 결합과 KD는 실험으로 확인하세요.",
 }
 POSE_ANNOTATIONS = ("site_satisfied", "site_selection_eligible", "pose_cluster_id", "pose_supporting_engines",
                     "pose_quality_supporting_engines", "pose_consensus_status", "design_consistency_status",
@@ -1538,20 +1538,20 @@ class ResultReader:
             f"인터넷·서버·Python·GPU 설치 없이 {viewer_features}을 사용할 수 있습니다.\n" + retained_note +
             "브라우저의 WebGL이 필요합니다. 미평가·실패와 전체 모델을 포함하며 화면 필터로 데이터를 삭제하지 않습니다.\n"
             "MSA, 로그, 가중치, 중간 계산 파일은 포함하지 않습니다. 재실행이나 전체 계산 감사를 위해 전체 원본 ZIP을 별도로 보관하세요.\n"
-            "기존 결과의 presentation 사본입니다. 예측 신뢰도는 결합 확률·KD 또는 실험 검증이 아닙니다.\n"
+            "저장된 분석 결과를 공유용으로 구성했습니다. 결합·친화도·KD는 실험으로 확인하세요.\n"
             "delivery_manifest.json은 이 패키지의 파일 및 내장 구조/PAE 해시와 출처를 기록합니다.\n").encode()
-        files["README.txt"] += "서버 절대 경로는 상대 경로 또는 [local path]로 표시합니다. 원본 계산 영수증은 별도 전체 원본에 보존합니다.\n".encode()
+        files["README.txt"] += "서버 경로는 상대 경로 또는 [local path]로 표시합니다. 원본 계산 기록은 전체 원본 ZIP에서 확인하세요.\n".encode()
         english = ("NanoCoFold shareable report\n\nExtract the entire ZIP, then open report.html in Chrome, Edge or Firefox.\n"
                    "Choose Language in the report to switch between English and Korean. No Python, server, GPU installation or internet is required.\n"
                    "Check candidate/model counts and exclusions, select a candidate and observation, then inspect its structure and PAE.\n"
-                   "WebGL is needed for 3D. Modern gzip DecompressionStream support is needed for packed PAE; unsupported or oversized views keep tables and structures available.\n"
+                   "3D viewing requires WebGL. Use a current browser to view PAE. Tables and structures remain available if the PAE view is unsupported or too large.\n"
                    "All stored rows, including failed and unevaluated records, remain in the package. Display filters do not remove data.\n"
-                   "PAE is losslessly compressed once per unique numeric array; structure-specific residue axes remain separate.\n"
+                   "PAE values retain their full precision and the residue axes for each structure.\n"
                    + ("This is a reduced retention archive: sequences, metrics and final coordinates remain; PAE arrays, MSA and intermediate files were removed by explicit retention.\n" if self.retained else "")
                    + "MSA, logs, weights and intermediate calculation files are omitted. Keep a separate full native archive for reruns and audits.\n"
-                   "Predicted scores do not establish experimental binding, affinity or KD.\n"
-                   "delivery_manifest.json records exact file hashes, provenance and embedded coordinate/PAE receipts.\n"
-                   "Absolute host paths in presentation metadata are relative or [local path]; original internal receipts stay in the native source.\n\n--- 한국어 ---\n\n")
+                   "Confirm binding, affinity and KD experimentally.\n"
+                   "delivery_manifest.json lists file hashes, sources, and the records for embedded coordinates and PAE.\n"
+                   "Server paths are shown as relative paths or [local path]. Original calculation records remain in the full native archive.\n\n--- 한국어 ---\n\n")
         files["README.txt"] = english.encode() + files["README.txt"]
         for name in ("3DMOL_LICENSE.txt", "MOLSTAR_LICENSE.txt", "PLOTLY_LICENSE.txt", "vendor_manifest.json"):
             content, evidence = _resolve_viewer_asset({}, name, asset_root=ASSET_ROOT, local_only=True)

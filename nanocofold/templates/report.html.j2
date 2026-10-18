@@ -56,7 +56,7 @@
 <p data-terminology="binding-site"><span data-report-i18n>결합 부위(hotspot)는 나노바디 설계와 접촉 평가에 사용할 표적 잔기입니다. 일반 복합체의 관심 잔기는 참조 구조 비교에 사용합니다.</span></p>
 <div class="wrap">
   <div class="report-language"><label for="language-select">Language / 언어</label> <select id="language-select" aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div>
-  <p role="status" aria-live="polite" class="muted"><span data-report-i18n>보존된 분석 결과입니다. 구조·점수·미평가 기록을 확인하고 필요한 파일을 저장하세요.</span></p>
+  <p role="status" aria-live="polite" class="muted"><span data-report-i18n>점수·구조·평가 기록을 확인하고 필요한 파일을 저장하세요.</span></p>
   <h1>{{ title }}</h1>
   <div class="sub"><span data-report-i18n>실행 ID:</span> {{ run_id }} <span data-report-i18n>· 모드:</span> <b>{{ mode }}</b> · {{ report_term("기준 단백질" if mode == "complex" else "표적") }}: <b>{{ target_name }}</b> <span data-report-i18n>· 생성:</span> {{ generated_at }} <span data-report-i18n>· 보고서 버전:</span> {{ reporting_version|default(report_term("미기록"), true) }} <span data-report-i18n>· 계산 버전:</span> {{ computation_version|default(report_term("미기록"), true) }}</div>
 
@@ -105,7 +105,7 @@
   <h2 id="report-target"><span data-report-i18n>01 입력·설정</span></h2>
   <p><span data-report-i18n>실행 모드:</span> {{ mode if mode else report_term('미기록') }} <span data-report-i18n>· 표적:</span> {{ target_name if target_name else report_term('미기록') }} <span data-report-i18n>· 결합 부위:</span> {{ context.hotspots|join(', ') if context.hotspots else report_term('미기록') }}</p>
   {% if assessment %}<details id="current-assessment-settings"><summary><span data-report-i18n>현재 평가 기준</span></summary><p><span data-report-i18n>설정 출처:</span> <code>{{ thresholds_source }}</code></p>{% if assessment.status == 'verified' %}<pre>{{ assessment|tojson(indent=2) }}</pre>{% else %}<p><span data-report-i18n>현재 평가 기준 미확인</span></p>{% endif %}</details>{% endif %}
-  <details><summary><span data-report-i18n>{{ '원래 예측 설정' if assessment else '입력과 실행 설정 원문' }}</span></summary><p><span data-report-i18n>설정 출처:</span> <code>{{ run_settings_source }}</code>.{% if run_settings_source == 'report_generation_config' %} <span data-report-i18n>실행 당시 설정이 저장되지 않아 보고서 생성 설정만 표시합니다. 과거 판정에 적용된 기준으로 추정하지 않습니다.</span>{% endif %}</p><pre>{{ run_settings|tojson(indent=2) }}</pre></details>
+  <details><summary><span data-report-i18n>{{ '원래 예측 설정' if assessment else '입력과 실행 설정 원문' }}</span></summary><p><span data-report-i18n>설정 출처:</span> <code>{{ run_settings_source }}</code>.{% if run_settings_source == 'report_generation_config' %} <span data-report-i18n>실행 당시 설정이 없어 보고서 생성 설정을 표시합니다. 과거 판정 기준은 미확인입니다.</span>{% endif %}</p><pre>{{ run_settings|tojson(indent=2) }}</pre></details>
   {% if context.target_qc is defined %}
   <div class="scroll" tabindex="0" role="region" aria-label="보고서 표" data-report-i18n-attributes="aria-label"><table style="max-width:900px"><caption><span data-report-i18n>표적 입력·구조 품질</span></caption>
     <tr><th scope="row"><span data-report-i18n>서열 길이</span></th><td>{{ context.target_qc.sequence_length if context.target_qc.sequence_length is defined and context.target_qc.sequence_length is not none else report_term('미기록') }}</td><th scope="row"><span data-report-i18n>체인</span></th><td>{{ context.target_qc.chain_id if context.target_qc.chain_id is defined and context.target_qc.chain_id is not none else report_term('미기록') }}</td></tr>
@@ -128,7 +128,7 @@
 
   {% if hotspot_rows %}
   <details id="target-residue-properties"><summary><span data-report-i18n>전체 표적 잔기 특성</span> · {{ target_residue_total }}<span data-report-i18n>개 잔기</span></summary>
-  <p><span data-report-i18n>이 표는 선택한 결합 부위만이 아니라 전체 표적 잔기의 특성입니다. 선택한 결합 부위 잔기 수:</span> {{ selected_site_residue_total if selected_site_residue_total is not none else report_term('미기록') }} <span data-report-i18n>· 전체 표적 잔기 수:</span> {{ target_residue_total }}.</p>
+  <p><span data-report-i18n>전체 표적 잔기의 특성을 표시합니다. 선택한 결합 부위 잔기 수:</span> {{ selected_site_residue_total if selected_site_residue_total is not none else report_term('미기록') }} <span data-report-i18n>· 전체 표적 잔기 수:</span> {{ target_residue_total }}.</p>
   <p><span data-report-i18n>표시 잔기 수:</span> {{ hotspot_rows|length }} / {{ target_residue_total }}. {% if target_residue_total > hotspot_rows|length %}<strong><span data-report-i18n>화면에는 처음 200개 잔기만 표시합니다. 나머지 잔기는 전체 CSV에서 확인하세요.</span></strong>{% endif %} <a href="01_target/hotspot_table.csv"><span data-report-i18n>전체 표적 잔기 CSV</span></a></p>
   <div class="scroll" tabindex="0" role="region" aria-label="보고서 표" data-report-i18n-attributes="aria-label"><table><caption><span data-report-i18n>전체 표적 잔기와 특성 값</span></caption>
     <tr>{% for key, label in hotspot_columns %}<th scope="col">{{ report_term(label) }}</th>{% endfor %}</tr>
@@ -238,7 +238,7 @@
   <h3><span data-report-i18n>3D 구조 뷰어</span></h3>
   <div class="viewer">
     <div class="viewer-tabs" id="tabs"></div>
-    <p id="viewer3d-summary" class="muted"><span data-report-i18n>모델 버튼으로 구조를 선택합니다. 좌표의 체인 역할은 아래 설명을 따르며, 원본 구조·점수는 산출물에서 저장할 수 있습니다.</span> <a href="#report-files"><span data-report-i18n>원본 자료·CSV 확인</span></a></p>
+    <p id="viewer3d-summary" class="muted"><span data-report-i18n>모델 버튼을 눌러 구조를 선택하세요. 체인 색상은 아래 설명을 참고하세요. 원본 구조와 점수 파일은 출처·산출물에서 저장할 수 있습니다.</span> <a href="#report-files"><span data-report-i18n>원본 자료·CSV 확인</span></a></p>
     <div id="viewer3d" role="group" aria-label="선택 모델 3D 구조" aria-describedby="viewer3d-summary" tabindex="0" data-report-i18n-attributes="aria-label"></div>
     <div class="muted" style="font-size:16px;margin-top:12px">{{ report_term("회색: 다른 체인 · 청록: 기준 체인 · 파랑: 비교 체인" if mode == "complex" else "회색: 파트너 · 청록: 선택 표적 · 파랑: 나노바디") }} <span data-report-i18n>· 구조 파일 형식(pdb/cif)과 실제 체인을 사용해 표시.</span></div>
   </div>
@@ -302,11 +302,11 @@
   </details>
 
   <h2 id="report-files"><span data-report-i18n>06 출처·산출물</span></h2><p class="muted"><span data-report-i18n>현재 결과의 기록에서 참조한 파일과 추가 보존 파일을 나누어 표시합니다. 추가 보존 파일에는 공통 입력과 이전 실행의 산출물이 포함될 수 있습니다.</span></p>
-  <p class="muted"><span data-report-i18n>파일은 변경하지 않습니다. 이 보고서와 후속 전달 ZIP, 내부 잠금 파일은 목록에서 제외합니다. 전달 파일의 최종 크기·해시는 전달 manifest를 확인하세요.</span></p>
+  <p class="muted"><span data-report-i18n>이 보고서·후속 전달 ZIP·잠금 파일은 목록에서 제외됩니다. 최종 파일 크기와 해시는 전달 manifest에서 확인하세요.</span></p>
   <p class="muted"><span data-report-i18n>실행 경로:</span> {{ run_dir }} <span data-report-i18n>· 보고서 생성:</span> {{ generated_at }}<span data-report-i18n>. 로컬 MSA와 별도 API 비교 실행은 각 실행의 설정·출처에서 확인하며 이 보고서의 모델 순위에 합산하지 않습니다.</span></p>
   <details><summary><span data-report-i18n>실행 당시 기록과 출처 원문</span></summary><pre>{{ context|tojson(indent=2) }}</pre></details>
   <details id="recorded-engine-provenance"><summary><span data-report-i18n>예측 엔진 버전·가중치·실행 출처</span></summary>
-    {% for engine in engine_provenance %}<h3>{{ engine.engine }}</h3><p><span data-report-i18n>버전 출처:</span> {{ engine.version_source }} <span data-report-i18n>· 실행 식별 출처:</span> {{ engine.runtime_source }}</p><pre>{{ engine|tojson(indent=2) }}</pre>{% else %}<p><span data-report-i18n>저장된 엔진 버전·가중치 영수증이 없습니다. 현재 설치 환경으로 과거 실행을 추정하지 않습니다.</span></p>{% endfor %}
+    {% for engine in engine_provenance %}<h3>{{ engine.engine }}</h3><p><span data-report-i18n>버전 출처:</span> {{ engine.version_source }} <span data-report-i18n>· 실행 식별 출처:</span> {{ engine.runtime_source }}</p><pre>{{ engine|tojson(indent=2) }}</pre>{% else %}<p><span data-report-i18n>엔진 버전·가중치의 실행 기록이 없습니다. 과거 실행 환경은 미확인입니다.</span></p>{% endfor %}
   </details>
   {% for group in file_groups %}
   <div class="scroll" tabindex="0" role="region" aria-label="보고서 표" data-report-i18n-attributes="aria-label"><table data-file-scope="{{ group.key }}"><caption>{{ report_term(group.label) }} ({{ group.total }})</caption>

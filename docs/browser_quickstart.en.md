@@ -2,17 +2,17 @@
 
 **English** · [한국어](browser_quickstart.md)
 
-This guide follows the separate environment check and analysis workflow. Follow the [README installation steps](../README.md#1-prepare-and-install) first. If your server is already installed, start at [Open the browser](../README.md#2-open-the-browser). Use the same source folder and workspace as the installation.
+Check the environment once, then prepare and run your analysis. Follow the [README installation steps](../README.md#1-prepare-and-install) first. If your server is already installed, start at [Open the browser](../README.md#2-open-the-browser). Use the same source folder and workspace as the installation.
 
-Start NanoCoFold as described in the README, then open the URL printed after `NanoCoFold:` (the documented port is `18765`). The link does not launch the app, and `127.0.0.1` points to your browser computer. If another app appears, keep it running and follow the README port/SSH instructions. For a remote server, keep both the server terminal and your SSH tunnel open. Select **Language → English** to match the screenshots. If **Preparing the interface.** appears, wait for the purpose buttons. If preparation fails, read the error and click **Reload interface**.
+Start NanoCoFold as described in the README, then open the URL printed after `NanoCoFold:` (the documented port is `18765`). Start the server before opening the link. `127.0.0.1` points to your browser computer. If another app appears, keep it running and follow the README port/SSH instructions. For a remote server, keep both the server terminal and your SSH tunnel open. Select **Language → English** to match the screenshots. If **Preparing the interface.** appears, wait for the purpose buttons. If preparation fails, read the error and click **Reload interface**.
 
-**Already looking at “diagnostics · Complete”?** Click **Prepare analysis**, then follow the **Purpose → Input → Settings → Review → Analysis** rows below. An environment check has no protein prediction. If you already ran an analysis, use **Jobs & logs → select that analysis → Open results**; saved runs are also available under **Explore results → Select run**.
+**Already looking at “diagnostics · Complete”?** Click **Prepare analysis**, then follow the **Purpose → Input → Settings → Review → Analysis** rows below. The environment check confirms installation readiness. If you already ran an analysis, use **Jobs & logs → select that analysis → Open results**; saved runs are also available under **Explore results → Select run**.
 
 ## Follow the workflow
 
 | Stage | Action | What it means |
 |---|---|---|
-| Environment · once | Check environment once → select analysis → Check environment → Prepare analysis | Installation readiness only; no prediction result |
+| Environment · once | Check environment once → select analysis → Check environment → Prepare analysis | Confirms installation readiness |
 | Purpose / example | After Prepare analysis, load the public example directly. If purpose choices are shown, first choose Predict protein complexes. | Public barnase–barstar input is filled in |
 | Input | Check full sequences, chain order and copies → Review input & continue | Required input is valid |
 | Settings | Check engines, planned models and MSA → Review settings & continue | Public MSA needs consent for these sequences |
@@ -20,15 +20,15 @@ Start NanoCoFold as described in the README, then open the URL printed after `Na
 | Analysis | Run analysis once → Jobs & logs | Prediction is submitted; inspect the analysis job |
 | Results | Open results → select a candidate | Read status, structure, PAE and metrics together |
 
-Input review does not submit analysis. A completed environment check (`diagnostics`) has no protein prediction. Reuse its receipt for the same installation, GPU and engine configuration. Review changed inputs and confirm their MSA transmission consent again.
+Input review checks your sequences and settings. **Run analysis** submits the calculation. The saved environment check (`diagnostics`) is reused for the same installation, GPU and engines. After changing inputs, review them and confirm MSA transmission consent again.
 
 ## Follow the screenshots
 
-**0. Check the environment once.** If **Environment ready** is already shown, click **Prepare analysis** without checking again. Otherwise, click **Check environment once** → choose the analysis → **Check environment**. Stay on this page until it passes, then click **Prepare analysis**. This check produces no protein prediction. It is reused for the same installation, GPU and engines. Adding engines or changing the installation requires another check.
+**0. Check the environment once.** If **Environment ready** is already shown, click **Prepare analysis** without checking again. Otherwise, click **Check environment once** → choose the analysis → **Check environment**. Stay on this page until it passes, then click **Prepare analysis**. The check is reused for the same installation, GPU and engines. Adding engines or changing the installation requires another check.
 
 ![Separate environment check, before it has been run](images/quickstart-flow/en/environment.jpg)
 
-**1. Confirm the purpose.** After **Prepare analysis**, **Prepare input** opens with the selected purpose already applied. Go directly to step 2; do not go back to look for a purpose button. If you started from the purpose-choice screen instead, click **Predict protein complexes · Enter input** as shown below.
+**1. Confirm the purpose.** After **Prepare analysis**, **Prepare input** opens with the selected purpose already applied. Continue to step 2. If you started from the purpose-choice screen instead, click **Predict protein complexes · Enter input** as shown below.
 
 ![Choose protein complex prediction](images/quickstart-flow/en/01-purpose.jpg)
 
@@ -44,7 +44,7 @@ Input review does not submit analysis. A completed environment check (`diagnosti
 
 ![Review inputs and follow the explicit next action](images/quickstart-flow/en/04-review.jpg)
 
-**5. Read the result.** Follow **Jobs & logs → completion → Open results**. Check evaluated, failed and unevaluated counts first, then select a model. Four planned models do not guarantee four successful predictions. This screenshot shows the previously verified four-engine GPU run. **Not applicable** for VHH eligibility is normal for a general protein complex.
+**5. Read the result.** Follow **Jobs & logs → completion → Open results**. Check evaluated, failed and unevaluated counts first, then select a model. The screenshot shows four evaluated models from an earlier four-engine GPU run. **Not applicable** for VHH eligibility is normal for a general protein complex.
 
 ![Planned and evaluated model counts in an actual GPU result](images/quickstart-rc5/en/05-results.jpg)
 
@@ -54,7 +54,7 @@ Input review does not submit analysis. A completed environment check (`diagnosti
 
 ![The same model's PAE](images/quickstart-rc5/en/07-pae.jpg)
 
-The English purpose and review screens (steps 1 and 4) were recaptured from version 0.4.8rc7 on 16 October 2026 using a local CPU-only browser session. The other environment/input/settings captures are preserved; see [the capture record](images/quickstart-flow/README.md). Results and purpose-specific settings retain the earlier rc5 captures and do not represent a new analysis. [Historical English capture scope and provenance](images/quickstart-rc5/en/README.md). No environment worker, MSA acquisition or GPU prediction was run for this update.
+Screenshots 1 and 4 show version 0.4.8rc7, captured on 16 October 2026. The result and purpose-specific settings screenshots are from rc5. Capture dates, conditions and original results are listed in the [capture record](images/quickstart-flow/README.md) and [rc5 record](images/quickstart-rc5/en/README.md).
 
 ## Settings by purpose
 
@@ -67,9 +67,9 @@ Use **Load public example for this purpose → review input → run settings →
 | Compare existing nanobodies | Target + full VHH sequence for each candidate | Every input VHH × four engines |
 | Evaluate nanobody variants | Target + full WT VHH sequence | Prepare up to three variants; evaluate up to two plus WT with four engines → up to twelve models |
 
-The small starter preset disables design generator prefilter rejection and the mature ESM score threshold. It retains ESM scoring, variant limits and final quality criteria. AntiFold is off in the variant example. A full VHH sequence is required; a CDR3 fragment alone is insufficient.
+The small starter preset disables design generator prefilter rejection and the mature ESM score threshold. It retains ESM scoring, variant limits and final quality criteria. AntiFold is off in the variant example. Enter the full VHH sequence, including its CDRs and framework.
 
-These small counts apply to the loaded public example. The general **Researcher exploration** preset uses `design.num_designs=1000`, `screen.tier2_n=500` and `mature.prefilter.top_n=500`; automatic target truncation is off. These are configured generation/evaluation limits, not counts of successful models. Check the planned count before using your own input. In the local browser the time-budget field is initially blank (no limit); enter a limit if needed. Read the applied settings before submission. Neither the preset nor environment-check completion guarantees successful models or binding.
+These small counts apply to the loaded public example. The general **Researcher exploration** preset uses `design.num_designs=1000`, `screen.tier2_n=500` and `mature.prefilter.top_n=500`; automatic target truncation is off. These values set generation and evaluation limits; results show the actual successful model counts. Check the planned count before using your own input. In the local browser the time-budget field is initially blank (no limit); enter a limit if needed. Read the applied settings before submission.
 
 <details>
 <summary>Design new nanobodies: settings screenshot</summary>
@@ -98,7 +98,7 @@ These web starter settings can differ from the preserved CLI conditions in `exam
 
 Choose either a structure file or a PDB ID; use **Change input method** to switch. Paste VHH/WT FASTA or import a file once. The populated FASTA is the actual input. Use **Load another file** or **Restore previous FASTA** to replace or undo an import. After restoring a draft, reselect structure files and reconfirm consent and input review. A matching installation check is reused. If you edit FASTA while a file is loading, the current input is retained and a notice is shown.
 
-In results, select a candidate to inspect its structure. Use **Show detailed metric columns** when needed. **Save selected display coordinates** saves the displayed coordinates; **Download original engine coordinates** is available only when the original is preserved and matches its recorded hash. Preparation/preselection records are not counted as failed prediction models. Unevaluated is not zero, and low confidence is different from execution failure. The full original ZIP includes server paths/logs and is intended for personal archiving; share the report ZIP with collaborators.
+In results, select a candidate to inspect its structure. Use **Show detailed metric columns** when needed. **Save selected display coordinates** saves the displayed coordinates; **Download original engine coordinates** is available only when the original is preserved and matches its recorded hash. Preparation and preselection have separate records from prediction failures. Unevaluated values remain missing. Check low-confidence predictions separately from failed calculations. The full original ZIP includes server paths/logs and is intended for personal archiving; share the report ZIP with collaborators.
 
 ## Read the report in six steps
 
@@ -107,29 +107,31 @@ In results, select a candidate to inspect its structure. Use **Show detailed met
 | 01 Inputs & settings | Are these the sequences and conditions you intended? |
 | 02 Candidate & model counts | Separate completed, failed and unevaluated models. General complexes have no VHH eligibility filter. |
 | 03 Compare candidates | Select a candidate/model and its prediction engine; read its recorded scores. |
-| 04 Excluded / unevaluated | If selection is zero, distinguish assessed candidates excluded by criteria from candidates that could not be assessed. Neither means a measured absence of binding. |
+| 04 Excluded / unevaluated | If selection is zero, check whether candidates were excluded by criteria or lacked the data needed for assessment. Use this information to plan the next analysis or experiment. |
 | 05 Structure & PAE | Inspect the selected model's structure and residue-placement uncertainty together. |
 | 06 Provenance & artifacts | Check recorded conditions and save the appropriate report/data files. |
 
-Section links move within the report. Browser **Back / Forward** returns to an earlier section or view; it does not submit, cancel or restart analysis. Keep the same selected candidate when comparing languages.
+Use section links and browser **Back / Forward** to return to earlier sections or views. Analysis continues during navigation. Keep the same selected candidate when comparing languages.
 
-The steps above use the locally installed application's labels. An administrator-hosted Site can instead show **Jobs**, **Reports and provenance**, **Offline HTML**, and **Resume verified stages**. Use **Offline HTML** for the current-language report presentation. A disabled resume control can mean that the old compute agent lacks safe-resume support; read its reason and contact the administrator rather than submitting a duplicate.
+The steps above use the locally installed application's labels. An administrator-hosted Site can instead show **Jobs**, **Reports and provenance**, **Offline HTML**, and **Resume verified stages**. Use **Offline HTML** for the current-language report presentation. If resume is disabled, read the reason and contact the administrator. Older compute agents may need an update.
 
 ## Saved files and offline reports
 
 Use the workspace shown in the browser. Each analysis is saved under `<workspace>/runs/<job_id>/`; the job identifier is in **Jobs & logs**. When report publication succeeds, start with `report.html` in that run folder. If it links to a `report_explorer-<hash>.html` file, keep that file beside the entry page. Older reports can use `report_explorer.html`. Keep the whole report folder or ZIP together; do not rename or delete a linked explorer.
 
-The detailed worker log is `<workspace>/.nanocofold/jobs/<job_id>/worker.log`, beside the submitted `config.yaml` snapshot. The run folder preserves `run_config.yaml`, `run_state.json` and available engine outputs. An interrupted run can contain partial results; an existing HTML file alone does not prove that the current analysis completed. Read its status and counts.
+The detailed worker log is `<workspace>/.nanocofold/jobs/<job_id>/worker.log`, beside the submitted `config.yaml` snapshot. The run folder preserves `run_config.yaml`, `run_state.json` and available engine outputs. An interrupted run can contain partial results. Check job status and completed model counts when opening its report.
 
-Use **Language → English / 한국어** in the browser and in newly exported interactive reports. The two languages navigate the same candidates and recorded values. IDs, sequences, coordinates, numeric data, source settings and original execution logs stay as recorded. Previously saved HTML and report ZIPs keep the renderer and language support they were created with. Downloading a historical ZIP again does not convert it to the current interface. Use the current report viewer/export offered by the application for a current-language presentation; keep the historical archive and scientific records unchanged.
+Use **Language → English / 한국어** in the browser and in newly exported interactive reports. The two languages navigate the same candidates and recorded values. IDs, sequences, coordinates, numeric data, source settings and original execution logs stay as recorded. Older HTML and ZIP files retain their original interface. For the current bilingual interface, export a new report from the application and keep the older archive.
 
 ## Follow jobs, cancel and resume
 
-Changing tabs, using Back or switching language does not cancel or resubmit analysis. Return to the same job to check its status. A delayed status display is not a reason to click Run again.
+Analysis continues when you change tabs, use Back, or switch language. Return to the same job to check its status and log before submitting another analysis.
 
-In **Jobs & logs**, select the analysis job and open **Detailed execution log**. An environment-check or installation job has no protein prediction to open. A browser disconnect does not create a second submission or automatically stop a detached analysis; reopen the same workspace and inspect the existing job before clicking Run again. Keep the server and compute host available.
+In **Jobs & logs**, select the analysis job and open **Detailed execution log**. Environment-check and installation jobs contain setup records. If the browser disconnects, reopen the same workspace and select the existing job. Keep the server and compute host running.
 
-To stop an active analysis, use **Cancel job** and wait until cleanup changes **Cancelling** to **Cancelled**. Saved work is retained. For an interrupted, failed or cancelled analysis, resolve the logged cause and use **Verify and resume** when that action is offered. It validates the saved input/configuration and previous process ownership before restarting; it does not resume automatically. After **Time budget exhausted**, enter additional minutes when prompted. If resume is unavailable, read the log rather than submitting a duplicate run. Inspect any available partial results as partial, not as a completed analysis.
+To stop analysis, click **Cancel job**, check the target in the confirmation dialog, and confirm. Wait for **Cancelling → Cancelled** while resources are released. **Keep running** or Esc returns to the job. Saved results remain available.
+
+For an interrupted, failed, or cancelled job, resolve the logged cause and use **Verify and resume** when available. NanoCoFold checks saved inputs, settings and previous process ownership before restarting. After **Time budget exhausted**, enter additional minutes when prompted. If resume is unavailable, read the displayed reason and log. Review partial results with their job status and completed model count.
 
 ## If you get stuck
 
@@ -137,6 +139,6 @@ To stop an active analysis, use **Cancel job** and wait until cleanup changes **
 - **Run analysis is unavailable:** review the input, then use Go to environment check if a matching receipt is missing. Complete that separate check and click Prepare analysis. Install missing environments as directed.
 - **A request is slow or the connection drops:** check the jobs list before submitting again.
 - **Only part of a structure is visible:** fit the entire structure and check chain visibility.
-- **MOCK or CPU demo is shown:** these are synthetic workflow examples, not actual GPU predictions.
+- **MOCK or CPU demo is shown:** use these synthetic examples to practice the workflow.
 
-Failed input-review files are preserved under `inputs/failed_reviews`. Review retention needs before cleaning them. Prediction completion, quality eligibility and experimental binding are different outcomes. Do not combine engine scores into a binding probability or KD. See [result interpretation](RESULTS.md) (technical reference in Korean).
+Failed input-review files are preserved under `inputs/failed_reviews`. Review retention needs before cleaning them. Compare candidates within the same engine and conditions. Use the selected candidates for follow-up binding and KD experiments. See [result interpretation](RESULTS.md) (technical reference in Korean).

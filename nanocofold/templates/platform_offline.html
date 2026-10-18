@@ -533,7 +533,7 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
 @media(max-width:480px){.cancel-confirmation{padding:20px}.cancel-confirmation-actions{flex-direction:column}.cancel-confirmation-actions button{width:100%}}
 </style></head><body><header class="offline-header"><div class="offline-brand"><strong>NanoCoFold · 오프라인 결과 탐색</strong><span>전체 후보 · 관측 · 구조 · 출처 포함</span></div><div class="language-switch"><label for="language-select">Language</label> <select id="language-select" aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div></header><main><div id="notice" role="status" aria-live="polite" hidden></div><section id="view-results">
 
-        <h1>분석 결과 보고서</h1><p class="muted">NanoCoFold · 저장된 데이터로 탐색하는 독립 보고서</p><nav class="report-nav" aria-label="보고서 내 탐색"><a href="#report-input">01 입력·설정</a><a href="#result-summary">02 후보·모델 수</a><a href="#report-comparison">03 후보 비교</a><a href="#report-exclusions">04 제외·미평가</a><a href="#candidate-title">05 구조·PAE</a><a href="#report-provenance">06 출처·산출물</a></nav>
+        <h1>분석 결과 보고서</h1><p class="muted">NanoCoFold · 저장된 분석 결과</p><nav class="report-nav" aria-label="보고서 내 탐색"><a href="#report-input">01 입력·설정</a><a href="#result-summary">02 후보·모델 수</a><a href="#report-comparison">03 후보 비교</a><a href="#report-exclusions">04 제외·미평가</a><a href="#candidate-title">05 구조·PAE</a><a href="#report-provenance">06 출처·산출물</a></nav>
         <p>
           저장된 결과를 탐색합니다. 후보를 선택해 점수·구조·PAE를 확인하세요.
         </p>
@@ -1155,6 +1155,9 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "표면 특성을 바탕으로 결합 부위(hotspot)를 제안합니다. 결합 여부는 실험으로 확인하세요. 결손 잔기·원자는 입력 상태로 유지합니다. 절단형 특이성에는 별도 입력과 검증이 필요합니다.": "Binding sites (hotspots) are proposed from surface properties. Confirm binding experimentally. Missing residues and atoms remain as supplied. Truncated-form specificity requires separate inputs and validation.",
+  "검토 정책 v3는 엔진별 단독 유망 예측과 같은 자세의 다중 엔진 지지를 구분합니다. 두 경우 모두 품질·지정 결합 부위를 확인합니다. 엔진 간 자세 차이와 설계 재현은 별도 진단이며 자동 탈락 조건에 포함되지 않습니다. 결합과 KD는 실험으로 확인하세요.": "Review policy v3 distinguishes promising single-engine predictions from multiple-engine support for the same pose. Both require quality and specified binding-site checks. Cross-engine pose differences and design reproducibility are separate diagnostics, excluded from automatic rejection criteria. Confirm binding and KD experimentally.",
+  "구조에서 측정한 SG–SG 거리입니다. 결합 상태·자유 Cys 여부는 별도 확인이 필요하며 서열 기반 제외 판정은 유지됩니다.": "These are SG–SG distances measured in the structure. Bond state and free Cys require separate assessment. Sequence-based exclusion decisions are retained.",
   "작업 상태가 바뀌었습니다. 현재 상태를 확인한 뒤 취소를 다시 선택하세요.": "The job status changed. Check the current status and choose cancel again.",
   "배치의 미완료 분석을 모두 취소할까요?": "Cancel all unfinished analyses in this batch?",
   "대기 중인 재개를 취소할까요?": "Cancel this queued resume?",
@@ -1184,6 +1187,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "전체 표적 잔기 특성": "Properties of all target residues",
   "개 잔기": " residues",
   "이 표는 선택한 결합 부위만이 아니라 전체 표적 잔기의 특성입니다. 선택한 결합 부위 잔기 수:": "This table describes all target residues, including those outside the selected binding site. Selected binding-site residue count:",
+  "전체 표적 잔기의 특성을 표시합니다. 선택한 결합 부위 잔기 수:": "This table lists the properties of all target residues. Selected binding-site residues:",
   "· 전체 표적 잔기 수:": "· Total target residue count:",
   "표시 잔기 수:": "Displayed residue count:",
   "화면에는 처음 200개 잔기만 표시합니다. 나머지 잔기는 전체 CSV에서 확인하세요.": "Only the first 200 residues are shown. See the complete CSV for the remaining residues.",
@@ -1194,10 +1198,13 @@ const NCF_TRANSLATIONS = Object.freeze({
   "전체 점수 CSV": "Complete score CSV",
   "원본 자료·CSV 확인": "View original data and CSV",
   "모델 버튼으로 구조를 선택합니다. 좌표의 체인 역할은 아래 설명을 따르며, 원본 구조·점수는 산출물에서 저장할 수 있습니다.": "Choose a structure with the model buttons. Chain roles follow the description below. Original structure and score files are available in the artifacts.",
+  "모델 버튼을 눌러 구조를 선택하세요. 체인 색상은 아래 설명을 참고하세요. 원본 구조와 점수 파일은 출처·산출물에서 저장할 수 있습니다.": "Select a structure with the model buttons. Chain colors are explained below. Save the original structure and score files from Sources & artifacts.",
   "3D 모델 {0} · 기준 체인 {1} · 비교 체인 {2}. 좌표 파일과 전체 점수는 산출물에서 확인하세요.": "3D model {0} · Reference chain {1} · Comparison chain {2}. See the artifacts for coordinate files and complete scores.",
   "선택 후보의 조건별 ipTM 분포": "ipTM distribution by condition for the selected candidate",
   "선택한 후보·구조가 없어 PAE를 표시하지 않습니다. 후보를 선택하거나 원본 자료를 확인하세요.": "PAE is not shown because no candidate structure is selected. Select a candidate or check the original data.",
+  "후보와 구조를 선택하면 PAE가 표시됩니다. 저장 자료는 출처·산출물에서 확인하세요.": "Select a candidate and structure to view PAE. Check Sources & artifacts for saved data.",
   "선택한 후보가 없어 관측 분포를 표시하지 않습니다. 후보 표에서 후보를 선택하세요.": "The observation distribution is not shown because no candidate is selected. Select a candidate in the table.",
+  "후보 표에서 후보를 선택하면 관측 분포가 표시됩니다.": "Select a candidate in the table to view its observation distribution.",
   "계면 점수 비교 산점도": "Interface-score comparison scatter plot",
   "현재 탐색 모델 {0}건 중 두 축 모두 평가된 {1}건을 표시합니다. 축 값 미평가 {2}건. X: {3} · Y: {4}. 각 점의 원값은 후보 표·CSV에서 확인하세요.": "Showing {1} of {0} explored models with both axes evaluated; {2} have an unevaluated axis. X: {3} · Y: {4}. See the candidate table and CSV for each point's stored values.",
   "표시할 평가값이 없습니다. 축 값 미평가와 필터 조건을 후보 표에서 확인하세요.": "No evaluated values to display. Check unevaluated axes and filters in the candidate table.",
@@ -1268,6 +1275,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "일부 항목을 제출하지 못했습니다. 항목별 오류를 확인한 뒤 미제출 항목 다시 제출을 누르세요. 이미 등록된 작업은 같은 작업으로 연결됩니다.": "Some items could not be submitted. Check each item’s error, then click Retry unsubmitted items. Items already registered stay linked to the same jobs.",
   "부분 결과 열기": "Open partial results",
   "중단 전 저장된 부분 결과입니다. 전체 분석 완료를 뜻하지 않습니다.": "These partial results were saved before the job stopped. They do not mean the full analysis completed.",
+  "중단 전까지 저장된 부분 결과입니다. 완료·미완료 항목을 확인하세요.": "These partial results were saved before the job stopped. Check which items are complete and which are unfinished.",
   "환경 확인 기록을 불러오고 있습니다.": "Loading the saved environment check.",
   "환경 확인 기록을 불러오지 못했습니다. 잠시 후 다시 조회합니다. 기존 결과는 계속 열 수 있습니다.": "Could not load the environment check. Retrying shortly. Existing results remain available.",
   "환경 확인 세부 기록이 아직 없습니다. 작업·로그에서 진행 상태나 종료 사유를 확인하세요.": "No detailed environment report is available yet. Open Jobs & logs for progress or the reason the check ended.",
@@ -1529,6 +1537,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "용량은 해당 서버 결과 폴더의 측정값입니다. 공용 캐시·모델 가중치·클라우드 사본 용량은 포함하지 않습니다.": "Storage is measured in the results folder on that server. Shared caches, model weights, and cloud copies are excluded.",
   "분석 결과 보고서": "Analysis results report",
   "NanoCoFold · 저장된 데이터로 탐색하는 독립 보고서": "NanoCoFold · Standalone explorer of saved data",
+  "NanoCoFold · 저장된 분석 결과": "NanoCoFold · Saved analysis results",
   "보고서 내 탐색": "Report navigation",
   "01 입력·설정": "01 Inputs & settings",
   "02 후보·모델 수": "02 Candidate & model counts",
@@ -1765,6 +1774,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "가져온 설정도 현재 입력에 대한 외부 MSA 전송 동의를 다시 확인해야 합니다.": "Imported settings also require fresh consent to send the current sequences to an external MSA service.",
   "후보 상한과 백본 수는 1 이상의 정수여야 합니다.": "The candidate limit and backbone count must be integers of at least 1.",
   "복합체 비교의 MSA 준비 방식을 지정하세요. 자동으로 다른 방식을 선택하지 않습니다.": "Specify the MSA preparation method for complex comparison. Another method will not be selected automatically.",
+  "복합체 비교에 사용할 MSA 준비 방식을 선택하세요.": "Select an MSA preparation method for complex comparison.",
   "계획 모델 {0}개 · 실제 성공·실패·미평가는 결과에서 구분합니다.": "Planned models: {0} · Successful, failed, and unevaluated models are distinguished in the results.",
   "평가 엔진을 선택하세요.": "Select evaluation engines.",
   "다단계 선별 경로입니다. 전체 입력·생성 수와 단계별 확정 평가 수를 실행 기록에서 구분합니다.": "This is a multistage screening workflow. Run records distinguish the input / generated counts from confirmed evaluations at each stage.",
@@ -1880,8 +1890,9 @@ const NCF_TRANSLATIONS = Object.freeze({
   "평가 미완료 {0} 모델. 일반 복합체에는 VHH 적격 판정을 적용하지 않습니다.": "{0} models with incomplete evaluation. VHH eligibility criteria do not apply to general complexes.",
   "고유 후보 서열 {0}종 · 평가 미완료 {1} · 적격 판정 미평가 {2} · 기록 선별 {3} 모델. 원본 후보는 source_sequence_id 및 원본 ID의 엔진 접두어로 구분합니다. 서열이 모두 기록된 경우에만 고유 서열 수를 계산합니다.": "{0} unique candidate sequences · {1} incompletely evaluated · {2} eligibility unevaluated · {3} recorded-selected models. Original candidates are distinguished by source_sequence_id and engine prefixes in the original IDs. Unique sequence counts are computed only when all sequences are recorded.",
   "실행 기록 요약: 기록 적격 {0} · 품질 적격 {1} (결합 부위 제외). 품질 적격은 원본 선별을 바꾸지 않는 탐색 값입니다.": "Run-record summary: {0} recorded-eligible · {1} quality-eligible (excluding hotspots). Quality eligibility is an exploration value that does not change the original selection.",
-  "기록된 계획 모델 {0} · 실제 모델 기록 {1} · 평가 완료 {2} · 전체 후보·모델 기록 {3} · 예측 전 준비·미선정 {4}": "{0} recorded planned models · {1} actual model records · {2} evaluated · {3} total candidate / model records · {4} preparation / non-selection before prediction",
+  "기록된 계획 모델 {0} · 실제 모델 기록 {1} · 평가 완료 {2} · 전체 후보·모델 기록 {3} · 예측 전 준비·미선정 {4}": "Planned models: {0} · Model records: {1} · Evaluated: {2} · All candidate/model records: {3} · Prepared or excluded before prediction: {4}",
   "집계 범위: 저장된 전체 후보·모델 기록. 예측 전 준비·미선정은 평가 미완료 모델 수에 포함하지 않습니다.": "Counts cover all saved candidate / model records. Preparation and non-selection before prediction are excluded from the count of incompletely evaluated models.",
+  "저장된 전체 후보·모델을 집계합니다. 예측 전 준비·미선정 후보와 평가 미완료 모델은 따로 계산합니다.": "Counts cover all saved candidates and models. Candidates prepared or excluded before prediction are counted separately from models with incomplete assessments.",
   "예측 엔진 버전·가중치·출처": "Prediction engine versions, weights & provenance",
   "평가 {0}/{1} · 오류 {2}{3}": "Evaluated {0}/{1} · Errors {2}{3}",
   " · 기록 적격 {0} · 판정 미평가 {1}": " · Recorded-eligible {0} · Eligibility unevaluated {1}",
@@ -2009,7 +2020,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "원본 판정 기록": "Original assessment records",
   "CDR·개발가능성·변이 상세 값": "CDR, developability & variant details",
   "선별된 / 대표 구조": "Selected / representative structure",
-  "현재 후보 {0}개 관측. 조건별 {1}을 따로 표시하며 서로 다른 조건을 합산하지 않습니다. ": "{0} observations for this candidate. {1} is displayed separately for each condition; different conditions are not aggregated. ",
+  "현재 후보 {0}개 관측. 조건별 {1}을 따로 표시하며 서로 다른 조건을 합산하지 않습니다. ": "Observations for this candidate: {0}. {1} is shown separately for each condition. ",
   "조건 {0}: {1}": "Condition {0}: {1}",
   "조건 {0}": "Condition {0}",
   "반복 관측의 ipTM 미평가": "ipTM of repeated observations not evaluated",
@@ -2082,6 +2093,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "선택 모델의 구조가 없습니다.": "No structure for the selected model.",
   "이 보고서에 검증된 원본 엔진 좌표가 없습니다. 출처·원본 산출물을 확인하세요.": "This report has no verified original engine coordinates. Check provenance and original artifacts.",
   "이 모델의 PAE는 미제공입니다. 다른 모델의 값을 대신 쓰지 않습니다.": "PAE is unavailable for this model. Values from another model are not substituted.",
+  "이 모델의 PAE는 제공되지 않았습니다. 후보 상세에서 기록을 확인하세요.": "PAE is unavailable for this model. Check the candidate details for its records.",
   "잔기를 선택하세요.": "Select residues.",
   "서로 다른 두 잔기를 선택하세요.": "Select two different residues.",
   "Cα 좌표가 없는 잔기입니다.": "This residue has no Cα coordinates.",
@@ -2142,6 +2154,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "새 분석 설정을 가져왔습니다. 표적·라이브러리·WT 입력을 검토한 뒤 별도 실행하세요.": "Settings for a new analysis imported. Review target, library, and WT inputs, then submit a separate run.",
   "현재 실행과 비교 실행을 선택하세요.": "Select the current run and a comparison run.",
   "조건이 다른 점수는 자동 합산하지 않습니다. 입력·엔진·seed·MSA·restraint를 확인하세요.": "Scores from different conditions are not combined automatically. Check inputs, engines, seeds, MSA, and restraints.",
+  "입력·엔진·seed·MSA·restraint가 같은 조건의 점수끼리 비교하세요.": "Compare scores from matching inputs, engines, seeds, MSA, and restraints.",
   "후보 {0} · 적격 {1} · {2}": "Candidates {0} · Eligible {1} · {2}",
   "실제 예측": "Real prediction",
   "FASTA는 >이름으로 시작해야 합니다.": "FASTA must start with >name.",
@@ -2735,6 +2748,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "지정 결합 부위 판정 (기록)": "Recorded binding-site decision",
   "PAE 자료가 손상되어 표시할 수 없습니다. 표와 구조는 계속 확인할 수 있습니다.": "The PAE data is damaged and cannot be displayed. Tables and structures remain available.",
   "체인 역할·잔기 정보가 일부 기록되지 않았습니다. 분류하지 않은 좌표는 회색으로 표시하며, 표적·파트너 역할이나 잔기 대응을 추정하지 않습니다.": "Some chain roles or residue metadata were not recorded. Unclassified coordinates are shown in gray; target/partner roles and residue mappings are not inferred.",
+  "체인 역할·잔기 정보 일부가 미기록입니다. 회색 좌표의 체인 역할과 잔기 대응은 미확인입니다.": "Some chain roles and residue details are missing. Gray coordinates have unknown chain roles or residue mappings.",
   "(dev_severe): free Cys, N-글리코실화 서열, CDR 탈아미드/이성화, CDR 소수성 패치.": "(dev_severe): free Cys, N-glycosylation motifs, CDR deamidation/isomerization, and hydrophobic CDR patches.",
   ", 잔기 선택과 거리 측정을 사용할 수 있습니다. 구조·PAE가 없으면 미평가로 남으며 원본 점수·선별 기록을 다시 계산하지 않습니다. 오프라인으로 옮길 때는 이 보고서와 연결된 탐색 HTML 파일을 같은 폴더에 보관하거나 전달 ZIP을 사용하세요.": ", residue selection, and distance measurement. Missing structures or PAE remain unevaluated; original scores and selection records are not recalculated. For offline use, keep this report and its linked explorer HTML in the same folder, or use the delivery ZIP.",
   ". 로컬 MSA와 별도 API 비교 실행은 각 실행의 설정·출처에서 확인하며 이 보고서의 모델 순위에 합산하지 않습니다.": ". Check each run's settings and provenance for local-MSA or separate API comparisons. Their scores are not added to this report's model ranking.",
@@ -2807,12 +2821,14 @@ const NCF_TRANSLATIONS = Object.freeze({
   "추가 보존 파일": "Other retained files",
   "현재 결과의 기록에서 참조한 파일과 추가 보존 파일을 나누어 표시합니다. 추가 보존 파일에는 공통 입력과 이전 실행의 산출물이 포함될 수 있습니다.": "Files referenced by the current result are listed separately from other retained files. Other retained files may include shared inputs and outputs from earlier runs.",
   "파일은 변경하지 않습니다. 이 보고서와 후속 전달 ZIP, 내부 잠금 파일은 목록에서 제외합니다. 전달 파일의 최종 크기·해시는 전달 manifest를 확인하세요.": "Files remain unchanged. This report, later delivery ZIPs, and internal lock files are excluded from the lists. Check the delivery manifest for final sizes and hashes.",
+  "이 보고서·후속 전달 ZIP·잠금 파일은 목록에서 제외됩니다. 최종 파일 크기와 해시는 전달 manifest에서 확인하세요.": "This report, later delivery ZIPs, and lock files are excluded from the lists. Check the delivery manifest for final file sizes and hashes.",
   "해당 파일이 없습니다.": "No files in this group.",
   "각 목록은 처음 200개까지 표시합니다. 나머지 파일은 실행 폴더와 전체 원본 ZIP에서 확인하세요.": "Each list shows up to 200 files. Find the remaining files in the run folder and full original ZIP.",
   "표적·후보 서열의 외부 MSA 전송에 동의하면 배치 설정에 api_consent: true를 추가한 뒤 다시 검토하세요.": "If you consent to sending target and candidate sequences to the external MSA service, add api_consent: true to the batch settings and review again.",
   "anchor_chain은 실제 분석 체인 ID여야 합니다.": "anchor_chain must be an existing analysis chain ID.",
   "primary_pair는 서로 다른 분석 체인 ID 2개의 목록이어야 합니다.": "primary_pair must list two distinct analysis chain IDs.",
   "보존된 분석 결과입니다. 구조·점수·미평가 기록을 확인하고 필요한 파일을 저장하세요.": "These are saved analysis results. Review structures, scores, and unevaluated records, then save the files you need.",
+  "점수·구조·평가 기록을 확인하고 필요한 파일을 저장하세요.": "Review scores, structures, and assessment records, then save the files you need.",
   "사용자 지정 결합 부위 세트": "User-defined binding-site sets",
   "상세 지표·원본 기록 펼치기": "Show detailed metrics and original records",
   "생성 시점의 보존 파일입니다. 이 보고서와 후속 전달 ZIP, 내부 잠금 파일은 제외하며 최종 파일 크기·해시는 전달 manifest를 확인하세요.": "Files retained when the report was generated. This report, later delivery ZIPs, and internal lock files are excluded. Check the delivery manifest for final sizes and hashes.",
@@ -2824,6 +2840,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "실행 경로:": "Run location:",
   "실행 당시 기록과 출처 원문": "Original execution records and provenance",
   "실행 당시 설정이 저장되지 않아 보고서 생성 설정만 표시합니다. 과거 판정에 적용된 기준으로 추정하지 않습니다.": "Run-time settings were not saved; only the report-generation settings are shown. They are not assumed to be the criteria used for past decisions.",
+  "실행 당시 설정이 없어 보고서 생성 설정을 표시합니다. 과거 판정 기준은 미확인입니다.": "Run settings were not saved, so report-generation settings are shown. The criteria used for the original assessment are unknown.",
   "실행 모드:": "Run mode:",
   "실행 상태:": "Run status:",
   "실험 결과 입력": "Enter experimental results",
@@ -2856,6 +2873,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "저자 코드": "Author code",
   "저장 결과 탐색 원본이 없는 진단·부분 기록은 대표 구조 최대": "Diagnostic or partial records without a saved full explorer show up to",
   "저장된 엔진 버전·가중치 영수증이 없습니다. 현재 설치 환경으로 과거 실행을 추정하지 않습니다.": "No saved engine version/weight receipt is available. The current installation is not used to infer a past run.",
+  "엔진 버전·가중치의 실행 기록이 없습니다. 과거 실행 환경은 미확인입니다.": "Engine version and weight records are missing. The original run environment is unknown.",
   "저장된 전체 후보 기록을 표시합니다.": "Showing all saved candidate records.",
   "저장된 후보·모델 기록에서 각 사유를 기록당 한 번 집계합니다. 예측 전 준비·미선정은 실제 모델 평가와 구분합니다. 한 기록에 여러 사유가 있을 수 있으므로 합계는 기록 수와 다를 수 있습니다. 기준 미통과와 계산 오류·미평가를 구분해 읽으세요.": "Each reason is counted once per saved candidate/model record. Prepared candidates not selected before prediction are separate from actual model assessments. One record may have several reasons, so totals can differ from record counts. Distinguish unmet criteria from computation errors and unevaluated items.",
   "전체 모델·구조·PAE 결과 탐색 열기": "Open all models, structures, and PAE in the result explorer",
@@ -3796,7 +3814,7 @@ function noviceComplexSettings(cfg) {
   if (!engines) return {...current, engine: current.engine || $("screen-engine").value,
     seeds: current.seeds || [Number($("seed").value)]};
   const source = small ? cfg.screen?.colabfold?.msa_source : current.msa_source ?? cfg.screen?.colabfold?.msa_source;
-  if (!source) throw Error("복합체 비교의 MSA 준비 방식을 지정하세요. 자동으로 다른 방식을 선택하지 않습니다.");
+  if (!source) throw Error("복합체 비교에 사용할 MSA 준비 방식을 선택하세요.");
   const preserved = {...current};
   delete preserved.engine;
   return {...preserved, comparison_engines: engines, seeds: current.seeds || [Number($("seed").value)], msa: "precomputed",
@@ -4684,7 +4702,7 @@ async function loadResult(id) {
     $("result-summary").append(el("p", I18N.format("실행 기록 요약: 기록 적격 {0} · 품질 적격 {1} (결합 부위 제외). 품질 적격은 원본 선별을 바꾸지 않는 탐색 값입니다.", [fmt(summary.eligible_total), fmt(summary.quality_eligible_total)]), "muted"));
   const expected = summary.expected_total;
   $("result-summary").append(el("p", I18N.format("기록된 계획 모델 {0} · 실제 모델 기록 {1} · 평가 완료 {2} · 전체 후보·모델 기록 {3} · 예측 전 준비·미선정 {4}", [expected == null ? I18N.term("미기록") : expected, (summary.model_record_total != null ? summary.model_record_total : counts.model_total), counts.evaluated_total, (summary.candidate_record_total != null ? summary.candidate_record_total : counts.prepared_record_total), (summary.preprediction_record_total != null ? summary.preprediction_record_total : counts.preprediction_record_total)]), "muted"));
-  $("result-summary").append(el("p", I18N.term("집계 범위: 저장된 전체 후보·모델 기록. 예측 전 준비·미선정은 평가 미완료 모델 수에 포함하지 않습니다."), "muted"));
+  $("result-summary").append(el("p", I18N.term("저장된 전체 후보·모델을 집계합니다. 예측 전 준비·미선정 후보와 평가 미완료 모델은 따로 계산합니다."), "muted"));
   if (summary.engine_provenance && Object.keys(summary.engine_provenance).length) {
     const provenance = el("details"); provenance.append(el("summary", I18N.term("예측 엔진 버전·가중치·출처")), el("pre", JSON.stringify(summary.engine_provenance, null, 2))); $("result-summary").append(provenance);
   }
@@ -4773,8 +4791,8 @@ function clearCandidate() {
       Plotly.purge($(id));
       $(id).replaceChildren();
     }
-  describeResultFigure("pae", "PAE · 예측 정렬 오차", I18N.term("선택한 후보·구조가 없어 PAE를 표시하지 않습니다. 후보를 선택하거나 원본 자료를 확인하세요."), "#report-provenance", true);
-  describeResultFigure("distribution", "선택 후보의 조건별 ipTM 분포", I18N.term("선택한 후보가 없어 관측 분포를 표시하지 않습니다. 후보 표에서 후보를 선택하세요."), "#candidate-table", true);
+  describeResultFigure("pae", "PAE · 예측 정렬 오차", I18N.term("후보와 구조를 선택하면 PAE가 표시됩니다. 저장 자료는 출처·산출물에서 확인하세요."), "#report-provenance", true);
+  describeResultFigure("distribution", "선택 후보의 조건별 ipTM 분포", I18N.term("후보 표에서 후보를 선택하면 관측 분포가 표시됩니다."), "#candidate-table", true);
   syncCandidateNavigation();
 }
 function syncCandidateNavigation() {
@@ -5263,7 +5281,7 @@ function renderDistribution(observations) {
   const evaluated = [...groups.values()].reduce((total, values) => total + values.length, 0);
   describeResultFigure("distribution", "선택 후보의 조건별 ipTM 분포", evaluated
     ? I18N.format("선택 후보 관측 {0}건 · ipTM 평가 {1}건 · 미평가 {2}건 · 서로 합산하지 않는 조건 {3}개. 조건별 원값은 아래 후보 상세 표에서 확인하세요.", [observations.length, evaluated, observations.length - evaluated, groups.size])
-    : I18N.term(!state.candidate && !observations.length ? "선택한 후보가 없어 관측 분포를 표시하지 않습니다. 후보 표에서 후보를 선택하세요." : "반복 관측의 ipTM이 미평가 상태입니다. 후보 상세 표에서 관측 기록과 사유를 확인하세요."), "#candidate-detail", !evaluated);
+    : I18N.term(!state.candidate && !observations.length ? "후보 표에서 후보를 선택하면 관측 분포가 표시됩니다." : "반복 관측의 ipTM이 미평가 상태입니다. 후보 상세 표에서 관측 기록과 사유를 확인하세요."), "#candidate-detail", !evaluated);
   I18N.text($("observation-note"), I18N.concat([I18N.format("현재 후보 {0}개 관측. 조건별 {1}을 따로 표시하며 서로 다른 조건을 합산하지 않습니다. ", [observations.length, I18N.term(metricCaption("iptm", observations))]), I18N.concat([...groups.keys()].flatMap((name, i) => [i ? " · " : "", I18N.format("조건 {0}: {1}", [i+1, name])]))]));
   if (window.Plotly)
     Plotly.react(
@@ -5407,7 +5425,7 @@ async function loadStructure() {
     state.structure = null;
     disposeResultViewer();
     I18N.text($("structure-note"), I18N.term(e.message));
-    describeResultFigure("pae", "PAE · 예측 정렬 오차", I18N.term("선택한 후보·구조가 없어 PAE를 표시하지 않습니다. 후보를 선택하거나 원본 자료를 확인하세요."), "#report-provenance", true);
+    describeResultFigure("pae", "PAE · 예측 정렬 오차", I18N.term("후보와 구조를 선택하면 PAE가 표시됩니다. 저장 자료는 출처·산출물에서 확인하세요."), "#report-provenance", true);
     $("structure-details").replaceChildren();
     if (window.Plotly) {
       await Plotly.react(
@@ -5580,7 +5598,7 @@ async function renderStructure() {
   await state.viewer.layers(resultLayers());
   await state.viewer.display(resultDisplay());
   if (state.structure !== data) return;
-  I18N.text($("structure-note"), state.viewer.metadataIncomplete ? I18N.term("체인 역할·잔기 정보가 일부 기록되지 않았습니다. 분류하지 않은 좌표는 회색으로 표시하며, 표적·파트너 역할이나 잔기 대응을 추정하지 않습니다.") : I18N.format("MolStar · {0} {1} · {2} {3} · 접촉 잔기쌍 {4} · 충돌 잔기쌍 {5}. 서열·PAE·아래 버튼에서 잔기를 선택하세요.", [state.result.mode === 'complex' ? I18N.term('기준 체인') : I18N.term('표적'), data.target_chain, state.result.mode === 'complex' ? I18N.term('파트너') : 'VHH', data.binder_chain, (data.contacts?.length ? data.contacts?.length : 0), (data.clashes?.length ? data.clashes?.length : 0)]));
+  I18N.text($("structure-note"), state.viewer.metadataIncomplete ? I18N.term("체인 역할·잔기 정보 일부가 미기록입니다. 회색 좌표의 체인 역할과 잔기 대응은 미확인입니다.") : I18N.format("MolStar · {0} {1} · {2} {3} · 접촉 잔기쌍 {4} · 충돌 잔기쌍 {5}. 서열·PAE·아래 버튼에서 잔기를 선택하세요.", [state.result.mode === 'complex' ? I18N.term('기준 체인') : I18N.term('표적'), data.target_chain, state.result.mode === 'complex' ? I18N.term('파트너') : 'VHH', data.binder_chain, (data.contacts?.length ? data.contacts?.length : 0), (data.clashes?.length ? data.clashes?.length : 0)]));
   const residues = chains.flatMap(chain => (Array.isArray(chain.residues) ? chain.residues : [])
     .filter(residue => residue && typeof residue.label === "string")
     .map(residue => ({value: residue.label, label: `${residue.label} ${residue.name || ""}`})));
@@ -5880,7 +5898,7 @@ function setupExplorer() {
   });
   action("save-pae", () => {
     const data=state.structure;
-    if (!data?.pae) throw Error("이 모델의 PAE는 미제공입니다. 다른 모델의 값을 대신 쓰지 않습니다.");
+    if (!data?.pae) throw Error("이 모델의 PAE는 제공되지 않았습니다. 후보 상세에서 기록을 확인하세요.");
     const pae = data.pae.values_ref && !data.pae.values ? {...data.pae, array:window.NANOCOFOLD_OFFLINE?.pae_arrays?.[data.pae.values_ref]} : data.pae;
     saveBlob(new Blob([JSON.stringify(pae,null,2)],{type:"application/json"}),
       `${data.candidate_id.replace(/[^A-Za-z0-9_.-]/g,"_")}_PAE.json`);
@@ -5984,7 +6002,7 @@ function renderBatch(batch) {
       status.append(button);
     }
     line.append(choice,el("td",row.id),el("td",(row.error ? row.error : I18N.term("검토 완료"))),status);
-    const result=el("td");if(row.job?.result_available===true&&["complete","failed","partial_failure","cancelled","interrupted","budget_exhausted"].includes(row.job.state)){const partial=row.job.state!=="complete",link=el("a",I18N.term(partial?"부분 결과 열기":"결과 열기"));link.href="/?result="+encodeURIComponent(row.job_id);link.target="_blank";link.rel="noopener";result.append(link);if(partial)result.append(el("p",I18N.term("중단 전 저장된 부분 결과입니다. 전체 분석 완료를 뜻하지 않습니다.")));}else I18N.text(result, "—");line.append(result);body.append(line);
+    const result=el("td");if(row.job?.result_available===true&&["complete","failed","partial_failure","cancelled","interrupted","budget_exhausted"].includes(row.job.state)){const partial=row.job.state!=="complete",link=el("a",I18N.term(partial?"부분 결과 열기":"결과 열기"));link.href="/?result="+encodeURIComponent(row.job_id);link.target="_blank";link.rel="noopener";result.append(link);if(partial)result.append(el("p",I18N.term("중단 전까지 저장된 부분 결과입니다. 완료·미완료 항목을 확인하세요.")));}else I18N.text(result, "—");line.append(result);body.append(line);
   }
   $("batch-rows").replaceChildren(target);
   const retryMissing = Boolean(batch.selected) && batch.rows.some(row => batch.selected.includes(row.id) && !row.job_id && !row.job && !row.error);
@@ -6379,7 +6397,7 @@ async function boot() {
     node.replaceChildren(
       el(
         "p",
-        I18N.term("조건이 다른 점수는 자동 합산하지 않습니다. 입력·엔진·seed·MSA·restraint를 확인하세요."),
+        I18N.term("입력·엔진·seed·MSA·restraint가 같은 조건의 점수끼리 비교하세요."),
         "warning",
       ),
     );

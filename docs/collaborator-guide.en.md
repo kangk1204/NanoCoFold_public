@@ -8,7 +8,7 @@ NanoCoFold designs nanobody candidates for a target protein and compares their p
 
 ## How does the platform work?
 
-This is the basic workflow for designing new nanobodies. A backbone is the protein's three-dimensional framework; a sequence specifies the amino acids that form it.
+For new nanobody design, NanoCoFold follows the workflow below. A backbone is the protein's three-dimensional framework; a sequence specifies its amino acids.
 
 **Target and scaffold → generate candidates → optional pre-assessment and CDR substitutions → predict complexes → assess and select → report**
 
@@ -23,7 +23,7 @@ This is the basic workflow for designing new nanobodies. A backbone is the prote
    Selecting both tools generates candidates with each tool, then brings them together for assessment.
 3. **Predict complexes:** use the selected ColabFold, Boltz-2, Chai-1, or OpenDDE engines to predict candidate–target complexes. Choose engines and any staged screening workflow in the run settings.
 4. **Assess and select:** review ipTM/ipSAE, pLDDT/PAE, hotspot contacts, atomic clashes, and sequence developability. Compare candidates within the same engine and conditions. Selection applies eligibility criteria and CDR3 diversity limits.
-5. **Review the results:** work through the candidate table, 3D structures and PAE, exclusion and unevaluated-item reasons, then download sequences, scores, and reports. Use the final candidates to plan follow-up experiments.
+5. **Review the results:** compare candidates in the table, inspect their 3D structures and PAE, and read why models were excluded or left unevaluated. Download the sequences, scores, and reports for follow-up experiments.
 
 Depending on the settings, you can add CDR substitution candidates or use ESM/AntiFold pre-assessment.
 
@@ -87,11 +87,15 @@ Once connected, open [http://127.0.0.1:18765](http://127.0.0.1:18765) in your co
 5. Consent to sending the example sequences to the public MSA service. Click **Review settings & continue → Review input → Run analysis** once.
 6. In **Jobs & logs**, select the analysis you submitted and wait for completion. Then click **Open results**.
 
-First check the completed, failed, and unevaluated model counts. Select a candidate/model row to view its scores, 3D structure, and PAE. You can reopen a saved analysis through **Explore results → Select run**.
+While analysis runs, **Jobs & logs** shows **Running**, the current stage, model count, and elapsed time. Open **Detailed execution log** for more detail. Keep the server running; you can close the browser and return to the same job later.
+
+When analysis completes, check the completed, failed, and unevaluated model counts. Select a candidate/model row to view its scores, 3D structure, and PAE. Reopen saved analyses through **Explore results → Select run**.
 
 `diagnostics · Complete` is the environment-check record. Continue with **Prepare analysis**. If the results button is out of view, scroll down in the job details.
 
 After the public example, choose your research purpose and enter your own amino acid sequences.
+
+To stop analysis, click **Cancel job**, check the job in the confirmation dialog, and confirm. Wait for **Cancelling → Cancelled** while resources are released. **Keep running** or Esc returns to the job. Saved results remain available. For a failed, interrupted, or cancelled job, read the log, resolve the cause, then use **Verify and resume** if available. See the [job controls](../README.md#6-follow-jobs-cancel-and-resume).
 
 ## 5. Open and share ZIP files
 

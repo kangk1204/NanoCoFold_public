@@ -97,7 +97,7 @@ bash start.sh --port 18765
 
 Open the **URL printed after `NanoCoFold:`** in the terminal. The command above uses [http://127.0.0.1:18765](http://127.0.0.1:18765). Check that the page says **NanoCoFold** and keep the server terminal open while using it. `127.0.0.1` refers to your current PC; use the instructions below for a remote server.
 
-**While the server is running:** the terminal shows a `NanoCoFold:` address and stays open without a new command prompt. Open that address in your browser and use the app there. Keep the terminal open.
+**Server running:** the terminal shows a `NanoCoFold:` address and waits. Use the app in your browser and keep this terminal open.
 
 **If another application uses the same port**, run the command below to select a free port, then open the new URL printed in the terminal.
 
@@ -156,17 +156,17 @@ If an update is interrupted, rerun `bash update.sh`. Finish all jobs and close t
 </details>
 
 <details>
-<summary>Check the installed version (source development is different)</summary>
+<summary>Check the installed version</summary>
 
-`bash start.sh` starts the installed program in the saved workspace. In this source folder, check that same executable. For the default installation:
+`bash start.sh` uses the installed program in the saved workspace. To check its version from the source folder:
 
 ```bash
 .nanocofold/workspace/.venv-dev/bin/nanocofold --version
 ```
 
-If you chose a custom workspace, replace `.nanocofold/workspace` with the `workspace` value in `.nanocofold/install-location.json`. If the installed version is old, finish all jobs, stop its web server, and follow **Update an existing installation** above using `bash update.sh`. Keep the workspace, models and results.
+For a custom workspace, use the `workspace` path in `.nanocofold/install-location.json`. To update an older installation, finish all jobs, stop the web server, and follow **Update an existing installation** above.
 
-**Source developers:** use the commands below to check the checkout version and module path. Use the installation-path command above to check the installed version.
+**For source development**, check the checkout version and module path with:
 
 ```bash
 source .nanocofold/workspace/.venv-dev/bin/activate

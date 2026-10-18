@@ -33,7 +33,7 @@ def cysteine_geometry(binder):
     return {"residues": [pdb_io.residue_label(r, binder.id) for r in cysteines],
             "missing_sg": [pdb_io.residue_label(r, binder.id) for r in cysteines if "SG" not in r],
             "pairs": sorted(pairs, key=lambda p: p["distance"] if p["distance"] is not None else float("inf")),
-            "note": "SG–SG 좌표 거리입니다. 공유결합·자유 Cys를 확정하지 않으며 서열 기반 제외 판정을 변경하지 않습니다."}
+            "note": "구조에서 측정한 SG–SG 거리입니다. 결합 상태·자유 Cys 여부는 별도 확인이 필요하며 서열 기반 제외 판정은 유지됩니다."}
 
 
 def _numbered_cdr_ranges(entry, sequence):
