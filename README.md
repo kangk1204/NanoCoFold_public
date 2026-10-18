@@ -97,6 +97,8 @@ bash start.sh --port 18765
 
 Open the **URL printed after `NanoCoFold:`** in the terminal. The command above uses [http://127.0.0.1:18765](http://127.0.0.1:18765). Check that the page says **NanoCoFold** and keep the server terminal open while using it. `127.0.0.1` refers to your current PC; use the instructions below for a remote server.
 
+**While the server is running:** the terminal shows a `NanoCoFold:` address and stays open without a new command prompt. Open that address in your browser and use the app there. Keep the terminal open.
+
 **If another application uses the same port**, run the command below to select a free port, then open the new URL printed in the terminal.
 
 ```bash
@@ -190,6 +192,8 @@ Use the **Predict protein complexes** public example and follow the table in ord
 | F · Analysis | Click **Run analysis** once → **Jobs & logs** | Select the submitted analysis job and wait for completion. |
 | G · Result | On the completed analysis, click **Open results** | A candidate/model table appears. Select a row to see its scores, 3D structure and PAE. |
 
+**Check that analysis is running:** in **Jobs & logs**, select the job you just submitted. Its **Running** status, current stage, model count, and elapsed time update automatically. A single model can take time, so the stage and count may stay the same for a while. Open **Detailed execution log** for details. When the job is **Complete**, click **Open results**. If you used browser Back, return to **Jobs & logs** and reopen the same job; analysis continues. See [job controls](#6-follow-jobs-cancel-and-resume).
+
 **Prepare analysis** opens **Prepare input** for the selected purpose. Load the public example there. From the purpose-selection screen, choose **Predict protein complexes · Enter input**.
 
 If prompted for an environment check, follow **Go to environment check → Environment ready → Prepare analysis**. The saved check is reused while the installation, GPU, and selected engines remain the same.
@@ -277,7 +281,7 @@ nanocofold run --mode mature --mock \
   --set run.name=mature_mock_small
 ```
 
-The terminal prints the actual candidate count before prediction, then **candidate n/total** while calculating scores. When it finishes, open the printed **report.html** path. Keep the linked report files together when moving it.
+The terminal shows elapsed time and the current stage every **10 seconds**. The terminal prints the actual candidate count before prediction, then **candidate n/total** while calculating scores. When it finishes, open the printed **report.html** path. Keep the linked report files together when moving it.
 
 For a short practice run, use `max_variants=3` and `top_n=2` as shown above. The mature research default evaluates up to **200** variant candidates. For research, remove `--mock` and use your sequences with checked CDR annotations.
 
