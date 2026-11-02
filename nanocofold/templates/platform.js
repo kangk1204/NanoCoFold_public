@@ -551,7 +551,8 @@ function noviceModelPlan(cfg, mode, libraryCount) {
     for (const engine of selected) {
       const sequences = engine === "rfantibody" ? design.mpnn?.seqs_per_struct : design.boltzgen?.inverse_fold_num_sequences;
       const generated = design.num_designs * (sequences ?? 1);
-      candidates += engine === "rfantibody" && Number.isInteger(design.filters?.top_n_to_score)
+      // The synthetic RF adapter retains the generated cohort instead of applying the real RF2 top-N cutoff.
+      candidates += engine === "rfantibody" && !cfg.run?.mock && Number.isInteger(design.filters?.top_n_to_score)
         ? Math.min(generated, design.filters.top_n_to_score) : generated;
     }
     return `최대 계획 후보 ${candidates}개 × 엔진 ${engines}개 = 최대 ${candidates * engines}모델 · 실제 생성·선별 이후 확정 수를 기록합니다.`;
@@ -1184,7 +1185,7 @@ async function refreshJobs() {
       if (state.job !== chosen || state.jobSelectionVersion !== selection) return;
       I18N.text($("job-title"), job.name);
       if (state.submissionNoticeJob === job.id && !["queued","running","cancelling"].includes(job.state)) {
-        notice(`${states[job.state] || job.state} · ${job.result_id?"결과 열기로 결과를 확인하세요.":"작업 상세와 로그에서 종료 사유를 확인하세요."}`,job.state!=="complete");
+        notice(I18N.format(job.result_id ? "{0} · 결과 열기로 결과를 확인하세요." : "{0} · 작업 상세와 로그에서 종료 사유를 확인하세요.", [I18N.term(states[job.state] || job.state)]), job.state!=="complete");
         state.submissionNoticeJob=null;
       }
       $("job-detail").replaceChildren(
@@ -2518,37 +2519,62 @@ function saveBlob(blob, name) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
+/* DIAGNOSTIC_PRESENTATION_START */
+function diagnosticCaption(name) {
+  const labels = {
+    gpu: "NVIDIA GPU", smoke: "시험 실행",
+    "report.viewer_asset": "3D 뷰어", "report.delivery_assets": "보고서·다운로드 구성 요소",
+  };
+  if (Object.hasOwn(labels, name)) return I18N.term(labels[name]);
+  const [engine, kind] = String(name || "").split(".");
+  const checks = {env_imports: "실행 환경", jax_cuda: "GPU 계산", headless_plot: "그래프 저장",
+    binary: "실행 프로그램", weights: "모델 가중치", msa: "MSA 설정",
+    installation_identity: "설치 버전", wt_structure: "기준 VHH 구조", graph_cuda: "GPU 계산",
+    framework: "프레임워크 구조", scaffold: "프레임워크 구조", blackwell: "GPU 호환성",
+    followup_ready: "복합체 평가 준비", supported: "엔진 지원"};
+  const engines = {colabfold: "ColabFold", boltz2: "Boltz-2", chai1: "Chai-1", opendde: "OpenDDE Preview",
+    rfantibody: "RFantibody", boltzgen: "BoltzGen", antifold: "AntiFold", esm: "ESM"};
+  return engines[engine] && checks[kind]
+    ? I18N.concat([engines[engine], " · ", I18N.term(checks[kind])]) : String(name || "");
+}
+function diagnosticAction(check) {
+  if (check.ok) return "확인 완료";
+  if (!check.required) return "이 선택 기능 없이 분석할 수 있습니다.";
+  const name = String(check.name || "");
+  if (name.includes("wt_structure")) return "WT VHH 구조를 입력하거나 AntiFold를 끄세요.";
+  if (name.includes("cuda") || name === "gpu" || name.endsWith(".blackwell"))
+    return "NVIDIA GPU가 있는 계산 서버에서 드라이버·CUDA 환경을 확인하세요.";
+  if (name.startsWith("report.")) return "프로그램을 업데이트한 뒤 환경 확인을 다시 실행하세요.";
+  if (name.endsWith(".framework") || name.endsWith(".scaffold"))
+    return "선택한 프레임워크 구조 파일을 확인하세요.";
+  return "환경·설치에서 이 엔진의 설치 프로필을 설치한 뒤 다시 확인하세요.";
+}
 function renderDiagnostics(diagnosis) {
   if (!diagnosis) return;
   const output = $("diagnostics-output");
-  output.replaceChildren(
-    el("h3", diagnosis.ok ? I18N.term("실행 준비 통과") : I18N.term("실행 준비 미충족")),
-  );
+  output.replaceChildren(el("h3", I18N.term(Array.isArray(diagnosis.checks) && diagnosis.checks.length
+    ? diagnosis.ok ? "실행 준비 통과" : "실행 준비 미충족" : "환경 확인 기록")));
   if (!Array.isArray(diagnosis.checks) || !diagnosis.checks.length) {
-    output.replaceChildren(el("p", I18N.term("환경 확인 세부 기록이 아직 없습니다. 작업·로그에서 진행 상태나 종료 사유를 확인하세요.")));
+    output.append(el("p", I18N.term("환경 확인 세부 기록이 아직 없습니다. 작업·로그에서 진행 상태나 종료 사유를 확인하세요.")));
     return;
   }
-  const rows = diagnosis.checks.map((c) => ({
-    항목: c.name,
-    필수: c.required,
-    준비: c.ok,
-    조치: c.ok
-      ? "확인 완료"
-      : c.name.includes("wt_structure")
-        ? "WT VHH 구조를 입력하거나 AntiFold를 끄세요."
-        : c.name.includes("cuda") || c.name === "gpu"
-          ? "GPU 드라이버·CUDA·계산 호스트 환경을 확인하세요."
-          : "선택한 모드의 설치 프로필을 설치하고 작업 로그를 확인하세요.",
-    근거: JSON.stringify(c.details || c.detail || c.evidence || c),
-  }));
-  table(output.appendChild(el("div", undefined, "scroll")), rows, [
-    "항목",
-    "필수",
-    "준비",
-    "조치",
-    "근거",
-  ]);
+  const grid = el("table", null, "diagnostic-table"), head = el("tr"), body = el("tbody");
+  for (const title of ["항목", "구분", "준비 상태", "다음 단계"]) head.append(el("th", I18N.term(title)));
+  const thead = el("thead"); thead.append(head); grid.append(thead, body);
+  for (const check of diagnosis.checks) {
+    const row = el("tr");
+    for (const value of [diagnosticCaption(check.name), I18N.term(check.required ? "필수" : "선택"),
+      I18N.term(check.ok ? "준비됨" : check.required ? "필수 확인" : "선택 기능"), I18N.term(diagnosticAction(check))])
+      row.append(el("td", value));
+    body.append(row);
+  }
+  const scroll = el("div", null, "scroll"); scroll.append(grid); output.append(scroll);
+  const original = el("details"), raw = el("pre");
+  original.id = "diagnostics-original";
+  raw.textContent = JSON.stringify(diagnosis, null, 2);
+  original.append(el("summary", I18N.term("기술 진단 원문")), raw); output.append(original);
 }
+/* DIAGNOSTIC_PRESENTATION_END */
 function setupExplorer() {
   for (const id of [
     "candidate-search",
@@ -3359,7 +3385,7 @@ async function initNoviceFlow() {
   }
   next.onclick=()=>{try {if(step===1)validateInputs();else inputSettings();jump(step+1);}catch(e){I18N.text(reason, I18N.term(e.message));const field=e.inputField||(step===2?consent:$("mode").value==="complex"?fasta:$("input-kind").value==="fasta"?$("target-fasta"):$("structure-file"));field.focus();field.setAttribute("aria-invalid","true");}};
   start.onclick=()=>{fields();jump(1);};prev.onclick=()=>jump(step-1);
-  function copiesReview(){try{const old=[...copies.querySelectorAll("input")].map(i=>i.value),rows=noviceFasta(fasta.value);copies.replaceChildren(...rows.map((r,i)=>{const l=el("label",I18N.format("{0} · {1} · {2} aa · 사본 수", [String.fromCharCode(65+i), r.name, r.sequence.length])),n=el("input");n.id="complex-copies-"+i;n.type="number";n.min="1";n.max="25";n.value=old[i]||"1";l.append(n);return l;}));}catch(e){I18N.text(copies, I18N.term(e.message));}}
+  function copiesReview(){try{const old=[...copies.querySelectorAll("input")].map(i=>i.value),rows=noviceFasta(fasta.value);copies.replaceChildren(...rows.map((r,i)=>{const l=el("label",I18N.format("{0} · {1} · {2} aa · 사본 수", [String.fromCharCode(65+i), r.name, r.sequence.length])),n=el("input");n.id="complex-copies-"+i;n.type="number";n.min="1";n.max="25";n.value=old[i]||"1";l.append(n);return l;}));}catch{copies.replaceChildren();}}
   fasta.addEventListener("input",copiesReview);
   host.addEventListener("input",e=>{if(e.target!==consent)consent.checked=false;I18N.text(reason, "");render();if(restoring)return;clearTimeout(draftTimer);draftTimer=setTimeout(()=>{const fields={};for(const n of host.querySelectorAll("input[id],select[id],textarea[id]")){if(n.type!=="file"&&n.id!=="novice-consent")fields[n.id]=n.type==="checkbox"?n.checked:n.value;}fields.comparison_engines=[...controls.querySelectorAll('[data-novice-engine]:checked')].map(i=>i.value);saveQueue=saveQueue.catch(()=>{}).then(()=>api("/api/draft",{version:1,fields})).catch(e=>{I18N.text(reason, I18N.concat([I18N.term("초안 저장 실패: "), e.message]));});},500);});
   action("load-tutorial",async()=>{const revision=state.inputRevision;const example=await api("/api/tutorials/"+$("tutorial-mode").value),entry=example.payload.entries[0];if(revision!==state.inputRevision)throw Error("불러오는 동안 입력이 변경되었습니다. 현재 입력을 유지합니다.");$("mode").value=example.mode;$("input-kind").value="fasta";$("analysis-preset").value="small-four-v1";$("advanced").value="{}";$("mock").checked=false;$("candidate-limit").value="";$("design-count").value="";if($("selection-limit"))$("selection-limit").value="";$("seed").value="42";$("job-name").value=example.payload.name;$("target-fasta").value=entry.content||"";$("vhh-fasta").value=entry.vhh_fasta||"";$("wt-fasta").value=entry.wt_fasta||"";fasta.value=(entry.proteins||[]).map(p=>`>${p.name}\n${p.sequence}`).join("\n");consent.checked=false;invalidateInput();copiesReview();fields();jump(1);I18N.text($("tutorial-status"), I18N.term("공개 입력을 불러왔습니다. 아직 계산은 시작하지 않았습니다."));});

@@ -1,6 +1,6 @@
 # Update an existing installation
 
-The current release is **0.4.8rc11**. It updates the interface and guidance without rerunning saved analyses. Model weights and prediction engines do not need reinstallation.
+The current release is **0.4.8rc12**. It updates the interface and guidance without rerunning saved analyses. Model weights and prediction engines do not need reinstallation.
 
 ## 1. Finish active jobs
 
@@ -20,10 +20,10 @@ If local changes or conflicts block the update, read the message. Keep your chan
 
 ### Installed from a ZIP
 
-Download `NanoCoFold_public-0.4.8rc11.zip` from the [new release](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8rc11) and **extract it into a separate folder**. Run the following in the original installation folder. Replace the path on the first line with the folder you just extracted.
+Download `NanoCoFold_public-0.4.8rc12.zip` from the [new release](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8rc12) and **extract it into a separate folder**. Run the following in the original installation folder. Replace the path on the first line with the folder you just extracted.
 
 ```bash
-update_source="/path/to/extracted/NanoCoFold_public-0.4.8rc11"
+update_source="/path/to/extracted/NanoCoFold_public-0.4.8rc12"
 rsync -a --exclude='.git/' --exclude='.nanocofold/' "$update_source/" ./
 ```
 
@@ -40,7 +40,7 @@ bash start.sh --port 18765
 
 Wait for **Update complete / 업데이트 완료** before starting the server. `git pull` alone does not update the installed program. `update.sh` updates the app at its saved installation location and does not run GPU analysis.
 
-Reload the browser and check **v0.4.8rc11** at the bottom of the page. If the old interface remains, use **Ctrl+Shift+R** (**Cmd+Shift+R** on macOS). Reopen saved results through **Explore results → Select run**. Existing HTML files retain their original interface; export a new report to use the updated one.
+Reload the browser and check **v0.4.8rc12** at the bottom of the page. If the old interface remains, use **Ctrl+Shift+R** (**Cmd+Shift+R** on macOS). Reopen saved results through **Explore results → Select run**. Existing HTML files retain their original interface; export a new report to use the updated one.
 
 ## If the update stops
 

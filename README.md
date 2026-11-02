@@ -2,7 +2,7 @@
 
 **English** · [한국어](README.ko.md)
 
-**Build: 0.4.8rc11**
+**Build: 0.4.8rc12**
 
 **Already installed?** Follow the [update guide](docs/UPDATE.en.md). Keep the original workspace and run `bash update.sh` after obtaining the new source.
 
@@ -27,6 +27,8 @@ Predict protein complexes, design new nanobodies, and compare existing candidate
 **Environment check → prepare input → review settings → run once → Open results.**
 
 **After the environment check, click Prepare analysis.** `diagnostics · Complete` is the environment-check record. Start the analysis in [section 3](#3-try-the-first-public-example).
+
+If a required check needs attention, follow its **Next step** before running an analysis. **Technical diagnostic record** contains the original details for your server administrator.
 
 [Collaborator guide: workflow, installation, and results](docs/collaborator-guide.en.md)
 

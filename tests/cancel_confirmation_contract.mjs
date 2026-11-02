@@ -178,3 +178,15 @@ test('a cancelling-only batch offers no repeated cancellation action',()=>{
  const f=fixture();f.row.state='cancelling';f.c.renderBatch(f.batch);
  assert.equal(f.$('batch-cancel').disabled,true);assert.equal(f.all(f.$('batch-rows')).filter(n=>n.tag==='button'&&n.textContent==='항목 취소').length,0);
 });
+
+for(const language of ['ko','en'])for(const state of ['cancelled','complete','interrupted'])for(const hasResult of [true,false])test(`${language}: ${state} terminal notice with results=${hasResult} is localized`,async()=>{
+ const f=fixture(language);f.row.state=state;f.row.result_id=hasResult?'saved-result':null;
+ Object.assign(f.c.states,{complete:'완료',interrupted:'중단'});
+ f.c.state.submissionNoticeJob='a';await f.c.refreshJobs();
+ const text=f.c.I18N.value(f.c.lastNotice);
+ assert.equal(f.c.state.submissionNoticeJob,null);
+ assert.match(text,language==='en'?/Cancelled|Complete|Interrupted/:/취소|완료|중단/);
+ assert.match(text,language==='en'?(hasResult?/Open results/:/job details and logs/):(hasResult?/결과 열기/:/작업 상세와 로그/));
+ if(language==='en')assert.equal(/[가-힣]/.test(text),false);
+ assert.equal(f.row.result_id,hasResult?'saved-result':null);
+});

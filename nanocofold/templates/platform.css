@@ -534,3 +534,10 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
 
 /* Counts are visible before submission and retain each field's explanation. */
 #analysis-scale{min-width:0;margin:16px 0;padding:16px;border:1px solid #c7d2d7;border-radius:6px}#analysis-scale legend{font-weight:700;padding:0 6px}#analysis-scale p{overflow-wrap:anywhere}#analysis-scale .muted{margin:8px 0 16px}#analysis-scale input{box-sizing:border-box;width:100%;min-width:0}
+
+/* Read the next action without horizontal scrolling, including on a phone. */
+.diagnostic-table{table-layout:fixed;min-width:0;width:100%}
+.diagnostic-table :is(th,td){white-space:normal;overflow-wrap:anywhere;vertical-align:top}
+.diagnostic-table th:nth-child(1){width:25%}
+.diagnostic-table th:nth-child(2){width:14%}
+.diagnostic-table th:nth-child(3){width:17%}

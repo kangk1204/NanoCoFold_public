@@ -3,6 +3,12 @@
 영어를 README와 웹 플랫폼의 기본 언어로 사용합니다. README 상단에서 한국어판으로 이동할 수 있고, 플랫폼 및 새 오프라인 보고서는 English/한국어를 즉시 전환하고 선택을 저장합니다. 입력·후보 ID·서열·수치·원본 로그·설정은 번역하거나 변경하지 않습니다. 언어 전환 시 사본 수 입력·체인 체크박스·선택한 모델과 PAE를 유지합니다. (2026-10-15)
 
 
+## 0.4.8rc12 — 2026-11-02
+
+Environment checks show readable names, required or optional status, and the next action. Original diagnostic records remain available in closed details. Terminal job notices follow the selected language, and invalid complex FASTA has one inline error.
+
+환경 확인에 쉬운 항목명·필수/선택 상태·다음 조치를 표시하고, 진단 원문은 접힌 상세 기록에 보존합니다. 작업 종료 안내의 한영 전환과 복합체 FASTA 오류 중복 표시를 수정했습니다.
+
 ## 0.4.8rc11 — 2026-11-02
 
 구조 입력의 수동 핫스팟 지정과 서열 입력의 자동 추천을 구분해 안내합니다. rc10의 설정 표시·업데이트 개선을 포함합니다.

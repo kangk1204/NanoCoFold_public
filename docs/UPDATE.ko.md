@@ -1,6 +1,6 @@
 # 기존 설치 업데이트
 
-현재 릴리스는 **0.4.8rc11**입니다. 웹 화면과 안내를 업데이트하며 기존 분석을 다시 계산하지 않습니다. 모델 가중치와 예측 엔진을 다시 설치할 필요가 없습니다.
+현재 릴리스는 **0.4.8rc12**입니다. 웹 화면과 안내를 업데이트하며 기존 분석을 다시 계산하지 않습니다. 모델 가중치와 예측 엔진을 다시 설치할 필요가 없습니다.
 
 ## 1. 실행 중인 작업 마치기
 
@@ -20,10 +20,10 @@ git pull --ff-only
 
 ### ZIP으로 설치한 경우
 
-[새 릴리스](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8rc11)에서 `NanoCoFold_public-0.4.8rc11.zip`을 받아 **별도 폴더에 압축 해제**합니다. 원래 설치 폴더에서 아래 명령을 실행합니다. 첫 줄의 경로는 방금 압축을 푼 폴더로 바꾸세요.
+[새 릴리스](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8rc12)에서 `NanoCoFold_public-0.4.8rc12.zip`을 받아 **별도 폴더에 압축 해제**합니다. 원래 설치 폴더에서 아래 명령을 실행합니다. 첫 줄의 경로는 방금 압축을 푼 폴더로 바꾸세요.
 
 ```bash
-update_source="/새로/압축을/푼/NanoCoFold_public-0.4.8rc11"
+update_source="/새로/압축을/푼/NanoCoFold_public-0.4.8rc12"
 rsync -a --exclude='.git/' --exclude='.nanocofold/' "$update_source/" ./
 ```
 
@@ -40,7 +40,7 @@ bash start.sh --port 18765
 
 **Update complete / 업데이트 완료**를 확인한 뒤 시작 명령을 실행하세요. `git pull`만으로 설치된 프로그램이 바뀌지는 않습니다. `update.sh`가 기존 설치 위치의 프로그램을 갱신하며 GPU 계산은 실행하지 않습니다.
 
-브라우저를 새로고침하고 화면 하단의 **v0.4.8rc11**을 확인합니다. 이전 화면이 남으면 **Ctrl+Shift+R**(macOS: **Cmd+Shift+R**)로 다시 불러옵니다. 결과는 **결과 탐색 → 실행 선택**에서 다시 엽니다. 저장된 HTML은 생성 당시 화면을 유지하므로 새 화면이 필요하면 보고서를 다시 내보내세요.
+브라우저를 새로고침하고 화면 하단의 **v0.4.8rc12**을 확인합니다. 이전 화면이 남으면 **Ctrl+Shift+R**(macOS: **Cmd+Shift+R**)로 다시 불러옵니다. 결과는 **결과 탐색 → 실행 선택**에서 다시 엽니다. 저장된 HTML은 생성 당시 화면을 유지하므로 새 화면이 필요하면 보고서를 다시 내보내세요.
 
 ## 업데이트가 멈추면
 

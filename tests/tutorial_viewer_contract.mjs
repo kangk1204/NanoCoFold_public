@@ -28,6 +28,9 @@ test('new complex comparison uses the visible selection and only fresh input con
 test('model plan follows custom candidate counts and never drops a screen library',()=>{
   const {context:c}=noviceSettingsFixture(),screen={comparison:{enabled:true,engines:['colabfold','boltz2','chai1','opendde']}};
   assert.match(c.noviceModelPlan({screen,design:{engine:'both',num_designs:3,mpnn:{seqs_per_struct:1}}},'design',0),/최대 24모델/);
+  const design={engine:'both',num_designs:3,mpnn:{seqs_per_struct:1},filters:{top_n_to_score:2}};
+  assert.match(c.noviceModelPlan({screen,design,run:{mock:true}},'design',0),/후보 6개.*최대 24모델/);
+  assert.match(c.noviceModelPlan({screen,design,run:{mock:false}},'design',0),/후보 5개.*최대 20모델/);
   assert.match(c.noviceModelPlan({screen},'screen',101),/101개.*404모델/);
   assert.match(c.noviceModelPlan({screen,mature:{library:{max_variants:3},prefilter:{top_n:9}}},'mature',0),/최대 16모델/);
   assert.match(c.noviceModelPlan({complex:{proteins:[],comparison_engines:['boltz2','opendde'],seeds:[42,7],models_per_seed:2}},'complex',0),/계획 모델 8개/);
