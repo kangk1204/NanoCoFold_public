@@ -2,7 +2,7 @@
 
 **English** · [한국어](README.ko.md)
 
-**Build: 0.4.8rc10**
+**Build: 0.4.8rc11**
 
 **Already installed?** Follow the [update guide](docs/UPDATE.en.md). Keep the original workspace and run `bash update.sh` after obtaining the new source.
 
@@ -253,7 +253,7 @@ The rc9 offline report viewer shows the preserved rc5 Barnase–Barstar GPU resu
 
 For **Design new nanobodies**, the small starter preset requests one backbone from RFantibody and one from BoltzGen, then evaluates the two candidates with four engines: **up to 8 predicted models**. This is a starter size, not an application limit. In **Run settings → Analysis size**, check the current values and adjust the backbone count and final selection limit as needed. Backbone, sequence, predicted-model and selected-candidate counts are separate. The final selection limit applies per engine in a multi-engine comparison.
 
-Hotspot exclusions omit tags or fusion regions from automatic site suggestions. They retain the structure and contact assessment and do not prohibit binding there. Specify intended residues in the hotspot position field; leave exclusions blank when unnecessary. Region start/end changes the actual target segment used for analysis.
+Hotspot exclusions omit tags or fusion regions from automatic site suggestions. They retain the structure and contact assessment and do not prohibit binding there. For structure input, specify intended residues in the hotspot position field. Sequence-only input selects hotspots automatically from the predicted structure. Leave exclusions blank when unnecessary. Region start/end changes the actual target segment used for analysis.
 
 ## 4. Use your own input
 

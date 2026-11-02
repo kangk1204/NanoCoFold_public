@@ -1,5 +1,9 @@
 # 배포 검증 기록
 
+## 0.4.8rc11 — 2026-11-02 input guidance clarification
+
+rc11 distinguishes manual hotspot entry for structure input from automatic hotspot selection for sequence-only input. It retains the rc10 runtime/update improvements. Exact final test counts, package hashes and operating deployment are recorded in the rc11 release `VALIDATION.json`; the rc10 observations below retain their original scope.
+
 ## 0.4.8rc10 — 2026-11-02 UI and update verification
 
 The interface displays effective generation, evaluation and selection settings, explains hotspot exclusions, and shows the installed version. Default computation sizes, scientific thresholds and saved analyses are retained.

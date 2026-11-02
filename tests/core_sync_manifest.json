@@ -1,7 +1,7 @@
 {
   "files": {
     "config/default.yaml": "63d91e04d1b038179f3bbb6a7bc84e88ec2990d8105f42d8112439d3718649aa",
-    "nanocofold/__init__.py": "e4ff5a8ab9bae097d17c64486d2fe5d490bc5947f774ff19b8851b70991b9fc9",
+    "nanocofold/__init__.py": "ed13fdbe25d330f0ec74fbcddf7d28301d997585de8d73020acee23f7b9b3674",
     "nanocofold/__main__.py": "d62328ce089787b32b289638f572509797ed41c59575d858d6faf6d06569369f",
     "nanocofold/_data/core-linux.txt": "b27f25a584d273ebe7a98f1cb28d1d6b6e9c138b135fa254f64dd0ba73e9c529",
     "nanocofold/_data/locks/antibody-source.json": "93a87140c4584deb609649f2079e87310f2d19f83bbca09fdf55c3e4aad1394d",
@@ -127,11 +127,11 @@
     "nanocofold/templates/benchmark-viewer-display.js": "8bd0d88f3ad2499029bc1a3142048e0c4930004c329c63edb3bda3571f901395",
     "nanocofold/templates/input-molstar.js": "a67974ff3f720ccc48fe85a66ae12764cafc7096df4989f8a025150e23559727",
     "nanocofold/templates/native_delivery_viewer.html": "b1b507291e699f961a4a901ecb09dcabf538fd213a701a0cf178458db5772f4e",
-    "nanocofold/templates/platform-i18n.js": "31db8c33b5fea787b70bd02d949c2a88fde2ab893024770157e17eb021286aa1",
+    "nanocofold/templates/platform-i18n.js": "df2f8de1ee058aeb3cac3d185a6f5b7a6dfd642f029fd1164eb2d05de8dc2c9f",
     "nanocofold/templates/platform.css": "d823da21dc48395c3115a61105e09ff0b619f719aae028d3bd5d0b324277d188",
-    "nanocofold/templates/platform.html": "3e8c2af07816d580eaf7a421a6b2abe5cc45b5b3578ecbef39f4afaee551c16f",
+    "nanocofold/templates/platform.html": "99042d67fd69dbddf349e466df7867557c882f430ac251ca65d8a9649adbc4fa",
     "nanocofold/templates/platform.js": "d8a1171c6ff5cc1c79f8ff62b4b0e3f6ea00c56c439d4a42565f7277ba7a795b",
-    "nanocofold/templates/platform_offline.html": "6c54f3f21f17bb578328d740239cb0ca5b86ff48a471444fe984455840a9ba6c",
+    "nanocofold/templates/platform_offline.html": "fb36f0dfb332ef072328fbfbd171abd01b1018cb1492e2bb1e6ce3be0628a231",
     "nanocofold/templates/report.html.j2": "bff9a3d2ed03e365b418b0ab44be68b4592cedeb5f05ff8f9e0688ee97be7b5d",
     "nanocofold/templates/result-molstar.js": "6bfb1867be13aa3b6d4c927b8af5449153e2082bf33f7212e4e78f9a568a3817",
     "nanocofold/templates/wizard.html": "f5370199178d2eeebdaafe4f0a925941b2ce52c3013bcab7c736192b6dffbd6b",

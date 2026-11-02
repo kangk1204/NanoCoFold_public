@@ -2053,7 +2053,8 @@ const NCF_TRANSLATIONS = Object.freeze({
   "현재 설정의 생성·평가 규모를 확인하세요. 백본 수와 서열 수는 다를 수 있으며, 후보가 늘면 계산 시간과 저장 공간도 늘어납니다.": "Review the generation and evaluation counts. Backbone and sequence counts can differ. More candidates require more computation time and storage.",
   "분석 규모": "Analysis size",
   "최종 선별 상한 · 여러 엔진 비교는 엔진별": "Final selection limit · Per engine when comparing engines",
-  "서열 입력의 구조와 결합 부위는 예측됩니다. 실험 구조 확인과 구분하세요.": "Sequence input produces predicted structures and hotspots."
+  "서열 입력의 구조와 결합 부위는 예측됩니다. 실험 구조 확인과 구분하세요.": "Sequence input produces predicted structures and hotspots.",
+  "구조 입력은 결합 부위(hotspot) 위치에서 잔기를 지정합니다. 서열만 입력하면 예측 구조에서 결합 부위를 자동 추천합니다. 분석 시작·끝은 사용할 표적 서열 구간이며, 번호는 입력 서열의 첫 잔기를 1로 셉니다.": "For structure input, specify residues in the hotspot position field. Sequence-only input selects hotspots automatically from the predicted structure. Region start and end select the target segment; positions start at 1 in the input sequence."
 });
 /* Explicit presentation bindings; no DOM observer, input rewriting, or API mutation. */
 globalThis.I18N = (() => {
