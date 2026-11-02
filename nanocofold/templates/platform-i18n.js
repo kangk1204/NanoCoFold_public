@@ -339,7 +339,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "분석 끝": "Region end",
   "표적 끝": "End of target",
   "결합 부위(hotspot) 추천 제외 구간 · 한 줄에 시작-끝 이름": "Regions excluded from hotspot suggestions · One start-end name per line",
-  "1-20 정제 태그 150-170 융합 구간": "1-20 purification tag 150-170 fusion region",
+  "1-20 정제 태그 150-170 융합 구간": "1-20 purification tag\n150-170 fusion region",
   "제외 구간은 좌표·접촉 평가를 유지합니다. 분석 구간 선택은 실제 표적 construct를 절단합니다. 도메인·태그 이름은 연구자가 지정하며 자동 확정하지 않습니다.": "Exclusions retain coordinates and contact evaluation. Selecting an analysis region truncates the actual target construct. Domain and tag names are supplied by the researcher and are not inferred automatically.",
   "VHH 라이브러리 FASTA": "VHH library FASTA",
   "전체 VHH FASTA 파일": "Full VHH FASTA file",
@@ -2035,7 +2035,25 @@ const NCF_TRANSLATIONS = Object.freeze({
   "CDR 미평가 모델:": "Models without CDR assessment:",
   "건. CDR 범위와 평가 도구를 확인하세요. 점수·구조 탐색과 파일 저장은 계속할 수 있습니다.": " records. Check CDR ranges and assessment tools. You can continue exploring scores and structures and saving files.",
   "결과 탐색기는 소수 3자리, 정적 보고서는 유효숫자 8자리까지 표시합니다. 원값은 툴팁과 CSV에서 확인하세요. 순위와 적격 판정은 저장된 값을 사용합니다.": "The explorer shows three decimal places; static reports show up to eight significant digits. Check tooltips and CSV files for original values. Rankings and eligibility use the saved values.",
-  "후보의 신뢰도 지표·PAE·계면 접촉을 함께 확인하세요.": "Review the candidate’s confidence metrics, PAE, and interface contacts together."
+  "후보의 신뢰도 지표·PAE·계면 접촉을 함께 확인하세요.": "Review the candidate’s confidence metrics, PAE, and interface contacts together.",
+  "후속 평가 후보 수 설정": "Candidates for follow-up evaluation",
+  "생성할 백본 수 · 생성기별": "Backbones to generate · Per generator",
+  "비우면 현재 설정 유지": "Leave blank to keep the current setting",
+  "연구자 탐색 · 후보 폭넓게 평가": "Researcher exploration · Evaluate more candidates",
+  "자동 추천에서 뺄 정제 태그·융합 구간만 입력하세요. 원하는 결합 부위를 남기려고 나머지 전체를 입력할 필요는 없습니다. 비워 두면 추가 제외 없이 추천합니다. 제외 구간도 구조와 접촉 평가에 포함되며, 결합을 금지하지 않습니다.": "Enter only tags or fusion regions to omit from automatic hotspot suggestions. You do not need to list every region outside your intended binding site. Leave blank for no extra exclusions. Excluded regions remain in the structure and contact assessment; this does not prevent binding there.",
+  "원하는 잔기는 결합 부위(hotspot) 위치에 지정하세요. 분석 시작·끝은 실제로 사용할 표적 서열 구간을 정합니다. 번호는 입력 서열의 첫 잔기를 1로 세며 PDB 원본 번호와 다를 수 있습니다.": "Specify intended residues in the hotspot position field. Region start and end select the target sequence used for analysis. Positions start at 1 in the input sequence and may differ from original PDB numbering.",
+  "최종 선별 상한은 1 이상의 정수여야 합니다.": "The final selection limit must be an integer of at least 1.",
+  "입력 검토에서 확인": "Check during input review",
+  "현재 설정 {0} · 비우면 유지": "Current setting: {0} · Leave blank to keep",
+  "생성기별 백본 {0}개 · RFantibody 백본당 서열 {1}개 · BoltzGen 백본당 서열 {2}개. 실제 생성 수는 결과에서 확인합니다.": "Backbones per generator: {0} · Sequences per backbone: RFantibody {1}, BoltzGen {2}. Check actual generation counts in the results.",
+  "변이 후보 최대 {0}개를 평가하며 WT는 별도 대조군입니다.": "Evaluate up to {0} variant candidates, with WT as a separate control.",
+  "RFantibody 후속 평가 후보 최대 {0}개 · 단일 엔진 평가 최대 {1}개. BoltzGen과 다중 엔진 비교에는 별도 생성·평가 경로가 적용됩니다.": "RFantibody follow-up candidates: up to {0} · Single-engine evaluation: up to {1}. BoltzGen and multi-engine comparison use their respective generation and evaluation paths.",
+  "최종 선별은 최대 {0}개입니다. 여러 엔진 비교에서는 엔진별로 적용하며, 적격 기준과 다양성 제한에 따라 줄어들 수 있습니다.": "Select up to {0} candidates, per engine in a multi-engine comparison. Eligibility and diversity criteria may reduce this number.",
+  "작은 시작 설정은 설치 확인용 소규모 분석입니다. 아래 수를 바꾸면 규모를 늘릴 수 있습니다. 후보 서열 수·예측 모델 수·최종 선별 수는 서로 다릅니다.": "The small starter preset is a short installation check. Change the counts below for a larger run. Candidate sequences, predicted models and final selections are separate counts.",
+  "현재 설정의 생성·평가 규모를 확인하세요. 백본 수와 서열 수는 다를 수 있으며, 후보가 늘면 계산 시간과 저장 공간도 늘어납니다.": "Review the generation and evaluation counts. Backbone and sequence counts can differ. More candidates require more computation time and storage.",
+  "분석 규모": "Analysis size",
+  "최종 선별 상한 · 여러 엔진 비교는 엔진별": "Final selection limit · Per engine when comparing engines",
+  "서열 입력의 구조와 결합 부위는 예측됩니다. 실험 구조 확인과 구분하세요.": "Sequence input produces predicted structures and hotspots."
 });
 /* Explicit presentation bindings; no DOM observer, input rewriting, or API mutation. */
 globalThis.I18N = (() => {

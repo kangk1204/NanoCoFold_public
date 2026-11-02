@@ -63,6 +63,7 @@ const state = {
   inputRevision: 0,
   inputReadinessRequest: 0,
   presets: {},
+  planningDefaults: {},
   starter: null,
   capabilities: {},
   submissionId: null,
@@ -468,6 +469,7 @@ function inputSettings(forPlan = false) {
   let cfg = merge($("analysis-preset").value === "small-four-v1"
     ? state.starter?.modes[$("mode").value]?.native_override || {}
     : state.presets[$("analysis-preset").value] || {}, advanced);
+  if (forPlan) cfg = merge(state.planningDefaults || {}, cfg);
   const simulated = $("mock").checked && $("mode").value !== "complex";
   if ($("analysis-preset").value === "small-four-v1") {
     cfg.screen.colabfold.msa_source = $("novice-msa").value;
@@ -496,6 +498,12 @@ function inputSettings(forPlan = false) {
       screen: { tier2_n: value },
       mature: { prefilter: { top_n: value } },
     });
+  }
+  const selection = $("selection-limit");
+  if (selection?.value && ["design", "mature"].includes($("mode").value)) {
+    if (!Number.isSafeInteger(selection.valueAsNumber) || selection.valueAsNumber < 1)
+      throw Error("최종 선별 상한은 1 이상의 정수여야 합니다.");
+    cfg = merge(cfg, {rank: {final_n: selection.valueAsNumber}});
   }
   return merge(cfg, {
     run: {
@@ -553,9 +561,37 @@ function noviceModelPlan(cfg, mode, libraryCount) {
   const selected = Number.isInteger(variants) ? Math.min(top, variants) : top;
   return `${Number.isInteger(variants) ? `변이 최대 ${variants}개 준비 · ` : ""}최대 ${selected}개와 WT × 엔진 ${engines}개 = 최대 ${(selected + 1) * engines}모델 · 실제 선별 수는 실행 후 확정됩니다.`;
 }
+function renderAnalysisScale(cfg, mode) {
+  const known = value => Number.isSafeInteger(value) && value > 0 ? value : I18N.term("입력 검토에서 확인");
+  const design = cfg.design || {}, screen = cfg.screen || {}, mature = cfg.mature || {};
+  const defaults = {"design-count": design.num_designs,
+    "candidate-limit": mode === "mature" ? mature.prefilter?.top_n : design.filters?.top_n_to_score,
+    "selection-limit": cfg.rank?.final_n};
+  for (const [id, value] of Object.entries(defaults)) {
+    if ($(id)) I18N.attribute($(id), "placeholder", I18N.format("현재 설정 {0} · 비우면 유지", [known(value)]));
+  }
+  I18N.text($("design-count-help"), I18N.format("생성기별 백본 {0}개 · RFantibody 백본당 서열 {1}개 · BoltzGen 백본당 서열 {2}개. 실제 생성 수는 결과에서 확인합니다.",
+    [known(design.num_designs), known(design.mpnn?.seqs_per_struct), known(design.boltzgen?.inverse_fold_num_sequences)]));
+  I18N.text($("candidate-limit-help"), mode === "mature"
+    ? I18N.format("변이 후보 최대 {0}개를 평가하며 WT는 별도 대조군입니다.", [known(mature.prefilter?.top_n)])
+    : I18N.format("RFantibody 후속 평가 후보 최대 {0}개 · 단일 엔진 평가 최대 {1}개. BoltzGen과 다중 엔진 비교에는 별도 생성·평가 경로가 적용됩니다.",
+      [known(design.filters?.top_n_to_score), known(screen.tier2_n)]));
+  I18N.text($("selection-limit-help"), I18N.format("최종 선별은 최대 {0}개입니다. 여러 엔진 비교에서는 엔진별로 적용하며, 적격 기준과 다양성 제한에 따라 줄어들 수 있습니다.", [known(cfg.rank?.final_n)]));
+  const comparison = mode === "complex" ? cfg.complex?.comparison_engines || (screen.comparison?.enabled ? screen.comparison.engines : null)
+    : screen.comparison?.enabled ? screen.comparison.engines : null;
+  $("screen-engine").hidden = Array.isArray(comparison);
+  document.querySelector('label[for="screen-engine"]').hidden = Array.isArray(comparison);
+  const small = $("analysis-preset").value === "small-four-v1";
+  I18N.text($("analysis-scale-note"), I18N.term(small
+    ? "작은 시작 설정은 설치 확인용 소규모 분석입니다. 아래 수를 바꾸면 규모를 늘릴 수 있습니다. 후보 서열 수·예측 모델 수·최종 선별 수는 서로 다릅니다."
+    : "현재 설정의 생성·평가 규모를 확인하세요. 백본 수와 서열 수는 다를 수 있으며, 후보가 늘면 계산 시간과 저장 공간도 늘어납니다."));
+  for (const [id, visible] of [["design-count-help", mode === "design"], ["candidate-limit-help", ["design", "mature"].includes(mode)]]) $(id).hidden = !visible;
+  $("analysis-scale").hidden = mode === "complex" || mode === "screen";
+}
 function fields() {
   const mode = $("mode").value;
-  for (const [id, visible] of [["candidate-limit", mode !== "screen"], ["design-count", mode === "design"]]) {
+  for (const [id, visible] of [["candidate-limit", ["design", "mature"].includes(mode)], ["design-count", mode === "design"], ["selection-limit", mode !== "complex"]]) {
+    if (!$(id)) continue;
     $(id).hidden = !visible;
     document.querySelector(`label[for="${id}"]`).hidden = !visible;
   }
@@ -2868,7 +2904,7 @@ async function boot() {
       $("advanced").value = JSON.stringify(parsed.config, null, 2);
       $("analysis-preset").value = "standard";
       $("candidate-limit").value = "";
-      $("design-count").value = "";
+      $("design-count").value = ""; if ($("selection-limit")) $("selection-limit").value = "";
       $("mode").value = parsed.config.run.mode;
       $("screen-engine").value = parsed.config.screen.engine;
       $("seed").value = parsed.config.run.seed;
@@ -2991,7 +3027,7 @@ async function boot() {
   action("fill-demo", () => {
     $("analysis-preset").value = "small-four-v1";
     $("candidate-limit").value = "";
-    $("design-count").value = "";
+    $("design-count").value = ""; if ($("selection-limit")) $("selection-limit").value = "";
     $("region-start").value = ""; $("region-end").value = ""; $("hotspot-exclusions").value = "";
     $("input-kind").value = "fasta";
     $("mock").checked = true;
@@ -3079,7 +3115,7 @@ async function boot() {
     $("advanced").value = JSON.stringify(state.result.config, null, 2);
     $("analysis-preset").value = "standard";
     $("candidate-limit").value = "";
-    $("design-count").value = "";
+    $("design-count").value = ""; if ($("selection-limit")) $("selection-limit").value = "";
     $("mode").value = state.result.mode;
     $("job-name").value = (state.result.name || "analysis") + "-new";
     fields();
@@ -3140,6 +3176,8 @@ async function boot() {
   $("view-input").addEventListener("input", invalidateInput);
   const session = await api("/api/session");
   state.presets = session.presets || {};
+  state.planningDefaults = session.planning_defaults || {};
+  I18N.text($("platform-version"), session.version ? "v" + session.version : "");
   [state.starter, state.capabilities] = await Promise.all([api("/api/starter-presets"), api("/api/capabilities")]);
   I18N.text($("workspace-path"), session.workspace);
   fields();
@@ -3239,7 +3277,7 @@ async function initNoviceFlow() {
   const rail = host.querySelector(".workflow-steps"); rail.replaceChildren(...state.starter.steps.map((name,i) => el("li", I18N.format("{0}. {1}", [i+1, I18N.term(name)]))));
   const heading = el("h2", "", "novice-heading"), task = el("p", "", "next-step"); heading.tabIndex=-1;task.setAttribute("role","status");host.insertBefore(heading,purposeCard);host.insertBefore(task,purposeCard);
   I18N.text(inputCard.querySelector("h2"), I18N.term("입력 준비 · 필요한 서열 또는 파일"));
-  I18N.text(settingsCard.querySelector("h2"), I18N.term("실행 조건 · 작은 시작 설정"));
+  I18N.text(settingsCard.querySelector("h2"), I18N.term("실행 조건"));
   const intro = $("analysis-preset").nextElementSibling;
   I18N.text(intro, I18N.term("새 분석의 기본값은 Seed 42와 엔진별 모델 1개입니다. screen은 모든 입력 후보를 평가합니다. 복원한 설정은 그대로 유지합니다."));
   const advanced = el("details"); advanced.id="novice-advanced";advanced.append(el("summary",I18N.term("고급 설정 · 후보 수·Seed·기존 설정 가져오기")));
@@ -3251,6 +3289,18 @@ async function initNoviceFlow() {
   const consent=el("input");consent.id="novice-consent";consent.type="checkbox";const cl=el("label",null,"check");cl.append(consent,el("span", I18N.term("이 입력의 단백질 서열을 api.colabfold.com으로 전송하는 데 동의합니다.")));controls.append(cl);
   const demoMsaNote=el("p",I18N.term("CPU 합성 데모는 MSA를 준비하거나 외부 서버로 서열을 전송하지 않습니다."),"muted");controls.append(demoMsaNote);
   const plan=el("p","","next-step");plan.id="novice-model-plan";settingsCard.insertBefore(controls,advanced);settingsCard.insertBefore(plan,advanced);
+  plan.setAttribute("role", "status"); plan.setAttribute("aria-live", "polite");
+  const scale = el("fieldset"); scale.id = "analysis-scale";
+  scale.append(el("legend", I18N.term("분석 규모")));
+  const scaleNote = el("p", null, "muted"); scaleNote.id = "analysis-scale-note"; scale.append(scaleNote);
+  for (const id of ["design-count", "candidate-limit"]) {
+    const help = el("p", null, "muted"); help.id = id + "-help";
+    scale.append(document.querySelector('label[for="' + id + '"]'), $(id), help);
+  }
+  const selectionLabel = el("label", I18N.term("최종 선별 상한 · 여러 엔진 비교는 엔진별")); selectionLabel.htmlFor = "selection-limit";
+  const selection = el("input"); selection.id = "selection-limit"; selection.type = "number"; selection.min = "1"; selection.step = "1"; selection.setAttribute("aria-describedby", "selection-limit-help");
+  const selectionHelp = el("p", null, "muted"); selectionHelp.id = "selection-limit-help";
+  scale.append(selectionLabel, selection, selectionHelp); settingsCard.insertBefore(scale, advanced);
   settingsCard.insertBefore(cl,advanced);
   const complex=el("div");complex.id="novice-complex-fields";complex.hidden=true;
   const label=el("label",I18N.term("복합체 단백질 FASTA · 위에서 아래 순서로 체인 배정"));label.htmlFor="complex-fasta";const fasta=el("textarea");fasta.id="complex-fasta";fasta.rows=8;fasta.spellcheck=false;
@@ -3294,7 +3344,7 @@ async function initNoviceFlow() {
     complex.hidden=!isComplex||$("input-kind").value!=="fasta";$("fasta-fields").hidden=isComplex||$("input-kind").value!=="fasta";
     controls.hidden=$("analysis-preset").value!=="small-four-v1";$("mock").disabled=isComplex;demoControls.hidden=isComplex;
     const simulated=$("mock").checked&&!isComplex;ml.hidden=simulated;msa.hidden=simulated;cl.hidden=simulated;demoMsaNote.hidden=!simulated;
-    try {I18N.text(plan, I18N.term(noviceModelPlan(inputSettings(true),$("mode").value,$("mode").value==="screen"?noviceFasta($("vhh-fasta").value).length:0)));}catch(e){I18N.text(plan, I18N.term(e.message));}
+    try {const cfg = inputSettings(true); renderAnalysisScale(cfg, $("mode").value); I18N.text(plan, I18N.term(noviceModelPlan(cfg,$("mode").value,$("mode").value==="screen"?noviceFasta($("vhh-fasta").value).length:0)));}catch(e){I18N.text(plan, I18N.term(e.message));}
     I18N.text($("review-input"), I18N.term("입력 확인"));I18N.text($("start-job"), I18N.term("분석 실행"));
     refreshSequenceHelp();
   }
@@ -3312,7 +3362,7 @@ async function initNoviceFlow() {
   function copiesReview(){try{const old=[...copies.querySelectorAll("input")].map(i=>i.value),rows=noviceFasta(fasta.value);copies.replaceChildren(...rows.map((r,i)=>{const l=el("label",I18N.format("{0} · {1} · {2} aa · 사본 수", [String.fromCharCode(65+i), r.name, r.sequence.length])),n=el("input");n.id="complex-copies-"+i;n.type="number";n.min="1";n.max="25";n.value=old[i]||"1";l.append(n);return l;}));}catch(e){I18N.text(copies, I18N.term(e.message));}}
   fasta.addEventListener("input",copiesReview);
   host.addEventListener("input",e=>{if(e.target!==consent)consent.checked=false;I18N.text(reason, "");render();if(restoring)return;clearTimeout(draftTimer);draftTimer=setTimeout(()=>{const fields={};for(const n of host.querySelectorAll("input[id],select[id],textarea[id]")){if(n.type!=="file"&&n.id!=="novice-consent")fields[n.id]=n.type==="checkbox"?n.checked:n.value;}fields.comparison_engines=[...controls.querySelectorAll('[data-novice-engine]:checked')].map(i=>i.value);saveQueue=saveQueue.catch(()=>{}).then(()=>api("/api/draft",{version:1,fields})).catch(e=>{I18N.text(reason, I18N.concat([I18N.term("초안 저장 실패: "), e.message]));});},500);});
-  action("load-tutorial",async()=>{const revision=state.inputRevision;const example=await api("/api/tutorials/"+$("tutorial-mode").value),entry=example.payload.entries[0];if(revision!==state.inputRevision)throw Error("불러오는 동안 입력이 변경되었습니다. 현재 입력을 유지합니다.");$("mode").value=example.mode;$("input-kind").value="fasta";$("analysis-preset").value="small-four-v1";$("advanced").value="{}";$("mock").checked=false;$("candidate-limit").value="";$("design-count").value="";$("seed").value="42";$("job-name").value=example.payload.name;$("target-fasta").value=entry.content||"";$("vhh-fasta").value=entry.vhh_fasta||"";$("wt-fasta").value=entry.wt_fasta||"";fasta.value=(entry.proteins||[]).map(p=>`>${p.name}\n${p.sequence}`).join("\n");consent.checked=false;invalidateInput();copiesReview();fields();jump(1);I18N.text($("tutorial-status"), I18N.term("공개 입력을 불러왔습니다. 아직 계산은 시작하지 않았습니다."));});
+  action("load-tutorial",async()=>{const revision=state.inputRevision;const example=await api("/api/tutorials/"+$("tutorial-mode").value),entry=example.payload.entries[0];if(revision!==state.inputRevision)throw Error("불러오는 동안 입력이 변경되었습니다. 현재 입력을 유지합니다.");$("mode").value=example.mode;$("input-kind").value="fasta";$("analysis-preset").value="small-four-v1";$("advanced").value="{}";$("mock").checked=false;$("candidate-limit").value="";$("design-count").value="";if($("selection-limit"))$("selection-limit").value="";$("seed").value="42";$("job-name").value=example.payload.name;$("target-fasta").value=entry.content||"";$("vhh-fasta").value=entry.vhh_fasta||"";$("wt-fasta").value=entry.wt_fasta||"";fasta.value=(entry.proteins||[]).map(p=>`>${p.name}\n${p.sequence}`).join("\n");consent.checked=false;invalidateInput();copiesReview();fields();jump(1);I18N.text($("tutorial-status"), I18N.term("공개 입력을 불러왔습니다. 아직 계산은 시작하지 않았습니다."));});
   render();const draftRevision=state.inputRevision;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=true);start.disabled=true;$("load-tutorial").disabled=true;try{const draft=await api("/api/draft");if(draftRevision!==state.inputRevision)throw Error("입력이 변경되어 저장된 초안을 덮어쓰지 않았습니다.");restoring=true;for(const [id,value]of Object.entries(draft.fields||{})){const n=$(id);if(n&&host.contains(n)&&n.type!=="file"){if(n.type==="checkbox")n.checked=value===true;else n.value=String(value);}}if(draft.fields?.comparison_engines)for(const n of controls.querySelectorAll('[data-novice-engine]'))n.checked=draft.fields.comparison_engines.includes(n.value);consent.checked=false;fields();copiesReview();if(Object.keys(draft.fields||{}).length)I18N.text(task, I18N.term("초안 입력을 복원했습니다. 구조 파일을 다시 선택하고 전송 동의와 입력을 확인하세요. 설치 환경 확인 기록은 재사용합니다."));}catch(e){I18N.text(reason, I18N.concat([I18N.term("초안 복원 실패: "), e.message]));}finally{restoring=false;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=false);start.disabled=false;$("load-tutorial").disabled=false;render();}
 }
 I18N.init();

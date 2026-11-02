@@ -206,7 +206,8 @@
               </div>
               <label for="hotspot-exclusions">결합 부위(hotspot) 추천 제외 구간 · 한 줄에 시작-끝 이름</label>
               <textarea id="hotspot-exclusions" rows="3" placeholder="1-20 정제 태그&#10;150-170 융합 구간"></textarea>
-              <p class="muted">제외 구간의 좌표·접촉 평가는 유지합니다. 분석 구간을 선택하면 해당 표적 구간만 사용합니다. 도메인·태그 이름은 직접 지정하세요.</p>
+              <p id="hotspot-exclusions-help" class="muted">자동 추천에서 뺄 정제 태그·융합 구간만 입력하세요. 원하는 결합 부위를 남기려고 나머지 전체를 입력할 필요는 없습니다. 비워 두면 추가 제외 없이 추천합니다. 제외 구간도 구조와 접촉 평가에 포함되며, 결합을 금지하지 않습니다.</p>
+              <p class="muted">원하는 잔기는 결합 부위(hotspot) 위치에 지정하세요. 분석 시작·끝은 실제로 사용할 표적 서열 구간을 정합니다. 번호는 입력 서열의 첫 잔기를 1로 세며 PDB 원본 번호와 다를 수 있습니다.</p>
             </details>
             <div id="library-fields" hidden>
               <label for="vhh-fasta">VHH 라이브러리 FASTA</label
@@ -253,7 +254,7 @@
             <label for="analysis-preset">후보 탐색 설정</label>
             <select id="analysis-preset">
               <option value="small-four-v1">작은 시작 설정 · 네 엔진 비교 (새 분석 기본)</option>
-              <option value="researcher_exploration">연구자 탐색 · 후보 폭넓게 평가 (기본)</option>
+              <option value="researcher_exploration">연구자 탐색 · 후보 폭넓게 평가</option>
               <option value="standard">기존 기본 설정 · 사전 필터 적용</option>
             </select>
             <p class="muted">연구자 탐색은 RF2·ESM 사전 탈락을 해제하고 결합 부위 restraint·랭킹 가중치를 끕니다.
@@ -261,10 +262,10 @@
               mature는 최대 500개와 WT 대조군을 평가합니다. screen은 입력 라이브러리 전체를 평가합니다.
               품질 판정·충돌·개발가능성 경고를 유지하며 결과는 전체 후보를 표시합니다.
               design 구조 생성은 선택한 결합 부위에 조건화됩니다. 후보 수가 늘면 계산 시간도 늘어납니다.</p>
-            <label for="candidate-limit">복합체 평가 후보 상한 · design/mature (WT는 별도 추가 가능)</label>
-            <input id="candidate-limit" type="number" min="1" step="1" placeholder="기본 500 · 비우면 설정값 사용" />
-            <label for="design-count">생성할 백본 수 · design</label>
-            <input id="design-count" type="number" min="1" step="1" placeholder="기본 1000 · 비우면 설정값 사용" />
+            <label for="candidate-limit">후속 평가 후보 수 설정</label>
+            <input id="candidate-limit" type="number" min="1" step="1" placeholder="비우면 현재 설정 유지" aria-describedby="candidate-limit-help" />
+            <label for="design-count">생성할 백본 수 · 생성기별</label>
+            <input id="design-count" type="number" min="1" step="1" placeholder="비우면 현재 설정 유지" aria-describedby="design-count-help" />
             <label for="screen-engine">복합체 예측 엔진</label
             ><select id="screen-engine">
               <option value="chai1">Chai-1</option>
@@ -732,7 +733,8 @@ ssh -L 8765:127.0.0.1:8765 USER@GPU_HOST</pre
       </section>
     </main>
     <footer>
-      로컬 자산 · 전체 후보 보존 · 예측 점수는 실험 검증과 함께 해석하세요.
+      <span id="platform-version"></span>
+      <span>로컬 자산 · 전체 후보 보존 · 예측 점수는 실험 검증과 함께 해석하세요.</span>
     </footer>
   </body>
 </html>

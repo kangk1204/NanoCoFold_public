@@ -22,13 +22,38 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.background import BackgroundTask
 
-from ..config import ASSET_ROOT, _deep_merge, exploration_config, read_config_yaml
+from ..config import ASSET_ROOT, _deep_merge, cfg_get, exploration_config, read_config_yaml
 from .inputs import InputManager, normalized_config
 from .jobs import JobManager
 from .paths import contained, native
 from .results import ResultReader, TABLES
 
 MAX_REQUEST = 20 * 1024 * 1024
+
+
+def planning_defaults(workspace: Path) -> dict:
+    """Display-only defaults from the same configuration used by input review.
+
+    Never return paths, environment variables, sequences or credentials here.
+    The browser still submits its explicit overrides, not these display values.
+    """
+    cfg = normalized_config(workspace)
+    result = {}
+    for dotted in (
+        "design.engine", "design.num_designs", "design.mpnn.seqs_per_struct",
+        "design.boltzgen.inverse_fold_num_sequences", "design.filters.top_n_to_score",
+        "design.refinement.enabled", "screen.engine", "screen.tier2_n",
+        "screen.comparison.enabled", "screen.comparison.engines", "screen.cascade.enabled",
+        "screen.num_diffn_samples", "screen.colabfold.num_models", "screen.colabfold.num_seeds",
+        "score.boltz2_diffusion_samples", "mature.prefilter.top_n",
+        "mature.library.max_variants", "rank.final_n",
+    ):
+        target = result
+        parts = dotted.split(".")
+        for part in parts[:-1]:
+            target = target.setdefault(part, {})
+        target[parts[-1]] = cfg_get(cfg, dotted)
+    return result
 
 
 class ExportFileResponse(FileResponse):
@@ -338,8 +363,16 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
 
     @app.get("/api/session")
     def session():
-        return {"workspace": str(workspace), "modes": ["complex", "design", "screen", "mature"], "poll_interval_ms": 2000,
-                "presets": {"researcher_exploration": exploration_config(), "standard": {}}}
+        from .. import __version__
+        try:
+            defaults = planning_defaults(workspace)
+        except (ValueError, OSError, KeyError):
+            # A broken installation remains inspectable through Environment.
+            # Do not invent numeric defaults before input review succeeds.
+            defaults = {}
+        return {"workspace": str(workspace), "version": __version__, "modes": ["complex", "design", "screen", "mature"], "poll_interval_ms": 2000,
+                "presets": {"researcher_exploration": exploration_config(), "standard": {}},
+                "planning_defaults": defaults}
 
     @app.get("/api/inputs")
     def input_list():

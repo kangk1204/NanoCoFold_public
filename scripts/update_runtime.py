@@ -11,8 +11,12 @@ import sys
 from install_runtime import ROOT, lock, now, reject_active_jobs, save
 
 
-def update(root=ROOT, *, run=subprocess.run):
-    location = json.loads((root / ".nanocofold/install-location.json").read_text())
+def installation(root):
+    location_path = root / ".nanocofold/install-location.json"
+    if not location_path.is_file():
+        raise ValueError("처음 설치한 소스 폴더에서 업데이트하세요. 새 설치는 bash install.sh를 실행하세요. / "
+                         "Update from the original installation folder. For a new installation, run bash install.sh.")
+    location = json.loads(location_path.read_text())
     workspace = Path(location["workspace"])
     python = workspace / ".venv-dev/bin/python"
     uv = Path(location["uv_path"])
@@ -23,6 +27,11 @@ def update(root=ROOT, *, run=subprocess.run):
             marker.get("workspace") != str(workspace) or marker.get("python") != str(python) or
             marker.get("status") != "complete"):
         raise ValueError("관리 중인 설치 위치를 확인할 수 없습니다. 기존 파일을 보존했습니다.")
+    return location, workspace, python, uv
+
+
+def update(root=ROOT, *, run=subprocess.run):
+    location, workspace, python, uv = installation(root)
     # This operation neither selects nor probes a GPU, and never initializes or
     # replaces the workspace. No setup/doctor/analysis command is invoked.
     environment = {**os.environ, "PYTHONUNBUFFERED": "1", "CUDA_VISIBLE_DEVICES": ""}
@@ -61,6 +70,11 @@ def update(root=ROOT, *, run=subprocess.run):
 
 if __name__ == "__main__":
     try:
+        # Use the installed Python for its job database and dependency checks.
+        # The host Python can use a different SQLite library (notably on macOS).
+        _, _, managed_python, _ = installation(ROOT)
+        if Path(sys.executable).absolute() != managed_python:
+            os.execv(str(managed_python), [str(managed_python), str(Path(__file__).resolve())])
         update()
     except (OSError,ValueError,KeyError,subprocess.SubprocessError,sqlite3.Error) as error:
         print("업데이트 실패 / Update failed: " + str(error),file=sys.stderr)

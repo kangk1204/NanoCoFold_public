@@ -3,6 +3,14 @@
 영어를 README와 웹 플랫폼의 기본 언어로 사용합니다. README 상단에서 한국어판으로 이동할 수 있고, 플랫폼 및 새 오프라인 보고서는 English/한국어를 즉시 전환하고 선택을 저장합니다. 입력·후보 ID·서열·수치·원본 로그·설정은 번역하거나 변경하지 않습니다. 언어 전환 시 사본 수 입력·체인 체크박스·선택한 모델과 PAE를 유지합니다. (2026-10-15)
 
 
+## 0.4.8rc10 — 2026-11-02
+
+현재 적용되는 백본·평가·선별 수를 표시하고, 작은 시작 설정을 유지한 채 분석 규모를 조절할 수 있도록 입력을 정리했습니다. 여러 엔진 비교에서는 적용되지 않는 단일 엔진 선택기를 숨깁니다. 핫스팟 추천 제외와 실제 분석 구간을 구분하고, 실행 버전을 화면 하단에 표시합니다. 계산 기본값·선별 기준·기존 결과는 유지합니다.
+
+업데이트는 검증된 설치본의 Python을 사용합니다. 시스템 Python과 SQLite 버전 차이로 기존 작업 DB를 열지 못하던 경로를 보완했습니다.
+
+공개 배포본에는 Git·ZIP 설치별 업데이트 안내를 추가했습니다. 기존 설치 위치에서 `bash update.sh`로 갱신한 뒤 웹을 다시 열면 됩니다. GPU 계산이나 모델 가중치 재설치는 필요하지 않습니다.
+
 ## 0.4.8rc9 — 2026-10-17
 
 Specificity campaigns apply the declared maturation library strategy, variant bounds and design engine selection. Managed core installation recovery and CLI/update exclusion protect existing work. The Site's selected-model PAE export includes verified numerical values, and legacy report scope captions follow the selected candidate. Final tests and deployment acceptance are recorded separately; historical results are preserved.

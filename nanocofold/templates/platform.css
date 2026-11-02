@@ -531,3 +531,6 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
 .cancel-confirmation p{line-height:1.6}.cancel-confirmation-target{font-weight:600;overflow-wrap:anywhere}.cancel-confirmation-target code{display:block;font-size:13px;font-weight:400;overflow-wrap:anywhere}
 .cancel-confirmation-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:12px;margin-top:24px}.cancel-confirmation-actions button{min-height:48px;margin:0}.cancel-confirmation-submit{background:#a43125;color:#fff;border-color:#a43125}.cancel-confirmation button:focus-visible{outline:3px solid #85601e;outline-offset:3px}
 @media(max-width:480px){.cancel-confirmation{padding:20px}.cancel-confirmation-actions{flex-direction:column}.cancel-confirmation-actions button{width:100%}}
+
+/* Counts are visible before submission and retain each field's explanation. */
+#analysis-scale{min-width:0;margin:16px 0;padding:16px;border:1px solid #c7d2d7;border-radius:6px}#analysis-scale legend{font-weight:700;padding:0 6px}#analysis-scale p{overflow-wrap:anywhere}#analysis-scale .muted{margin:8px 0 16px}#analysis-scale input{box-sizing:border-box;width:100%;min-width:0}

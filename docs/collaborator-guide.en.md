@@ -1,5 +1,7 @@
 # NanoCoFold collaborator guide
 
+Already installed? Use the [update guide](UPDATE.en.md) to keep your workspace and results.
+
 NanoCoFold designs nanobody candidates for a target protein and compares their predicted structures and sequence properties. Start with the public example to install the software and find the results. To view results someone sent you, go to [Opening ZIP files](#5-open-and-share-zip-files).
 
 - [GitHub](https://github.com/kangk1204/NanoCoFold_public)

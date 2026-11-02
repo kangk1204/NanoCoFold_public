@@ -1,5 +1,20 @@
 # 배포 검증 기록
 
+## 0.4.8rc10 — 2026-11-02 UI and update verification
+
+The interface displays effective generation, evaluation and selection settings, explains hotspot exclusions, and shows the installed version. Default computation sizes, scientific thresholds and saved analyses are retained.
+
+- Initial public CPU suite: 1,695 passed, 74 skipped, no failures. Final counts are recorded in `VALIDATION.json`. After the final hidden-control guard, the affected suite passed 111 tests with 24 opt-in skips; the JavaScript count and language contract passed all 5 cases. These are overlapping scopes.
+- Site contract suite: 916 passed, 4 skipped; type check, lint and production build passed.
+- The final updater regression suite passed 36 tests, including installed-interpreter selection before database access and refusal of an incomplete installation.
+- A separate CPU core installation was upgraded from rc9 to rc10 using the shipped updater. The installed CLI reported `0.4.8rc10`; all 6 protected installation/config/result files retained their SHA-256 hashes. Prediction engines and GPU execution were excluded.
+- Manual browser checks cover EN/KO settings, current-count hints, count changes, back navigation, 390px layouts, saved-report candidate selection and coordinate downloads. Browser-only tests skipped by the CPU suite are not counted as automated browser passes.
+- The ZIP update copy procedure was executed on isolated files. It retained the installation record, existing results, model fixture and Git metadata without deletion.
+- Final source commits, release assets and operating deployment status are recorded in the release's `VALIDATION.json`. Operating browser sign-in is a separate verification boundary.
+
+H200 and A6000 were not accessed. Private remote CI remains `USER_APPROVED_EXCEPTION_NOT_PASS`. Prior validation records below describe their original versions.
+
+
 **Archive paths:** References below to `examples/current_native`, `examples/outputs`, `START_HERE.html` and `validation/status.json` identify files in the separately supplied collaborator delivery ZIP. They are not directories in this GitHub source checkout. The source includes public inputs under `examples/tutorial`; source-only users run those inputs separately. Historical evidence below is preserved as recorded.
 
 ## 0.4.8rc9 — 2026-10-17 validation contract / 검증 계약
