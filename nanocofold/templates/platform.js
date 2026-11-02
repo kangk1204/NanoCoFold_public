@@ -2264,7 +2264,8 @@ function setPaeErrorStatus(error = null) {
 }
 function localizeEmptyPaeAnnotation() {
   const plot = $("pae");
-  setPaeErrorStatus(plot?.data?.length === 0 ? state.structure?.pae_error : null);
+  const renderError = state.paeRenderError && state.paeRenderError.data === state.structure ? state.paeRenderError.message : null;
+  setPaeErrorStatus(renderError || (plot?.data?.length === 0 ? state.structure?.pae_error : null));
   if (!window.Plotly || plot?.data?.length !== 0 || !plot.layout?.annotations?.length) return;
   const text = !state.structure ? "구조 / PAE 미평가"
     : state.structure.pae_error ? "PAE" : state.structure.pae_status === "removed_by_retention" ? "PAE · 용량 정리로 삭제됨" : "PAE 미평가";
@@ -2433,6 +2434,14 @@ function focusButton(label, labels, text, measurement) {
 async function renderStructure() {
   const data = state.structure;
   if (!data) return;
+  // Neither display owns the other's readiness. Handle plot failures now so a
+  // pending 3D factory cannot leave an unhandled plot rejection behind.
+  renderPae(data).catch(() => {
+    if (state.structure !== data) return;
+    const message = "PAE 차트를 표시하지 못했습니다. 아래 자료 설명을 확인하세요.";
+    state.paeRenderError = {data, message};
+    setPaeErrorStatus(message);
+  });
   const chains = (Array.isArray(data.chains) ? data.chains : []).filter(chain => chain && typeof chain.id === "string");
   I18N.text($("structure-data-note"), localizedStructureDataNote(data));
   if (state.viewerData !== data) {
@@ -2449,6 +2458,11 @@ async function renderStructure() {
       const original = location.mapping ? `${location.mapping.author_chain || location.mapping.source_chain}:${location.mapping.source_residue || "미관측"}` : null;
       I18N.text($("structure-note"), I18N.format("{0} · 구조 author 번호{1}", [I18N.term(location.label), original ? I18N.concat([I18N.term(" · 입력 원본 "), original]) : I18N.term(" · 원본 대응은 아래 표 확인")]));
       $("residue-a").value = location.label;
+    }, phase => {
+      if (request !== state.viewerRequest || state.structure !== data) return;
+      const messages = {viewer: "3D 뷰어를 시작하고 있습니다.", coordinates: "3D 좌표를 읽고 있습니다.",
+        layers: "체인과 표시 레이어를 준비하고 있습니다.", display: "3D 화면을 정리하고 있습니다."};
+      if (messages[phase]) I18N.text($("structure-note"), I18N.term(messages[phase]));
     });
     let viewer;
     try { viewer = await state.viewerReady; }
@@ -2538,6 +2552,10 @@ async function renderStructure() {
       ),
     );
   warnings(details.appendChild(el("div")), data.issues);
+}
+async function renderPae(data) {
+  if (state.structure !== data) return;
+  if (state.paeRenderError?.data !== data) state.paeRenderError = null;
   describeResultFigure("pae", "PAE · 예측 정렬 오차", data.pae
     ? I18N.format("PAE 행렬 {0} × {0} 잔기. 단위 Å. 행은 정렬 기준 잔기, 열은 평가 잔기입니다. 색상 눈금은 0–30 Å이며 원값은 PAE 다운로드에서 확인하세요.", [data.pae.labels?.length ?? I18N.term("미기록")])
     : I18N.term(data.pae_status === "removed_by_retention" ? "PAE · 용량 정리로 삭제됨" : "PAE 미평가"), "#report-provenance", !data.pae);
@@ -2580,11 +2598,17 @@ async function renderStructure() {
       },
       { responsive: true, displaylogo: false, displayModeBar: false },
     );
-    if (state.structure === data) localizeEmptyPaeAnnotation();
+    if (state.structure !== data) return;
+    state.paeRenderError = null;
+    localizeEmptyPaeAnnotation();
     const resetPae = $("pae-reset");
-    if (resetPae) resetPae.onclick = () => Plotly.relayout($("pae"), {"xaxis.autorange":true, "yaxis.autorange":"reversed"});
+    if (resetPae) resetPae.onclick = () => {
+      if (state.structure !== data) return;
+      return Plotly.relayout($("pae"), {"xaxis.autorange":true, "yaxis.autorange":"reversed"});
+    };
     $("pae").removeAllListeners?.("plotly_click");
     $("pae").on("plotly_click", event => {
+      if (state.structure !== data) return;
       const point = event.points?.[0];
       if (!point) return;
       const layout = $("pae")._fullLayout;

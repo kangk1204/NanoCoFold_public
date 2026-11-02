@@ -846,7 +846,8 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
       </section></main><script id="result-data" type="application/json">__RESULT_DATA__</script><script>window.NANOCOFOLD_OFFLINE=JSON.parse(document.getElementById("result-data").textContent);</script><script>__PLOTLY_JS__</script><script>__3DMOL_JS__</script><script>__MOLSTAR_JS__</script><script>/* Mol* 5.12.0, local assets and saved coordinates only. */
 "use strict";
 window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
-  static async create(host, data, onPick) {
+  static async create(host, data, onPick, onProgress = () => {}) {
+    onProgress("viewer");
     const viewer = await molstar.Viewer.create(host, {
       extensions: [], layoutIsExpanded: false, layoutShowControls: true,
       layoutShowRemoteState: false, layoutShowSequence: true, layoutShowLog: false,
@@ -858,8 +859,10 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     });
     const result = new NanoCoFoldResultViewer(viewer, data);
     try {
+      onProgress("coordinates");
       result.structure = await result.load(data.content, data.format, () => result.text("예측 복합체", "Predicted complex"));
       result.addCoordinateChains();
+      onProgress("layers");
       if (!result.displayChains.length)
         await result.component(result.structure, {}, "unclassified", () => result.text("좌표", "Coordinates"), 0x909ea9, "ball-and-stick");
       for (const chain of result.displayChains)
@@ -885,6 +888,7 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
         const location = result.location(event.current?.loci);
         if (location) onPick(location);
       });
+      onProgress("display");
       await result.display({sequence: false, residues: false});
       await result.fit();
       result.observeResize(host);
@@ -1165,6 +1169,11 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "PAE 차트를 표시하지 못했습니다. 아래 자료 설명을 확인하세요.": "The PAE chart could not be displayed. Check the data description below.",
+  "3D 뷰어를 시작하고 있습니다.": "Starting the 3D viewer.",
+  "3D 좌표를 읽고 있습니다.": "Reading the 3D coordinates.",
+  "체인과 표시 레이어를 준비하고 있습니다.": "Preparing chains and display layers.",
+  "3D 화면을 정리하고 있습니다.": "Finishing the 3D display.",
   "RFantibody 후속 후보 최대 {0}개 · 단일 엔진 평가 최대 {1}개. BoltzGen 후보 수는 백본·서열 설정을 따르며, 비교에서는 후속 후보마다 엔진별 모델을 계산합니다.": "Up to {0} RFantibody follow-up candidates · Up to {1} candidates for single-engine evaluation. BoltzGen candidates follow the backbone and sequence settings. Comparison evaluates each follow-up candidate separately in each engine.",
   "백본은 단백질의 골격 구조입니다. 생성기별 요청 수이며, 백본당 제안 서열 수와 후속 평가 수는 입력 검토에서 확인하세요.": "A backbone is the structural framework of a protein. This is the request count for each generator. Check sequences per backbone and follow-up limits during input review.",
   "백본은 단백질의 골격 구조입니다. 생성기별 백본 {0}개 · RFantibody 백본당 서열 {1}개 · BoltzGen 백본당 서열 {2}개. 실제 생성 수는 결과에서 확인합니다.": "A backbone is the structural framework of a protein. {0} backbones per generator · {1} sequences per RFantibody backbone · {2} per BoltzGen backbone. Check generated totals in the results.",
@@ -5675,7 +5684,8 @@ function setPaeErrorStatus(error = null) {
 }
 function localizeEmptyPaeAnnotation() {
   const plot = $("pae");
-  setPaeErrorStatus(plot?.data?.length === 0 ? state.structure?.pae_error : null);
+  const renderError = state.paeRenderError && state.paeRenderError.data === state.structure ? state.paeRenderError.message : null;
+  setPaeErrorStatus(renderError || (plot?.data?.length === 0 ? state.structure?.pae_error : null));
   if (!window.Plotly || plot?.data?.length !== 0 || !plot.layout?.annotations?.length) return;
   const text = !state.structure ? "구조 / PAE 미평가"
     : state.structure.pae_error ? "PAE" : state.structure.pae_status === "removed_by_retention" ? "PAE · 용량 정리로 삭제됨" : "PAE 미평가";
@@ -5844,6 +5854,14 @@ function focusButton(label, labels, text, measurement) {
 async function renderStructure() {
   const data = state.structure;
   if (!data) return;
+  // Neither display owns the other's readiness. Handle plot failures now so a
+  // pending 3D factory cannot leave an unhandled plot rejection behind.
+  renderPae(data).catch(() => {
+    if (state.structure !== data) return;
+    const message = "PAE 차트를 표시하지 못했습니다. 아래 자료 설명을 확인하세요.";
+    state.paeRenderError = {data, message};
+    setPaeErrorStatus(message);
+  });
   const chains = (Array.isArray(data.chains) ? data.chains : []).filter(chain => chain && typeof chain.id === "string");
   I18N.text($("structure-data-note"), localizedStructureDataNote(data));
   if (state.viewerData !== data) {
@@ -5860,6 +5878,11 @@ async function renderStructure() {
       const original = location.mapping ? `${location.mapping.author_chain || location.mapping.source_chain}:${location.mapping.source_residue || "미관측"}` : null;
       I18N.text($("structure-note"), I18N.format("{0} · 구조 author 번호{1}", [I18N.term(location.label), original ? I18N.concat([I18N.term(" · 입력 원본 "), original]) : I18N.term(" · 원본 대응은 아래 표 확인")]));
       $("residue-a").value = location.label;
+    }, phase => {
+      if (request !== state.viewerRequest || state.structure !== data) return;
+      const messages = {viewer: "3D 뷰어를 시작하고 있습니다.", coordinates: "3D 좌표를 읽고 있습니다.",
+        layers: "체인과 표시 레이어를 준비하고 있습니다.", display: "3D 화면을 정리하고 있습니다."};
+      if (messages[phase]) I18N.text($("structure-note"), I18N.term(messages[phase]));
     });
     let viewer;
     try { viewer = await state.viewerReady; }
@@ -5949,6 +5972,10 @@ async function renderStructure() {
       ),
     );
   warnings(details.appendChild(el("div")), data.issues);
+}
+async function renderPae(data) {
+  if (state.structure !== data) return;
+  if (state.paeRenderError?.data !== data) state.paeRenderError = null;
   describeResultFigure("pae", "PAE · 예측 정렬 오차", data.pae
     ? I18N.format("PAE 행렬 {0} × {0} 잔기. 단위 Å. 행은 정렬 기준 잔기, 열은 평가 잔기입니다. 색상 눈금은 0–30 Å이며 원값은 PAE 다운로드에서 확인하세요.", [data.pae.labels?.length ?? I18N.term("미기록")])
     : I18N.term(data.pae_status === "removed_by_retention" ? "PAE · 용량 정리로 삭제됨" : "PAE 미평가"), "#report-provenance", !data.pae);
@@ -5991,11 +6018,17 @@ async function renderStructure() {
       },
       { responsive: true, displaylogo: false, displayModeBar: false },
     );
-    if (state.structure === data) localizeEmptyPaeAnnotation();
+    if (state.structure !== data) return;
+    state.paeRenderError = null;
+    localizeEmptyPaeAnnotation();
     const resetPae = $("pae-reset");
-    if (resetPae) resetPae.onclick = () => Plotly.relayout($("pae"), {"xaxis.autorange":true, "yaxis.autorange":"reversed"});
+    if (resetPae) resetPae.onclick = () => {
+      if (state.structure !== data) return;
+      return Plotly.relayout($("pae"), {"xaxis.autorange":true, "yaxis.autorange":"reversed"});
+    };
     $("pae").removeAllListeners?.("plotly_click");
     $("pae").on("plotly_click", event => {
+      if (state.structure !== data) return;
       const point = event.points?.[0];
       if (!point) return;
       const layout = $("pae")._fullLayout;

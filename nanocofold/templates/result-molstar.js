@@ -1,7 +1,8 @@
 /* Mol* 5.12.0, local assets and saved coordinates only. */
 "use strict";
 window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
-  static async create(host, data, onPick) {
+  static async create(host, data, onPick, onProgress = () => {}) {
+    onProgress("viewer");
     const viewer = await molstar.Viewer.create(host, {
       extensions: [], layoutIsExpanded: false, layoutShowControls: true,
       layoutShowRemoteState: false, layoutShowSequence: true, layoutShowLog: false,
@@ -13,8 +14,10 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     });
     const result = new NanoCoFoldResultViewer(viewer, data);
     try {
+      onProgress("coordinates");
       result.structure = await result.load(data.content, data.format, () => result.text("예측 복합체", "Predicted complex"));
       result.addCoordinateChains();
+      onProgress("layers");
       if (!result.displayChains.length)
         await result.component(result.structure, {}, "unclassified", () => result.text("좌표", "Coordinates"), 0x909ea9, "ball-and-stick");
       for (const chain of result.displayChains)
@@ -40,6 +43,7 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
         const location = result.location(event.current?.loci);
         if (location) onPick(location);
       });
+      onProgress("display");
       await result.display({sequence: false, residues: false});
       await result.fit();
       result.observeResize(host);

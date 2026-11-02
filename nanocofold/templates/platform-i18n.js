@@ -44,6 +44,11 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "PAE 차트를 표시하지 못했습니다. 아래 자료 설명을 확인하세요.": "The PAE chart could not be displayed. Check the data description below.",
+  "3D 뷰어를 시작하고 있습니다.": "Starting the 3D viewer.",
+  "3D 좌표를 읽고 있습니다.": "Reading the 3D coordinates.",
+  "체인과 표시 레이어를 준비하고 있습니다.": "Preparing chains and display layers.",
+  "3D 화면을 정리하고 있습니다.": "Finishing the 3D display.",
   "RFantibody 후속 후보 최대 {0}개 · 단일 엔진 평가 최대 {1}개. BoltzGen 후보 수는 백본·서열 설정을 따르며, 비교에서는 후속 후보마다 엔진별 모델을 계산합니다.": "Up to {0} RFantibody follow-up candidates · Up to {1} candidates for single-engine evaluation. BoltzGen candidates follow the backbone and sequence settings. Comparison evaluates each follow-up candidate separately in each engine.",
   "백본은 단백질의 골격 구조입니다. 생성기별 요청 수이며, 백본당 제안 서열 수와 후속 평가 수는 입력 검토에서 확인하세요.": "A backbone is the structural framework of a protein. This is the request count for each generator. Check sequences per backbone and follow-up limits during input review.",
   "백본은 단백질의 골격 구조입니다. 생성기별 백본 {0}개 · RFantibody 백본당 서열 {1}개 · BoltzGen 백본당 서열 {2}개. 실제 생성 수는 결과에서 확인합니다.": "A backbone is the structural framework of a protein. {0} backbones per generator · {1} sequences per RFantibody backbone · {2} per BoltzGen backbone. Check generated totals in the results.",
