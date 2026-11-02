@@ -8,11 +8,12 @@ const catalog=readFileSync(new URL('nanocofold/templates/platform-i18n.js',root)
 const starter=JSON.parse(readFileSync(new URL('nanocofold/_data/starter-presets.json',root)));
 function fixture(){
  const nodes=new Map(),labels=new Map();
- function get(id){if(!nodes.has(id))nodes.set(id,{value:'',valueAsNumber:NaN,checked:false,hidden:false,textContent:'',isConnected:true,setAttribute(key,value){this[key]=value;},getAttribute(key){return this[key]??null;}});return nodes.get(id);}
+ function get(id){if(!nodes.has(id))nodes.set(id,{value:'',valueAsNumber:NaN,checked:false,hidden:false,textContent:'',isConnected:true,replaceChildren(...children){this.children=children;},setAttribute(key,value){this[key]=value;},getAttribute(key){return this[key]??null;}});return nodes.get(id);}
  get('analysis-preset').value='small-four-v1';get('mode').value='design';get('advanced').value='{}';get('seed').value='42';get('screen-engine').value='chai1';get('novice-msa').value='cache';
  const boxes=starter.engines.map(value=>({value,checked:true}));
  const context={structuredClone,window:{},state:{starter,presets:{standard:{},researcher_exploration:{design:{num_designs:1000,filters:{top_n_to_score:1000}},screen:{tier2_n:500}}},planningDefaults:{design:{engine:'rfantibody',num_designs:1000,mpnn:{seqs_per_struct:4},boltzgen:{inverse_fold_num_sequences:1},filters:{top_n_to_score:300}},screen:{engine:'chai1',tier2_n:50},rank:{final_n:30}}},$:get,
  CustomEvent:class{constructor(type){this.type=type;}},document:{documentElement:{},getElementById:()=>null,dispatchEvent(){},querySelectorAll:()=>boxes.filter(b=>b.checked),querySelector:s=>{if(!labels.has(s))labels.set(s,{hidden:false});return labels.get(s);}}};
+ context.el=(_tag,text)=>({textContent:text});
  const document=context.document;delete context.document;vm.createContext(context);vm.runInContext(catalog,context);context.document=document;
  vm.runInContext(source.slice(source.indexOf('function merge('),source.indexOf('function fields()')),context);
  return {c:context,get,boxes,labels};

@@ -7,10 +7,10 @@ function fixture(){const context={};vm.createContext(context);vm.runInContext(so
 test('mature model plans translate the optional preparation prefix and preserve counts',()=>{
  const ui=readFileSync(new URL('../nanocofold/templates/platform.js',import.meta.url),'utf8');
  const i=fixture(),context={I18N:i};vm.createContext(context);
- vm.runInContext(ui.slice(ui.indexOf('function noviceModelPlan('),ui.indexOf('function fields()')),context);
+ vm.runInContext(ui.slice(ui.indexOf('function analysisQuantityPlan('),ui.indexOf('function fields()')),context);
  for(const [variants,selected] of [[3,2],[1,1],[undefined,2]]){
   const cfg={screen:{comparison:{enabled:true,engines:['colabfold','boltz2','chai1','opendde']}},
-   mature:{prefilter:{top_n:2},library:variants===undefined?{}:{max_variants:variants}}};
+   mature:{prefilter:{top_n:2},library:variants===undefined?{}:{max_variants:variants}},rank:{include_wt_control:true}};
   const saved=JSON.stringify(cfg),message=i.term(context.noviceModelPlan(cfg,'mature',0));
   for(const language of ['en','ko','en']){
    i.setLanguage(language,{persist:false});

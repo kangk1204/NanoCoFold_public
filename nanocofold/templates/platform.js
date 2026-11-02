@@ -486,9 +486,15 @@ function inputSettings(forPlan = false) {
   const publicMsa = !simulated && (cfg.complex?.msa_source === "public_api" || cfg.screen?.colabfold?.msa_source === "public_api" || cfg.screen?.msa_mode === "msa" || cfg.structure?.msa?.backend === "public_api");
   if (!forPlan && publicMsa && !$("novice-consent").checked) throw Error("가져온 설정도 현재 입력에 대한 외부 MSA 전송 동의를 다시 확인해야 합니다.");
   if (publicMsa) cfg.screen = merge(cfg.screen, {allow_public_msa_server: true});
+  const enteredSeed = $("seed").value;
+  if ($("seed").validity?.badInput) throw Error("Seed는 0–4294967295 정수를 입력하세요.");
+  const effectiveSeed = enteredSeed === "" ? cfg.run?.seed ?? state.planningDefaults?.run?.seed ?? 42 : Number(enteredSeed);
+  if (!Number.isSafeInteger(effectiveSeed) || effectiveSeed < 0 || effectiveSeed >= 2 ** 32)
+    throw Error("Seed는 0–4294967295 정수를 입력하세요.");
   for (const id of ["candidate-limit", "design-count"]) {
     if (id === "design-count" && $("mode").value !== "design") continue;
     if (id === "candidate-limit" && $("mode").value === "screen") continue;
+    if ($(id).validity?.badInput) throw Error("후보 상한과 백본 수는 1 이상의 정수여야 합니다.");
     if (!$(id).value) continue;
     const value = $(id).valueAsNumber;
     if (!Number.isSafeInteger(value) || value < 1)
@@ -509,7 +515,7 @@ function inputSettings(forPlan = false) {
     run: {
       mode: $("mode").value,
       name: $("job-name").value,
-      seed: Number($("seed").value),
+      seed: effectiveSeed,
       mock: $("mock").checked,
       analysis_preset: $("analysis-preset").value,
     },
@@ -533,49 +539,177 @@ function noviceComplexSettings(cfg) {
     models_per_seed: current.models_per_seed ?? 1, recycles: current.recycles ?? 3,
     diffusion_steps: current.diffusion_steps ?? 200};
 }
-function noviceModelPlan(cfg, mode, libraryCount) {
-  if (mode === "complex") {
-    const settings = cfg.complex?.proteins ? cfg.complex : noviceComplexSettings(cfg);
-    return `계획 모델 ${(settings.comparison_engines || [settings.engine]).length * settings.seeds.length * settings.models_per_seed}개 · 실제 성공·실패·미평가는 결과에서 구분합니다.`;
-  }
+// QUANTITY_PLAN_START
+/** @param {any} cfg @param {string} [mode] @param {number|null} [libraryCount] */
+function analysisQuantityPlan(cfg = {}, mode = cfg.run?.mode, libraryCount = null) {
+  const positive = value => Number.isSafeInteger(value) && value > 0 ? value : null;
+  const product = values => values.every(v => Number.isSafeInteger(v) && v > 0) && Number.isSafeInteger(values.reduce((a,b)=>a*b,1)) ? values.reduce((a,b)=>a*b,1) : null;
   const screen = cfg.screen || {}, design = cfg.design || {}, mature = cfg.mature || {};
-  const engines = screen.comparison?.enabled ? screen.comparison.engines?.length : 1;
-  if (!engines) return "평가 엔진을 선택하세요.";
-  if (screen.cascade?.enabled || design.refinement?.enabled)
-    return "다단계 선별 경로입니다. 전체 입력·생성 수와 단계별 확정 평가 수를 실행 기록에서 구분합니다.";
-  if (mode === "screen") return `입력 VHH 전체 ${libraryCount}개 × 엔진 ${engines}개 = 계획 ${libraryCount * engines}모델 · 후보를 자동 생략하지 않습니다.`;
-  if (mode === "design") {
-    if (!Number.isInteger(design.num_designs)) return "설정 검토 후 생성 후보·평가 모델의 계획 상한을 확인하세요.";
-    const selected = design.engine === "both" ? ["rfantibody", "boltzgen"] : [design.engine];
-    let candidates = 0;
-    for (const engine of selected) {
-      const sequences = engine === "rfantibody" ? design.mpnn?.seqs_per_struct : design.boltzgen?.inverse_fold_num_sequences;
-      const generated = design.num_designs * (sequences ?? 1);
-      // The synthetic RF adapter retains the generated cohort instead of applying the real RF2 top-N cutoff.
-      candidates += engine === "rfantibody" && !cfg.run?.mock && Number.isInteger(design.filters?.top_n_to_score)
-        ? Math.min(generated, design.filters.top_n_to_score) : generated;
-    }
-    return `최대 계획 후보 ${candidates}개 × 엔진 ${engines}개 = 최대 ${candidates * engines}모델 · 실제 생성·선별 이후 확정 수를 기록합니다.`;
+  const compared = mode === 'complex' ? cfg.complex?.comparison_engines || (screen.comparison?.enabled ? screen.comparison.engines : null) : screen.comparison?.enabled ? screen.comparison.engines : null;
+  const engines = Array.isArray(compared) ? [...compared] : [mode === 'complex' ? cfg.complex?.engine || screen.engine || 'boltz2' : screen.engine || 'boltz2'];
+  const seed = cfg.run?.seed ?? 42;
+  const conditions = {
+    boltz2: {seed: cfg.score?.boltz2?.seed ?? seed, samples: screen.engine === 'boltz2' || engines.includes('boltz2') ? cfg.score?.boltz2_diffusion_samples ?? 1 : null},
+    chai1: {seed, samples: screen.num_diffn_samples ?? 1},
+    colabfold: {seed, models: screen.colabfold?.num_models ?? 1, seeds: screen.colabfold?.num_seeds ?? 1},
+    opendde: {seed, samples: screen.opendde?.samples ?? 1}
+  };
+  const staged = mode !== 'complex' && Boolean(screen.cascade?.enabled || (mode === 'design' && design.refinement?.enabled));
+  const plan = {mode, generators: [], requestedBackbones: null, uniqueSequences: null, candidateUpper: null, modelUpper: null, nativeModelUpper: null,
+    engines, engineCount: positive(engines.length), seed, conditions: Object.fromEntries(engines.filter(engine=>conditions[engine]).map(engine=>[engine,conditions[engine]])), staged, wtIncluded: cfg.rank?.include_wt_control === true || (mode === 'mature' && screen.cascade?.enabled === true),
+    rfCap: positive(design.filters?.top_n_to_score), tier2Cap: positive(screen.tier2_n), finalSelection: positive(cfg.rank?.final_n)};
+  if (mode === 'complex') {
+    const settings = cfg.complex || {}, seeds = settings.seeds || [seed];
+    plan.seeds = Array.isArray(seeds) ? [...seeds] : null;
+    plan.modelsPerSeed = positive(settings.models_per_seed ?? 1);
+    plan.conditions = Object.fromEntries(engines.map(engine=>[engine,{seeds:plan.seeds,modelsPerSeed:plan.modelsPerSeed}]));
+    plan.candidateUpper = 1;
+    plan.modelUpper = product([plan.engineCount, positive(plan.seeds?.length), plan.modelsPerSeed]);
+    plan.nativeModelUpper = plan.modelUpper;
+    return plan;
   }
-  const top = mature.prefilter?.top_n, variants = mature.library?.max_variants;
-  if (!Number.isInteger(top)) return "설정 검토 후 치환 후보와 WT의 계획 평가 상한을 확인하세요.";
-  const selected = Number.isInteger(variants) ? Math.min(top, variants) : top;
-  return `${Number.isInteger(variants) ? `변이 최대 ${variants}개 준비 · ` : ""}최대 ${selected}개와 WT × 엔진 ${engines}개 = 최대 ${(selected + 1) * engines}모델 · 실제 선별 수는 실행 후 확정됩니다.`;
+  if (mode === 'design') {
+    const selected = design.engine === 'both' ? ['rfantibody','boltzgen'] : ['rfantibody','boltzgen'].includes(design.engine) ? [design.engine] : [];
+    for (const engine of selected) {
+      const backbones = positive(design.num_designs);
+      const sequencesPerBackbone = positive(engine === 'rfantibody' ? design.mpnn?.seqs_per_struct ?? 1 : design.boltzgen?.inverse_fold_num_sequences ?? 1);
+      const proposed = product([backbones, sequencesPerBackbone]);
+      const candidates = cfg.run?.mock ? backbones : engine === 'rfantibody' ? proposed && plan.rfCap ? Math.min(proposed, plan.rfCap) : null : proposed;
+      plan.generators.push({engine, backbones, sequencesPerBackbone, proposed, candidates});
+    }
+    if (plan.generators.length && plan.generators.every(g=>g.backbones !== null)) plan.requestedBackbones = plan.generators.reduce((sum,g)=>sum+g.backbones,0);
+    if (plan.generators.length && plan.generators.every(g=>g.candidates !== null)) {
+      const total = plan.generators.reduce((sum,g)=>sum+g.candidates,0);
+      plan.candidateUpper = screen.comparison?.enabled ? total : plan.tier2Cap === null ? null : Math.min(total, plan.tier2Cap);
+    }
+  } else if (mode === 'mature') {
+    const top = positive(mature.prefilter?.top_n), variants = positive(mature.library?.max_variants);
+    const selected = top === null ? null : variants === null ? top : Math.min(top, variants);
+    plan.variantUpper = selected;
+    plan.candidateUpper = selected === null ? null : selected + Number(plan.wtIncluded);
+  } else if (mode === 'screen') plan.candidateUpper = positive(libraryCount);
+  if (!staged) plan.modelUpper = product([plan.candidateUpper, plan.engineCount]);
+  if (plan.modelUpper !== null) {
+    const samples = engines.map(engine=>engine === 'colabfold' ? product([positive(conditions.colabfold.models),positive(conditions.colabfold.seeds)]) : positive(conditions[engine]?.samples));
+    if (samples.every(v=>v !== null)) plan.nativeModelUpper = product([plan.candidateUpper,samples.reduce((a,b)=>a+b,0)]);
+  }
+  return plan;
+}
+function largeQuantityPlan(plan) {
+  return plan.modelUpper === null || plan.nativeModelUpper === null || plan.modelUpper >= 100 || plan.nativeModelUpper >= 100 || plan.requestedBackbones >= 100;
+}
+// QUANTITY_PLAN_END
+function noviceModelPlan(cfg, mode, libraryCount) {
+  const plan = analysisQuantityPlan(cfg, mode, libraryCount);
+  if (plan.staged) return '다단계 선별 경로입니다. 전체 입력·생성 수와 단계별 확정 평가 수를 실행 기록에서 구분합니다.';
+  if (plan.modelUpper === null) return '계획 미확정 · 입력과 적용 설정을 확인하세요.';
+  if (mode === 'complex') return `계획 모델 ${plan.modelUpper}개 · 실제 성공·실패·미평가는 결과에서 구분합니다.`;
+  if (mode === 'screen') return `입력 VHH 전체 ${libraryCount}개 × 엔진 ${plan.engineCount}개 = 계획 ${plan.modelUpper}모델 · 후보를 자동 생략하지 않습니다.`;
+  if (mode === 'mature') {
+    const prepared = cfg.mature?.library?.max_variants;
+    const prefix = Number.isSafeInteger(prepared) && prepared > 0 ? `변이 최대 ${prepared}개 준비 · ` : '';
+    return prefix + (plan.wtIncluded
+      ? `최대 ${plan.variantUpper}개와 WT × 엔진 ${plan.engineCount}개 = 최대 ${plan.modelUpper}모델 · 실제 선별 수는 실행 후 확정됩니다.`
+      : `변이 후보 최대 ${plan.variantUpper}개 × 엔진 ${plan.engineCount}개 = 최대 ${plan.modelUpper}모델 · WT 제외.`);
+  }
+  return `최대 계획 후보 ${plan.candidateUpper}개 × 엔진 ${plan.engineCount}개 = 최대 ${plan.modelUpper}모델 · 실제 생성·선별 이후 확정 수를 기록합니다.`;
+}
+function quantitySource(id, path) {
+  if (id === 'seed' && $(id)?.dataset?.quantitySource !== 'direct') {
+    if ($(id)?.dataset?.quantitySource === 'imported') return '가져온 설정·고급 설정';
+    if ($(id)?.dataset?.quantitySource === 'restored') return '복원한 입력';
+    if ($('analysis-preset').value === 'small-four-v1') return '작은 시작 설정';
+  }
+  if ($(id)?.value) return '직접 입력';
+  let current;
+  try { current = JSON.parse($('advanced').value || '{}'); } catch { return '설정 확인 필요'; }
+  for (const part of path.split('.')) current = current && Object.hasOwn(current, part) ? current[part] : undefined;
+  if (current !== undefined) return '가져온 설정·고급 설정';
+  return $('analysis-preset').value === 'small-four-v1' ? '작은 시작 설정' : $('analysis-preset').value === 'researcher_exploration' ? '연구자 탐색' : '작업 공간 기본값';
+}
+function clearScalePreview() {
+  for (const id of ['design-count','candidate-limit','selection-limit']) {
+    if ($(id)) I18N.attribute($(id), 'placeholder', I18N.term('설정 확인 필요'));
+    if ($(id+'-current')) I18N.text($(id+'-current'), I18N.term('적용값 미확정 · 설정을 확인하세요.'));
+  }
+  if ($('seed-current')) I18N.text($('seed-current'), I18N.term('적용값 미확정 · 설정을 확인하세요.'));
+  if ($('quantity-conditions')) I18N.text($('quantity-conditions'), I18N.term('계획 미확정 · 입력과 적용 설정을 확인하세요.'));
+  if ($('quantity-breakdown')) I18N.text($('quantity-breakdown'), I18N.term('계획 미확정 · 입력과 적용 설정을 확인하세요.'));
+}
+function applyAnalysisSettings(cfg) {
+  $('advanced').value = JSON.stringify(cfg, null, 2);
+  $('analysis-preset').value = 'standard';
+  for (const id of ['candidate-limit','design-count','selection-limit']) if ($(id)) $(id).value = '';
+  $('mode').value = cfg.run.mode;
+  $('seed').value = String(cfg.run.seed ?? 42);
+  if ($('seed').dataset) $('seed').dataset.quantitySource = 'imported';
+  $('mock').checked = cfg.run.mock === true;
+  const engine = $('screen-engine'), selected = cfg.screen?.engine;
+  if (typeof selected === 'string' && selected) {
+    if (engine.options && ![...engine.options].some(option=>option.value===selected)) {
+      const option = el('option', selected); option.value = selected; engine.append(option);
+    }
+    engine.value = selected;
+  }
+  if ($('novice-consent')) $('novice-consent').checked = false;
+  invalidateInput(); fields();
+}
+async function submitReviewedAnalysis() {
+  if (state.analysisSubmitting) return;
+  if (!state.input) throw Error('먼저 입력·적용 설정을 확인하세요.');
+  if (!state.readiness) throw Error('현재 입력의 필수 환경 점검을 먼저 통과해야 합니다.');
+  const input = state.input, revision = state.inputRevision;
+  const mode = input.config.run.mode;
+  const libraryCount = mode === 'screen' ? noviceFasta($('vhh-fasta').value).length : null;
+  const plan = analysisQuantityPlan(input.config, mode, libraryCount);
+  state.analysisSubmitting = true;
+  try {
+    if (largeQuantityPlan(plan)) {
+      const details = I18N.value(I18N.term(noviceModelPlan(input.config, mode, libraryCount)));
+      const message = I18N.value(I18N.format('분석 규모 확인\n{0}\n요청 백본 합계: {1}\n엔진 내부 예측 요청 상한: {2}\n고유 서열 수는 생성 후 확정됩니다. 엔진별 샘플 설정은 적용 설정에 보존됩니다.\n이 규모로 작업을 제출하시겠습니까?', [details, plan.requestedBackbones ?? I18N.value(I18N.term('해당 없음')), plan.nativeModelUpper ?? I18N.value(I18N.term('미확정'))]));
+      if (typeof window.confirm !== 'function') throw Error('규모 확인창을 열지 못했습니다. 브라우저에서 다시 시도하세요.');
+      if (!await window.confirm(message)) return;
+    }
+    if (revision !== state.inputRevision || input !== state.input) throw Error('입력이나 설정이 변경되었습니다. 다시 검토하세요.');
+    const budget = $('budget').value;
+    const job = await api('/api/jobs', {submission_id:state.submissionId || (state.submissionId=crypto.randomUUID().replaceAll('-','')),
+      reuse_results:!$('force-rerun').checked,input_id:input.id,mode,name:$('job-name').value,mock:input.config.run.mock,
+      ...(budget ? {budget_seconds:Number(budget)*60}: {})}, {timeoutMs:30000});
+    await selectJob(job.id); view('jobs'); state.submissionNoticeJob=job.id;
+    notice('작업을 등록했습니다. 브라우저를 닫아도 실행됩니다.');
+  } finally { state.analysisSubmitting=false; renderInputReadiness(); }
 }
 function renderAnalysisScale(cfg, mode) {
   const known = value => Number.isSafeInteger(value) && value > 0 ? value : I18N.term("입력 검토에서 확인");
   const design = cfg.design || {}, screen = cfg.screen || {}, mature = cfg.mature || {};
+  const customSeeds = mode === 'complex' && Array.isArray(cfg.complex?.seeds);
+  $("seed").hidden = customSeeds;
+  const seedLabel = document.querySelector('label[for="seed"]'); if (seedLabel) seedLabel.hidden = customSeeds;
+  if ($("seed-current")) I18N.text($("seed-current"), customSeeds
+    ? I18N.format("복합체 Seed 목록: {0} · 가져온 목록은 고급 설정에서 수정합니다.", [cfg.complex.seeds.join(', ')])
+    : I18N.format("적용값: {0} · 출처: {1}", [cfg.run?.seed ?? 42, I18N.term(quantitySource('seed', 'run.seed'))]));
   const defaults = {"design-count": design.num_designs,
     "candidate-limit": mode === "mature" ? mature.prefilter?.top_n : design.filters?.top_n_to_score,
     "selection-limit": cfg.rank?.final_n};
   for (const [id, value] of Object.entries(defaults)) {
     if ($(id)) I18N.attribute($(id), "placeholder", I18N.format("현재 설정 {0} · 비우면 유지", [known(value)]));
+    const path = id === "design-count" ? "design.num_designs" : id === "selection-limit" ? "rank.final_n" : mode === "mature" ? "mature.prefilter.top_n" : "design.filters.top_n_to_score";
+    if ($(id + "-current")) I18N.text($(id + "-current"), I18N.format("적용값: {0} · 출처: {1}", [known(value), I18N.term(quantitySource(id, path))]));
   }
-  I18N.text($("design-count-help"), I18N.format("생성기별 백본 {0}개 · RFantibody 백본당 서열 {1}개 · BoltzGen 백본당 서열 {2}개. 실제 생성 수는 결과에서 확인합니다.",
+  const quantities = analysisQuantityPlan(cfg, mode, null);
+  if ($("quantity-breakdown")) {
+    const lines = quantities.generators.map(g => el("p", I18N.format("{0}: 요청 백본 {1}개 · 백본당 제안 서열 {2}개 · 제안 예산 최대 {3}개", [g.engine, known(g.backbones), known(g.sequencesPerBackbone), known(g.proposed)])));
+    lines.push(el("p", I18N.term("고유 후보 서열 수: 생성·중복 확인 후 확정")));
+    $("quantity-breakdown").replaceChildren(...lines);
+  }
+  if ($("quantity-conditions")) I18N.text($("quantity-conditions"), JSON.stringify(quantities.conditions, null, 2));
+  I18N.text($("design-count-help"), I18N.format("백본은 단백질의 골격 구조입니다. 생성기별 백본 {0}개 · RFantibody 백본당 서열 {1}개 · BoltzGen 백본당 서열 {2}개. 실제 생성 수는 결과에서 확인합니다.",
     [known(design.num_designs), known(design.mpnn?.seqs_per_struct), known(design.boltzgen?.inverse_fold_num_sequences)]));
+  const limitLabel = document.querySelector('label[for="candidate-limit"]');
+  if (limitLabel) I18N.text(limitLabel, I18N.term(mode === 'mature' ? '구조 평가할 변이 후보 상한' : screen.comparison?.enabled ? 'RFantibody 후속 평가 후보 상한' : '후속 평가 후보 수 설정'));
   I18N.text($("candidate-limit-help"), mode === "mature"
     ? I18N.format("변이 후보 최대 {0}개를 평가하며 WT는 별도 대조군입니다.", [known(mature.prefilter?.top_n)])
-    : I18N.format("RFantibody 후속 평가 후보 최대 {0}개 · 단일 엔진 평가 최대 {1}개. BoltzGen과 다중 엔진 비교에는 별도 생성·평가 경로가 적용됩니다.",
+    : I18N.format("RFantibody 후속 후보 최대 {0}개 · 단일 엔진 평가 최대 {1}개. BoltzGen 후보 수는 백본·서열 설정을 따르며, 비교에서는 후속 후보마다 엔진별 모델을 계산합니다.",
       [known(design.filters?.top_n_to_score), known(screen.tier2_n)]));
   I18N.text($("selection-limit-help"), I18N.format("최종 선별은 최대 {0}개입니다. 여러 엔진 비교에서는 엔진별로 적용하며, 적격 기준과 다양성 제한에 따라 줄어들 수 있습니다.", [known(cfg.rank?.final_n)]));
   const comparison = mode === "complex" ? cfg.complex?.comparison_engines || (screen.comparison?.enabled ? screen.comparison.engines : null)
@@ -2923,19 +3057,13 @@ async function boot() {
     $(id).addEventListener("change", fields);
   initAlternativeInputs();
   $("yaml-file").onchange = async () => {
+    const revision = state.inputRevision;
     try {
       const parsed = await api("/api/configs/parse", {
         content: await $("yaml-file").files[0].text(),
       });
-      $("advanced").value = JSON.stringify(parsed.config, null, 2);
-      $("analysis-preset").value = "standard";
-      $("candidate-limit").value = "";
-      $("design-count").value = ""; if ($("selection-limit")) $("selection-limit").value = "";
-      $("mode").value = parsed.config.run.mode;
-      $("screen-engine").value = parsed.config.screen.engine;
-      $("seed").value = parsed.config.run.seed;
-      $("mock").checked = parsed.config.run.mock;
-      fields();
+      if (revision !== state.inputRevision) throw Error("불러오는 동안 입력이 변경되었습니다. 현재 입력을 유지합니다.");
+      applyAnalysisSettings(parsed.config);
       notice(
         "YAML 설정을 가져왔습니다. 입력을 다시 검토해 적용 설정을 확인하세요.",
       );
@@ -3096,29 +3224,7 @@ async function boot() {
   });
   $("environment-mode").onchange = () => { state.environmentTarget = null; refreshEnvironmentStatus().catch(e => notice(e.message, true)); };
   action("diagnose-environment", submitDiagnostic);
-  action("start-job", async () => {
-    if (state.analysisSubmitting) return;
-    if (!state.input) throw Error("먼저 입력·적용 설정을 확인하세요.");
-    if (!state.readiness)
-      throw Error("현재 입력의 필수 환경 점검을 먼저 통과해야 합니다.");
-    const budget = $("budget").value;
-    state.analysisSubmitting = true;
-    try {
-    const job = await api("/api/jobs", {
-      submission_id: state.submissionId || (state.submissionId = crypto.randomUUID().replaceAll("-", "")),
-      reuse_results: !$("force-rerun").checked,
-      input_id: state.input.id,
-      mode: state.input.config.run.mode,
-      name: $("job-name").value,
-      mock: $("mock").checked,
-      ...(budget ? { budget_seconds: Number(budget) * 60 } : {}),
-    }, {timeoutMs: 30000});
-    await selectJob(job.id);
-    view("jobs");
-    state.submissionNoticeJob=job.id;
-    notice("작업을 등록했습니다. 브라우저를 닫아도 실행됩니다.");
-    } finally { state.analysisSubmitting = false; renderInputReadiness(); }
-  });
+  action("start-job", submitReviewedAnalysis);
   action("install-profile-button", async () => {
     const job = await api("/api/setup", {
       profile: $("install-profile").value,
@@ -3138,13 +3244,8 @@ async function boot() {
     await loadResult(result.id);
   });
   action("reanalyze", () => {
-    $("advanced").value = JSON.stringify(state.result.config, null, 2);
-    $("analysis-preset").value = "standard";
-    $("candidate-limit").value = "";
-    $("design-count").value = ""; if ($("selection-limit")) $("selection-limit").value = "";
-    $("mode").value = state.result.mode;
+    applyAnalysisSettings(state.result.config);
     $("job-name").value = (state.result.name || "analysis") + "-new";
-    fields();
     view("input");
     notice(
       "새 분석 설정을 가져왔습니다. 표적·라이브러리·WT 입력을 검토한 뒤 별도 실행하세요.",
@@ -3200,6 +3301,7 @@ async function boot() {
     });
   }
   $("view-input").addEventListener("input", invalidateInput);
+  $("seed").addEventListener("input", () => { $("seed").dataset.quantitySource = "direct"; });
   const session = await api("/api/session");
   state.presets = session.presets || {};
   state.planningDefaults = session.planning_defaults || {};
@@ -3319,14 +3421,21 @@ async function initNoviceFlow() {
   const scale = el("fieldset"); scale.id = "analysis-scale";
   scale.append(el("legend", I18N.term("분석 규모")));
   const scaleNote = el("p", null, "muted"); scaleNote.id = "analysis-scale-note"; scale.append(scaleNote);
+  const breakdown = el("div"); breakdown.id = "quantity-breakdown"; breakdown.setAttribute("role", "status"); breakdown.setAttribute("aria-live", "polite"); scale.append(breakdown);
   for (const id of ["design-count", "candidate-limit"]) {
     const help = el("p", null, "muted"); help.id = id + "-help";
-    scale.append(document.querySelector('label[for="' + id + '"]'), $(id), help);
+    const current = el("p"); current.id = id + "-current"; current.setAttribute("aria-live", "polite");
+    $(id).setAttribute("aria-describedby", id + "-current " + id + "-help");
+    scale.append(document.querySelector('label[for="' + id + '"]'), $(id), current, help);
   }
   const selectionLabel = el("label", I18N.term("최종 선별 상한 · 여러 엔진 비교는 엔진별")); selectionLabel.htmlFor = "selection-limit";
   const selection = el("input"); selection.id = "selection-limit"; selection.type = "number"; selection.min = "1"; selection.step = "1"; selection.setAttribute("aria-describedby", "selection-limit-help");
   const selectionHelp = el("p", null, "muted"); selectionHelp.id = "selection-limit-help";
-  scale.append(selectionLabel, selection, selectionHelp); settingsCard.insertBefore(scale, advanced);
+  const selectionCurrent = el("p"); selectionCurrent.id = "selection-limit-current";
+  selection.setAttribute("aria-describedby", "selection-limit-current selection-limit-help");
+  const conditions = el("details"), conditionData = el("pre"); conditionData.id = "quantity-conditions";
+  conditions.append(el("summary", I18N.term("평가 엔진별 Seed·샘플 설정")), conditionData);
+  scale.append(selectionLabel, selection, selectionCurrent, selectionHelp, conditions); settingsCard.insertBefore(scale, advanced);
   settingsCard.insertBefore(cl,advanced);
   const complex=el("div");complex.id="novice-complex-fields";complex.hidden=true;
   const label=el("label",I18N.term("복합체 단백질 FASTA · 위에서 아래 순서로 체인 배정"));label.htmlFor="complex-fasta";const fasta=el("textarea");fasta.id="complex-fasta";fasta.rows=8;fasta.spellcheck=false;
@@ -3370,7 +3479,7 @@ async function initNoviceFlow() {
     complex.hidden=!isComplex||$("input-kind").value!=="fasta";$("fasta-fields").hidden=isComplex||$("input-kind").value!=="fasta";
     controls.hidden=$("analysis-preset").value!=="small-four-v1";$("mock").disabled=isComplex;demoControls.hidden=isComplex;
     const simulated=$("mock").checked&&!isComplex;ml.hidden=simulated;msa.hidden=simulated;cl.hidden=simulated;demoMsaNote.hidden=!simulated;
-    try {const cfg = inputSettings(true); renderAnalysisScale(cfg, $("mode").value); I18N.text(plan, I18N.term(noviceModelPlan(cfg,$("mode").value,$("mode").value==="screen"?noviceFasta($("vhh-fasta").value).length:0)));}catch(e){I18N.text(plan, I18N.term(e.message));}
+    try {const cfg = inputSettings(true); renderAnalysisScale(cfg, $("mode").value); I18N.text(plan, I18N.term(noviceModelPlan(cfg,$("mode").value,$("mode").value==="screen"?noviceFasta($("vhh-fasta").value).length:0)));}catch(e){clearScalePreview();I18N.text(plan, I18N.term(e.message));}
     I18N.text($("review-input"), I18N.term("입력 확인"));I18N.text($("start-job"), I18N.term("분석 실행"));
     refreshSequenceHelp();
   }
@@ -3389,7 +3498,7 @@ async function initNoviceFlow() {
   fasta.addEventListener("input",copiesReview);
   host.addEventListener("input",e=>{if(e.target!==consent)consent.checked=false;I18N.text(reason, "");render();if(restoring)return;clearTimeout(draftTimer);draftTimer=setTimeout(()=>{const fields={};for(const n of host.querySelectorAll("input[id],select[id],textarea[id]")){if(n.type!=="file"&&n.id!=="novice-consent")fields[n.id]=n.type==="checkbox"?n.checked:n.value;}fields.comparison_engines=[...controls.querySelectorAll('[data-novice-engine]:checked')].map(i=>i.value);saveQueue=saveQueue.catch(()=>{}).then(()=>api("/api/draft",{version:1,fields})).catch(e=>{I18N.text(reason, I18N.concat([I18N.term("초안 저장 실패: "), e.message]));});},500);});
   action("load-tutorial",async()=>{const revision=state.inputRevision;const example=await api("/api/tutorials/"+$("tutorial-mode").value),entry=example.payload.entries[0];if(revision!==state.inputRevision)throw Error("불러오는 동안 입력이 변경되었습니다. 현재 입력을 유지합니다.");$("mode").value=example.mode;$("input-kind").value="fasta";$("analysis-preset").value="small-four-v1";$("advanced").value="{}";$("mock").checked=false;$("candidate-limit").value="";$("design-count").value="";if($("selection-limit"))$("selection-limit").value="";$("seed").value="42";$("job-name").value=example.payload.name;$("target-fasta").value=entry.content||"";$("vhh-fasta").value=entry.vhh_fasta||"";$("wt-fasta").value=entry.wt_fasta||"";fasta.value=(entry.proteins||[]).map(p=>`>${p.name}\n${p.sequence}`).join("\n");consent.checked=false;invalidateInput();copiesReview();fields();jump(1);I18N.text($("tutorial-status"), I18N.term("공개 입력을 불러왔습니다. 아직 계산은 시작하지 않았습니다."));});
-  render();const draftRevision=state.inputRevision;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=true);start.disabled=true;$("load-tutorial").disabled=true;try{const draft=await api("/api/draft");if(draftRevision!==state.inputRevision)throw Error("입력이 변경되어 저장된 초안을 덮어쓰지 않았습니다.");restoring=true;for(const [id,value]of Object.entries(draft.fields||{})){const n=$(id);if(n&&host.contains(n)&&n.type!=="file"){if(n.type==="checkbox")n.checked=value===true;else n.value=String(value);}}if(draft.fields?.comparison_engines)for(const n of controls.querySelectorAll('[data-novice-engine]'))n.checked=draft.fields.comparison_engines.includes(n.value);consent.checked=false;fields();copiesReview();if(Object.keys(draft.fields||{}).length)I18N.text(task, I18N.term("초안 입력을 복원했습니다. 구조 파일을 다시 선택하고 전송 동의와 입력을 확인하세요. 설치 환경 확인 기록은 재사용합니다."));}catch(e){I18N.text(reason, I18N.concat([I18N.term("초안 복원 실패: "), e.message]));}finally{restoring=false;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=false);start.disabled=false;$("load-tutorial").disabled=false;render();}
+  render();const draftRevision=state.inputRevision;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=true);start.disabled=true;$("load-tutorial").disabled=true;try{const draft=await api("/api/draft");if(draftRevision!==state.inputRevision)throw Error("입력이 변경되어 저장된 초안을 덮어쓰지 않았습니다.");restoring=true;for(const [id,value]of Object.entries(draft.fields||{})){const n=$(id);if(n&&host.contains(n)&&n.type!=="file"){if(n.type==="checkbox")n.checked=value===true;else n.value=String(value);}}if(Object.hasOwn(draft.fields||{},'seed')&&$('seed').dataset)$('seed').dataset.quantitySource='restored';if(draft.fields?.comparison_engines)for(const n of controls.querySelectorAll('[data-novice-engine]'))n.checked=draft.fields.comparison_engines.includes(n.value);consent.checked=false;fields();copiesReview();if(Object.keys(draft.fields||{}).length)I18N.text(task, I18N.term("초안 입력을 복원했습니다. 구조 파일을 다시 선택하고 전송 동의와 입력을 확인하세요. 설치 환경 확인 기록은 재사용합니다."));}catch(e){I18N.text(reason, I18N.concat([I18N.term("초안 복원 실패: "), e.message]));}finally{restoring=false;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=false);start.disabled=false;$("load-tutorial").disabled=false;render();}
 }
 I18N.init();
 document.addEventListener("nanocofold:language", () => {

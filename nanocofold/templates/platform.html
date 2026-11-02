@@ -258,8 +258,8 @@
               <option value="standard">기존 기본 설정 · 사전 필터 적용</option>
             </select>
             <p class="muted">연구자 탐색은 RF2·ESM 사전 탈락을 해제하고 결합 부위 restraint·랭킹 가중치를 끕니다.
-              design은 1,000개 백본을 생성하고 최대 500개 복합체를 평가합니다.
-              mature는 최대 500개와 WT 대조군을 평가합니다. screen은 입력 라이브러리 전체를 평가합니다.
+              백본 수와 평가 상한은 아래 현재 적용값으로 확인하세요.
+              screen은 입력 라이브러리 전체를 평가합니다.
               품질 판정·충돌·개발가능성 경고를 유지하며 결과는 전체 후보를 표시합니다.
               design 구조 생성은 선택한 결합 부위에 조건화됩니다. 후보 수가 늘면 계산 시간도 늘어납니다.</p>
             <label for="candidate-limit">후속 평가 후보 수 설정</label>
@@ -271,7 +271,9 @@
               <option value="chai1">Chai-1</option>
               <option value="boltz2">Boltz-2</option></select
             ><label for="seed">Seed</label
-            ><input id="seed" type="number" value="42" min="0" /><label
+            ><input id="seed" type="number" value="42" min="0" step="1" aria-describedby="seed-current seed-help" />
+            <p id="seed-current" aria-live="polite"></p>
+            <p id="seed-help" class="muted">Seed는 난수 초기값입니다. 후보 수가 아닙니다. 엔진별로 가져온 개별 설정은 유지합니다.</p><label
               for="budget"
               >시간 한도 (분, 비우면 없음)</label
             ><input id="budget" type="number" min="1" placeholder="예: 120" />

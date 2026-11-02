@@ -427,8 +427,8 @@
           }
         }
       },
-      "maximum_models": 12,
-      "model_count_basis": "maximum planned; actual generation/selection separately recorded"
+      "maximum_models": 8,
+      "model_count_basis": "Default resolved settings, with WT counted only when enabled; actual generation and selection recorded separately"
     }
   }
 }

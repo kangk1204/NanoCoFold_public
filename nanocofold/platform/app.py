@@ -40,13 +40,14 @@ def planning_defaults(workspace: Path) -> dict:
     cfg = normalized_config(workspace)
     result = {}
     for dotted in (
+        "run.seed", "score.boltz2.seed", "screen.opendde.samples",
         "design.engine", "design.num_designs", "design.mpnn.seqs_per_struct",
         "design.boltzgen.inverse_fold_num_sequences", "design.filters.top_n_to_score",
         "design.refinement.enabled", "screen.engine", "screen.tier2_n",
         "screen.comparison.enabled", "screen.comparison.engines", "screen.cascade.enabled",
         "screen.num_diffn_samples", "screen.colabfold.num_models", "screen.colabfold.num_seeds",
         "score.boltz2_diffusion_samples", "mature.prefilter.top_n",
-        "mature.library.max_variants", "rank.final_n",
+        "mature.library.max_variants", "rank.final_n", "rank.include_wt_control",
     ):
         target = result
         parts = dotted.split(".")
