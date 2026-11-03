@@ -640,6 +640,10 @@ class ResultReader:
             if self.assessment:
                 self.assessment = self._specificity_assessment()
                 summary["assessment"] = self.assessment
+            # The retained record is already hash-verified. Keep any saved
+            # diagnostic snapshot when native files were explicitly pruned.
+            if "handoff_diagnostics" not in summary:
+                summary["handoff_diagnostics"] = self.handoff_diagnostics()
             return summary
         recorded_engines = self.engine_provenance()
         rows = self.all_rows()
@@ -680,7 +684,7 @@ class ResultReader:
                 expected = final.get("total_models")
             if type(expected) is not int or expected < 0:
                 expected = None
-            return {**population, "id": self.root.name, "mode": "complex", "name": self.config.get("run", {}).get("name", self.root.name),
+            return {**population, "handoff_diagnostics": self.handoff_diagnostics(), "id": self.root.name, "mode": "complex", "name": self.config.get("run", {}).get("name", self.root.name),
                     "total": len(rows), "scored_total": sum(_assessed(r) for r in rows), "failed_candidates": failures, "issues": issues,
                     "mock": bool(self.config.get("run", {}).get("mock")), "status": status, "complete": status == "complete", "readonly": True,
                     "config": self.config, "state": self.state, "conditions": self.config.get("complex", {}),
@@ -714,7 +718,7 @@ class ResultReader:
         status = authoritative_status or ("complete" if finalized else "incomplete")
         if finalized and successful_execution and (failures or issues or stage_failure):
             status = "partial_failure"
-        return {**population, "id": self.root.name, "name": run.get("name", self.root.name), "path": str(self.root),
+        return {**population, "handoff_diagnostics": self.handoff_diagnostics(), "id": self.root.name, "name": run.get("name", self.root.name), "path": str(self.root),
                 "mode": run.get("mode"), "mock": bool(run.get("mock")), "total": len(rows),
                 "scored_total": sum(_assessed(row) for row in rows),
                 "eligible_total": sum(_assessed(row) and row.get("final_eligible") is True for row in rows),
@@ -1267,6 +1271,11 @@ class ResultReader:
                 result.append({"path": relative, "size": path.stat().st_size, "type": path.suffix.lower().lstrip(".")})
         return {"artifacts": result, "provenance": self.provenance()}
 
+    def handoff_diagnostics(self):
+        from ..handoff_diagnostics import saved_handoff_diagnostics
+        recorded = self.state.get("phases", {}).get("final", {}).get("handoff_gate")
+        return saved_handoff_diagnostics(self.root, recorded)
+
     def provenance(self):
         authoritative = []
         for relative in ("run_config.yaml", "run_state.json", "complex_results.json", "03_score/scored_candidates.csv",
@@ -1277,6 +1286,9 @@ class ResultReader:
             if path.is_file():
                 path = self.artifact_path(relative)
                 authoritative.append({"path": relative, "size": path.stat().st_size, "sha256": sha256(path)})
+        gate = self.handoff_diagnostics()
+        if gate["source_sha256"]:
+            authoritative.append({"path": gate["source"], "size": gate["source_bytes"], "sha256": gate["source_sha256"]})
         return {"source_artifacts": authoritative,
             "engine_provenance": self.engine_provenance(),
             "ranking_policy": self._json("03_score/ranking_policy.json") if self._path("03_score/ranking_policy.json").is_file() else None,
@@ -1503,6 +1515,9 @@ class ResultReader:
             if path.is_file():
                 path = self.artifact_path(relative)
                 sources.append({"path": relative, "size": path.stat().st_size, "sha256": sha256(path)})
+        gate = self.handoff_diagnostics()
+        if gate["source_sha256"]:
+            sources.append({"path": gate["source"], "size": gate["source_bytes"], "sha256": gate["source_sha256"]})
         provenance = {"summary": self.summary(), "filters": filters,
                       "filtered_ids": [row["candidate_id"] for row in filtered_table["rows"]],
                       "source_artifacts": sources, "viewer_asset_sources": asset_sources,
@@ -1530,6 +1545,10 @@ class ResultReader:
         payload = portable_metadata(payload, root=self.root)
         all_table, provenance = payload["candidates"], payload["provenance"]
         files = {"report.html": self._offline_document(payload, assets)}
+        # This portable presentation is not an approval or a regenerated gate.
+        # The source receipt's hash identifies the unchanged original bytes.
+        files["handoff_diagnostics.json"] = json.dumps(payload["summary"]["handoff_diagnostics"],
+            ensure_ascii=False, allow_nan=False, indent=2).encode()
         stream = io.StringIO()
         writer = csv.DictWriter(stream, fieldnames=all_table["columns"])
         from ..utils.spreadsheet import csv_cell, csv_headers
@@ -1546,6 +1565,7 @@ class ResultReader:
             "브라우저의 WebGL이 필요합니다. 미평가·실패와 전체 모델을 포함하며 화면 필터로 데이터를 삭제하지 않습니다.\n"
             "MSA, 로그, 가중치, 중간 계산 파일은 포함하지 않습니다. 재실행이나 전체 계산 감사를 위해 전체 원본 ZIP을 별도로 보관하세요.\n"
             "저장된 분석 결과를 공유용으로 구성했습니다. 결합·친화도·KD는 실험으로 확인하세요.\n"
+            "handoff_diagnostics.json은 저장된 인계 판정의 표시용 사본입니다. 계산 완료와 인계 준비 완료는 별개입니다. 원본을 재검증하거나 승인하지 않습니다.\n"
             "delivery_manifest.json은 이 패키지의 파일 및 내장 구조/PAE 해시와 출처를 기록합니다.\n").encode()
         files["README.txt"] += "서버 경로는 상대 경로 또는 [local path]로 표시합니다. 원본 계산 기록은 전체 원본 ZIP에서 확인하세요.\n".encode()
         english = ("NanoCoFold shareable report\n\nExtract the entire ZIP, then open report.html in Chrome, Edge or Firefox.\n"
@@ -1557,6 +1577,7 @@ class ResultReader:
                    + ("This is a reduced retention archive: sequences, metrics and final coordinates remain; PAE arrays, MSA and intermediate files were removed by explicit retention.\n" if self.retained else "")
                    + "MSA, logs, weights and intermediate calculation files are omitted. Keep a separate full native archive for reruns and audits.\n"
                    "Confirm binding, affinity and KD experimentally.\n"
+                   "handoff_diagnostics.json presents the saved handoff receipt and its source hash. Computation completion and handoff readiness are separate. No revalidation or approval is performed.\n"
                    "delivery_manifest.json lists file hashes, sources, and the records for embedded coordinates and PAE.\n"
                    "Server paths are shown as relative paths or [local path]. Original calculation records remain in the full native archive.\n\n--- 한국어 ---\n\n")
         files["README.txt"] = english.encode() + files["README.txt"]

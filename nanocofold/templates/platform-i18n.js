@@ -44,6 +44,18 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "계산 상태와 별도의 인계 확인": "Handoff check, separate from computation status",
+  "저장된 인계 검사 통과": "Saved handoff check passed",
+  "인계 미완료": "Handoff incomplete",
+  "인계 준비 상태 미확인": "Handoff readiness unknown",
+  "기록 오류 {0}건 · 경고 {1}건": "Recorded errors: {0} · Warnings: {1}",
+  "계산 완료는 인계 승인이나 실험 검증을 뜻하지 않습니다. 저장된 판정만 표시하며 재검증·자동 승인을 하지 않습니다.": "Computation completion does not mean handoff approval or experimental validation. Only saved assessments are shown; no revalidation or automatic approval is performed.",
+  "상세 인계 JSON이 없어 항목별 이유를 확인할 수 없습니다. 미확인을 오류 0건이나 통과로 해석하지 마세요.": "The detailed handoff JSON is missing, so individual reasons are unavailable. Unknown does not mean zero errors or a pass.",
+  "상세 인계 JSON을 신뢰할 수 없습니다. 파일 형식·접근 상태 또는 기록 요약과의 불일치를 확인하세요.": "The detailed handoff JSON cannot be trusted. Check its format, accessibility, or disagreement with the recorded summary.",
+  "인계 차단 사유": "Handoff blockers",
+  "저장된 인계 경고": "Saved handoff warnings",
+  "저장된 진단 JSON·출처": "Saved diagnostic JSON and source",
+  "MSA 없이 실행한 기록입니다. 예측 품질의 한계이며 인계 확인으로 해소되지 않습니다.": "The saved settings record execution without an MSA. This prediction-quality limitation is not resolved by a handoff check.",
   "현재 Cys 보호 설정에서 치환 가능한 CDR 잔기가 없습니다. CDR 구간과 WT 서열을 확인하세요.": "No CDR residues can be substituted under the current cysteine protection settings. Check the CDR regions and WT sequence.",
   "변이 수는 중복 없는 서열 수입니다. 치환 가능한 위치와 치환 개수에 따라 가능한 수가 달라집니다. 요청이 가능한 수를 넘으면 설정을 조정해야 합니다.": "The variant count is the number of unique sequences. The available count depends on mutable positions and the number of substitutions. Adjust the settings if the request exceeds this count.",
   "가능한 고유 변이 공간은 최대 {0}개인데 {1}개를 요청했습니다(WT 제외). 변이 수를 {2}개 이하로 줄이거나 치환 조건을 조정하세요. WT 대조군은 별도 1개입니다.": "The unique variant space contains at most {0} variants, but {1} were requested (excluding WT). Reduce the variant count to {2} or fewer, or adjust the substitution settings. One WT control is additional.",
@@ -2316,6 +2328,6 @@ globalThis.I18N = (() => {
     document.getElementById('language-select')?.addEventListener('change',event=>setLanguage(event.target.value));
     apply();
   }
-  return Object.freeze({init,setLanguage,term,format,concat,text:(node,value)=>bind(node,'textContent',value),
+  return Object.freeze({init,setLanguage,term,format,concat,bilingual:message,text:(node,value)=>bind(node,'textContent',value),
     attribute:(node,name,value)=>bind(node,name,value),attributeValue:(node,name)=>bindingIndex.get(node)?.get(name) ?? node.getAttribute(name),value:value=>at(value,language),get language(){return language;}});
 })();

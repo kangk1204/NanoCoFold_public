@@ -1532,6 +1532,60 @@ async function refreshResults() {
     notice(e.message, true);
   }
 }
+// HANDOFF_PRESENTATION_START
+function resultHandoffView(summary) {
+  const count = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
+  const d = summary?.handoff_diagnostics;
+  const saved = summary?.state?.phases?.final?.handoff_gate ?? d?.recorded_summary;
+  const recorded = saved && typeof saved.ok === "boolean" && count(saved.n_errors) !== null && count(saved.n_warnings) !== null
+    && saved.ok === (saved.n_errors === 0) ? saved : null;
+  const entries = list => Array.isArray(list) && list.every(item => item && typeof item.code === "string" && typeof item.message === "string");
+  const detailed = d?.detail_status === "available" && typeof d.ok === "boolean" && entries(d.errors) && entries(d.warnings)
+    && d.n_errors === d.errors.length && d.n_warnings === d.warnings.length && d.ok === (d.errors.length === 0);
+  const consistent = detailed && (!recorded || (recorded.ok === d.ok && recorded.n_errors === d.n_errors && recorded.n_warnings === d.n_warnings));
+  const status = consistent ? d.ok ? "passed" : "blocked" : recorded?.ok === false ? "blocked" : "unknown";
+  return {status, detail_status: consistent ? "available" : d?.detail_status === "available" ? "invalid" : d?.detail_status || "missing",
+    n_errors: consistent ? d.n_errors : recorded ? recorded.n_errors : null,
+    n_warnings: consistent ? d.n_warnings : recorded ? recorded.n_warnings : null,
+    errors: consistent ? d.errors : [], warnings: consistent ? d.warnings : [],
+    source: typeof d?.source === "string" ? d.source : "05_final/handoff_gate.json",
+    source_sha256: typeof d?.source_sha256 === "string" ? d.source_sha256 : null,
+    empty_msa: summary?.mode === "complex" ? (summary?.conditions?.msa ?? summary?.config?.complex?.msa) === "empty" : summary?.config?.structure?.msa?.backend === "empty",
+    visible: summary?.mode !== "complex" || !!recorded || (d && d.detail_status !== "missing")};
+}
+// HANDOFF_PRESENTATION_END
+
+function renderHandoffStatus(summary) {
+  const gate = resultHandoffView(summary);
+  if (!gate.visible) return;
+  const panel = el("section", undefined, "report-guide");
+  panel.setAttribute("data-handoff-status", gate.status);
+  panel.append(el("h3", I18N.term("계산 상태와 별도의 인계 확인")));
+  panel.append(el("strong", I18N.term(gate.status === "passed" ? "저장된 인계 검사 통과" : gate.status === "blocked" ? "인계 미완료" : "인계 준비 상태 미확인")));
+  panel.append(el("p", I18N.format("기록 오류 {0}건 · 경고 {1}건", [gate.n_errors ?? I18N.term("미기록"), gate.n_warnings ?? I18N.term("미기록")])));
+  panel.append(el("p", I18N.term("계산 완료는 인계 승인이나 실험 검증을 뜻하지 않습니다. 저장된 판정만 표시하며 재검증·자동 승인을 하지 않습니다.")));
+  if (gate.empty_msa) panel.append(el("p", I18N.term("MSA 없이 실행한 기록입니다. 예측 품질의 한계이며 인계 확인으로 해소되지 않습니다."), "warning"));
+  if (gate.detail_status !== "available") panel.append(el("p", I18N.term(gate.detail_status === "missing"
+    ? "상세 인계 JSON이 없어 항목별 이유를 확인할 수 없습니다. 미확인을 오류 0건이나 통과로 해석하지 마세요."
+    : "상세 인계 JSON을 신뢰할 수 없습니다. 파일 형식·접근 상태 또는 기록 요약과의 불일치를 확인하세요."), "warning"));
+  for (const [key, label] of [["errors", "인계 차단 사유"], ["warnings", "저장된 인계 경고"]]) {
+    if (!gate[key].length) continue;
+    panel.append(el("h4", I18N.term(label)));
+    const list = el("ul");
+    for (const item of gate[key]) {
+      const row = el("li");
+      row.append(el("code", item.code), document.createTextNode(" · "), el("span", I18N.bilingual(item.message_i18n?.ko ?? item.message, item.message_i18n?.en ?? item.message)));
+      if (typeof item.path === "string") row.append(el("code", " · " + item.path));
+      list.append(row);
+    }
+    panel.append(list);
+  }
+  const detail = el("details");
+  detail.append(el("summary", I18N.term("저장된 진단 JSON·출처")), el("pre", JSON.stringify(summary.handoff_diagnostics ?? {recorded_summary: summary.state?.phases?.final?.handoff_gate ?? null, detail_status: "missing"}, null, 2)));
+  panel.append(detail);
+  $("result-summary").append(panel);
+}
+
 function resultMsaCaption(summary) {
   const complex = summary.mode === "complex";
   const mode = summary.conditions?.msa ?? summary.config?.complex?.msa;
@@ -1662,6 +1716,7 @@ async function loadResult(id) {
       "badge",
     ),
   );
+  renderHandoffStatus(summary);
   warnings($("result-issues"), [
     ...(summary.issues || []),
     ...[...new Set((summary.warnings || []).map(String))].map(message =>

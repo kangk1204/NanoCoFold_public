@@ -1169,6 +1169,18 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "계산 상태와 별도의 인계 확인": "Handoff check, separate from computation status",
+  "저장된 인계 검사 통과": "Saved handoff check passed",
+  "인계 미완료": "Handoff incomplete",
+  "인계 준비 상태 미확인": "Handoff readiness unknown",
+  "기록 오류 {0}건 · 경고 {1}건": "Recorded errors: {0} · Warnings: {1}",
+  "계산 완료는 인계 승인이나 실험 검증을 뜻하지 않습니다. 저장된 판정만 표시하며 재검증·자동 승인을 하지 않습니다.": "Computation completion does not mean handoff approval or experimental validation. Only saved assessments are shown; no revalidation or automatic approval is performed.",
+  "상세 인계 JSON이 없어 항목별 이유를 확인할 수 없습니다. 미확인을 오류 0건이나 통과로 해석하지 마세요.": "The detailed handoff JSON is missing, so individual reasons are unavailable. Unknown does not mean zero errors or a pass.",
+  "상세 인계 JSON을 신뢰할 수 없습니다. 파일 형식·접근 상태 또는 기록 요약과의 불일치를 확인하세요.": "The detailed handoff JSON cannot be trusted. Check its format, accessibility, or disagreement with the recorded summary.",
+  "인계 차단 사유": "Handoff blockers",
+  "저장된 인계 경고": "Saved handoff warnings",
+  "저장된 진단 JSON·출처": "Saved diagnostic JSON and source",
+  "MSA 없이 실행한 기록입니다. 예측 품질의 한계이며 인계 확인으로 해소되지 않습니다.": "The saved settings record execution without an MSA. This prediction-quality limitation is not resolved by a handoff check.",
   "현재 Cys 보호 설정에서 치환 가능한 CDR 잔기가 없습니다. CDR 구간과 WT 서열을 확인하세요.": "No CDR residues can be substituted under the current cysteine protection settings. Check the CDR regions and WT sequence.",
   "변이 수는 중복 없는 서열 수입니다. 치환 가능한 위치와 치환 개수에 따라 가능한 수가 달라집니다. 요청이 가능한 수를 넘으면 설정을 조정해야 합니다.": "The variant count is the number of unique sequences. The available count depends on mutable positions and the number of substitutions. Adjust the settings if the request exceeds this count.",
   "가능한 고유 변이 공간은 최대 {0}개인데 {1}개를 요청했습니다(WT 제외). 변이 수를 {2}개 이하로 줄이거나 치환 조건을 조정하세요. WT 대조군은 별도 1개입니다.": "The unique variant space contains at most {0} variants, but {1} were requested (excluding WT). Reduce the variant count to {2} or fewer, or adjust the substitution settings. One WT control is additional.",
@@ -3441,7 +3453,7 @@ globalThis.I18N = (() => {
     document.getElementById('language-select')?.addEventListener('change',event=>setLanguage(event.target.value));
     apply();
   }
-  return Object.freeze({init,setLanguage,term,format,concat,text:(node,value)=>bind(node,'textContent',value),
+  return Object.freeze({init,setLanguage,term,format,concat,bilingual:message,text:(node,value)=>bind(node,'textContent',value),
     attribute:(node,name,value)=>bind(node,name,value),attributeValue:(node,name)=>bindingIndex.get(node)?.get(name) ?? node.getAttribute(name),value:value=>at(value,language),get language(){return language;}});
 })();
 </script><script>/* Shared browser/offline explorer. Data is displayed with textContent, not HTML injection. */
@@ -4978,6 +4990,60 @@ async function refreshResults() {
     notice(e.message, true);
   }
 }
+// HANDOFF_PRESENTATION_START
+function resultHandoffView(summary) {
+  const count = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
+  const d = summary?.handoff_diagnostics;
+  const saved = summary?.state?.phases?.final?.handoff_gate ?? d?.recorded_summary;
+  const recorded = saved && typeof saved.ok === "boolean" && count(saved.n_errors) !== null && count(saved.n_warnings) !== null
+    && saved.ok === (saved.n_errors === 0) ? saved : null;
+  const entries = list => Array.isArray(list) && list.every(item => item && typeof item.code === "string" && typeof item.message === "string");
+  const detailed = d?.detail_status === "available" && typeof d.ok === "boolean" && entries(d.errors) && entries(d.warnings)
+    && d.n_errors === d.errors.length && d.n_warnings === d.warnings.length && d.ok === (d.errors.length === 0);
+  const consistent = detailed && (!recorded || (recorded.ok === d.ok && recorded.n_errors === d.n_errors && recorded.n_warnings === d.n_warnings));
+  const status = consistent ? d.ok ? "passed" : "blocked" : recorded?.ok === false ? "blocked" : "unknown";
+  return {status, detail_status: consistent ? "available" : d?.detail_status === "available" ? "invalid" : d?.detail_status || "missing",
+    n_errors: consistent ? d.n_errors : recorded ? recorded.n_errors : null,
+    n_warnings: consistent ? d.n_warnings : recorded ? recorded.n_warnings : null,
+    errors: consistent ? d.errors : [], warnings: consistent ? d.warnings : [],
+    source: typeof d?.source === "string" ? d.source : "05_final/handoff_gate.json",
+    source_sha256: typeof d?.source_sha256 === "string" ? d.source_sha256 : null,
+    empty_msa: summary?.mode === "complex" ? (summary?.conditions?.msa ?? summary?.config?.complex?.msa) === "empty" : summary?.config?.structure?.msa?.backend === "empty",
+    visible: summary?.mode !== "complex" || !!recorded || (d && d.detail_status !== "missing")};
+}
+// HANDOFF_PRESENTATION_END
+
+function renderHandoffStatus(summary) {
+  const gate = resultHandoffView(summary);
+  if (!gate.visible) return;
+  const panel = el("section", undefined, "report-guide");
+  panel.setAttribute("data-handoff-status", gate.status);
+  panel.append(el("h3", I18N.term("계산 상태와 별도의 인계 확인")));
+  panel.append(el("strong", I18N.term(gate.status === "passed" ? "저장된 인계 검사 통과" : gate.status === "blocked" ? "인계 미완료" : "인계 준비 상태 미확인")));
+  panel.append(el("p", I18N.format("기록 오류 {0}건 · 경고 {1}건", [gate.n_errors ?? I18N.term("미기록"), gate.n_warnings ?? I18N.term("미기록")])));
+  panel.append(el("p", I18N.term("계산 완료는 인계 승인이나 실험 검증을 뜻하지 않습니다. 저장된 판정만 표시하며 재검증·자동 승인을 하지 않습니다.")));
+  if (gate.empty_msa) panel.append(el("p", I18N.term("MSA 없이 실행한 기록입니다. 예측 품질의 한계이며 인계 확인으로 해소되지 않습니다."), "warning"));
+  if (gate.detail_status !== "available") panel.append(el("p", I18N.term(gate.detail_status === "missing"
+    ? "상세 인계 JSON이 없어 항목별 이유를 확인할 수 없습니다. 미확인을 오류 0건이나 통과로 해석하지 마세요."
+    : "상세 인계 JSON을 신뢰할 수 없습니다. 파일 형식·접근 상태 또는 기록 요약과의 불일치를 확인하세요."), "warning"));
+  for (const [key, label] of [["errors", "인계 차단 사유"], ["warnings", "저장된 인계 경고"]]) {
+    if (!gate[key].length) continue;
+    panel.append(el("h4", I18N.term(label)));
+    const list = el("ul");
+    for (const item of gate[key]) {
+      const row = el("li");
+      row.append(el("code", item.code), document.createTextNode(" · "), el("span", I18N.bilingual(item.message_i18n?.ko ?? item.message, item.message_i18n?.en ?? item.message)));
+      if (typeof item.path === "string") row.append(el("code", " · " + item.path));
+      list.append(row);
+    }
+    panel.append(list);
+  }
+  const detail = el("details");
+  detail.append(el("summary", I18N.term("저장된 진단 JSON·출처")), el("pre", JSON.stringify(summary.handoff_diagnostics ?? {recorded_summary: summary.state?.phases?.final?.handoff_gate ?? null, detail_status: "missing"}, null, 2)));
+  panel.append(detail);
+  $("result-summary").append(panel);
+}
+
 function resultMsaCaption(summary) {
   const complex = summary.mode === "complex";
   const mode = summary.conditions?.msa ?? summary.config?.complex?.msa;
@@ -5108,6 +5174,7 @@ async function loadResult(id) {
       "badge",
     ),
   );
+  renderHandoffStatus(summary);
   warnings($("result-issues"), [
     ...(summary.issues || []),
     ...[...new Set((summary.warnings || []).map(String))].map(message =>
