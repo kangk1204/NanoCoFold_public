@@ -100,3 +100,12 @@ test('candidate eligibility captions translate composed UI terms and preserve ra
  }
  delete row.final_eligible;assert.equal(JSON.stringify(row),original);
 });
+
+test('insufficient mutation capacity preserves requested and available counts across language changes',()=>{
+ const i=fixture(),node={textContent:'',isConnected:true};
+ const ko='가능한 고유 변이 공간은 최대 18개인데 100개를 요청했습니다(WT 제외). 변이 수를 18개 이하로 줄이거나 치환 조건을 조정하세요. WT 대조군은 별도 1개입니다.';
+ i.text(node,i.term(ko));assert.doesNotMatch(node.textContent,/[가-힣]/);
+ assert.match(node.textContent,/18 variants.*100.*18 or fewer/);
+ i.setLanguage('ko',{persist:false});assert.equal(node.textContent,ko);
+ i.setLanguage('en',{persist:false});assert.match(node.textContent,/18 variants.*100.*18 or fewer/);
+});

@@ -309,6 +309,16 @@ class InputManager:
         from ..score_complex import iptm_availability_warnings
         from ..utils.seq import nucleotide_ambiguity_hint, read_fasta
         advisories = iptm_availability_warnings(cfg)
+        from ..mature import preview_random_library
+        capacity = preview_random_library(cfg, folder / "mutation_capacity")
+        if capacity is not None:
+            review["mutation_capacity"] = capacity
+            if capacity["status"] == "checked":
+                advisories.append(
+                    f"변이 조합 확인: 요청 {capacity['requested_variants']}개 · 가능한 고유 변이 최대 {capacity['max_variants']}개(WT 제외). WT 대조군은 별도 1개입니다."
+                )
+            else:
+                advisories.append("고유 변이 수는 CDR 구간 확인 후 계산합니다. 가능한 수보다 많이 요청하면 생성 전에 중단하고 조정할 수를 안내합니다.")
         if cfg.get("screen", {}).get("vhh_fasta"):
             library = read_fasta(cfg["screen"]["vhh_fasta"])
             if cfg.get("screen", {}).get("comparison", {}).get("enabled"):

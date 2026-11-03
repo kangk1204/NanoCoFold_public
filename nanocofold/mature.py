@@ -267,26 +267,12 @@ def resolve_cdr_annotations_batch(cfg, sequences, work_dir):
     return result
 
 
-def generate_random_library(
-    wt_sequence: str, cdr_ranges: dict[str, tuple[int, int]], *, size: int = 10000,
-    min_mutations: int = 1, max_mutations: int = 5, seed: int = 42,
-    exclude_cys: bool = True, protect_wt_cys: bool = True,
-) -> pd.DataFrame:
-    """Unique CDR-only random substitutions; size includes the WT control.
-
-    Draw mutation count uniformly among non-exhausted requested counts, then
-    positions without replacement and an alternative residue at each position.
-    Duplicate draws retry within that count. A deterministic enumeration fallback
-    after bounded retries prevents near-exhausted spaces from hanging.
-    """
+def _random_substitution_space(wt_sequence, cdr_ranges, min_mutations, max_mutations,
+                               exclude_cys, protect_wt_cys):
     if not isinstance(wt_sequence, str) or not wt_sequence or any(aa not in AMINO_ACIDS for aa in wt_sequence):
         raise ValueError("random 라이브러리 WT는 표준 아미노산의 대문자 서열이어야 합니다.")
-    if isinstance(size, bool) or not isinstance(size, int) or not 2 <= size <= 100000:
-        raise ValueError("random 라이브러리 size는 WT 포함 2–100000 사이의 정수여야 합니다.")
     if any(isinstance(value, bool) or not isinstance(value, int) for value in (min_mutations, max_mutations)) or not 1 <= min_mutations <= max_mutations <= 50:
         raise ValueError("random 변이 개수는 1 ≤ min_mutations ≤ max_mutations ≤ 50이어야 합니다.")
-    if isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed < 2**32:
-        raise ValueError("random seed는 0–4294967295 사이의 정수여야 합니다.")
     if not isinstance(exclude_cys, bool) or not isinstance(protect_wt_cys, bool):
         raise ValueError("random Cys 보호 설정은 true/false여야 합니다.")
     if not isinstance(cdr_ranges, dict) or not cdr_ranges:
@@ -303,8 +289,10 @@ def generate_random_library(
                 raise ValueError("random CDR 구간이 서로 겹칩니다.")
             regions[position] = name
     positions = [p for p in sorted(regions) if not (protect_wt_cys and wt_sequence[p - 1] == "C")]
+    if not positions:
+        raise ValueError("현재 Cys 보호 설정에서 치환 가능한 CDR 잔기가 없습니다. CDR 구간과 WT 서열을 확인하세요.")
     if max_mutations > len(positions):
-        raise ValueError(f"random max_mutations={max_mutations}가 변경 가능한 CDR 위치 {len(positions)}개보다 큽니다.")
+        raise ValueError(f"변경 가능한 CDR 위치는 {len(positions)}개입니다. 최소·최대 치환 잔기 수를 {len(positions)}개 이하로 조정하세요.")
     alternatives = {p: [aa for aa in AMINO_ACIDS if aa != wt_sequence[p - 1] and not (exclude_cys and aa == "C")] for p in positions}
     # Elementary symmetric polynomial gives the exact number of distinct
     # k-substitution sequences, including mixed 18/19-option positions.
@@ -312,9 +300,80 @@ def generate_random_library(
     for p in positions:
         for count in range(max_mutations, 0, -1):
             capacity[count] += capacity[count - 1] * len(alternatives[p])
+    return regions, positions, alternatives, capacity
+
+
+def random_library_capacity(wt_sequence: str, cdr_ranges: dict, *, min_mutations: int = 1,
+                            max_mutations: int = 5, exclude_cys: bool = True,
+                            protect_wt_cys: bool = True) -> dict:
+    """Count unique non-WT sequences with the sampler's exact residue rules."""
+    _, positions, _, capacity = _random_substitution_space(
+        wt_sequence, cdr_ranges, min_mutations, max_mutations, exclude_cys, protect_wt_cys)
+    return {"mutable_residues": len(positions),
+            "max_variants": sum(capacity[min_mutations:max_mutations + 1]),
+            "min_mutations": min_mutations, "max_mutations": max_mutations}
+
+
+def validate_random_library_capacity(size: int, maximum: int) -> None:
+    if size - 1 > maximum:
+        raise ValueError(
+            f"가능한 고유 변이 공간은 최대 {maximum}개인데 {size - 1}개를 요청했습니다(WT 제외). "
+            f"변이 수를 {maximum}개 이하로 줄이거나 치환 조건을 조정하세요. WT 대조군은 별도 1개입니다."
+        )
+
+
+def preview_random_library(cfg: dict, work_dir: Path) -> dict | None:
+    """CPU-only capacity check before a browser input review is accepted.
+
+    Never invent CDR boundaries when annotation is unavailable. Decimal strings
+    preserve large exact counts at the JSON/JavaScript boundary.
+    """
+    if (cfg_get(cfg, "run.mode") != "mature"
+            or cfg_get(cfg, "mature.library.strategy", "dms") != "random"):
+        return None
+    if cfg_get(cfg, "run.mock", False) or cfg_get(cfg, "run.dry_run", False):
+        return {"status": "not_checked"}
+    wt = resolve_wt_sequence(cfg)
+    if cfg_get(cfg, "mature.cdr.source", "auto") == "config":
+        ranges = validate_cdr_ranges(cfg_get(cfg, "mature.cdr.regions", {}), len(wt))
+    else:
+        env = resolve_path(cfg, cfg_get(cfg, "mature.anarci.env"))
+        if not env or not (env / "bin/python").is_file():
+            return {"status": "not_checked"}
+        ranges = resolve_cdr_ranges_batch(cfg, {"WT": wt}, work_dir).get("WT", {})
+        if not ranges:
+            return {"status": "not_checked"}
+    capacity = random_library_capacity(wt, ranges,
+        min_mutations=cfg_get(cfg, "mature.library.min_mutations", 1),
+        max_mutations=cfg_get(cfg, "mature.library.max_mutations", 5),
+        exclude_cys=cfg_get(cfg, "mature.exclude.cys_substitution", True),
+        protect_wt_cys=cfg_get(cfg, "mature.exclude.wt_cys", True))
+    size = cfg_get(cfg, "mature.library.size", 10000)
+    validate_random_library_capacity(size, capacity["max_variants"])
+    return {"status": "checked", **capacity, "max_variants": str(capacity["max_variants"]),
+            "requested_variants": size - 1, "wt_controls": 1}
+
+
+def generate_random_library(
+    wt_sequence: str, cdr_ranges: dict[str, tuple[int, int]], *, size: int = 10000,
+    min_mutations: int = 1, max_mutations: int = 5, seed: int = 42,
+    exclude_cys: bool = True, protect_wt_cys: bool = True,
+) -> pd.DataFrame:
+    """Unique CDR-only random substitutions; size includes the WT control.
+
+    Draw mutation count uniformly among non-exhausted requested counts, then
+    positions without replacement and an alternative residue at each position.
+    Duplicate draws retry within that count. A deterministic enumeration fallback
+    after bounded retries prevents near-exhausted spaces from hanging.
+    """
+    if isinstance(size, bool) or not isinstance(size, int) or not 2 <= size <= 100000:
+        raise ValueError("random 라이브러리 size는 WT 포함 2–100000 사이의 정수여야 합니다.")
+    if isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed < 2**32:
+        raise ValueError("random seed는 0–4294967295 사이의 정수여야 합니다.")
+    regions, positions, alternatives, capacity = _random_substitution_space(
+        wt_sequence, cdr_ranges, min_mutations, max_mutations, exclude_cys, protect_wt_cys)
     total_capacity = 1 + sum(capacity[min_mutations:max_mutations + 1])
-    if size > total_capacity:
-        raise ValueError(f"random 요청 {size}종이 중복 없는 가능한 공간 {total_capacity}종(WT 포함)을 초과합니다.")
+    validate_random_library_capacity(size, total_capacity - 1)
     rng = np.random.default_rng(seed)
     seen = {count: set() for count in range(min_mutations, max_mutations + 1)}
     fallback_iterators = {}

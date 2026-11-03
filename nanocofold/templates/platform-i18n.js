@@ -44,6 +44,12 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "현재 Cys 보호 설정에서 치환 가능한 CDR 잔기가 없습니다. CDR 구간과 WT 서열을 확인하세요.": "No CDR residues can be substituted under the current cysteine protection settings. Check the CDR regions and WT sequence.",
+  "변이 수는 중복 없는 서열 수입니다. 치환 가능한 위치와 치환 개수에 따라 가능한 수가 달라집니다. 요청이 가능한 수를 넘으면 설정을 조정해야 합니다.": "The variant count is the number of unique sequences. The available count depends on mutable positions and the number of substitutions. Adjust the settings if the request exceeds this count.",
+  "가능한 고유 변이 공간은 최대 {0}개인데 {1}개를 요청했습니다(WT 제외). 변이 수를 {2}개 이하로 줄이거나 치환 조건을 조정하세요. WT 대조군은 별도 1개입니다.": "The unique variant space contains at most {0} variants, but {1} were requested (excluding WT). Reduce the variant count to {2} or fewer, or adjust the substitution settings. One WT control is additional.",
+  "변이 조합 확인: 요청 {0}개 · 가능한 고유 변이 최대 {1}개(WT 제외). WT 대조군은 별도 1개입니다.": "Variant combinations checked: {0} requested; up to {1} unique variants available (excluding WT). One WT control is additional.",
+  "고유 변이 수는 CDR 구간 확인 후 계산합니다. 가능한 수보다 많이 요청하면 생성 전에 중단하고 조정할 수를 안내합니다.": "The unique variant count is calculated after the CDR regions are confirmed. If the request exceeds the available count, generation stops and shows how to adjust it.",
+  "변경 가능한 CDR 위치는 {0}개입니다. 최소·최대 치환 잔기 수를 {1}개 이하로 조정하세요.": "There are {0} mutable CDR positions. Adjust both the minimum and maximum substitution counts to {1} or fewer.",
   "변이 생성 설정": "Variant generation",
   "변이 생성 방식": "Variant generation method",
   "CDR 단일 잔기 치환 (DMS)": "Single-residue CDR substitutions (DMS)",
