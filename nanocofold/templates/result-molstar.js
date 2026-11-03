@@ -30,13 +30,24 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
         ["contacts", (data.contacts || []).flatMap(p => [p.a, p.b]), 0x16a092, "ball-and-stick"],
         ["clashes", (data.clashes || []).flatMap(p => [p.a, p.b]), 0xd83a31, "ball-and-stick"],
       ]) if (labels.length)
-        await result.component(result.structure, result.schema(labels), key, () => result.layerLabel(key), color, type);
+        result.optionalLayers.set(key, () => result.component(result.structure, result.schema(labels), key, () => result.layerLabel(key), color, type));
       const cdrColors = {CDR1: 0x4376d7, CDR2: 0x199a74, CDR3: 0xb750a5};
-      for (const [name, region] of Object.entries(data.cdr?.ranges || {}))
-        await result.component(result.structure, result.schema(region.labels), "cdr", name, cdrColors[name], "cartoon");
+      const loadedCdr = new Set();
+      result.optionalLayers.set("cdr", async () => {
+        for (const [name, region] of Object.entries(data.cdr?.ranges || {})) {
+          if (result.disposed) return;
+          if (loadedCdr.has(name)) continue;
+          await result.component(result.structure, result.schema(region.labels), "cdr", name, cdrColors[name], "cartoon");
+          loadedCdr.add(name);
+        }
+      });
       if (data.reference?.available) {
-        const reference = await result.load(data.reference.content, data.reference.format, () => result.text("입력 참조 · 표적 Cα 정렬", "Input reference · target Cα alignment"));
-        await result.component(reference, {}, "reference", () => result.text("저장된 입력 좌표", "Saved input coordinates"), 0x697582, "cartoon", 0.35);
+        let reference;
+        result.optionalLayers.set("reference", async () => {
+          reference ||= await result.load(data.reference.content, data.reference.format, () => result.text("입력 참조 · 표적 Cα 정렬", "Input reference · target Cα alignment"));
+          if (!result.disposed)
+            await result.component(reference, {}, "reference", () => result.text("저장된 입력 좌표", "Saved input coordinates"), 0x697582, "cartoon", 0.35);
+        });
       }
       viewer.subscribe(viewer.plugin.behaviors.interaction.click, event => {
         if (result.disposed) return;
@@ -67,6 +78,7 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     this.labelBindings = [];
     this.watchLanguage();
     this.activeLayers = {target: true, binder: true, context: true};
+    this.optionalLayers = new Map(); this.loadedOptionalLayers = new Set();
     this.displayOptions = {sequence: false, residues: false};
     this.residuesCreated = false;
     this.cameraFocusLabels = null;
@@ -165,10 +177,23 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     return this.pending;
   }
   layers(active) {
-    return this.enqueue(() => {
+    return this.enqueue(async () => {
       this.activeLayers = {...active};
+      await this.ensureOptionalLayers();
       this.applyVisibility();
     });
+  }
+  async ensureOptionalLayers() {
+    // Saved overlays remain intact, but hidden geometry must not hold basic
+    // readiness. Queue creation with display/layer changes so a rapid toggle
+    // cannot create duplicate representations or report readiness too early.
+    for (const [key, create] of this.optionalLayers) {
+      if (this.disposed) return;
+      const atoms = ["hotspots", "contacts", "clashes"].includes(key);
+      if (!this.activeLayers[key] || (atoms && !this.displayOptions.residues) || this.loadedOptionalLayers.has(key)) continue;
+      await create();
+      if (!this.disposed) this.loadedOptionalLayers.add(key);
+    }
   }
   applyVisibility() {
     if (this.disposed) return;
@@ -199,6 +224,7 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
         }
         this.residuesCreated = true;
       }
+      await this.ensureOptionalLayers();
       this.applyVisibility();
     });
   }
