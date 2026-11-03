@@ -262,6 +262,27 @@
               screen은 입력 라이브러리 전체를 평가합니다.
               품질 판정·충돌·개발가능성 경고를 유지하며 결과는 전체 후보를 표시합니다.
               design 구조 생성은 선택한 결합 부위에 조건화됩니다. 후보 수가 늘면 계산 시간도 늘어납니다.</p>
+            <fieldset id="mature-library-settings" hidden>
+              <legend>변이 생성 설정</legend>
+              <label for="mutation-strategy">변이 생성 방식</label>
+              <select id="mutation-strategy">
+                <option value="">현재 설정 유지</option>
+                <option value="dms">CDR 단일 잔기 치환 (DMS)</option>
+                <option value="random">CDR 무작위 다중 잔기 치환</option>
+              </select>
+              <div id="random-mutation-fields" hidden>
+                <label for="mutation-count">생성할 변이 후보 수 · WT 제외</label>
+                <input id="mutation-count" type="number" min="1" max="99999" step="1" placeholder="비우면 현재 설정 유지" />
+                <label for="mutation-min">후보당 최소 치환 잔기 수</label>
+                <input id="mutation-min" type="number" min="1" max="50" step="1" placeholder="비우면 현재 설정 유지" />
+                <label for="mutation-max">후보당 최대 치환 잔기 수</label>
+                <input id="mutation-max" type="number" min="1" max="50" step="1" placeholder="비우면 현재 설정 유지" />
+                <p class="muted">CDR 안에서만 치환하며 프레임워크와 Cys 보호 설정을 유지합니다. 실제 분석은 생성한 변이를 모두 평가하고 ESM·AntiFold 사전 선별은 생략합니다.</p>
+              </div>
+              <label for="mutation-wt">WT 대조군 평가</label>
+              <select id="mutation-wt"><option value="">현재 설정 유지</option><option value="include">포함</option><option value="exclude">제외</option></select>
+              <p id="mutation-current" role="status" aria-live="polite"></p>
+            </fieldset>
             <label for="candidate-limit">후속 평가 후보 수 설정</label>
             <input id="candidate-limit" type="number" min="1" step="1" placeholder="비우면 현재 설정 유지" aria-describedby="candidate-limit-help" />
             <label for="design-count">생성할 백본 수 · 생성기별</label>

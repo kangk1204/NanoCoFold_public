@@ -544,7 +544,7 @@ class Agent:
         strategy=p.get('mutation_strategy','random' if design_cascade else 'dms')
         if strategy not in ('dms','random'):raise ValueError('치환 방법 오류')
         if strategy=='random':
-            if mode not in ('mature','design') or not cascade:raise ValueError('무작위 다중 치환은 mature/design의 ColabFold workflow에서 지원합니다.')
+            if mode!='mature' and not design_cascade:raise ValueError('무작위 다중 치환은 기존 나노바디 변이 평가 또는 신규 설계의 CDR 치환 단계에서 사용하세요.')
             low,high=p.get('mutation_min',1),p.get('mutation_max',5)
             if type(low) is not int or type(high) is not int or not 1<=low<=high<=5:raise ValueError('치환 잔기 수는 1–5 범위입니다.')
             if count<2:raise ValueError('무작위 라이브러리는 WT 포함 2개 이상입니다.')
@@ -553,6 +553,10 @@ class Agent:
             else:
                 cfg['mature']['library']={'strategy':'random','size':count,'min_mutations':low,'max_mutations':high}
                 cfg['mature']['prefilter']['mode']='none'
+                # Multi-substitution libraries have no single-mutation prior.
+                # Keep structural/developability gates; omit only unmeasured priors.
+                cfg['rank'].setdefault('weights',{}).update(esm_score=0.0,antifold=0.0)
+                cfg['rank']['include_wt_control']=True
         if design_cascade and strategy!='random':raise ValueError('백본 CDR 탐색은 무작위 치환 라이브러리를 사용합니다.')
         return cfg
     def sync_result(self, cloud_id,job):

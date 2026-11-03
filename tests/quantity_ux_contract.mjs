@@ -22,6 +22,48 @@ test('reanalyze restores the saved Seed and predictor rather than previous contr
 test('small budgets, unique sequence uncertainty, per-generator caps and engine conditions stay separate',()=>{const{c}=fixture();const small=c.inputSettings(true),before=JSON.stringify(small),p=c.analysisQuantityPlan(small,'design',null);assert.equal(p.modelUpper,8);assert.equal(p.uniqueSequences,null);assert.equal(p.generators.length,2);assert.equal(JSON.stringify(small),before);small.design.num_designs=1000;small.design.filters.top_n_to_score=500;small.screen.tier2_n=500;assert.equal(c.analysisQuantityPlan(small,'design',null).modelUpper,6000);small.score={boltz2:{seed:99}};small.screen.colabfold.num_seeds=3;const q=c.analysisQuantityPlan(small,'design',null);assert.equal(q.conditions.boltz2.seed,99);assert.equal(q.conditions.colabfold.seeds,3);});
 test('count sources and invalid previews never display a stale effective number',()=>{const{c,get}=fixture();assert.equal(c.quantitySource('design-count','design.num_designs'),'작은 시작 설정');get('advanced').value='{"design":{"num_designs":7}}';assert.equal(c.quantitySource('design-count','design.num_designs'),'가져온 설정·고급 설정');get('design-count').value='9';assert.equal(c.quantitySource('design-count','design.num_designs'),'직접 입력');c.clearScalePreview();assert.ok(!/\d/.test(get('design-count').placeholder));});
 function ready(f,cfg){f.c.state.input={id:'opaque-review',config:cfg};f.c.state.readiness=true;}
+test('random native library budgets ignore unused top_n and stale DMS limits',()=>{
+ const {c}=fixture();const cfg={run:{mode:'mature',mock:false},mature:{library:{strategy:'random',size:101,max_variants:3},prefilter:{mode:'none',top_n:2}},screen:{engine:'boltz2'},rank:{include_wt_control:true}};
+ const before=JSON.stringify(cfg);assert.equal(c.analysisQuantityPlan(cfg,'mature').modelUpper,101);
+ cfg.rank.include_wt_control=false;assert.equal(c.analysisQuantityPlan(cfg,'mature').modelUpper,100);
+ cfg.screen.comparison={enabled:true,engines:['boltz2','chai1']};assert.equal(c.analysisQuantityPlan(cfg,'mature').modelUpper,200);
+ cfg.run.mock=true;assert.equal(c.analysisQuantityPlan(cfg,'mature').modelUpper,4);
+ const original=JSON.parse(before);assert.match(c.noviceModelPlan(original,'mature'),/101모델/);
+ assert.doesNotMatch(c.I18N.value(c.I18N.term(c.noviceModelPlan(original,'mature'))),/[가-힣]/);
+});
+test('unfiltered unbounded DMS never advertises a prefilter cap as its compute budget',()=>{
+ const {c}=fixture();const cfg={mature:{library:{strategy:'dms'},prefilter:{mode:'none',top_n:2}},rank:{include_wt_control:true}};
+ assert.equal(c.analysisQuantityPlan(cfg,'mature').modelUpper,null);
+ cfg.mature.library.max_variants=3;assert.equal(c.analysisQuantityPlan(cfg,'mature').modelUpper,4);
+});
+test('native mutation controls turn 100 variants into 101 sequences and preserve quality settings',()=>{
+ const {c,get}=fixture();get('mode').value='mature';get('analysis-preset').value='standard';get('screen-engine').value='boltz2';
+ get('advanced').value=JSON.stringify({score:{thresholds:{ipsae:0.6}},mature:{library:{strategy:'dms',max_variants:3}}});
+ get('mutation-strategy').value='random';get('mutation-count').value='100';get('mutation-min').value='1';get('mutation-max').value='3';get('candidate-limit').value='2';
+ const cfg=c.inputSettings(false);assert.equal(cfg.mature.library.size,101);assert.equal(cfg.mature.library.min_mutations,1);assert.equal(cfg.mature.library.max_mutations,3);
+ assert.equal(cfg.mature.prefilter.mode,'none');assert.equal(cfg.mature.antifold.enabled,false);assert.equal(cfg.rank.include_wt_control,true);assert.equal(cfg.score.thresholds.ipsae,0.6);
+ assert.equal(c.analysisQuantityPlan(cfg,'mature').modelUpper,101);
+ get('mutation-wt').value='exclude';assert.equal(c.analysisQuantityPlan(c.inputSettings(false),'mature').modelUpper,100);
+ get('mutation-min').value='4';assert.throws(()=>c.inputSettings(false),/최대/);
+});
+test('switching from DMS to random starts at 100 variants in both preview and request',()=>{
+ const {c,get}=fixture();get('mode').value='mature';get('analysis-preset').value='standard';
+ c.state.planningDefaults.mature={library:{strategy:'dms',size:10000}};
+ get('mutation-strategy').value='random';
+ assert.equal(c.inputSettings(true).mature.library.size,101);
+ assert.equal(c.inputSettings(false).mature.library.size,101);
+});
+test('imported mutation configuration clears old controls and retains counts and WT choice',()=>{
+ const {c,get}=fixture();get('mutation-strategy').value='random';get('mutation-count').value='100';get('mutation-max').value='3';
+ const cfg={run:{mode:'mature',seed:99},screen:{engine:'boltz2'},mature:{library:{strategy:'random',size:8,min_mutations:1,max_mutations:2},prefilter:{mode:'none',top_n:2}},rank:{include_wt_control:false}};
+ c.applyAnalysisSettings(cfg);assert.equal(get('mutation-count').value,'');const applied=c.inputSettings(false);
+ assert.equal(applied.mature.library.size,8);assert.equal(applied.mature.library.max_mutations,2);assert.equal(applied.rank.include_wt_control,false);
+ assert.equal(c.analysisQuantityPlan(applied,'mature').modelUpper,7);
+});
+test('all visible mutation controls have English labels and validation messages',()=>{
+ const {c}=fixture();for(const key of ['변이 생성 설정','변이 생성 방식','현재 설정 유지','생성할 변이 후보 수 · WT 제외','후보당 최소 치환 잔기 수','후보당 최대 치환 잔기 수','WT 대조군 평가','포함','제외','CDR 단일 잔기 치환 (DMS)','CDR 무작위 다중 잔기 치환','변이 수와 치환 수는 허용 범위의 정수로 입력하세요.','WT 대조군 포함 여부를 확인하세요.'])
+  assert.doesNotMatch(c.I18N.value(c.I18N.term(key)),/[가-힣]/,key);
+});
 test('large confirmation cancellation submits zero; double click submits one',async()=>{const f=fixture();ready(f,design);f.c.window.confirm=()=>false;await f.c.submitReviewedAnalysis();assert.equal(f.writes.length,0);let approve;f.c.window.confirm=()=>new Promise(resolve=>{approve=resolve;});const a=f.c.submitReviewedAnalysis(),b=f.c.submitReviewedAnalysis();assert.equal(f.writes.length,0);approve(true);await Promise.all([a,b]);assert.equal(f.writes.length,1);assert.equal(f.writes[0].path,'/api/jobs');});
 test('changing the reviewed input while confirmation is open invalidates approval',async()=>{const f=fixture();ready(f,design);let approve;f.c.window.confirm=()=>new Promise(resolve=>{approve=resolve;});const pending=f.c.submitReviewedAnalysis();f.c.state.inputRevision++;approve(true);await assert.rejects(pending,/변경/);assert.equal(f.writes.length,0);});
 test('small eight-model request needs no large-run confirmation; unknown is never zero',async()=>{const f=fixture();ready(f,f.c.inputSettings(true));f.c.window.confirm=()=>{throw Error('unexpected confirmation');};await f.c.submitReviewedAnalysis();assert.equal(f.writes.length,1);assert.equal(f.c.analysisQuantityPlan({},'design',null).modelUpper,null);});
