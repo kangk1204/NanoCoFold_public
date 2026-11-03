@@ -66,3 +66,12 @@ test('screen and complex keep their own candidate semantics and do not show VHH 
  const {c,get}=fixture();for(const mode of ['screen','complex']){get('mode').value=mode;c.renderAnalysisScale(c.inputSettings(true),mode);assert.equal(get('analysis-scale').hidden,true);}
  assert.match(c.noviceModelPlan({screen:{comparison:{enabled:true,engines:['boltz2','chai1']}}},'screen',1001),/1001개.*2002모델/);
 });
+
+test('unfiltered random libraries do not restore the unused prefilter cap caption',()=>{
+ const {c,get}=fixture();get('mode').value='mature';
+ const cfg={run:{mode:'mature',mock:false},mature:{library:{strategy:'random',size:101},prefilter:{mode:'none',top_n:2}},screen:{engine:'boltz2'},rank:{include_wt_control:true}};
+ c.renderAnalysisScale(cfg,'mature');
+ for(const id of ['candidate-limit','candidate-limit-help','candidate-limit-current','design-count-current'])assert.equal(get(id).hidden,true,id);
+ assert.match(c.noviceModelPlan(cfg,'mature'),/101모델/);
+ cfg.run.mock=true;c.renderAnalysisScale(cfg,'mature');assert.equal(get('candidate-limit-help').hidden,false);
+});

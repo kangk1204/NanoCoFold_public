@@ -781,7 +781,7 @@ function renderAnalysisScale(cfg, mode) {
   I18N.text($("analysis-scale-note"), I18N.term(small
     ? "작은 시작 설정은 설치 확인용 소규모 분석입니다. 아래 수를 바꾸면 규모를 늘릴 수 있습니다. 후보 서열 수·예측 모델 수·최종 선별 수는 서로 다릅니다."
     : "현재 설정의 생성·평가 규모를 확인하세요. 백본 수와 서열 수는 다를 수 있으며, 후보가 늘면 계산 시간과 저장 공간도 늘어납니다."));
-  for (const [id, visible] of [["design-count-help", mode === "design"], ["candidate-limit-help", ["design", "mature"].includes(mode)]]) $(id).hidden = !visible;
+  for (const [id, visible] of [["design-count-help", mode === "design"], ["design-count-current", mode === "design"], ["candidate-limit-help", ["design", "mature"].includes(mode) && !unfiltered]]) $(id).hidden = !visible;
   $("analysis-scale").hidden = mode === "complex" || mode === "screen";
 }
 function fields() {
