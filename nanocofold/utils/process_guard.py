@@ -70,6 +70,30 @@ def _kill_owned_child(pid, stamp):
             os.close(descriptor)
 
 
+def _reap_children():
+    """True only when the kernel confirms that this guardian has no children."""
+    while True:
+        try:
+            reaped, _ = os.waitpid(-1, os.WNOHANG)
+        except ChildProcessError:
+            return True
+        if not reaped:
+            # WNOHANG zero means a child still exists but is not waitable.
+            # A /proc children scan can be empty during orphan adoption.
+            return False
+
+
+def _drain_children():
+    while True:
+        for pid, stamp in _direct_children():
+            _kill_owned_child(pid, stamp)
+        # Keep the subreaper and inherited reservations alive until ECHILD.
+        # Killing a parent can adopt another generation after a /proc scan.
+        if _reap_children() and not _direct_children():
+            return
+        time.sleep(.01)
+
+
 def main():
     lifeline, status, request, *reservations = map(int, sys.argv[1:])
     reservations = tuple(dict.fromkeys(fd for fd in reservations if fd >= 0))
@@ -84,23 +108,7 @@ def main():
         if not subreaper:
             return
         with cleanup_lock:
-            while True:
-                children = _direct_children()
-                for pid, stamp in children:
-                    _kill_owned_child(pid, stamp)
-                # Only children of this private guardian are eligible for reap.
-                # Killing a parent adopts its children; repeat until all levels
-                # have been killed/reaped, irrespective of their session/group.
-                while True:
-                    try:
-                        reaped, _ = os.waitpid(-1, os.WNOHANG)
-                    except ChildProcessError:
-                        reaped = 0
-                    if not reaped:
-                        break
-                if not _direct_children():
-                    return
-                time.sleep(.01)
+            _drain_children()
 
     def kill_group(*_):
         cleanup_children()

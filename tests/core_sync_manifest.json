@@ -144,7 +144,7 @@
     "nanocofold/utils/pdb_io.py": "46bdcb17fa688e6a14e7fc91c71098cd0f5f79997ae59722f09e18feb576093f",
     "nanocofold/utils/predictions.py": "faaccd4c03269bde3f820ef2c8b56a5fed44d0a8b3db39904184915e2d97fef7",
     "nanocofold/utils/presentation.py": "5db51b50de0df0b655e1675a078bf5b3f14fbc7c60e05b53e3b60b9d64665069",
-    "nanocofold/utils/process_guard.py": "1c43f4633f69c204add2c82545d864fa49ac961284c065d61fe62b1bcf15c05a",
+    "nanocofold/utils/process_guard.py": "a67118ba2cb70025e888531ba9d89079059bb44950714ecd3f48b21f2f0a7bb2",
     "nanocofold/utils/residue_mapping.py": "e7db438770174dd77751afa1c9e821389106b2c38acb629b25fd5401b86d8fd2",
     "nanocofold/utils/seq.py": "8e682900d065251655026d07e5656ea0432c3af5bba666df19b793071075489a",
     "nanocofold/utils/shell.py": "8d96f957e54a470c92d286235898d07431f7ca727c8b5366b358456deeab5133",
