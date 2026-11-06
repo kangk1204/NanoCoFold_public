@@ -361,6 +361,10 @@ class InputManager:
                 )
         if advisories:
             review["warnings"] = list(dict.fromkeys([*review.get("warnings", []), *advisories]))
+        return self._persist_review(folder, cfg, review)
+
+    def _persist_review(self, folder: Path, cfg: dict, review: dict):
+        """Persist a finalized review without rerunning tools or changing its inputs."""
         (folder / "config.yaml").write_text(yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False))
         result = {"id": folder.name, "input_id": folder.name, "config": cfg, "review": review,
                   "config_path": str(folder / "config.yaml")}

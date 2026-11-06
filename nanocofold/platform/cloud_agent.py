@@ -232,7 +232,9 @@ class Agent:
                  'allow_public_msa_server':result['config'].get('screen',{}).get('allow_public_msa_server',False)}
         receipt['receipt_sha256']=json_sha256(receipt)
         review['cloud_review_receipt']=receipt
-        return self.inputs._save(folder,result['config'],review),receipt
+        # Input review already finalized the annotation and capacity artifacts.
+        # Rerunning those tools after sealing changes logs and invalidates the receipt.
+        return self.inputs._persist_review(folder,result['config'],review),receipt
     def reviewed_diagnostics_config(self,payload):
         identifier=payload['input_id']
         if not isinstance(identifier,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,80}',identifier):raise ValueError('잘못된 입력 ID입니다.')

@@ -23,6 +23,40 @@ def config(scope='cdr3', ranges=None):
     return cfg
 
 
+def test_cloud_review_seals_annotation_artifacts_after_preview_once(tmp_path, monkeypatch):
+    """Real ANARCI logs include run timings and change if preview is repeated."""
+    calls = []
+    def preview(cfg, work_dir):
+        work_dir.mkdir(parents=True, exist_ok=True)
+        calls.append(work_dir)
+        (work_dir / 'anarci_batch.log').write_text(f'annotation invocation {len(calls)}\n')
+        return {'status': 'checked', 'mutable_positions': [23, 24],
+                'min_mutations': 2, 'max_mutations': 2, 'max_variants': '324',
+                'requested_variants': 100, 'wt_controls': 1}
+    class Client:
+        def upload(self, key, path):
+            pass
+    monkeypatch.setattr(mature, 'preview_random_library', preview)
+    agent = Agent(tmp_path, Client())
+    settings = {'workflow': 'direct', 'engine': 'boltz2', 'count': 101,
+                'mutation_strategy': 'random', 'mutation_min': 2, 'mutation_max': 2,
+                'mutation_region': 'custom', 'mutation_ranges': [[23, 24]]}
+    try:
+        response = agent.operation({'id': 'annotation-review', 'agent_id': agent.agent_id,
+            'kind': 'prepare', 'payload': json.dumps({'mode': 'mature', 'settings': settings,
+            'proteins': [{'name': 'fixture', 'sequence': WT}], 'wt_fasta': '>WT\n' + WT})})['response']
+        payload = {'input_id': response['input_id'], 'mode': 'mature', 'settings': settings}
+        cfg, receipt = agent.reviewed_diagnostics_config(payload)
+        assert len(calls) == 1
+        assert cfg == response['config'] and receipt == response['review_receipt']
+        assert 'mutation_capacity/anarci_batch.log' in receipt['files']
+        (calls[0] / 'anarci_batch.log').write_text('changed after review')
+        with pytest.raises(ValueError, match='다시 검토'):
+            agent.reviewed_diagnostics_config(payload)
+    finally:
+        agent.manager.close(); agent.inputs.close()
+
+
 @pytest.mark.parametrize('scope,ranges,expected', [
     ('cdr3', [], {20, 21, 23, 24, 25, 26}),
     ('custom', [[22, 24], [26, 26]], {23, 24, 26}),
