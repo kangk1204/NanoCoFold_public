@@ -15,6 +15,20 @@ function fixture(){
   vm.runInContext(source.slice(source.indexOf('function invalidateInput('),source.indexOf('function chainLabel(')),c);
  return{c,get,writes,actions};
 }
+test('native mutation range controls map CDR3 and custom masks without changing CDR annotations',()=>{
+ const {c,get}=fixture();get('mode').value='mature';get('mutation-strategy').value='random';
+ get('mutation-count').value='100';get('mutation-min').value='2';get('mutation-max').value='2';
+ get('mutation-region').value='cdr3';
+ const original={mature:{cdr:{source:'config',regions:{CDR3:[99,106]}}}}, before=JSON.stringify(original);
+ let cfg=c.matureInputSettings(original);assert.equal(cfg.mature.library.mutation_region,'cdr3');
+ assert.equal(cfg.mature.library.size,101);assert.equal(cfg.mature.library.min_mutations,2);assert.equal(cfg.mature.library.max_mutations,2);
+ get('mutation-region').value='custom';get('mature-library-settings').hidden=true;get('random-mutation-fields').hidden=true;assert.throws(()=>c.matureInputSettings(original),/번호를 입력/);
+ assert.equal(get('mature-library-settings').hidden,false);assert.equal(get('random-mutation-fields').hidden,false);assert.equal(get('mutation-ranges-field').hidden,false);c.clearScalePreview();assert.match(get('mutation-scope-current').textContent || '',/not determined|미확정/);
+ get('mutation-ranges').value='99-103, 106';cfg=c.matureInputSettings(original);
+ assert.equal(JSON.stringify(cfg.mature.library.mutation_ranges),'[[99,103],[106,106]]');
+ assert.equal(JSON.stringify(original),before);
+ get('mutation-ranges').value='99-103, 103';assert.throws(()=>c.matureInputSettings(original),/겹칩니다/);
+});
 const design={run:{mode:'design',seed:42},design:{engine:'rfantibody',num_designs:1000,mpnn:{seqs_per_struct:4},filters:{top_n_to_score:1000}},screen:{engine:'boltz2',tier2_n:500},rank:{final_n:30}};
 test('researcher design plan includes the final single-engine candidate cap',()=>{const {c}=fixture();assert.match(c.noviceModelPlan(design,'design',0),/500모델/);});
 test('WT-off mature plans eight representative models, WT-on plans twelve',()=>{const{c}=fixture();const cfg={mature:{library:{max_variants:3},prefilter:{top_n:2}},screen:{comparison:{enabled:true,engines:starter.engines}},rank:{include_wt_control:false}};assert.match(c.noviceModelPlan(cfg,'mature',0),/8모델/);cfg.rank.include_wt_control=true;assert.match(c.noviceModelPlan(cfg,'mature',0),/12모델/);});

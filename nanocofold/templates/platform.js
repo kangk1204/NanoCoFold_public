@@ -526,13 +526,34 @@ function inputSettings(forPlan = false) {
     },
   });
 }
+// MUTATION_SCOPE_START
+function parseMutationRanges(text) {
+  if (typeof text !== 'string' || !text.trim()) throw Error('치환할 CDR 잔기 번호를 입력하세요. 예: 99-103, 106');
+  const ranges = text.trim().split(/[,\n]/).map(part => {
+    const match = part.trim().match(/^(\d+)(?:\s*-\s*(\d+))?$/);
+    if (!match) throw Error('치환 구간은 1부터 시작하는 시작-끝 번호로 입력하세요. 예: 99-103, 106');
+    const start = Number(match[1]), end = Number(match[2] || match[1]);
+    if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 1 || end < start)
+      throw Error('치환 구간은 1부터 시작하는 시작-끝 번호로 입력하세요. 예: 99-103, 106');
+    return [start, end];
+  }).sort((a,b) => a[0]-b[0]);
+  if (ranges.some((range,i) => i && range[0] <= ranges[i-1][1]))
+    throw Error('지정 치환 구간이 겹칩니다. 각 잔기 번호를 한 번만 지정하세요.');
+  return ranges;
+}
+// MUTATION_SCOPE_END
 function matureInputSettings(cfg) {
+  if ($('mature-library-settings')) $('mature-library-settings').hidden = $('mode').value !== 'mature';
   if ($('mode').value !== 'mature') return cfg;
   const selected = $('mutation-strategy')?.value || '';
   const library = cfg.mature?.library || {};
   const strategy = selected || library.strategy || state.planningDefaults?.mature?.library?.strategy || 'dms';
+  if ($('random-mutation-fields')) $('random-mutation-fields').hidden = strategy !== 'random';
+  const region = $('mutation-region')?.value || library.mutation_region || 'all_cdr';
+  if ($('mutation-ranges-field')) $('mutation-ranges-field').hidden = region !== 'custom';
   if (!['dms', 'random'].includes(strategy)) throw Error('지원하는 치환 방식을 선택하세요.');
-  if (selected) cfg = merge(cfg, {mature: {library: {strategy}}});
+  if (selected) cfg = merge(cfg, {mature: {library: {strategy,
+    ...(selected === 'dms' ? {mutation_region: 'all_cdr', mutation_ranges: []} : {})}}});
   const wt = $('mutation-wt')?.value || '';
   if (wt && !['include', 'exclude'].includes(wt)) throw Error('WT 대조군 포함 여부를 확인하세요.');
   if (wt || selected === 'random') cfg = merge(cfg, {rank: {include_wt_control: wt ? wt === 'include' : true}});
@@ -553,11 +574,15 @@ function matureInputSettings(cfg) {
   const min = value('mutation-min', library.min_mutations ?? 1, 50);
   const max = value('mutation-max', library.max_mutations ?? 5, 50);
   if (min > max) throw Error('최대 치환 수는 최소 치환 수 이상이어야 합니다.');
-  return merge(cfg, {mature: {library: {strategy, size: count + 1, min_mutations: min, max_mutations: max},
+  if (!['all_cdr','cdr3','custom'].includes(region)) throw Error('치환 범위는 all_cdr, cdr3, custom 중 하나여야 합니다.');
+  const ranges = region === 'custom' ? parseMutationRanges($('mutation-ranges')?.value?.trim()
+    || (library.mutation_ranges || []).map(([start,end]) => `${start}-${end}`).join(', ')) : [];
+  return merge(cfg, {mature: {library: {strategy, size: count + 1, min_mutations: min, max_mutations: max,
+    mutation_region: region, mutation_ranges: ranges},
     prefilter: {mode: 'none'}, antifold: {enabled: false}}, rank: {weights: {esm_score: 0, antifold: 0}}});
 }
 function resetMutationControls() {
-  for (const id of ['mutation-strategy','mutation-count','mutation-min','mutation-max','mutation-wt'])
+  for (const id of ['mutation-strategy','mutation-count','mutation-min','mutation-max','mutation-wt','mutation-region','mutation-ranges'])
     if ($(id)) $(id).value = '';
 }
 function noviceComplexSettings(cfg) {
@@ -684,6 +709,7 @@ function clearScalePreview() {
   if ($('quantity-conditions')) I18N.text($('quantity-conditions'), I18N.term('계획 미확정 · 입력과 적용 설정을 확인하세요.'));
   if ($('quantity-breakdown')) I18N.text($('quantity-breakdown'), I18N.term('계획 미확정 · 입력과 적용 설정을 확인하세요.'));
   if ($('mutation-current')) I18N.text($('mutation-current'), I18N.term('적용값 미확정 · 설정을 확인하세요.'));
+  if ($('mutation-scope-current')) I18N.text($('mutation-scope-current'), I18N.term('적용값 미확정 · 설정을 확인하세요.'));
 }
 function applyAnalysisSettings(cfg) {
   resetMutationControls();
@@ -759,6 +785,10 @@ function renderAnalysisScale(cfg, mode) {
   if ($('mature-library-settings')) {
     $('mature-library-settings').hidden = mode !== 'mature';
     $('random-mutation-fields').hidden = mature.library?.strategy !== 'random';
+    if ($('mutation-ranges-field')) $('mutation-ranges-field').hidden = mature.library?.mutation_region !== 'custom';
+    if ($('mutation-scope-current')) I18N.text($('mutation-scope-current'), I18N.format('치환 범위: {0}', [
+      I18N.term(mature.library?.mutation_region === 'cdr3' ? 'CDR3만' : mature.library?.mutation_region === 'custom' ? '지정 CDR 구간' : '전체 CDR'),
+    ]));
     for (const [id, value] of [['mutation-count', quantities.preparedVariants], ['mutation-min', mature.library?.min_mutations ?? 1], ['mutation-max', mature.library?.max_mutations ?? 5]])
       if ($(id)) I18N.attribute($(id), 'placeholder', known(value));
     I18N.text($('mutation-current'), I18N.format('적용 방식: {0} · WT {1}',

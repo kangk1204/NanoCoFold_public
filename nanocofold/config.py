@@ -340,6 +340,10 @@ def _validate(cfg: dict, *, historical: bool = False) -> None:
     strategy = library.get("strategy", "dms")
     if not isinstance(strategy, str) or strategy not in {"dms", "random"}:
         raise ValueError("mature.library.strategy는 dms/random 중 하나여야 합니다.")
+    from .mature import validate_mutation_scope
+    scope, _ = validate_mutation_scope(library.get("mutation_region", "all_cdr"), library.get("mutation_ranges", []))
+    if strategy != "random" and scope != "all_cdr":
+        raise ValueError("치환 범위를 선택하려면 CDR 무작위 다중 잔기 치환을 사용하세요.")
     if mode == "mature" and strategy == "dms" and "size" in library and library["size"] != 10000:
         warnings.warn(
             "mature.library.strategy=dms에서는 mature.library.size를 사용하지 않습니다. "

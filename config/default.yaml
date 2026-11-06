@@ -192,6 +192,8 @@ mature:
     min_mutations: 1
     max_mutations: 5
     seed: null             # null이면 run.seed; 재개 시 동일 라이브러리
+    mutation_region: all_cdr # random: all_cdr | cdr3 | custom; CDR 주석과 별도의 치환 범위
+    mutation_ranges: []     # custom: [[시작, 끝], ...], 입력 WT 서열의 1-based 번호
   cdr:
     scheme: imgt
     source: auto           # auto(ANARCI) | config

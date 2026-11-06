@@ -45,7 +45,8 @@ def test_preview_boundary_excludes_wt_and_preserves_exact_count(tmp_path):
     cfg = config()
     preview = mature.preview_random_library(cfg, tmp_path)
     assert preview == {'status': 'checked', 'mutable_residues': 1, 'max_variants': '18',
-        'requested_variants': 18, 'wt_controls': 1, 'min_mutations': 1, 'max_mutations': 1}
+        'requested_variants': 18, 'wt_controls': 1, 'min_mutations': 1, 'max_mutations': 1, 'mutation_region': 'all_cdr',
+        'mutation_ranges': [], 'mutable_positions': [2]}
     frame = mature.generate_library('AAA', {'CDR1': (2, 2)}, cfg)
     assert len(frame) == frame.sequence.nunique() == 19
     assert frame.mutation_count.tolist() == [0] + [1] * 18

@@ -267,8 +267,31 @@ def resolve_cdr_annotations_batch(cfg, sequences, work_dir):
     return result
 
 
+def validate_mutation_scope(region="all_cdr", ranges=None):
+    """Validate a mutation mask independently of the biological CDR annotation."""
+    if not isinstance(region, str) or region not in {"all_cdr", "cdr3", "custom"}:
+        raise ValueError("치환 범위는 all_cdr, cdr3, custom 중 하나여야 합니다.")
+    ranges = [] if ranges is None else ranges
+    if not isinstance(ranges, list):
+        raise ValueError("지정 치환 구간은 시작·끝 번호 쌍의 목록이어야 합니다.")
+    if region != "custom" and ranges:
+        raise ValueError("지정 치환 구간을 사용하려면 치환 범위를 custom으로 선택하세요.")
+    if region == "custom" and not ranges:
+        raise ValueError("치환할 CDR 잔기 번호를 입력하세요. 예: 99-103, 106")
+    normalized = []
+    for bounds in ranges:
+        if (not isinstance(bounds, (list, tuple)) or len(bounds) != 2
+                or any(type(v) is not int for v in bounds) or not 1 <= bounds[0] <= bounds[1]):
+            raise ValueError("치환 구간은 1부터 시작하는 시작-끝 번호로 입력하세요. 예: 99-103, 106")
+        normalized.append(list(bounds))
+    normalized.sort()
+    if any(right[0] <= left[1] for left, right in zip(normalized, normalized[1:])):
+        raise ValueError("지정 치환 구간이 겹칩니다. 각 잔기 번호를 한 번만 지정하세요.")
+    return region, normalized
+
+
 def _random_substitution_space(wt_sequence, cdr_ranges, min_mutations, max_mutations,
-                               exclude_cys, protect_wt_cys):
+                               exclude_cys, protect_wt_cys, mutation_region="all_cdr", mutation_ranges=None):
     if not isinstance(wt_sequence, str) or not wt_sequence or any(aa not in AMINO_ACIDS for aa in wt_sequence):
         raise ValueError("random 라이브러리 WT는 표준 아미노산의 대문자 서열이어야 합니다.")
     if any(isinstance(value, bool) or not isinstance(value, int) for value in (min_mutations, max_mutations)) or not 1 <= min_mutations <= max_mutations <= 50:
@@ -288,7 +311,19 @@ def _random_substitution_space(wt_sequence, cdr_ranges, min_mutations, max_mutat
             if position in regions:
                 raise ValueError("random CDR 구간이 서로 겹칩니다.")
             regions[position] = name
-    positions = [p for p in sorted(regions) if not (protect_wt_cys and wt_sequence[p - 1] == "C")]
+    scope, bounds = validate_mutation_scope(mutation_region, mutation_ranges)
+    selected = set(regions)
+    if scope == "cdr3":
+        selected = {p for p, name in regions.items() if name == "CDR3"}
+        if not selected:
+            raise ValueError("CDR3 구간을 확인할 수 없습니다. WT 서열과 CDR 주석을 확인하세요.")
+    elif scope == "custom":
+        if any(end > len(wt_sequence) for _, end in bounds):
+            raise ValueError("지정 치환 구간이 WT 서열 길이를 벗어났습니다. 입력 서열의 첫 잔기를 1로 세세요.")
+        selected = {p for start, end in bounds for p in range(start, end + 1)}
+        if not selected.issubset(regions):
+            raise ValueError("지정 치환 구간에 CDR 밖의 잔기가 있습니다. 확인된 CDR 안의 번호만 지정하세요.")
+    positions = [p for p in sorted(selected) if not (protect_wt_cys and wt_sequence[p - 1] == "C")]
     if not positions:
         raise ValueError("현재 Cys 보호 설정에서 치환 가능한 CDR 잔기가 없습니다. CDR 구간과 WT 서열을 확인하세요.")
     if max_mutations > len(positions):
@@ -305,13 +340,17 @@ def _random_substitution_space(wt_sequence, cdr_ranges, min_mutations, max_mutat
 
 def random_library_capacity(wt_sequence: str, cdr_ranges: dict, *, min_mutations: int = 1,
                             max_mutations: int = 5, exclude_cys: bool = True,
-                            protect_wt_cys: bool = True) -> dict:
+                            protect_wt_cys: bool = True, mutation_region: str = "all_cdr",
+                            mutation_ranges: list | None = None) -> dict:
     """Count unique non-WT sequences with the sampler's exact residue rules."""
     _, positions, _, capacity = _random_substitution_space(
-        wt_sequence, cdr_ranges, min_mutations, max_mutations, exclude_cys, protect_wt_cys)
+        wt_sequence, cdr_ranges, min_mutations, max_mutations, exclude_cys, protect_wt_cys,
+        mutation_region, mutation_ranges)
     return {"mutable_residues": len(positions),
             "max_variants": sum(capacity[min_mutations:max_mutations + 1]),
-            "min_mutations": min_mutations, "max_mutations": max_mutations}
+            "min_mutations": min_mutations, "max_mutations": max_mutations,
+            "mutation_region": mutation_region, "mutation_ranges": sorted(mutation_ranges or []),
+            "mutable_positions": positions}
 
 
 def validate_random_library_capacity(size: int, maximum: int) -> None:
@@ -347,7 +386,9 @@ def preview_random_library(cfg: dict, work_dir: Path) -> dict | None:
         min_mutations=cfg_get(cfg, "mature.library.min_mutations", 1),
         max_mutations=cfg_get(cfg, "mature.library.max_mutations", 5),
         exclude_cys=cfg_get(cfg, "mature.exclude.cys_substitution", True),
-        protect_wt_cys=cfg_get(cfg, "mature.exclude.wt_cys", True))
+        protect_wt_cys=cfg_get(cfg, "mature.exclude.wt_cys", True),
+        mutation_region=cfg_get(cfg, "mature.library.mutation_region", "all_cdr"),
+        mutation_ranges=cfg_get(cfg, "mature.library.mutation_ranges", []))
     size = cfg_get(cfg, "mature.library.size", 10000)
     validate_random_library_capacity(size, capacity["max_variants"])
     return {"status": "checked", **capacity, "max_variants": str(capacity["max_variants"]),
@@ -358,6 +399,7 @@ def generate_random_library(
     wt_sequence: str, cdr_ranges: dict[str, tuple[int, int]], *, size: int = 10000,
     min_mutations: int = 1, max_mutations: int = 5, seed: int = 42,
     exclude_cys: bool = True, protect_wt_cys: bool = True,
+    mutation_region: str = "all_cdr", mutation_ranges: list | None = None,
 ) -> pd.DataFrame:
     """Unique CDR-only random substitutions; size includes the WT control.
 
@@ -371,7 +413,8 @@ def generate_random_library(
     if isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed < 2**32:
         raise ValueError("random seed는 0–4294967295 사이의 정수여야 합니다.")
     regions, positions, alternatives, capacity = _random_substitution_space(
-        wt_sequence, cdr_ranges, min_mutations, max_mutations, exclude_cys, protect_wt_cys)
+        wt_sequence, cdr_ranges, min_mutations, max_mutations, exclude_cys, protect_wt_cys,
+        mutation_region, mutation_ranges)
     total_capacity = 1 + sum(capacity[min_mutations:max_mutations + 1])
     validate_random_library_capacity(size, total_capacity - 1)
     rng = np.random.default_rng(seed)
@@ -419,6 +462,8 @@ def generate_random_library(
     frame.attrs["library_generation"] = {"strategy": "random", "size_including_wt": size,
         "seed": seed, "min_mutations": min_mutations, "max_mutations": max_mutations,
         "mutable_cdr_positions": positions, "capacity_including_wt": total_capacity,
+        "mutation_region": mutation_region, "mutation_ranges": sorted(mutation_ranges or []),
+        "position_numbering": "one_based_input_wt_sequence",
         "sampling": "uniform_nonexhausted_mutation_count_then_positions_and_alternative_aa",
         "duplicate_fallback_count": fallback_count}
     return frame
@@ -476,6 +521,8 @@ def generate_library(wt_sequence: str, cdr_ranges: dict, cfg: dict) -> pd.DataFr
         size=cfg_get(cfg, "mature.library.size", 10000),
         min_mutations=cfg_get(cfg, "mature.library.min_mutations", 1),
         max_mutations=cfg_get(cfg, "mature.library.max_mutations", 5),
+        mutation_region=cfg_get(cfg, "mature.library.mutation_region", "all_cdr"),
+        mutation_ranges=cfg_get(cfg, "mature.library.mutation_ranges", []),
         seed=cfg_seed(cfg, "mature.library.seed"), **options)
 
 

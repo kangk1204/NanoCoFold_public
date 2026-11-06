@@ -187,6 +187,7 @@ class Agent:
                         for path in sorted(root.rglob('*.py'))
                         if '__pycache__' not in path.parts}
         return {'comparison_public_api':True,'review_bound_diagnostics':True,'resume_action_receipts_v1':True,
+                'mutation_region_selection':True,
                 'comparison_engine_selection':True,'comparison_predictors':list(AVAILABLE_ENGINES),
                 'complex_comparison':True,'complex_comparison_schema':1,'complex_comparison_predictors':list(AVAILABLE_ENGINES),
                 'package_version':__version__,'application_python_sha256':fingerprint(python_files),
@@ -552,6 +553,9 @@ class Agent:
             if design_cascade:cfg['design']['refinement'].update(min_mutations=low,max_mutations=high)
             else:
                 cfg['mature']['library']={'strategy':'random','size':count,'min_mutations':low,'max_mutations':high}
+                from ..mature import validate_mutation_scope
+                scope,ranges=validate_mutation_scope(p.get('mutation_region','all_cdr'),p.get('mutation_ranges',[]))
+                cfg['mature']['library'].update(mutation_region=scope,mutation_ranges=ranges)
                 cfg['mature']['prefilter']['mode']='none'
                 # Multi-substitution libraries have no single-mutation prior.
                 # Keep structural/developability gates; omit only unmeasured priors.

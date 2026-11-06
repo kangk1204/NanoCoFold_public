@@ -271,6 +271,19 @@
                 <option value="random">CDR 무작위 다중 잔기 치환</option>
               </select>
               <div id="random-mutation-fields" hidden>
+                <label for="mutation-region">치환 범위</label>
+                <select id="mutation-region" aria-describedby="mutation-numbering-help mutation-scope-current">
+                  <option value="">현재 설정 유지</option>
+                  <option value="all_cdr">전체 CDR</option>
+                  <option value="cdr3">CDR3만</option>
+                  <option value="custom">지정 CDR 구간</option>
+                </select>
+                <div id="mutation-ranges-field" hidden>
+                  <label for="mutation-ranges">치환할 잔기 번호</label>
+                  <input id="mutation-ranges" type="text" placeholder="예: 99-103, 106" aria-describedby="mutation-numbering-help" />
+                </div>
+                <p id="mutation-numbering-help" class="muted">입력한 WT 나노바디 서열의 첫 잔기가 1번입니다. 표적·PDB·IMGT 번호가 아닙니다. 지정 구간은 CDR 안에 있어야 하며, Cys 보호 설정을 유지합니다.</p>
+                <p id="mutation-scope-current" role="status" aria-live="polite"></p>
                 <label for="mutation-count">생성할 변이 후보 수 · WT 제외</label>
                 <input id="mutation-count" type="number" min="1" max="99999" step="1" placeholder="비우면 현재 설정 유지" />
                 <label for="mutation-min">후보당 최소 치환 잔기 수</label>

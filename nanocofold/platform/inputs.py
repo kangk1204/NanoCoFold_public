@@ -314,6 +314,10 @@ class InputManager:
         if capacity is not None:
             review["mutation_capacity"] = capacity
             if capacity["status"] == "checked":
+                positions = ", ".join(map(str, capacity["mutable_positions"]))
+                advisories.append(
+                    f"치환 가능한 WT 잔기 번호: {positions}. 후보당 치환 수: {capacity['min_mutations']}–{capacity['max_mutations']}."
+                )
                 advisories.append(
                     f"변이 조합 확인: 요청 {capacity['requested_variants']}개 · 가능한 고유 변이 최대 {capacity['max_variants']}개(WT 제외). WT 대조군은 별도 1개입니다."
                 )
