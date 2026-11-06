@@ -44,6 +44,9 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "ESM env 를 찾지 못해 ESM 서열 점수를 결측(NaN)으로 기록합니다. envs/setup_esm.sh 를 실행하세요.": "The ESM environment was not found, so ESM sequence scores are recorded as missing (NaN). Run envs/setup_esm.sh to install it.",
+  "소수성 잔기가 {0}개입니다. 자동 결합 부위의 소수성 패치 기준(≥3)은 탐색용 휴리스틱이며, 실제 결합이나 설계 성공을 보장하지 않습니다.": "The site contains {0} hydrophobic residues. The automatic hotspot threshold of at least 3 is an exploratory heuristic; it does not establish binding or design success.",
+  "실행 당시 기록 경고: {0}": "Warnings recorded at execution: {0}",
   "현재 계산 서버는 치환 범위 선택을 지원하지 않습니다. 서버를 업데이트한 뒤 다시 검토하세요.": "This compute server does not support mutation-region selection. Update the server, then review again.",
   "검토한 치환 범위가 요청과 다릅니다. 입력을 다시 검토하세요.": "The reviewed mutation region differs from your request. Review the inputs again.",
   "치환 범위": "Mutation region",
@@ -2204,6 +2207,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "서열 입력의 구조와 결합 부위는 예측됩니다. 실험 구조 확인과 구분하세요.": "Sequence input produces predicted structures and hotspots.",
   "구조 입력은 결합 부위(hotspot) 위치에서 잔기를 지정합니다. 서열만 입력하면 예측 구조에서 결합 부위를 자동 추천합니다. 분석 시작·끝은 사용할 표적 서열 구간이며, 번호는 입력 서열의 첫 잔기를 1로 셉니다.": "For structure input, specify residues in the hotspot position field. Sequence-only input selects hotspots automatically from the predicted structure. Region start and end select the target segment; positions start at 1 in the input sequence."
 });
+
 /* Explicit presentation bindings; no DOM observer, input rewriting, or API mutation. */
 globalThis.I18N = (() => {
   let language = 'en';

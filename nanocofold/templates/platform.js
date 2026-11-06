@@ -1,5 +1,21 @@
 /* Shared browser/offline explorer. Data is displayed with textContent, not HTML injection. */
 "use strict";
+/** Display recorded prediction seeds without changing saved rows or inferring defaults. */
+function recordedCandidateSeed(row, observations = []) {
+  const valid = value => (typeof value === 'number' || (typeof value === 'string' && /^\d+$/.test(value)))
+    && Number.isSafeInteger(Number(value)) && Number(value) >= 0 && Number(value) <= 4294967295;
+  if (row.seed != null && row.seed !== '') return valid(row.seed) ? Number(row.seed) : null;
+  if (row.model_record === false || !row.candidate_id) return null;
+  const engine = value => value === 'boltz' ? 'boltz2' : value;
+  const selectedEngine = engine(row.predictor_engine || row.engine);
+  if (!selectedEngine || selectedEngine === 'unknown' || selectedEngine === 'not_predicted') return null;
+  const matching = observations.filter(record => record.candidate_id === row.candidate_id
+    && engine(record.predictor_engine || record.engine) === selectedEngine);
+  if (!matching.length || matching.some(record => !valid(record.seed))) return null;
+  const seeds = [...new Set(matching.map(record => Number(record.seed)))].sort((a, b) => a - b);
+  return seeds.length === 1 ? seeds[0] : seeds.join(', ');
+}
+
 const $ = (id) => document.getElementById(id);
 const metricCaptions = Object.freeze({ptm:"pTM",pdockq:"pDockQ",pdockq2:"pDockQ2 (최소)",interface_pae_ab:"PAE 행 표적·열 VHH (Å)",interface_pae_ba:"PAE 행 VHH·열 표적 (Å)",interface_pae_median:"계면 PAE 중앙값 (Å)",interface_pae_p90:"계면 PAE 90백분위 (Å)",target_plddt:"표적 pLDDT",binder_plddt:"VHH pLDDT",complex_plddt:"전체 복합체 pLDDT",n_hotspots_requested:"지정 결합 부위 잔기 수",n_hotspots_contacted:"접촉한 지정 잔기 수",n_target_clashes:"표적–VHH 충돌 원자쌍",n_context_clashes:"파트너–VHH 충돌 원자쌍",candidate_id:"후보",ipsae:"ipSAE",iptm:"ipTM",interface_plddt:"계면 pLDDT",interface_pae:"계면 PAE (Å)",hotspot_contact_frac:"결합 부위 접촉률",seed:"Seed",model:"모델",error:"평가 오류",chain_a:"체인 1",chain_b:"체인 2",iptm_a_to_b:"체인 1→2 ipTM",iptm_b_to_a:"체인 2→1 ipTM",a:"잔기 1",b:"잔기 2",distance:"거리 (Å)",kind:"구분",pdockq2_target:"pDockQ2 표적 방향",pdockq2_binder:"pDockQ2 VHH 방향",dev_flags:"전체 평가 위험 수",dev_severe:"심한 위험 수 (5종)",n_hbonds:"N/O 근접 원자쌍",n_salt_bridges:"반대 전하 원자쌍",esm_score:"ESM 서열 점수",composite_score:"배치 상대 종합점수",n_clashes:"충돌 원자쌍",site_satisfied:"지정 결합 부위 판정 (기록)",site_selection_eligible:"지정 결합 부위 포함 적격",pose_consensus_status:"동일 후보 자세 일치",pose_supporting_engines:"자세 일치 엔진 수",pose_quality_supporting_engines:"기록 적격·자세 일치 엔진 수",design_consistency_status:"설계·재예측 일치",design_binder_rmsd_A:"설계·재예측 VHH RMSD (Å)",review_rank:"검토 순위 (동률 허용)",review_rank_scope:"검토 순위 범위",review_priority_reason:"검토 판정 이유",candidate_review_priority:"후보 검토 판정",review_priority:"모델 검토 판정"});
 function iptmCaption(records) {
@@ -1684,7 +1700,7 @@ async function loadResult(id) {
     const checkbox = document.querySelector(`[data-layer="${layer}"]`);
     if (checkbox) checkbox.parentElement.replaceChildren(checkbox, el("span", I18N.term(caption)));
   }
-  state.rows = rows.map(row => ({...row, predictor_engine: row.predictor_engine || row.engine || summary.conditions?.engine || "unknown", design_origin: row.design_origin || row.parent_engine || row.source || null}));
+  state.rows = rows.map(row => ({...row, seed: recordedCandidateSeed({...row, predictor_engine: row.predictor_engine || row.engine || summary.conditions?.engine}, observations), predictor_engine: row.predictor_engine || row.engine || summary.conditions?.engine || "unknown", design_origin: row.design_origin || row.parent_engine || row.source || null}));
   syncResultModeControls();
   refreshMetricCaptions(state.rows, state.result?.mode);
   const savedSort = offline ? window.NANOCOFOLD_OFFLINE.filters?.sort : null;
@@ -1995,6 +2011,7 @@ function renderCandidates() {
   const columns = state.result.mode === "complex" ? ["candidate_id", "predictor_engine", "seed", "model", "iptm", "ipsae", "pdockq2", "pdockq2_target", "pdockq2_binder", "interface_pae", "n_clashes", "error"] : [
       "candidate_id",
       "predictor_engine",
+      "seed",
       "design_origin",
       "quality_eligible",
       "final_eligible",
@@ -2018,7 +2035,7 @@ function renderCandidates() {
   if (!expanded) {
     const core = state.result.mode === "complex"
       ? ["candidate_id","predictor_engine","seed","model","iptm","ipsae","n_clashes","error"]
-      : ["candidate_id","predictor_engine","final_eligible","selected","ipsae","iptm","interface_plddt","interface_pae","hotspot_site_status","n_clashes","exclusion_reasons"];
+      : ["candidate_id","predictor_engine","seed","final_eligible","selected","ipsae","iptm","interface_plddt","interface_pae","hotspot_site_status","n_clashes","exclusion_reasons"];
     columns.splice(0,columns.length,...core);
   }
   const captions = {quality_eligible: "품질 적격 (결합 부위 제외)", final_eligible: "기록 적격", selected: "기록 선별", exclusion_reasons: "기록 제외 사유"};
@@ -2059,6 +2076,7 @@ function renderCandidates() {
           button.onclick = () => reviewCandidate(row.candidate_id);
           td.append(button);
         } else if(["final_eligible","quality_eligible"].includes(key)) I18N.text(td, I18N.term(decisionCaption(row[key])));
+        else if(key === "seed") I18N.text(td, row[key] == null ? I18N.term("미기록") : String(row[key]));
         else if(key === "error") I18N.text(td, I18N.term(evaluationErrorCaption(row)));
         else if(key === "selected") I18N.text(td, typeof row[key]==="boolean" ? row[key] ? I18N.term("선별") : I18N.term("미선별") : I18N.term("미기록"));
         else if(key === "exclusion_reasons") I18N.text(td, (row[key]||[]).length ? I18N.concat(row[key].flatMap((code,index) => [index ? " · " : "", I18N.term(reportReasonLabel(code))])) : I18N.term("없음"));
