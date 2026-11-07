@@ -179,9 +179,17 @@ def test_supplied_offline_structure_pae_columns_and_focus(tmp_path):
         page.goto(report.as_uri())
         page.wait_for_function("()=>Boolean(state.viewer?.viewer.plugin.canvas3d)",timeout=30000)
         expect(page.locator("#structure-note")).to_contain_text("충돌 잔기쌍")
-        assert page.locator("#candidate-table th").count()==11
+        core_columns = ["candidate_id", "predictor_engine", "seed", "final_eligible", "selected",
+                        "ipsae", "iptm", "interface_plddt", "interface_pae", "hotspot_site_status",
+                        "n_clashes", "exclusion_reasons"]
+        assert page.locator("#candidate-table th").evaluate_all(
+            "headers => headers.map(header => header.dataset.columnKey)") == core_columns
+        expect(page.locator('#candidate-table td[data-column-key="seed"]')).to_have_text("미기록")
         expect(page.locator("#candidate-table")).to_contain_text("부적격")
-        page.locator("#candidate-extra-columns").check();assert page.locator("#candidate-table th").count()>11
+        page.locator("#candidate-extra-columns").check()
+        expanded_columns = page.locator("#candidate-table th").evaluate_all(
+            "headers => headers.map(header => header.dataset.columnKey)")
+        assert set(core_columns) <= set(expanded_columns) and len(expanded_columns) > len(core_columns)
         assert page.locator("#pae").evaluate("e=>e.data[0].zmin===0 && e.data[0].zmax===30 && e._context.displayModeBar===false")
         assert page.locator("#pae").evaluate("e=>e._fullLayout.shapes.length") == 2
         original=page.evaluate("JSON.stringify(window.NANOCOFOLD_OFFLINE)")
