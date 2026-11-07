@@ -12,12 +12,27 @@ const cases=[
  ['complex config source is used when conditions record only mode',{mode:'complex',conditions:{msa:'precomputed'},config:{complex:{msa_source:'cache'}}},'로컬·캐시 MSA 실행'],
  ['complex empty mode remains empty even when source metadata is retained',{mode:'complex',conditions:{msa:'empty',msa_source:'public_api'},config:{complex:{msa_source:'cache'}}},'MSA 없음 · 서열만 사용'],
  ['complex config empty mode remains visible when conditions are absent',{mode:'complex',config:{complex:{msa:'empty'}}},'MSA 없음 · 서열만 사용'],
- ['precomputed mode without any recorded source stays unknown',{mode:'complex',conditions:{msa:'precomputed'},config:{complex:{msa:'precomputed'}}},'MSA 출처 미기록'],
- ['unknown explicit conditions source is not replaced with a known config source',{mode:'complex',conditions:{msa:'precomputed',msa_source:'unrecognized'},config:{complex:{msa_source:'public_api'}}},'MSA 출처 미기록'],
+ ['precomputed mode without any recorded source stays unknown',{mode:'complex',conditions:{msa:'precomputed'},config:{complex:{msa:'precomputed'}}},'사전 준비 MSA · 출처 미기록'],
+ ['unknown explicit conditions source is not replaced with a known config source',{mode:'complex',conditions:{msa:'precomputed',msa_source:'unrecognized'},config:{complex:{msa_source:'public_api'}}},'사전 준비 MSA · 출처 미기록'],
  ['missing complex MSA metadata stays unknown',{mode:'complex'},'MSA 출처 미기록'],
  ['legacy complex source value remains readable',{mode:'complex',conditions:{msa:'public_api'}},'API에서 확보한 MSA'],
- ['noncomplex source continues to use screen config',{mode:'screen',conditions:{msa:'empty',msa_source:'cache'},config:{complex:{msa_source:'cache'},screen:{colabfold:{msa_source:'public_api'}}}},'API에서 확보한 MSA'],
- ['noncomplex cache source continues to use screen config',{mode:'design',config:{screen:{colabfold:{msa_source:'cache'}}}},'로컬·캐시 MSA 실행'],
+ ['noncomplex recorded empty mode overrides unused screen defaults',{mode:'screen',conditions:{msa:'empty',msa_source:'cache'},config:{complex:{msa_source:'cache'},screen:{colabfold:{msa_source:'public_api'}}}},'MSA 없음 · 서열만 사용'],
+ ['legacy ColabFold source requires the ColabFold engine',{mode:'design',config:{screen:{engine:'colabfold',colabfold:{msa_source:'cache'}}}},'로컬·캐시 MSA 실행'],
  ['missing noncomplex source stays unknown',{mode:'mature',conditions:{msa_source:'public_api'}},'MSA 출처 미기록'],
 ];
 for(const [name,summary,expected] of cases)test(name,()=>assert.equal(c.resultMsaCaption(summary),expected));
+
+test('actual model MSA overrides defaults without changing saved records',()=>{
+ const summary={mode:'mature',config:{screen:{engine:'boltz2',colabfold:{msa_source:'cache'}},structure:{msa:{backend:'cache'}}}};
+ const rows=[{candidate_id:'WT',msa_used:'empty',msa:'cache'}];const before=JSON.stringify({summary,rows});
+ assert.equal(c.resultMsaCaption(summary,rows),'MSA 없음 · 서열만 사용');
+ assert.equal(c.resultMsaCaption(summary,[{msa:'partial_precomputed'}]),'일부 체인에 사전 준비 MSA 사용');
+ assert.equal(c.resultMsaCaption(summary,[{msa:'precomputed'}]),'사전 준비 MSA · 출처 미기록');
+ assert.equal(c.resultMsaCaption(summary,[{msa:'empty'},{msa:'precomputed'}]),'MSA 조건 혼합 · 관측별 기록 확인');
+ assert.equal(c.resultMsaCaption(summary,[{msa:'unknown'}]),'MSA 출처 미기록');
+ assert.equal(c.resultMsaCaption(summary,[]),'MSA 출처 미기록');
+ assert.equal(JSON.stringify({summary,rows}),before);
+});
+test('legacy explicit Boltz empty backend never inherits unused ColabFold cache',()=>{
+ assert.equal(c.resultMsaCaption({mode:'mature',config:{screen:{engine:'boltz2',colabfold:{msa_source:'cache'}},structure:{msa:{backend:'empty'}}}}),'MSA 없음 · 서열만 사용');
+});

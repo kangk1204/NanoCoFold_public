@@ -44,6 +44,20 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "체인 {0}: alternate atom location {1}개가 있습니다. BioPython이 선택한 altloc: {2} 외 {3}개. 숨은 좌표 선택이므로 원본 확인을 권장합니다.": "Chain {0}: {1} alternate atom locations. BioPython-selected conformers: {2}, and {3} more. Check the original coordinates before assessing structural confidence.",
+  "일부 체인에 사전 준비 MSA 사용": "Precomputed MSA for some chains",
+  "사전 준비 MSA · 출처 미기록": "Precomputed MSA · Source not recorded",
+  "MSA 조건 혼합 · 관측별 기록 확인": "Mixed MSA conditions · See individual observations",
+  "접두사 없는 결합 부위 번호는 제공 구조의 PDB 잔기 번호로 해석했습니다. 번호 체계를 고정하려면 pdbN 또는 seqN으로 입력하세요.": "Binding-site numbers without a prefix were interpreted as PDB residue numbers. Use pdbN or seqN to specify the numbering system.",
+  "구조가 없어 접두사 없는 결합 부위 번호는 1-based 서열 위치로 해석했습니다. 번호 체계를 고정하려면 seqN으로 입력하세요.": "Without a structure, binding-site numbers without a prefix were interpreted as 1-based sequence positions. Use seqN to specify sequence numbering.",
+  "{0}: 매몰 잔기(relative SASA={1}). 노출 잔기로 교체 권장.": "{0}: Buried residue (relative SASA={1}). Consider an exposed residue.",
+  "{0}: 구조에 존재하지 않음": "{0}: Not present in the structure",
+  "{0}: pLDDT={1} (구조 신뢰도 낮음). 다른 에피토프 고려.": "{0}: pLDDT={1} (low structural confidence). Consider another epitope.",
+  "{0}: 글리칸과 {1} Å 거리. 당질 근처 에피토프는 결합 설계가 어려움.": "{0}: {1} Å from a glycan. Nearby glycans may obstruct the binding site.",
+  "체인 {0}: 단백질 표준 잔기가 없어 normalized structure.pdb에서 제외했습니다.": "Chain {0}: Excluded from normalized structure.pdb because it contains no standard protein residues.",
+  "context.pdb에는 structure.pdb와 같은 정규화 단백질 체인/잔기 번호에 비단백질 context를 추가 보존했습니다. SASA/당질 영향은 후속 단계에서 별도 확인하세요.": "context.pdb retains nonprotein components alongside the normalized protein chain and residue numbering used in structure.pdb. Review their effects on solvent exposure and glycan shielding.",
+  "체인 {0}: alternate atom location {1}개가 있습니다. BioPython이 선택한 altloc: {2}. 숨은 좌표 선택이므로 원본 확인을 권장합니다.": "Chain {0}: {1} alternate atom locations. BioPython-selected conformers: {2}. Check the original coordinates before assessing structural confidence.",
+
   "ESM env 를 찾지 못해 ESM 서열 점수를 결측(NaN)으로 기록합니다. envs/setup_esm.sh 를 실행하세요.": "The ESM environment was not found, so ESM sequence scores are recorded as missing (NaN). Run envs/setup_esm.sh to install it.",
   "소수성 잔기가 {0}개입니다. 자동 결합 부위의 소수성 패치 기준(≥3)은 탐색용 휴리스틱이며, 실제 결합이나 설계 성공을 보장하지 않습니다.": "The site contains {0} hydrophobic residues. The automatic hotspot threshold of at least 3 is an exploratory heuristic; it does not establish binding or design success.",
   "실행 당시 기록 경고: {0}": "Warnings recorded at execution: {0}",
@@ -2233,6 +2247,8 @@ globalThis.I18N = (() => {
     for(const {pattern,keys,en,ko} of patterns){
       if(ko==='진행 {0}'&&!/^진행 (?:\d+|미기록)\/(?:\d+|미기록)$/.test(raw))continue;
       const match=pattern.exec(raw);if(!match)continue;
+      if (/^\{0\}: (?:매몰 잔기|구조에 존재하지 않음|pLDDT=|글리칸과)/.test(ko) &&
+          !/^(?:[A-Za-z0-9]+:)?-?\d+[A-Za-z]?$/.test(match[1])) continue;
       // These parameters are configuration field paths, not arbitrary Korean
       // prose. Translate full authored descriptions via their explicit keys.
       if((ko==='{0} 설정은 객체여야 합니다.'||ko==='{0} 설정은 true/false여야 합니다.'||ko==='{0}는 목록이어야 합니다.'||ko==="{0}는 문자열이어야 합니다. ':'를 포함하는 --set 값은 따옴표로 감싸세요.")&&

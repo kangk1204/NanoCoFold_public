@@ -345,7 +345,7 @@ function table(node, rows, columns, {localizedValues = []} = {}) {
   rows.forEach((row) => {
     const r = el("tr");
     columns.forEach((key) => {
-      const cell = el("td", row[key] == null ? I18N.term("미평가") : ["이유", "조치", "구분", ...localizedValues].includes(key) ? I18N.term(fmt(row[key])) : fmt(row[key]));
+      const cell = el("td", row[key] == null ? I18N.term("미평가") : typeof row[key] === "object" && I18N.term(row[key]) === row[key] ? row[key] : ["이유", "조치", "구분", ...localizedValues].includes(key) ? I18N.term(fmt(row[key])) : fmt(row[key]));
       if (typeof row[key] === "number" && Number.isFinite(row[key])) cell.title = String(row[key]);
       r.append(cell);
     });
@@ -918,7 +918,7 @@ function invalidateInput() {
 function chainLabel(chain) {
   const author = chain.author_chain && chain.author_chain !== chain.original_id
     ? ` · author ${chain.author_chain}` : "";
-  return `${chain.id} · 원본 ${chain.original_id}${author} · ${chain.name || "단백질"} · ${chain.length} aa`;
+  return I18N.format("{0} · 원본 {1}{2} · {3} · {4} aa", [chain.id, chain.original_id, author, chain.name || I18N.term("단백질"), chain.length]);
 }
 function selectedPartners() {
   return [...$("partner-chains").querySelectorAll("input:checked")].map((i) => i.value);
@@ -939,10 +939,10 @@ function renderInputAssessment() {
   const root = $("input-assessment");
   root.replaceChildren(el("p", data.blockers?.length ? I18N.term("실험 좌표 경로에 확인할 문제가 있습니다. 전체 서열을 검토해 새 구조를 예측할 수 있습니다.") : I18N.term("실험 좌표 경로를 사용할 수 있습니다. 관측 서열과 전체 서열의 차이를 확인하세요.")));
   table(root.appendChild(el("div", undefined, "scroll")), data.retained_chains.map(c => ({
-    체인: chainLabel(c), 관측: c.length, 전체: c.sequence_review?.full_length ?? "정보 없음",
-    미관측: c.sequence_review?.missing_positions?.length ?? "대응 미확인",
+    체인: chainLabel(c), 관측: c.length, 전체: c.sequence_review?.full_length ?? I18N.term("정보 없음"),
+    미관측: c.sequence_review?.missing_positions?.length ?? I18N.term("대응 미확인"),
     수정잔기: c.sequence_review?.modifications?.length ?? 0,
-    불명확: c.sequence_review?.unknown_positions?.join(", ") || "없음",
+    불명확: c.sequence_review?.unknown_positions?.join(", ") || I18N.term("없음"),
   })), ["체인", "관측", "전체", "미관측", "수정잔기", "불명확"]);
   $("input-preparation").value = data.preparation?.recommended || "coordinates";
   $("prediction-sequences").value = data.retained_chains.map(c =>
@@ -1120,7 +1120,7 @@ async function prepareInput() {
     summary.replaceChildren(el("h3",I18N.term("이번에 실행할 입력과 조건")),
       el("p",`${mode} · ${entries.map(p=>`${p.id}: ${p.sequence.length} aa`).join(" · ")} · Seed ${cfg.run.seed}`),
       el("p",I18N.format("평가 엔진: {0} · 엔진 점수를 합산하지 않습니다.", [engines.join(" · ")])),
-      el("p",I18N.format("MSA: {0} · 공용 전송 동의: {1}", [complex ? (cfg.complex.msa_source ? cfg.complex.msa_source : cfg.complex.msa) : (cfg.screen.colabfold?.msa_source ? cfg.screen.colabfold?.msa_source : cfg.screen.msa_mode), cfg.screen.allow_public_msa_server===true ? I18N.term("현재 입력에 동의") : I18N.term("외부 전송 없음")])),
+      el("p",I18N.format("MSA: {0} · 공용 전송 동의: {1}", [complex ? (cfg.complex.msa_source ? cfg.complex.msa_source : cfg.complex.msa) : (cfg.screen.engine === "colabfold" ? cfg.screen.colabfold?.msa_source : cfg.screen.engine === "chai1" ? cfg.screen.msa_mode : cfg.structure?.msa?.backend), cfg.screen.allow_public_msa_server===true ? I18N.term("현재 입력에 동의") : I18N.term("외부 전송 없음")])),
       el("p",I18N.term(noviceModelPlan(cfg,mode,mode==="screen"?noviceFasta($("vhh-fasta").value).length:0))));
   }
   warnings($("review-summary"), result.review?.warnings);
@@ -1632,16 +1632,40 @@ function renderHandoffStatus(summary) {
   $("result-summary").append(panel);
 }
 
-function resultMsaCaption(summary) {
+function resultMsaCaption(summary, observations = []) {
+  const missing = "MSA 출처 미기록";
+  const caption = (mode, source) => {
+    if (["empty", "single", "chai1_single", "chai1_single_fallback"].includes(mode)) return "MSA 없음 · 서열만 사용";
+    if (mode === "partial_precomputed") return "일부 체인에 사전 준비 MSA 사용";
+    if (["public_api", "explicitly_authorized_api_cache", "chai1_public_msa"].includes(mode)) return "API에서 확보한 MSA";
+    if (!["precomputed", "precomputed_unpaired", "chai1_local_msa", "local", "local_mmseqs2", "public_mmseqs2", "mmseqs", "colabfold_search", "cache"].includes(mode)) return missing;
+    if (["public_api", "explicitly_authorized_api_cache"].includes(source)) return "API에서 확보한 MSA";
+    if (["cache", "local_mmseqs2", "public_mmseqs2"].includes(source)) return "로컬·캐시 MSA 실행";
+    return ["precomputed", "precomputed_unpaired", "chai1_local_msa"].includes(mode) ? "사전 준비 MSA · 출처 미기록" : missing;
+  };
+  // Actual per-model records take precedence over configured defaults, including
+  // a cache miss or an engine's single-sequence fallback. Do not flatten a mix.
+  if (observations.length) {
+    const values = new Set(observations.map(row => caption(row.msa_used ?? row.msa,
+      row.msa_source ?? (summary.mode === "complex" ? summary.conditions?.msa_source : undefined))));
+    return values.size > 1 ? "MSA 조건 혼합 · 관측별 기록 확인" : [...values][0];
+  }
   const complex = summary.mode === "complex";
-  const mode = summary.conditions?.msa ?? summary.config?.complex?.msa;
-  if (complex && mode === "empty") return "MSA 없음 · 서열만 사용";
-  const source = complex
-    ? summary.conditions?.msa_source || summary.config?.complex?.msa_source || summary.conditions?.msa || summary.config?.complex?.msa
-    : summary.config?.screen?.colabfold?.msa_source;
-  if (["public_api", "explicitly_authorized_api_cache"].includes(source)) return "API에서 확보한 MSA";
-  if (["cache", "local_mmseqs2", "public_mmseqs2"].includes(source)) return "로컬·캐시 MSA 실행";
-  return "MSA 출처 미기록";
+  const mode = summary.conditions?.msa ?? (complex ? summary.config?.complex?.msa : undefined);
+  const source = summary.conditions?.msa_source ?? (complex ? summary.config?.complex?.msa_source : undefined);
+  if (mode != null) return caption(mode, source);
+  if (complex) return missing;
+  const engine = summary.conditions?.engine ?? summary.config?.screen?.engine;
+  if (engine === "colabfold") {
+    const config = summary.config?.screen?.colabfold;
+    return caption(config?.msa_mode ?? config?.msa_source, config?.msa_source);
+  }
+  // Old reports may lack model-level MSA records. An explicit empty backend is
+  // unambiguous; a configured cache/search is not proof that an MSA was used.
+  if (["boltz2", "opendde"].includes(engine) && summary.config?.structure?.msa?.backend === "empty")
+    return caption("empty");
+  if (engine === "chai1" && summary.config?.screen?.msa_mode === "single") return caption("single");
+  return missing;
 }
 async function loadResult(id) {
   if (!id) return;
@@ -1718,7 +1742,7 @@ async function loadResult(id) {
   $("explorer").hidden = false;
   state.displayAliases = reportAliases(state.rows);
   const counts = reportModelCounts(state.rows, summary.mode, summary.config);
-  const msaCaption = resultMsaCaption(summary);
+  const msaCaption = resultMsaCaption(summary, observations);
   $("result-input").replaceChildren(el("p", I18N.format("실행: {0} · 모드: {1} · {2}", [(summary.name || summary.id ? (summary.name ? summary.name : summary.id) : I18N.term("미기록")), (summary.mode ? summary.mode : I18N.term("미기록")), I18N.term(msaCaption)])));
   const mockNotice = mockZeroSelectionNotice(summary, state.rows);
   if (mockNotice) $("result-input").prepend(mockNotice);
@@ -3333,7 +3357,7 @@ async function boot() {
       ...(state.analyzed.patches || []).map((p) => {
         const button = el(
           "button",
-          I18N.format("{0} · {1}", [p.positions.join(", "), (p.reason ? p.reason : I18N.term("추천 패치"))]),
+          I18N.format("{0} · {1}", [p.positions.join(", "), I18N.term(p.reason || "추천 패치")]),
           "secondary",
         );
         button.onclick = () => {

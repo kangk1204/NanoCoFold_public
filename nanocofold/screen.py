@@ -237,6 +237,8 @@ def predict_complexes(
                 id_column: candidate_id,
                 "pred_dir": str((nested if Path(nested).exists() else candidate_dir).resolve()),
                 "engine": "boltz2",
+                "msa_used": _boltz_msa_mode(chain_records, target_msa, binder_letter, binder_msa,
+                                            target_info.get("chain_msas")),
                 "target_chain": "A",
                 "binder_chain": binder_letter,
                 "aux_chains": ";".join(f"{name}:{letter}" for name, letter in aux_pairs),
@@ -659,6 +661,22 @@ def _prepare_chai_msa_directory(cfg: dict, candidate_dir: Path, target_info: dic
         return destination
 
 
+def _boltz_chain_inputs(chain_records, target_msa, binder_letter, binder_msa="empty", chain_msas=None):
+    """Use the same resolved MSA assignments in engine input and result metadata."""
+    return [
+        {"id": letter, "sequence": sequence,
+         "msa": (chain_msas or {}).get(letter, target_msa if letter == "A" else
+                                       binder_msa if letter == binder_letter else "empty")}
+        for letter, sequence in chain_records.items()
+    ]
+
+
+def _boltz_msa_mode(chain_records, target_msa, binder_letter, binder_msa="empty", chain_msas=None):
+    chains = _boltz_chain_inputs(chain_records, target_msa, binder_letter, binder_msa, chain_msas)
+    used = [chain["msa"] not in (None, "", "empty", "none") for chain in chains]
+    return "precomputed" if used and all(used) else "partial_precomputed" if any(used) else "empty"
+
+
 def _predict_boltz2(
     cfg: dict,
     candidate_dir: Path,
@@ -729,14 +747,7 @@ def _predict_boltz2(
     if not dry_run:
         _clear_prediction_markers(completion_path, fingerprint_path)
     env = resolve_path(cfg, cfg_get(cfg, "screen.boltz2_env", cfg_get(cfg, "structure.boltz2.env")))
-    chains = [
-        {
-            "id": letter,
-            "sequence": sequence,
-            "msa": (chain_msas or {}).get(letter, target_msa if letter == "A" else (binder_msa if letter == binder_letter else "empty")),
-        }
-        for letter, sequence in chain_records.items()
-    ]
+    chains = _boltz_chain_inputs(chain_records, target_msa, binder_letter, binder_msa, chain_msas)
     suffix = ".dry-run" if dry_run else ""
     yaml_path = write_boltz_yaml(
         chains,
