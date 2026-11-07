@@ -44,6 +44,19 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "검토 보류": "Held for review",
+  "v2 서열 검토 보류는 fallback 설정으로 해제되지 않습니다.": "Fallback does not override v2 sequence review holds.",
+  "서열 검토 항목 수": "Sequence review count",
+  "서열 평가 정책": "Sequence assessment policy",
+  "서열 검토 상태": "Sequence review status",
+  "서열 검토 필요 · 자동 선별 보류": "Sequence review required · Automatic selection held",
+  "v2 서열 검토는 모티프, Cys 개수와 선형 소수성 창을 검사합니다. 상한 초과는 검토 보류이며 실험적 개발 불가를 뜻하지 않습니다. 구조 표면의 소수성이나 실제 분해·응집은 별도 평가가 필요합니다.": "The v2 sequence screen checks motifs, cysteine counts and linear hydrophobic windows. Exceeding the limit places selection on hold for review. Surface hydrophobicity, degradation and aggregation require separate assessment.",
+  "선별에는 기록된 기준과 CDR3 다양성 제한을 적용합니다. dev_severe는 선별에 사용하는 서열 검토 항목 수, dev_flags는 종합점수에 반영하는 전체 항목 수입니다. 항목 정의는 실행 당시 평가 정책을 따릅니다.": "Selection uses the recorded criteria and CDR3 diversity limits. dev_severe counts sequence categories used for selection; dev_flags counts all categories used in the composite score. Category definitions follow the recorded assessment policy.",
+  "종합점수는 같은 엔진·후보 집합 안에서 비교합니다. 가중치는 ranking_policy에서 확인하세요. dev_severe는 선별용 서열 검토 항목 수이며 항목 정의는 기록된 정책을 따릅니다. 접촉·충돌은 거리 기준 원자쌍 수입니다.": "Compare composite scores within the same engine and candidate cohort. See ranking_policy for weights. dev_severe counts sequence review categories under the recorded policy. Contacts and clashes are distance-based atom-pair counts.",
+  "dev_flags는 종합점수 가중치입니다. CDR 미평가와 v2 서열 검토 보류는 fallback 설정으로 해제되지 않습니다.": "dev_flags contributes to the composite score. Fallback does not override unassessed CDRs or v2 sequence review holds.",
+  "실행 당시 선별에 사용한 서열 검토 항목 수입니다. v2는 모티프·Cys 개수·선형 소수성 창을 검사하며 상한 초과는 검토 보류입니다. 항목 정의는 기록된 평가 정책을 따릅니다.": "Sequence categories counted for selection in the recorded run. The v2 screen checks motifs, cysteine counts and linear hydrophobic windows; exceeding the limit holds selection for review. Definitions follow the recorded policy.",
+  "평가된 서열 검토 항목의 전체 수이며 종합점수에 반영합니다. 항목 정의는 기록된 정책을 따릅니다. CDR 미평가는 검토 항목 0건과 다릅니다.": "Total evaluated sequence review categories used in the composite score, as defined by the recorded policy. Unassessed CDRs differ from a screen with no findings.",
+  "자동 선별 후보가 0종입니다. 서열 검토 보류와 구조 기준 미통과 사유를 구분해 확인하세요. 서열 검토 보류는 실험적 개발 불가 판정이 아닙니다.": "No candidates were automatically selected. Check sequence review holds separately from unmet structure criteria. A sequence review hold does not establish experimental developability failure.",
   "체인 {0}: alternate atom location {1}개가 있습니다. BioPython이 선택한 altloc: {2} 외 {3}개. 숨은 좌표 선택이므로 원본 확인을 권장합니다.": "Chain {0}: {1} alternate atom locations. BioPython-selected conformers: {2}, and {3} more. Check the original coordinates before assessing structural confidence.",
   "일부 체인에 사전 준비 MSA 사용": "Precomputed MSA for some chains",
   "사전 준비 MSA · 출처 미기록": "Precomputed MSA · Source not recorded",

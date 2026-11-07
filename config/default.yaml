@@ -20,8 +20,8 @@ target:
   chain: A                 # 타깃 체인 ID (구조 사용 시)
   hotspots: auto           # auto | 정수 목록/문자열 예: [34, 67, "A:88"]
   hotspot_set: null        # auto 세트 중 선택 (예: auto2). null이면 최상위 세트
-  aux_chains: []           # 복합체 문맥 보존용 보조 체인 [{name: partner, sequence: "..."}]
-                           # 필요한 단백질 파트너를 함께 폴딩/예측에 포함
+  aux_chains: []           # 복합체 문맥 보존용 보조 체인 [{name: STX1A, sequence: "..."}]
+                           # 예: SNARE 복합체에서 Syntaxin/VAMP2를 함께 폴딩/예측에 포함
 
 structure:
   provider: boltz2         # boltz2 | chai1 | none | mock
@@ -58,7 +58,7 @@ truncate:
   radius: 30.0             # 핫스팟 CA 기준 유지 반경 (Å)
   min_segment: 5           # 이 길이 미만 연속 구간 제거
   keep_hetatm: false
-  keep_other_chains: false # 다중 체인 타깃에서 파트너 체인 유지
+  keep_other_chains: false # 다중 체인 타깃(예: SNARE 복합체)에서 파트너 체인 유지
 
 hotspots:
   auto:
@@ -251,11 +251,12 @@ score:
 
 developability:
   reference_sequence: null # 서열 PLL 비교 기준 (null이면 첫 후보 사용)
-  hydrophobic_window: 5
+  hydrophobic_window: 5    # 선형 서열 창; 구조 표면의 소수성 패치 점수가 아님
   hydrophobic_mean_kd: 1.6
-  max_cys: 2               # 정상 VHH: 프레임워크 2개 (추가 Cys 금지)
-  deamidation: ["NG", "NS", "DG", "DS"]
-  isomerization: ["DP", "DG"]
+  max_cys: 2               # Cys 개수 검토 기준; 자유 Cys나 이황화 결합을 확정하지 않음
+  deamidation: ["NG", "NS"]
+  isomerization: ["DG", "DS"]
+  cleavage: ["DP"]
   oxidation: ["M"]
   glycosylation: "N[^P][ST]"
   pI_min: 5.0
@@ -283,14 +284,14 @@ rank:
     esm_score: 0.3         # 서열/폴딩 prior: mature=ΔLLR, design/screen=배치 mean log-prob z-score; 친화도 아님
     antifold: 0.2          # 구조 조건부 서열 prior; 친화도 아님
     n_clashes: -0.5        # 실제 컬럼명(n_clashes)과 일치해야 적용됨
-    dev_flags: -0.4        # 전체 평가 위험 수; 심한 5종만 세는 dev_severe 게이트와 다름
+    dev_flags: -0.4        # 전체 서열 검토 항목 수; dev_severe는 선별에 쓰는 항목 수
   cdr3:
     cluster_identity: 0.85
     per_cluster: 1
   final_n: 30
-  max_dev_severe: 1        # 이 개수 초과 시 final_eligible 제외
+  max_dev_severe: 1        # v2: 이 개수 초과 시 검토 보류. 실험적 개발 불가 판정이 아님
   require_hotspot: false  # 접촉률은 결과 화면의 선택 필터. true는 기존 필수 선별 정책
-  fallback_to_ineligible: false  # true면 적격 후보가 없을 때 부적격 후보를 합성 목록에 포함
+  fallback_to_ineligible: false  # v2 개발가능성 검토·미평가 보류는 true여도 선별하지 않음
   include_wt_control: false # true면 mature에서 WT를 대조군으로 함께 스코어링(선별/발주 제외)
   diversity_pool: 200      # 랭킹 상위 이 풀에서 다양성 선별
 

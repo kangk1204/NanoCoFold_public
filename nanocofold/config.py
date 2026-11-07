@@ -582,8 +582,8 @@ def developability_patterns(cfg: dict) -> dict[str, str]:
     """Validate motif collections before joining them into regular expressions."""
     dev = cfg_get(cfg, "developability", {}) or {}
     patterns = {}
-    for name, default in (("deamidation", ["NG", "NS", "DG", "DS"]),
-                          ("isomerization", ["DP", "DG"]), ("oxidation", ["M"])):
+    for name, default in (("deamidation", ["NG", "NS"]),
+                          ("isomerization", ["DG", "DS"]), ("cleavage", ["DP"]), ("oxidation", ["M"])):
         value = dev.get(name, default)
         if not isinstance(value, (list, tuple)) or any(not isinstance(item, str) or not item for item in value):
             raise ValueError(f"developability.{name}는 비어 있지 않은 모티프 문자열의 목록이어야 합니다.")

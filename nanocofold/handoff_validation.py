@@ -373,6 +373,10 @@ def _warn_controls_in_synthesis(sheet: pd.DataFrame, warnings: list[dict[str, An
 
 
 def _validate_row_eligibility(sheet: pd.DataFrame, errors: list[dict[str, Any]]) -> None:
+    from .developability import selection_held
+    for index, row in sheet.iterrows():
+        if selection_held(row):
+            _add(errors, "developability_review_required", f"{_row_id(row, index)}: developability review is incomplete.", row=index)
     if "design_id" not in sheet or sheet["design_id"].isna().any() or sheet["design_id"].duplicated().any():
         _add(errors, "invalid_candidate_ids", "synthesis rows need unique non-empty design_id values.")
     if "plate_id" in sheet:

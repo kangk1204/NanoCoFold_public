@@ -17,7 +17,7 @@ function recordedCandidateSeed(row, observations = []) {
 }
 
 const $ = (id) => document.getElementById(id);
-const metricCaptions = Object.freeze({ptm:"pTM",pdockq:"pDockQ",pdockq2:"pDockQ2 (최소)",interface_pae_ab:"PAE 행 표적·열 VHH (Å)",interface_pae_ba:"PAE 행 VHH·열 표적 (Å)",interface_pae_median:"계면 PAE 중앙값 (Å)",interface_pae_p90:"계면 PAE 90백분위 (Å)",target_plddt:"표적 pLDDT",binder_plddt:"VHH pLDDT",complex_plddt:"전체 복합체 pLDDT",n_hotspots_requested:"지정 결합 부위 잔기 수",n_hotspots_contacted:"접촉한 지정 잔기 수",n_target_clashes:"표적–VHH 충돌 원자쌍",n_context_clashes:"파트너–VHH 충돌 원자쌍",candidate_id:"후보",ipsae:"ipSAE",iptm:"ipTM",interface_plddt:"계면 pLDDT",interface_pae:"계면 PAE (Å)",hotspot_contact_frac:"결합 부위 접촉률",seed:"Seed",model:"모델",error:"평가 오류",chain_a:"체인 1",chain_b:"체인 2",iptm_a_to_b:"체인 1→2 ipTM",iptm_b_to_a:"체인 2→1 ipTM",a:"잔기 1",b:"잔기 2",distance:"거리 (Å)",kind:"구분",pdockq2_target:"pDockQ2 표적 방향",pdockq2_binder:"pDockQ2 VHH 방향",dev_flags:"전체 평가 위험 수",dev_severe:"심한 위험 수 (5종)",n_hbonds:"N/O 근접 원자쌍",n_salt_bridges:"반대 전하 원자쌍",esm_score:"ESM 서열 점수",composite_score:"배치 상대 종합점수",n_clashes:"충돌 원자쌍",site_satisfied:"지정 결합 부위 판정 (기록)",site_selection_eligible:"지정 결합 부위 포함 적격",pose_consensus_status:"동일 후보 자세 일치",pose_supporting_engines:"자세 일치 엔진 수",pose_quality_supporting_engines:"기록 적격·자세 일치 엔진 수",design_consistency_status:"설계·재예측 일치",design_binder_rmsd_A:"설계·재예측 VHH RMSD (Å)",review_rank:"검토 순위 (동률 허용)",review_rank_scope:"검토 순위 범위",review_priority_reason:"검토 판정 이유",candidate_review_priority:"후보 검토 판정",review_priority:"모델 검토 판정"});
+const metricCaptions = Object.freeze({ptm:"pTM",pdockq:"pDockQ",pdockq2:"pDockQ2 (최소)",interface_pae_ab:"PAE 행 표적·열 VHH (Å)",interface_pae_ba:"PAE 행 VHH·열 표적 (Å)",interface_pae_median:"계면 PAE 중앙값 (Å)",interface_pae_p90:"계면 PAE 90백분위 (Å)",target_plddt:"표적 pLDDT",binder_plddt:"VHH pLDDT",complex_plddt:"전체 복합체 pLDDT",n_hotspots_requested:"지정 결합 부위 잔기 수",n_hotspots_contacted:"접촉한 지정 잔기 수",n_target_clashes:"표적–VHH 충돌 원자쌍",n_context_clashes:"파트너–VHH 충돌 원자쌍",candidate_id:"후보",ipsae:"ipSAE",iptm:"ipTM",interface_plddt:"계면 pLDDT",interface_pae:"계면 PAE (Å)",hotspot_contact_frac:"결합 부위 접촉률",seed:"Seed",model:"모델",error:"평가 오류",chain_a:"체인 1",chain_b:"체인 2",iptm_a_to_b:"체인 1→2 ipTM",iptm_b_to_a:"체인 2→1 ipTM",a:"잔기 1",b:"잔기 2",distance:"거리 (Å)",kind:"구분",pdockq2_target:"pDockQ2 표적 방향",pdockq2_binder:"pDockQ2 VHH 방향",dev_flags:"전체 평가 위험 수",dev_severe:"서열 검토 항목 수",n_hbonds:"N/O 근접 원자쌍",n_salt_bridges:"반대 전하 원자쌍",esm_score:"ESM 서열 점수",composite_score:"배치 상대 종합점수",n_clashes:"충돌 원자쌍",site_satisfied:"지정 결합 부위 판정 (기록)",site_selection_eligible:"지정 결합 부위 포함 적격",pose_consensus_status:"동일 후보 자세 일치",pose_supporting_engines:"자세 일치 엔진 수",pose_quality_supporting_engines:"기록 적격·자세 일치 엔진 수",design_consistency_status:"설계·재예측 일치",design_binder_rmsd_A:"설계·재예측 VHH RMSD (Å)",review_rank:"검토 순위 (동률 허용)",review_rank_scope:"검토 순위 범위",review_priority_reason:"검토 판정 이유",candidate_review_priority:"후보 검토 판정",review_priority:"모델 검토 판정"});
 function iptmCaption(records) {
   const rows = Array.isArray(records) ? records : records && typeof records === "object" ? [records] : [];
   const scopes = new Set(rows.map(row => ["whole_complex", "selected_target_binder_pair"].includes(row?.iptm_scope) ? row.iptm_scope : "unrecorded"));
@@ -38,7 +38,11 @@ function refreshMetricCaptions(records, mode) {
       }
     }
 }
-const decisionCaption = value => typeof value === "boolean" ? value ? "적격" : "부적격" : "미평가";
+function developabilityReviewOnly(row) {
+  const reasons = Array.isArray(row?.exclusion_reasons) ? row.exclusion_reasons : String(row?.exclusion_reason || "").split(";").filter(Boolean);
+  return row?.dev_assessment_policy === "sequence_liability_screen_v2" && row.dev_assessment_status === "review_required" && reasons.length > 0 && reasons.every(code => code === "developability_review_required");
+}
+const decisionCaption = (value, row) => typeof value === "boolean" ? value ? "적격" : developabilityReviewOnly(row) ? "검토 보류" : "부적격" : "미평가";
 const offline = Boolean(window.NANOCOFOLD_OFFLINE);
 const state = {
   input: null,
@@ -200,7 +204,7 @@ function reportAliases(rows) {
   return aliases;
 }
 function reportReasonLabel(code) {
-  const labels = {wt_control_not_in_model_pool:"WT 대조군 예측 풀에서 제외",sequence_prior_top_n_not_selected:"서열 prior 평가 한도 밖 (구조 미평가)",missing_metrics:"필수 지표 미평가",sequence_prior_prefilter_unmet:"서열 prior 기준 미달",sequence_prior_prefilter_unassessed:"서열 prior 미평가",clash:"거리 기준 충돌", ipsae:"ipSAE 기준 미통과", iptm:"ipTM 기준 미통과", interface_plddt:"계면 pLDDT 기준 미통과", hotspot:"결합 부위 접촉 기준 미통과", developability:"개발가능성 경고 기준 미통과", developability_unassessed:"CDR 개발가능성 미평가", scoring_error:"구조 점수 계산 오류", not_scored:"구조 점수 미평가", eligibility_unassessed:"적격 판정 미기록·미평가", parent_control:"원본 후보 대조군", wt_control:"야생형 대조군", prediction_error:"예측 오류",prefilter_not_selected:"예측 전 준비·미선정",cross_binding_risk:"전장형 교차 결합 위험",incomplete_comparison:"비교 미완료",first_stage_only:"1차 평가만 완료",boltz_failed_or_incomplete:"Boltz 최종 평가 실패·미완료"};
+  const labels = {wt_control_not_in_model_pool:"WT 대조군 예측 풀에서 제외",sequence_prior_top_n_not_selected:"서열 prior 평가 한도 밖 (구조 미평가)",missing_metrics:"필수 지표 미평가",sequence_prior_prefilter_unmet:"서열 prior 기준 미달",sequence_prior_prefilter_unassessed:"서열 prior 미평가",clash:"거리 기준 충돌", ipsae:"ipSAE 기준 미통과", iptm:"ipTM 기준 미통과", interface_plddt:"계면 pLDDT 기준 미통과", hotspot:"결합 부위 접촉 기준 미통과", developability:"개발가능성 경고 기준 미통과", developability_review_required:"서열 검토 필요 · 자동 선별 보류",developability_unassessed:"CDR 개발가능성 미평가", scoring_error:"구조 점수 계산 오류", not_scored:"구조 점수 미평가", eligibility_unassessed:"적격 판정 미기록·미평가", parent_control:"원본 후보 대조군", wt_control:"야생형 대조군", prediction_error:"예측 오류",prefilter_not_selected:"예측 전 준비·미선정",cross_binding_risk:"전장형 교차 결합 위험",incomplete_comparison:"비교 미완료",first_stage_only:"1차 평가만 완료",boltz_failed_or_incomplete:"Boltz 최종 평가 실패·미완료"};
   return Object.hasOwn(labels, code) ? labels[code] : "기록된 제외·미평가 사유";
 }
 function reportReasonCounts(rows, mode) {
@@ -1872,7 +1876,7 @@ function syncCandidateNavigation() {
     const eligibility = candidateEligibility(row);
     const basis = $("eligibility-basis").value === "quality" ? "품질 판정 (결합 부위 제외)" : "실행 당시 기록 판정";
     const assessment = recordedEvaluationError(row) ? I18N.term(modelAssessmentCaption(row)) : !row.evaluated ? I18N.term("미평가") : state.result.mode === "complex" ? I18N.term(modelAssessmentCaption(row))
-      : I18N.concat([I18N.term(basis), ": ", I18N.term(decisionCaption(eligibility))]);
+      : I18N.concat([I18N.term(basis), ": ", I18N.term(decisionCaption(eligibility, row))]);
     I18N.text($("candidate-status"), I18N.format("{0} · ipSAE {1} · {2} {3} · {4}", [(row.predictor_engine ? row.predictor_engine : I18N.term("엔진 미기록")), fmt(row.ipsae), I18N.term(metricCaption("iptm", row)), fmt(row.iptm), assessment]));
   } else I18N.text($("candidate-status"), I18N.term("현재 목록에서 후보를 선택하세요."));
 }
@@ -2099,7 +2103,7 @@ function renderCandidates() {
           button.title = row.candidate_id;
           button.onclick = () => reviewCandidate(row.candidate_id);
           td.append(button);
-        } else if(["final_eligible","quality_eligible"].includes(key)) I18N.text(td, I18N.term(decisionCaption(row[key])));
+        } else if(["final_eligible","quality_eligible"].includes(key)) I18N.text(td, I18N.term(decisionCaption(row[key], row)));
         else if(key === "seed") I18N.text(td, row[key] == null ? I18N.term("미기록") : String(row[key]));
         else if(key === "error") I18N.text(td, I18N.term(evaluationErrorCaption(row)));
         else if(key === "selected") I18N.text(td, typeof row[key]==="boolean" ? row[key] ? I18N.term("선별") : I18N.term("미선별") : I18N.term("미기록"));
@@ -2205,7 +2209,7 @@ async function selectCandidate(id) {
   if(state.result.mode!=="complex"&&hasPoseAssessment([row])) {
     const panel=el("div");panel.setAttribute("role","status");panel.className="pose-assessment";
     panel.append(el("h3",I18N.term("신뢰도 · 지정 결합 부위 · 자세 일관성")));
-    panel.append(el("p",I18N.format("실행 당시 기록 적격: {0} · 지정 결합 부위 포함 적격: {1}", [row.final_eligible===true ? I18N.term("적격") : row.final_eligible===false ? I18N.term("부적격") : I18N.term("미평가"), I18N.term(poseStatusLabel(row,"site_selection_eligible"))])));
+    panel.append(el("p",I18N.format("실행 당시 기록 적격: {0} · 지정 결합 부위 포함 적격: {1}", [I18N.term(decisionCaption(row.final_eligible, row)), I18N.term(poseStatusLabel(row,"site_selection_eligible"))])));
     panel.append(el("p",I18N.format("동일 후보 자세 일치: {0} · 자세 일치 엔진 {1}개 · 기록 적격 지지 {2}개", [I18N.term(poseStatusLabel(row,"pose_consensus_status")), fmt(row.pose_supporting_engines), fmt(row.pose_quality_supporting_engines)])));
     panel.append(el("p",I18N.format("설계·재예측: {0} · 표적 정렬 후 VHH RMSD {1} Å", [I18N.term(poseStatusLabel(row,"design_consistency_status")), fmt(row.design_binder_rmsd_A)])));
     panel.append(el("p",I18N.format("검토 순위: {0} · 범위 {1} · 1위도 보류일 수 있으며 동률을 허용합니다.", [fmt(row.review_rank), fmt(row.review_rank_scope)])));
@@ -2219,7 +2223,7 @@ async function selectCandidate(id) {
   const original = el("details");
   original.append(el("summary", I18N.term("원본 모델 ID·서열")), el("p", id, "sequence"), el("p", (row.sequence ? row.sequence : I18N.term("서열 미기록")), "sequence"));
   detail.append(original);
-  if (state.result.mode !== "complex") detail.append(el("p", I18N.format("품질 적격 (결합 부위 제외): {0} · 실행 당시 기록 적격: {1}", [I18N.term(decisionCaption(row.quality_eligible)), I18N.term(decisionCaption(row.final_eligible))])));
+  if (state.result.mode !== "complex") detail.append(el("p", I18N.format("품질 적격 (결합 부위 제외): {0} · 실행 당시 기록 적격: {1}", [I18N.term(decisionCaption(row.quality_eligible, row)), I18N.term(decisionCaption(row.final_eligible, row))])));
   if (row.quality_eligibility_source === "hotspot_only_exclusion_removed")
     detail.append(el("p", I18N.term("실행 당시 결합 부위 조건만으로 제외됐습니다. 나머지 기록 기준은 통과했으며 원본 판정·선별 목록은 보존됩니다.")));
   warnings(detail.appendChild(el("div")), [
@@ -2245,6 +2249,7 @@ async function selectCandidate(id) {
     confidenceScope.append(el("p", I18N.format("요약 쌍 선택: {0} · 유한한 기록값의 최솟값 {1} / 최댓값 {2} · 평가 쌍 {3} / 전체 쌍 {4}. 미평가 체인쌍은 최솟값·최댓값에서 제외됩니다.", [I18N.term(selection), fmt(row.min_pair_ipsae), fmt(row.max_pair_ipsae), fmt(row.pair_ipsae_assessed_count), fmt(row.pair_ipsae_total_count)])));
   }
   confidenceScope.append(el("pre",JSON.stringify(Object.fromEntries(Object.entries(row).filter(([key])=>/^ipsae_(scope|chain|source|selection)|^iptm_(scope|source|unavailable)|^(primary_pair|(max|min)_pair_ipsae|pair_ipsae_)/.test(key))),null,2)));detail.append(confidenceScope);
+  if (row.dev_assessment_policy === "sequence_liability_screen_v2") detail.append(el("p", I18N.term("v2 서열 검토는 모티프, Cys 개수와 선형 소수성 창을 검사합니다. 상한 초과는 검토 보류이며 실험적 개발 불가를 뜻하지 않습니다. 구조 표면의 소수성이나 실제 분해·응집은 별도 평가가 필요합니다."), "report-interpretation"));
   const methodReceipts = Object.entries(row.metric_provenance || {});
   if (methodReceipts.length) {
     const methods = el("details");
@@ -2259,9 +2264,9 @@ async function selectCandidate(id) {
     detail.append(methods);
   }
   detail.append(el("p", I18N.term("PAE는 상대 위치의 불확실성을 Å 단위로 나타냅니다. pDockQ2는 CA 8 Å 접촉과 방향별 PAE로 계산하며, 두 체인 중 낮은 값을 표시합니다. AlphaFold-Multimer에서 보정된 지표로, Boltz·Chai·OpenDDE 결과는 탐색용으로 사용합니다."), "muted"));
-  detail.append(el("p", I18N.term("종합점수는 같은 엔진·후보 집합 안에서 비교합니다. 가중치는 ranking_policy에서 확인하세요. 선별에는 적격 기준과 다양성 제한을 적용합니다. ESM·AntiFold는 서열·폴딩 점수이며, dev_severe는 심한 위험 5종, dev_flags는 전체 위험 수입니다. 접촉·충돌은 거리 기준 원자쌍 수로 표시합니다."), "muted"));
+  detail.append(el("p", I18N.term("종합점수는 같은 엔진·후보 집합 안에서 비교합니다. 가중치는 ranking_policy에서 확인하세요. dev_severe는 선별용 서열 검토 항목 수이며 항목 정의는 기록된 정책을 따릅니다. 접촉·충돌은 거리 기준 원자쌍 수입니다."), "muted"));
   detail.append(el("p", I18N.term("재현 조건은 엔진·장치·seed·실행 설정을 함께 확인하세요. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에서 지원합니다. 결합 부위 OFF/ON 실행의 난수 조건은 각각 확인하세요."), "muted"));
-  detail.append(el("p", I18N.term("dev_flags는 종합점수 가중치입니다. 최종 적격 판정에는 CDR 평가가 필요합니다. fallback_to_ineligible=true는 부적격 후보의 진단 목록을 만듭니다."), "muted"));
+  detail.append(el("p", I18N.term("dev_flags는 종합점수 가중치입니다. CDR 미평가와 v2 서열 검토 보류는 fallback 설정으로 해제되지 않습니다."), "muted"));
   if (row.threshold_checks !== undefined) {
     const facts = el("details"),
       caption = el("summary", I18N.term(row.assessment_status ? "현재 평가 기준" : "지표 해석·실행 당시 선별 기준"));

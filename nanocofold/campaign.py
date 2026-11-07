@@ -376,13 +376,15 @@ def write_outputs(cfg: dict, root: Path, definition: dict, candidates: pd.DataFr
         summary["final_eligible"] = (summary.specificity_complete & summary.positive_quality_pass &
                                      summary.comparison_status.eq("complete") & summary.dev_cdr_evaluated &
                                      summary.dev_severe.le(float(cfg_get(cfg, "rank.max_dev_severe", 1))) &
+                                     ~summary.apply(developability.selection_held, axis=1) &
                                      ~summary.design_id.eq("WT") & summary.evidence_type.eq("real"))
         summary["exclusion_reason"] = summary.apply(lambda r: ";".join([
             reason for condition, reason in ((not r.specificity_complete, "incomplete_comparison"),
                 (r.comparison_conditions_status != "verified", r.comparison_conditions_status),
                 (not r.positive_quality_pass, "positive_quality"), (r.comparison_status == "cross_binding_risk", "cross_binding_risk"),
                 (not r.dev_cdr_evaluated, "developability_unassessed"),
-                (r.dev_severe > float(cfg_get(cfg, "rank.max_dev_severe", 1)), "developability"),
+                (bool(developability.gate_reason(r, float(cfg_get(cfg, "rank.max_dev_severe", 1)))),
+                 developability.gate_reason(r, float(cfg_get(cfg, "rank.max_dev_severe", 1)))),
                 (r.evidence_type == "mock", "mock"), (r.design_id == "WT", "wt_control")) if condition]), axis=1)
         for metric in specificity.METRICS:
             summary[metric] = summary[f"cleaved_{metric}"]
@@ -663,6 +665,7 @@ def _run_locked(cfg: dict, root: Path, definition: dict, mapping: pd.DataFrame) 
             # 정상적인 0건과 구별한다(docs/22: 적격 후보가 0개인 정상 실행과 실행 실패를 구별).
             unevaluable = bool(candidates.empty or not candidates.dev_cdr_evaluated.astype(bool).any())
             eligible = candidates[candidates.dev_cdr_evaluated & candidates.dev_severe.le(float(cfg_get(cfg, "rank.max_dev_severe", 1)))].copy()
+            eligible = eligible[~eligible.apply(developability.selection_held, axis=1)] if not eligible.empty else eligible
             pool = _initial_pool(eligible, int(cfg_get(cfg, "specificity.stage1_n", 48)))
             if cfg_get(cfg, "run.mode") == "mature" and "WT" in candidates.design_id.values and "WT" not in pool.design_id.values:
                 pool = pd.concat([pool, candidates[candidates.design_id.eq("WT")]], ignore_index=True)

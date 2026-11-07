@@ -20,6 +20,7 @@ SYNTHESIS_COLUMNS = [
     "n_clashes", "hotspot_contact_frac", "esm_score", "esm_llr", "esm_mean_logprob", "esm_source", "antifold",
     "pI", "net_charge", "mw_kda", "dev_severe", "dev_warnings", "sequence", "sequence_sha256",
     "dev_cdr_evaluated",
+    "dev_assessment_policy", "dev_assessment_status", "dev_evidence_level", "dev_screen_limit",
     "comparison_status", "specificity_complete", "evidence_type",
     "terminal_modeling_status", "review_status",
     "construct_aa", "construct_dna", "dna_status", "notes",
@@ -28,6 +29,9 @@ SYNTHESIS_COLUMNS = [
 
 def write_synthesis_sheet(selected: pd.DataFrame, cfg: dict, out_dir: Path, sequence_column: str = "sequence",
                           metadata_columns: tuple[str, ...] = ()) -> dict:
+    from .developability import selection_held
+    if any(selection_held(row) for _, row in selected.iterrows()):
+        raise ValueError("개발가능성 검토·미평가 보류 후보는 합성 목록에 넣을 수 없습니다. / Candidates awaiting developability review or assessment cannot enter the synthesis list.")
     out_dir.mkdir(parents=True, exist_ok=True)
     expression = cfg_get(cfg, "expression", {}) or {}
     signal = str(expression.get("signal_peptide", "") or "")
@@ -81,6 +85,7 @@ def write_synthesis_sheet(selected: pd.DataFrame, cfg: dict, out_dir: Path, sequ
             "sequence": sequence,
             "sequence_sha256": row.get("sequence_sha256"),
             "dev_cdr_evaluated": row.get("dev_cdr_evaluated"),
+            **{key: row.get(key) for key in ("dev_assessment_policy", "dev_assessment_status", "dev_evidence_level", "dev_screen_limit")},
             "comparison_status": row.get("comparison_status"),
             "specificity_complete": row.get("specificity_complete"),
             "evidence_type": row.get("evidence_type"),

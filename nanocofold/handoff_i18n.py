@@ -13,6 +13,9 @@ from typing import Any
 
 # (diagnostic codes, original validator message, Korean and English presentation)
 MESSAGE_CATALOG = (
+    (('developability_review_required',), '{0}: developability review is incomplete.',
+     '{0}: 개발가능성 검토가 완료되지 않았습니다.',
+     '{0}: developability review is incomplete.'),
     (('empty_synthesis_sheet',), 'synthesis_plate_list.csv has no order rows.',
      'synthesis_plate_list.csv에 주문할 후보가 없습니다.',
      'synthesis_plate_list.csv has no order rows.'),

@@ -1333,14 +1333,9 @@ def _finalize(
             reasons.append("hotspot")
         if not passed(row.get("dev_cdr_evaluated", False)):
             reasons.append("developability_unassessed")
-        try:
-            raw_severe = row.get("dev_severe")
-            severe = float(raw_severe)
-            if (isinstance(raw_severe, (bool, np.bool_)) or not math.isfinite(severe)
-                    or severe < 0 or not severe.is_integer() or severe > max_severe):
-                reasons.append("developability")
-        except (TypeError, ValueError):
-            reasons.append("developability")
+        dev_reason = developability.gate_reason(row, max_severe)
+        if dev_reason:
+            reasons.append(dev_reason)
         return reasons
 
     merged["exclusion_reason"] = merged.apply(lambda row: ";".join(exclusion_reasons(row)), axis=1)
@@ -1360,7 +1355,8 @@ def _finalize(
     n_eligible = int(merged["final_eligible"].sum())
     if n_eligible == 0:
         state.add_warnings(
-            "final_eligible 후보가 0종입니다. "
+            "자동 선별 후보가 0종입니다. 서열 검토 보류와 구조 기준 미통과 사유를 구분해 확인하세요. 서열 검토 보류는 실험적 개발 불가 판정이 아닙니다."
+            if merged.get("dev_assessment_status", pd.Series(dtype=str)).eq("review_required").any() else "final_eligible 후보가 0종입니다. "
             + ("rank.fallback_to_ineligible=true는 종합점수가 있는 부적격 후보만 포함하며 미평가 보류 후보에는 적용되지 않습니다." if fallback
                else "합성 목록은 비어 있습니다. 임계값/예측 품질을 점검하세요.")
         )

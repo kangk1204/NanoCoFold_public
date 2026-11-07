@@ -86,7 +86,9 @@ CANDIDATE_COLUMNS = [
     ("esm_score", "ESM 서열 점수"),
     ("esm_llr", "ESM ΔLLR"),
     ("esm_mean_logprob", "ESM mean log-prob"),
-    ("dev_severe", "심한 위험 수 (5종)"),
+    ("dev_severe", "서열 검토 항목 수"),
+    ("dev_assessment_policy", "서열 평가 정책"),
+    ("dev_assessment_status", "서열 검토 상태"),
     ("dev_flags", "전체 평가 위험 수"),
     ("plate_id", "플레이트 ID"),
     ("plate_position", "웰"),
@@ -108,6 +110,7 @@ REASON_LABELS = {
     "hotspot": "결합 부위 접촉 기준 미통과",
     "developability": "개발가능성 경고 기준 미통과",
     "developability_unassessed": "CDR 개발가능성 미평가",
+    "developability_review_required": "서열 검토 필요 · 자동 선별 보류",
     "scoring_error": "구조 점수 계산 오류",
     "not_scored": "구조 점수 미평가",
     "prefilter_not_selected": "예측 전 준비·미선정 (모델 미평가 수에 합산하지 않음)",
@@ -475,6 +478,8 @@ def generate_report(
     # Only template-owned derived captions use this marker. Raw saved values
     # remain unmarked even when they equal a translation key such as 완료.
     env.globals["report_term"] = lambda value: Markup('<span data-report-i18n>') + escape(str(value)) + Markup('</span>')
+    from .developability import review_only_hold
+    env.globals["developability_review_only"] = review_only_hold
     env.filters["display_number"] = display_number
     template = env.get_template("report.html.j2")
 

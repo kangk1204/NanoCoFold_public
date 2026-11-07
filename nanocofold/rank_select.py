@@ -168,9 +168,10 @@ def ranking_policy(cfg: dict, frame: pd.DataFrame | None = None, *, selected: pd
         "affinity_improvement_established": False,
         "sequence_priors": {key: weight for key, weight in weights.items() if key in {"esm_score", "antifold"}},
         "sequence_prior_interpretation": "sequence/folding plausibility only; no measured affinity labels or binding calibration",
-        "developability_gate": "dev_severe: five severe risk flags",
+        "developability_gate": "recorded dev_severe category count and max_dev_severe; sequence_liability_screen_v2 exceeds the limit => review hold, not experimentally established failure; legacy rows retain their recorded policy",
+        "developability_assessment_policies": sorted({str(v) for v in frame["dev_assessment_policy"].dropna()}) if frame is not None and "dev_assessment_policy" in frame else [],
         "developability_weight": "dev_flags: all evaluated True risk flags; incomplete CDR assessment holds composite_score/rank and selection",
-        "fallback_scope": "recorded ineligible rows with available composite scores only; failed predictions, unavailable interfaces and unassessed weighted CDR liabilities stay held",
+        "fallback_scope": "recorded ineligible rows with available composite scores only; failed predictions, unavailable interfaces, unassessed weighted CDR liabilities and v2 developability review holds stay held",
     }
     if frame is None:
         return policy
@@ -479,9 +480,12 @@ def select_final(
     fallback = bool(cfg_get(cfg, "rank.fallback_to_ineligible", False)) if allow_fallback is None else allow_fallback
     available = (~_failed_prediction_rows(ranked) & ~_interface_unavailable_rows(ranked, cfg) & ~_weighted_unavailable_rows(ranked, cfg)
                  & ranked["composite_score"].notna())
+    from .developability import selection_held
+    if not ranked.empty:
+        available &= ~ranked.apply(selection_held, axis=1)
     if fallback and not ranked.empty and not available.any():
         messages = ranking_warnings(ranked, cfg)
-        _warnings.warn(messages[0] if messages else
+        _warnings.warn("v2 서열 검토 보류는 fallback 설정으로 해제되지 않습니다." if ranked.apply(selection_held, axis=1).any() else messages[0] if messages else
             "fallback_to_ineligible=true여도 실패 예측·종합점수 미평가 후보는 선별하지 않습니다.",
             RuntimeWarning, stacklevel=2)
     ranked = ranked.loc[available].copy()

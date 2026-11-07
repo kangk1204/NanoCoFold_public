@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
+import math
 
 import numpy as np
 import pandas as pd
@@ -10,14 +12,95 @@ from .utils import seq as seq_utils, shell
 from .utils.atomic import write_csv
 
 SCRIPTS_DIR = Path(__file__).resolve().parent / "scripts"
+ASSESSMENT_POLICY = "sequence_liability_screen_v2"
 
 SEVERE_RULES = {
     "free_cys",
     "glycosylation",
     "deamidation_cdr",
     "isomerization_cdr",
+    "cleavage_cdr",
     "hydrophobic_patch_cdr",
 }
+
+
+def _chemical_hits(hits: list[dict]) -> list[dict]:
+    """Classify the matched residue, including legacy/custom motif settings.
+
+    A configured pattern is a screen, not evidence that a reaction occurred.
+    Legacy defaults put DG/DS under deamidation and DP under isomerization.
+    Classify actual matches and count each site/reaction once. Keep the input
+    labels as provenance; do not edit the user's configuration.
+    """
+    unique: dict[tuple, dict] = {}
+    for raw in hits:
+        hit = dict(raw)
+        source = hit["type"]
+        motif = hit["motif"]
+        if source in {"deamidation", "isomerization", "cleavage"}:
+            if motif.startswith("N"):
+                hit["type"] = "deamidation"
+            elif motif.startswith("D"):
+                hit["type"] = "cleavage" if motif.startswith("DP") else "isomerization"
+            # Non-N/D custom matches retain their configured screen label;
+            # no reaction is inferred for them.
+            hit["chemistry_assigned"] = motif.startswith(("N", "D"))
+        key = (hit["type"], hit["pos"])
+        if key not in unique:
+            unique[key] = {**hit, "configured_types": [], "matched_motifs": []}
+        for field, value in (("configured_types", source), ("matched_motifs", motif)):
+            if value not in unique[key][field]:
+                unique[key][field].append(value)
+    return list(unique.values())
+
+
+def gate_reason(row, maximum: float) -> str | None:
+    """Read a versioned count gate without reinterpreting historical rows."""
+    raw = row.get("dev_severe")
+    try:
+        count = float(raw)
+    except (TypeError, ValueError):
+        return "developability"
+    if isinstance(raw, (bool, np.bool_)) or not math.isfinite(count) or count < 0 or not count.is_integer():
+        return "developability"
+    if str(row.get("dev_assessment_policy")) == ASSESSMENT_POLICY and str(row.get("dev_assessment_status")) == "review_required":
+        return "developability_review_required"
+    if count > maximum:
+        return ("developability_review_required" if str(row.get("dev_assessment_policy")) == ASSESSMENT_POLICY
+                else "developability")
+    return None
+
+
+def selection_held(row) -> bool:
+    """A v2 review/unassessed state cannot be bypassed by rank fallback."""
+    if str(row.get("dev_assessment_policy")) != ASSESSMENT_POLICY:
+        return False
+    if str(row.get("dev_assessment_status")) != "screen_pass":
+        return True
+    try:
+        maximum = float(row.get("dev_screen_limit"))
+    except (TypeError, ValueError):
+        return True
+    if isinstance(row.get("dev_screen_limit"), (bool, np.bool_)) or not math.isfinite(maximum) or maximum < 0:
+        return True
+    evaluated = row.get("dev_cdr_evaluated")
+    if isinstance(evaluated, str):
+        evaluated = evaluated.strip().lower() == "true"
+    elif isinstance(evaluated, (bool, np.bool_, int, float, np.integer, np.floating)):
+        evaluated = math.isfinite(float(evaluated)) and evaluated == 1
+    else:
+        evaluated = False
+    return gate_reason(row, maximum) is not None or not evaluated
+
+
+def review_only_hold(row) -> bool:
+    """Presentation only: distinguish a sole review hold from other failures."""
+    reasons = row.get("exclusion_reasons")
+    if not isinstance(reasons, list):
+        reasons = str(row.get("exclusion_reason", "")).split(";")
+    return (str(row.get("dev_assessment_policy")) == ASSESSMENT_POLICY
+            and str(row.get("dev_assessment_status")) == "review_required"
+            and set(filter(None, reasons)) == {"developability_review_required"})
 
 
 def sequence_liabilities(sequence: str, cfg: dict, cdr_ranges: dict[str, tuple[int, int]] | None = None) -> dict:
@@ -43,7 +126,9 @@ def sequence_liabilities(sequence: str, cfg: dict, cdr_ranges: dict[str, tuple[i
         cdr_positions.update(range(start, end + 1))
 
     motif_patterns = developability_patterns(cfg)
-    hits = seq_utils.find_motif_hits(sequence, motif_patterns)
+    hits = _chemical_hits(seq_utils.find_motif_hits(sequence, motif_patterns))
+    for hit in hits:
+        hit["cdr_regions"] = [name for name, (start, end) in normalized_ranges.items() if start <= hit["pos"] <= end]
     in_cdr = {name: [hit for hit in hits if hit["type"] == name and hit["pos"] in cdr_positions] for name in motif_patterns}
 
     cys_count = sequence.count("C")
@@ -60,6 +145,7 @@ def sequence_liabilities(sequence: str, cfg: dict, cdr_ranges: dict[str, tuple[i
     cdr_flags = {
         "deamidation_cdr": bool(in_cdr.get("deamidation")) if cdr_evaluated else None,
         "isomerization_cdr": bool(in_cdr.get("isomerization")) if cdr_evaluated else None,
+        "cleavage_cdr": bool(in_cdr.get("cleavage")) if cdr_evaluated else None,
         "oxidation_cdr": bool(in_cdr.get("oxidation")) if cdr_evaluated else None,
         "hydrophobic_patch_cdr": bool(cdr_patches) if cdr_evaluated else None,
     }
@@ -72,7 +158,19 @@ def sequence_liabilities(sequence: str, cfg: dict, cdr_ranges: dict[str, tuple[i
     }
     warnings = [name for name, value in flags.items() if value is True and name in SEVERE_RULES]
     unevaluated = [name for name, value in flags.items() if value is None]
+    limit = float(cfg_get(cfg, "rank.max_dev_severe", 1))
+    status = "unassessed" if not cdr_evaluated else "review_required" if len(warnings) > limit else "screen_pass"
+    window_evidence = [{"start": start, "end": end, "max_mean_kd": mean,
+                        "cdr_overlap": [name for name, (a, b) in normalized_ranges.items() if start <= b and end >= a]}
+                       for start, end, mean in patches]
     return {
+        "dev_assessment_policy": ASSESSMENT_POLICY,
+        "dev_assessment_status": status,
+        "dev_evidence_level": "sequence_screen",
+        "dev_screen_limit": limit,
+        "dev_review_required": status == "review_required",
+        "dev_motif_evidence": json.dumps(hits, ensure_ascii=False, separators=(",", ":")),
+        "dev_hydrophobic_evidence": json.dumps(window_evidence, separators=(",", ":")),
         "dev_cdr_evaluated": cdr_evaluated,
         "dev_cdr_missing_regions": ";".join(sorted(required_cdrs - valid_cdrs)),
         "dev_severe_unevaluated": sum(name in SEVERE_RULES for name in unevaluated),
