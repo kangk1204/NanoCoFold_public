@@ -253,7 +253,16 @@ The rc9 offline report viewer shows the preserved rc5 Barnase–Barstar GPU resu
 
 [Step-by-step buttons and result interpretation](docs/browser_quickstart.en.md) · [Example sequence sources and JSON](examples/tutorial/README.md) · [Analysis workflow and selection logic](docs/ANALYSIS_WORKFLOW.md)
 
-For **Design new nanobodies**, the small starter preset requests one backbone from RFantibody and one from BoltzGen, then evaluates the two candidates with four engines: **up to 8 predicted models**. This is a starter size, not an application limit. In **Run settings → Analysis size**, check the current values and adjust the backbone count and final selection limit as needed. Backbone, sequence, predicted-model and selected-candidate counts are separate. The final selection limit applies per engine in a multi-engine comparison.
+For **Design new nanobodies**, the small starter preset requests one backbone from RFantibody and one from BoltzGen. Evaluating their candidates with four engines gives **up to 8 representative models**. Check **Effective value** and **Source** in **Run settings → Analysis size** before changing the scale.
+
+| Setting | Meaning |
+|---|---|
+| Backbones | Structural frameworks requested from each generator; each can propose one or more sequences |
+| Follow-up limit | Candidate limit for the indicated evaluation stage; the model total also depends on the selected engines |
+| Seed | Random starting value, separate from candidate counts |
+| Final selection limit | Maximum selected records, applied per engine in a multi-engine comparison |
+
+Unique sequences and successful, failed or unevaluated models are counted in the results. Blank overrides keep the preset or imported values shown on screen. Large jobs ask for a size confirmation after **Run analysis**; cancelling submits no job and keeps your input.
 
 Hotspot exclusions omit tags or fusion regions from automatic site suggestions. They retain the structure and contact assessment and do not prohibit binding there. For structure input, specify intended residues in the hotspot position field. Sequence-only input selects hotspots automatically from the predicted structure. Leave exclusions blank when unnecessary. Region start/end changes the actual target segment used for analysis.
 
