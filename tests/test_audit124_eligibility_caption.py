@@ -22,7 +22,12 @@ def test_real_caption_round_trip_preserves_model_and_numeric_payload(tmp_path,ba
         page.goto(document.as_uri())
         expect(page.locator('#viewer-candidate-select')).to_have_value(row['candidate_id'])
         page.locator('#eligibility-basis').select_option(basis)
-        original=page.locator('#result-data').text_content()
+        # The viewer releases the duplicate JSON text after parsing. Verify the
+        # retained payload and the saved document rather than the freed buffer.
+        saved_document=document.read_bytes()
+        original=page.evaluate('JSON.stringify(window.NANOCOFOLD_OFFLINE)')
+        assert json.loads(original)['candidates']['rows']==payload['candidates']['rows']
+        assert page.locator('#result-data').text_content()==''
         ko_basis='실행 당시 기록 판정' if basis=='recorded' else '품질 판정 (결합 부위 제외)'
         en_basis='Assessment recorded at execution' if basis=='recorded' else 'Quality assessment (excluding hotspots)'
         en_status={True:'Eligible',False:'Ineligible',None:'Not evaluated'}[eligible]
@@ -32,7 +37,9 @@ def test_real_caption_round_trip_preserves_model_and_numeric_payload(tmp_path,ba
             expect(page.locator('#candidate-status')).to_contain_text(
                 f'{en_basis}: {en_status}' if language=='en' else f'{ko_basis}: {ko_status}')
             expect(page.locator('#viewer-candidate-select')).to_have_value(row['candidate_id'])
-            assert page.locator('#result-data').text_content()==original
+            assert page.evaluate('JSON.stringify(window.NANOCOFOLD_OFFLINE)')==original
+            assert page.locator('#result-data').text_content()==''
+        assert document.read_bytes()==saved_document
         assert json.loads(original)['candidates']['rows'][0]['final_eligible'] is eligible
         assert errors==[]
         browser.close()
