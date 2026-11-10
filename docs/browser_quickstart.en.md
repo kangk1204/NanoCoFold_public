@@ -65,7 +65,7 @@ Use **Load public example for this purpose → review input → run settings →
 | Predict protein complexes | Full sequences of the proteins to predict together | Four engines → four planned models |
 | Design new nanobodies | Full target sequence or structure | RFantibody 1 + BoltzGen 1, evaluated by four engines → up to eight models |
 | Compare existing nanobodies | Target + full VHH sequence for each candidate | Every input VHH × four engines |
-| Evaluate nanobody variants | Target + full WT VHH sequence | Prepare up to three variants; evaluate up to two plus WT with four engines → up to twelve models |
+| Evaluate nanobody variants | Target + full WT VHH sequence | Prepare up to three variants; evaluate up to two with four engines → up to eight models. Including the WT control raises this to twelve models |
 
 The small starter preset disables design generator prefilter rejection and the mature ESM score threshold. It retains ESM scoring, variant limits and final quality criteria. AntiFold is off in the variant example. Enter the full VHH sequence, including its CDRs and framework.
 

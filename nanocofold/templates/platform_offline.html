@@ -5189,6 +5189,13 @@ function renderHandoffStatus(summary) {
 
 function resultMsaCaption(summary, observations = []) {
   const missing = "MSA 출처 미기록";
+  // Completed preparation records describe actual inputs; configured defaults do not.
+  const comparison = summary.state?.phases?.comparison_msa;
+  const comparisonSource = comparison?.mode === "exact_cached_monomers" &&
+    /^[a-f0-9]{64}$/i.test(comparison.manifest_sha256 || "") &&
+    typeof comparison.manifest === "string" && comparison.manifest.startsWith("01_msa/") &&
+    ["cache", "local_mmseqs2", "public_api"].includes(comparison.provider)
+    ? comparison.provider : undefined;
   if (summary.msa_provenance?.method === "shared_parent_homologs" && observations.length &&
       observations.every(row => ["precomputed", "precomputed_unpaired"].includes(row.msa_used ?? row.msa)))
     return "사전 준비 MSA · WT 상동 서열 재사용";
@@ -5205,7 +5212,8 @@ function resultMsaCaption(summary, observations = []) {
   // a cache miss or an engine's single-sequence fallback. Do not flatten a mix.
   if (observations.length) {
     const values = new Set(observations.map(row => caption(row.msa_used ?? row.msa,
-      row.msa_source ?? (summary.mode === "complex" ? summary.conditions?.msa_source : undefined))));
+      row.msa_source ?? (summary.mode === "complex" ? summary.conditions?.msa_source :
+        row.comparison === true ? comparisonSource : undefined))));
     return values.size > 1 ? "MSA 조건 혼합 · 관측별 기록 확인" : [...values][0];
   }
   const complex = summary.mode === "complex";

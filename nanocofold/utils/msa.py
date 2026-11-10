@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import fcntl
+import json
+import os
+import shutil
+import tempfile
 import re
 from pathlib import Path
 
@@ -41,110 +46,132 @@ def ensure_a3m(
     cache_dir.mkdir(parents=True, exist_ok=True)
     target = cache_dir / f"{sequence_hash(sequence)}.a3m"
 
-    if target.exists():
-        validate_target_a3m(target, sequence)
-        return str(target), warnings
-
     if backend == "cache":
+        if target.exists():
+            validate_target_a3m(target, sequence)
+            return str(target), warnings
         warnings.append(
             f"캐시된 MSA가 없습니다: {target}. 서열만 입력으로 단일서열 모드(msa=empty)로 진행합니다. "
             "정확도를 높이려면 structure.msa.backend=colabfold_search 로 MSA를 먼저 생성하세요."
         )
         return empty_msa_token(), warnings
+    if backend not in {"mmseqs", "colabfold_search"}:
+        raise ValueError(f"지원하지 않는 MSA backend: {backend}. 허용값: cache, mmseqs, colabfold_search, empty.")
+    return _search_a3m(sequence, msa_cfg, cache_dir, warnings)
 
-    if backend == "empty":
+
+def _digest(path):
+    value = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            value.update(chunk)
+    return value.hexdigest()
+
+
+def _search_identity(sequence, cfg):
+    """Search reuse requires a declared DB revision, not merely a query match.
+
+    Without a DB manifest, each search gets a new workspace. Explicit legacy
+    ``backend=cache`` remains available and never rewrites the supplied cache.
+    """
+    backend = cfg["backend"]
+    command = str(cfg.get("mmseqs_binary" if backend == "mmseqs" else "colabfold_search") or "")
+    executable = shutil.which(command)
+    if executable is None and Path(command).is_file():
+        executable = str(Path(command).resolve())
+    manifest = cfg.get("database_manifest")
+    manifest_path = Path(manifest) if manifest else None
+    if manifest_path and not manifest_path.is_absolute():
+        manifest_path = PROJECT_ROOT / manifest_path
+    database = Path(str(cfg.get("db") or ""))
+    if not database.is_absolute():
+        database = PROJECT_ROOT / database
+    return {"schema_version": 1, "query_sha256": hashlib.sha256(sequence.encode()).hexdigest(),
+            "backend": backend, "database": str(database.resolve()),
+            "database_manifest_sha256": _digest(manifest_path) if manifest_path else None,
+            "executable": str(Path(executable).resolve()) if executable else command,
+            "executable_sha256": _digest(executable) if executable else None,
+            "threads": int(cfg.get("threads", 8)), "sensitivity": cfg.get("sensitivity", 5.7),
+            "max_seqs": int(cfg.get("max_seqs", 300)), "adapter_sha256": _digest(__file__)}
+
+
+def _search_a3m(sequence, cfg, cache_dir, warnings):
+    from .atomic import write_json, write_bytes, check_output
+    backend = cfg["backend"]
+    binary = cfg.get("mmseqs_binary" if backend == "mmseqs" else "colabfold_search")
+    if not binary or (backend == "mmseqs" and not Path(str(binary)).is_file() and not shutil.which(str(binary))):
+        warnings.append("structure.msa.mmseqs_binary 가 없어 msa=empty 로 진행합니다 (tools/mmseqs)." if backend == "mmseqs"
+                        else "structure.msa.colabfold_search 경로가 지정되지 않아 msa=empty 로 진행합니다.")
         return empty_msa_token(), warnings
-
-    if backend == "mmseqs":
-        return _ensure_a3m_mmseqs(sequence, target, msa_cfg, warnings)
-
-    if backend == "colabfold_search":
-        executable = (msa_cfg or {}).get("colabfold_search")
-        if not executable:
-            warnings.append("structure.msa.colabfold_search 경로가 지정되지 않아 msa=empty 로 진행합니다.")
-            return empty_msa_token(), warnings
-        db = (msa_cfg or {}).get("db")
-        if not db:
-            warnings.append("structure.msa.db(UniRef30)가 지정되지 않아 msa=empty 로 진행합니다.")
-            return empty_msa_token(), warnings
-        fasta = cache_dir / f"{sequence_hash(sequence)}.fasta"
-        seq_utils.write_fasta({"query": seq_utils.clean_sequence(sequence)}, fasta)
-        argv = [executable, "--db-load-mode", "2", "-s", "0.5", str(fasta), str(db), str(cache_dir)]
+    if not cfg.get("db"):
+        warnings.append("structure.msa.db (예: data/msa_db/uniref50_db)가 없어 msa=empty 로 진행합니다." if backend == "mmseqs"
+                        else "structure.msa.db(UniRef30)가 지정되지 않아 msa=empty 로 진행합니다.")
+        return empty_msa_token(), warnings
+    sequence = seq_utils.clean_sequence(sequence)
+    identity = _search_identity(sequence, cfg)
+    key = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+    root = cache_dir / "searches" / key
+    check_output(root / "latest.json", cache_dir)
+    root.mkdir(parents=True, exist_ok=True)
+    # Serialize only the same search request; completed/failed attempts are retained.
+    lock_path = root / ".lock"
+    check_output(lock_path, cache_dir)
+    with os.fdopen(os.open(lock_path, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600), "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        reusable = bool(identity["database_manifest_sha256"] and identity["executable_sha256"])
+        if reusable:
+            try:
+                saved = json.loads((root / "latest.json").read_text())
+                result = root / saved["result"]
+                if (saved["identity"] == identity and result.resolve().is_relative_to(root.resolve())
+                        and not result.is_symlink() and _digest(result) == saved["sha256"]):
+                    validate_target_a3m(result, sequence)
+                    return str(result), warnings
+            except (OSError, ValueError, KeyError, TypeError):
+                pass
+        work = Path(tempfile.mkdtemp(prefix="attempt-", dir=root))
+        fasta = work / "query.fasta"
+        seq_utils.write_fasta({"query": sequence}, fasta)
+        write_json(work / "request.json", {"identity": identity, "reusable": reusable})
+        database = identity["database"]
+        if backend == "colabfold_search":
+            output = work / "output"
+            output.mkdir()
+            commands = [[str(binary), "--db-load-mode", "2", "-s", str(identity["sensitivity"]),
+                         "--threads", str(identity["threads"]), str(fasta), database, str(output)]]
+            # ColabFold names this from the FASTA header, not the input filename.
+            produced = output / "query.a3m"
+        else:
+            qdb, alndb, msa_db, unpacked = (work / name for name in ("qdb", "alndb", "msaDB", "unpacked"))
+            commands = [
+                [str(binary), "createdb", str(fasta), str(qdb), "-v", "0"],
+                [str(binary), "search", str(qdb), database, str(alndb), str(work / "tmp"),
+                 "--alignment-mode", "3", "--threads", str(identity["threads"]),
+                 "-s", str(identity["sensitivity"]), "--max-seqs", str(identity["max_seqs"]), "-v", "0"],
+                [str(binary), "result2msa", str(qdb), database, str(alndb), str(msa_db), "--msa-format-mode", "6", "-v", "0"],
+                [str(binary), "unpackdb", str(msa_db), str(unpacked), "--unpack-suffix", ".a3m", "-v", "0"],
+            ]
+            produced = unpacked / "0.a3m"
         try:
-            shell.run(argv, log_path=cache_dir / f"{sequence_hash(sequence)}.msa.log")
+            for argv in commands:
+                shell.run(argv, log_path=work / "search.log")
         except shell.ToolError as exc:
-            warnings.append(f"ColabFold search 실패 → msa=empty 로 진행: {exc}")
+            warnings.append(f"ColabFold search 실패 → msa=empty 로 진행: {exc}" if backend == "colabfold_search"
+                            else f"MMseqs MSA 생성 실패 → msa=empty 로 진행: {exc}")
             return empty_msa_token(), warnings
-        produced = sorted(cache_dir.glob(f"{sequence_hash(sequence)}*.a3m"))
-        if not produced:
-            warnings.append("ColabFold search 결과 a3m을 찾지 못해 msa=empty 로 진행합니다.")
+        if not produced.is_file():
+            warnings.append("ColabFold search 결과 a3m을 찾지 못해 msa=empty 로 진행합니다." if backend == "colabfold_search"
+                            else "MMseqs 결과 a3m을 찾지 못해 msa=empty 로 진행합니다.")
             return empty_msa_token(), warnings
-        validate_target_a3m(produced[0], sequence)
-        produced[0].rename(target)
-        return str(target), warnings
-
-    raise ValueError(f"지원하지 않는 MSA backend: {backend}. 허용값: cache, mmseqs, colabfold_search, empty.")
-
-
-def _ensure_a3m_mmseqs(
-    sequence: str,
-    target: Path,
-    msa_cfg: dict,
-    warnings: list[str],
-) -> tuple[str, list[str]]:
-    """MMseqs2(GPL) 로컬 DB 검색으로 a3m을 생성한다 (상업적 이용 안전, 네트워크 불필요)."""
-    binary = (msa_cfg or {}).get("mmseqs_binary")
-    db = (msa_cfg or {}).get("db")
-    if not binary or not Path(str(binary)).exists():
-        warnings.append("structure.msa.mmseqs_binary 가 없어 msa=empty 로 진행합니다 (tools/mmseqs).")
-        return empty_msa_token(), warnings
-    if not db:
-        warnings.append("structure.msa.db (예: data/msa_db/uniref50_db)가 없어 msa=empty 로 진행합니다.")
-        return empty_msa_token(), warnings
-
-    work_dir = target.parent / f"{target.stem}_mmseqs"
-    unpacked = work_dir / "unpacked"
-    if unpacked.exists():
-        existing = sorted(unpacked.glob("*.a3m"))
-        if existing:
-            validate_target_a3m(existing[0], sequence)
-            return str(existing[0]), warnings
-
-    work_dir.mkdir(parents=True, exist_ok=True)
-    query_fasta = work_dir / "query.fasta"
-    seq_utils.write_fasta({"query": seq_utils.clean_sequence(sequence)}, query_fasta)
-    qdb = work_dir / "qdb"
-    alndb = work_dir / "alndb"
-    msa_db = work_dir / "msaDB"
-    tmp_dir = work_dir / "tmp"
-    threads = str(int((msa_cfg or {}).get("threads", 8)))
-    sensitivity = str((msa_cfg or {}).get("sensitivity", 5.7))
-    max_seqs = str(int((msa_cfg or {}).get("max_seqs", 300)))
-    log_path = work_dir / "mmseqs.log"
-
-    commands = [
-        [str(binary), "createdb", str(query_fasta), str(qdb), "-v", "0"],
-        [str(binary), "search", str(qdb), str(db), str(alndb), str(tmp_dir),
-         "--alignment-mode", "3", "--threads", threads,
-         "-s", sensitivity, "--max-seqs", max_seqs, "-v", "0"],
-        [str(binary), "result2msa", str(qdb), str(db), str(alndb), str(msa_db),
-         "--msa-format-mode", "6", "-v", "0"],
-        [str(binary), "unpackdb", str(msa_db), str(unpacked), "--unpack-suffix", ".a3m", "-v", "0"],
-    ]
-    try:
-        for argv in commands:
-            shell.run(argv, log_path=log_path)
-    except shell.ToolError as exc:
-        warnings.append(f"MMseqs MSA 생성 실패 → msa=empty 로 진행: {exc}")
-        return empty_msa_token(), warnings
-
-    produced = sorted(unpacked.glob("*.a3m"))
-    if not produced:
-        warnings.append("MMseqs 결과 a3m을 찾지 못해 msa=empty 로 진행합니다.")
-        return empty_msa_token(), warnings
-    validate_target_a3m(produced[0], sequence)
-    produced[0].rename(target)
-    return str(target), warnings
+        validate_target_a3m(produced, sequence)
+        if identity != _search_identity(sequence, cfg):
+            raise ValueError("MSA 검색 중 입력이 변경되었습니다. 새 분석으로 제출하세요. / MSA search inputs changed during execution; submit a new analysis.")
+        result = work / "alignment.a3m"
+        write_bytes(result, produced.read_bytes(), root=root)
+        receipt = {"identity": identity, "reusable": reusable, "result": str(result.relative_to(root)), "sha256": _digest(result)}
+        write_json(work / "receipt.json", receipt, root=root)
+        write_json(root / "latest.json", receipt, root=root)
+        return str(result), warnings
 
 
 def validate_target_a3m(path: str | Path, sequence: str) -> None:

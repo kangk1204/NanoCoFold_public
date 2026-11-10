@@ -36,3 +36,19 @@ test('actual model MSA overrides defaults without changing saved records',()=>{
 test('legacy explicit Boltz empty backend never inherits unused ColabFold cache',()=>{
  assert.equal(c.resultMsaCaption({mode:'mature',config:{screen:{engine:'boltz2',colabfold:{msa_source:'cache'}},structure:{msa:{backend:'empty'}}}}),'MSA 없음 · 서열만 사용');
 });
+test('completed comparison receipt supplies the actual MSA source in both languages',()=>{
+ const phase={mode:'exact_cached_monomers',provider:'cache',manifest:'01_msa/comparison/manifest.json',manifest_sha256:'a'.repeat(64)};
+ const summary={mode:'screen',state:{phases:{comparison_msa:phase}},config:{screen:{colabfold:{msa_source:'public_api'}}}};
+ for(const msa_used of ['precomputed','chai1_local_msa','precomputed_unpaired']){
+  assert.equal(c.resultMsaCaption(summary,[{comparison:true,msa_used}]),'로컬·캐시 MSA 실행');
+  c.I18N.setLanguage('en',{persist:false});
+  assert.equal(c.I18N.value(c.I18N.term(c.resultMsaCaption(summary,[{comparison:true,msa_used}]))),'Local / cached MSA run');
+  c.I18N.setLanguage('ko',{persist:false});
+ }
+ assert.equal(c.resultMsaCaption(summary,[{comparison:true,msa:'empty'}]),'MSA 없음 · 서열만 사용');
+ assert.equal(c.resultMsaCaption(summary,[{comparison:true,msa:'precomputed',msa_source:'unrecognized'}]),'사전 준비 MSA · 출처 미기록');
+ assert.equal(c.resultMsaCaption(summary,[{msa:'precomputed'}]),'사전 준비 MSA · 출처 미기록');
+ assert.equal(c.resultMsaCaption(summary,[{comparison:true,msa:'empty'},{comparison:true,msa:'precomputed'}]),'MSA 조건 혼합 · 관측별 기록 확인');
+ phase.manifest_sha256='invalid';
+ assert.equal(c.resultMsaCaption(summary,[{comparison:true,msa:'precomputed'}]),'사전 준비 MSA · 출처 미기록');
+});
