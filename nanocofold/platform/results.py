@@ -1479,8 +1479,9 @@ class ResultReader:
     @staticmethod
     def _offline_document(payload, assets=None):
         from ..report import _resolve_viewer_asset
+        from .offline_assets import compact_payload
         template = Path(__file__).resolve().parents[1] / "templates/platform_offline.html"
-        encoded = json.dumps(native(payload), ensure_ascii=False, allow_nan=False).replace("<", "\\u003c").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
+        encoded = json.dumps(compact_payload(native(payload)), ensure_ascii=False, allow_nan=False, separators=(",", ":")).replace("<", "\\u003c").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
         if not template.exists():
             return _offline_fallback(encoded).encode()
         document = template.read_text()

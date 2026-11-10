@@ -63,3 +63,33 @@ test('raw binding-site captions retain provenance and corrupt PAE has a bilingua
  assert.notEqual(i.value(caption),i.value(i.term('지정 결합 부위 충족')));
  i.setLanguage('en',{persist:false});assert.equal(i.value(caption),'Recorded binding-site decision');
 });
+
+test('partial-coordinate warning translates all counts and reverses without rewriting the record',()=>{
+ const i=i18n(),raw='입력 서열의 95.8%만 제공 구조에 대응합니다 (205/214잔기). 나머지 9잔기는 제공 좌표로 평가하지 못합니다. 결손·부분 구조를 확인하세요. 전체 입력 서열은 보존합니다.';
+ const message=i.term(raw); assert.match(i.value(message),/covers 95.8%.*205\/214.*remaining 9/);
+ i.setLanguage('ko',{persist:false});assert.equal(i.value(message),raw);
+});
+
+test('shuffled PAE restores exact float64 bytes including non-float32 values',async()=>{
+ const p=packed([0,.12345678912345678,30,1.23456789012345]),raw=Buffer.alloc(32);
+ [0,.12345678912345678,30,1.23456789012345].forEach((v,i)=>raw.writeDoubleLE(v,i*8));
+ const shuffled=Buffer.alloc(32);for(let lane=0;lane<8;lane++)for(let i=0;i<4;i++)shuffled[lane*4+i]=raw[i*8+lane];
+ p.record.encoding='gzip-base64-shuffled-float64le';p.record.data=gzipSync(shuffled).toString('base64');
+ const c=decoder(),rows=await c.offlinePaeValues({values_ref:p.sha,labels:['A:1','B:1']},{pae_arrays:{[p.sha]:p.record}});
+ assert.equal(JSON.stringify(rows),'[[0,0.12345678912345678],[30,1.23456789012345]]');
+});
+
+test('structure assets preserve coordinates and selection identity; corrupt assets fail closed',async()=>{
+ const c={window:{},atob,Blob,DecompressionStream,TextDecoder,crypto:webcrypto};vm.createContext(c);
+ vm.runInContext(source.slice(source.indexOf('const offlineStructureCache ='),source.indexOf('function setPaeErrorStatus')),c);
+ const body={content:'ATOM /home/native\n',raw_content_ref:'content',format:'pdb',seed:42,pae:{values_ref:'p'}};
+ const raw=Buffer.from(JSON.stringify(body)),sha=createHash('sha256').update(raw).digest('hex');
+ const record={encoding:'gzip-base64-json',bytes:raw.length,sha256:sha,data:gzipSync(raw).toString('base64')};
+ const payload={structure_assets:{[sha]:record}},binding={candidate_id:'first',observation_id:'s42',structure_ref:sha};
+ const a=await c.offlineStructure(binding,payload),b=await c.offlineStructure({...binding,candidate_id:'second'},payload);
+ assert.equal(a.candidate_id,'first');assert.equal(b.candidate_id,'second');assert.equal(a.raw_content,body.content);
+ a.pae.values=[[1]];assert.equal(b.pae.values,undefined);assert.equal(payload.structure_assets[sha].data,record.data);
+ const bad=structuredClone(payload);bad.structure_assets[sha].sha256='0'.repeat(64);
+ await assert.rejects(c.offlineStructure(binding,bad),/해시/);
+ const legacy={candidate_id:'legacy',content:'saved'};assert.strictEqual(await c.offlineStructure(legacy),legacy);
+});

@@ -189,9 +189,9 @@ def verified_reference(reader):
     raise FileNotFoundError("보존된 좌표가 없습니다. FASTA 입력에는 실험 좌표가 제공되지 않습니다.")
 
 
-def reference_overlay(reader, target, mapping):
+def reference_overlay(reader, target, mapping, *, verified=None):
     try:
-        path, provenance = verified_reference(reader)
+        path, provenance = verified if verified is not None else verified_reference(reader)
         reference = pdb_io.load_structure(path)
         review = reader._json("input_review.json")
         chains = review.get("chains", [])

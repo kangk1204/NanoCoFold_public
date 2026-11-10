@@ -45,6 +45,7 @@ def _presentation_data_identity(content):
         payload = json.loads(match[1])
         exact = {key: payload[key] for key in ("candidates", "observations", "structures")}
         exact["pae_arrays"] = payload.get("pae_arrays", {})
+        exact["structure_assets"] = payload.get("structure_assets", {})
         summary = copy.deepcopy(payload["summary"])
         for key in ("report_artifact", "delivery_artifact", "source_report_status", "source_delivery_status"):
             summary.pop(key, None)

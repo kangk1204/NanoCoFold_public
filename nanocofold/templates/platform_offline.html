@@ -730,7 +730,7 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
                   >충돌</label
                 >
                 <label class="check"><input type="checkbox" data-layer="cdr" >CDR</label>
-                <label class="check"><input type="checkbox" data-layer="reference" >입력 좌표 중첩</label>
+                <label class="check"><input type="checkbox" data-layer="reference" >참조 구조</label>
               </div>
               <div id="structure-actions" role="group" class="inline" aria-label="제외 사유 구조 탐색"></div>
               <div id="cdr-actions" class="inline"></div>
@@ -843,7 +843,7 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
           </details>
           <details><summary>파일 해시·출처 원문</summary><pre id="result-provenance"></pre></details>
         </div>
-      </section></main><script id="result-data" type="application/json">__RESULT_DATA__</script><script>window.NANOCOFOLD_OFFLINE=JSON.parse(document.getElementById("result-data").textContent);</script><script>__PLOTLY_JS__</script><script>__3DMOL_JS__</script><script>__MOLSTAR_JS__</script><script>/* Mol* 5.12.0, local assets and saved coordinates only. */
+      </section></main><script id="result-data" type="application/json">__RESULT_DATA__</script><script>window.NANOCOFOLD_OFFLINE=JSON.parse(document.getElementById("result-data").textContent);document.getElementById("result-data").textContent="";</script><script>__PLOTLY_JS__</script><script>__3DMOL_JS__</script><script>__MOLSTAR_JS__</script><script>/* Mol* 5.12.0, local assets and saved coordinates only. */
 "use strict";
 window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
   static async create(host, data, onPick, onProgress = () => {}) {
@@ -1195,6 +1195,19 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "보존된 입력 표적·파트너 좌표를 표적 Cα로 강체 정렬합니다. 실험 B-factor를 pLDDT로 해석하지 않습니다.": "Saved target and partner coordinates are aligned on target Cα atoms. Experimental B-factors are not treated as pLDDT.",
+  "WT 참조 비교: 표적 Cα {0}개 · RMSD {1} Å. 예측 입력이나 선별 기준으로 사용하지 않았습니다.": "WT reference comparison: {0} target Cα atoms · RMSD {1} Å. Not used as a prediction input or selection criterion.",
+  "참조 구조": "Reference structure",
+  "입력 서열의 {0}%만 제공 구조에 대응합니다 ({1}/{2}잔기). 나머지 {3}잔기는 제공 좌표로 평가하지 못합니다. 결손·부분 구조를 확인하세요. 전체 입력 서열은 보존합니다.": "The supplied structure covers {0}% of the input sequence ({1}/{2} residues). The remaining {3} residues have no supplied coordinates. Check the missing regions. The full input sequence is retained.",
+  "압축 구조 자료의 크기 또는 해시가 올바르지 않습니다.": "The compressed structure has an invalid size or hash.",
+  "압축 구조 보기는 최신 Chrome·Edge·Firefox에서 지원합니다.": "Use a current version of Chrome, Edge or Firefox to view compressed structures.",
+  "사전 준비 MSA · WT 상동 서열 재사용": "Precomputed MSA · Shared WT homologs",
+  "MSA 출처": "MSA provenance",
+  "공개 표적·WT 서열로 확보한 MSA를 사용했습니다. 변이별 첫 서열만 바꾸고 WT 상동 서열은 유지했습니다. 변이별 독립 검색은 하지 않았습니다.": "MSAs were obtained for the public target and WT sequences. Each variant replaces the first query sequence while retaining the WT homologs. Variants were not searched independently.",
+  "WT 참조 구조: {0}. 구조 화면에서 ‘참조 구조’를 켜면 표적에 정렬해 비교합니다. 예측 입력이나 선별 기준으로 사용하지 않았습니다.": "WT reference: {0}. Enable Reference structure in the structure viewer to compare after target alignment. It was not used as a prediction input or selection criterion.",
+  "보고서 출처 보완": "Report provenance update",
+  "기존 계산 결과에 MSA 출처와 WT 참조 구조를 연결한 사본입니다. 점수·순위·선별 판정은 그대로입니다.": "This copy links MSA provenance and the WT reference to the saved results. Scores, ranks and selection decisions are unchanged.",
+
   "검토 보류": "Held for review",
   "v2 서열 검토 보류는 fallback 설정으로 해제되지 않습니다.": "Fallback does not override v2 sequence review holds.",
   "서열 검토 항목 수": "Sequence review count",
@@ -5176,6 +5189,9 @@ function renderHandoffStatus(summary) {
 
 function resultMsaCaption(summary, observations = []) {
   const missing = "MSA 출처 미기록";
+  if (summary.msa_provenance?.method === "shared_parent_homologs" && observations.length &&
+      observations.every(row => ["precomputed", "precomputed_unpaired"].includes(row.msa_used ?? row.msa)))
+    return "사전 준비 MSA · WT 상동 서열 재사용";
   const caption = (mode, source) => {
     if (["empty", "single", "chai1_single", "chai1_single_fallback"].includes(mode)) return "MSA 없음 · 서열만 사용";
     if (mode === "partial_precomputed") return "일부 체인에 사전 준비 MSA 사용";
@@ -5286,6 +5302,16 @@ async function loadResult(id) {
   const counts = reportModelCounts(state.rows, summary.mode, summary.config);
   const msaCaption = resultMsaCaption(summary, observations);
   $("result-input").replaceChildren(el("p", I18N.format("실행: {0} · 모드: {1} · {2}", [(summary.name || summary.id ? (summary.name ? summary.name : summary.id) : I18N.term("미기록")), (summary.mode ? summary.mode : I18N.term("미기록")), I18N.term(msaCaption)])));
+  if (summary.msa_provenance) {
+    const evidence = el("details"); evidence.id = "msa-provenance";
+    evidence.append(el("summary", I18N.term("MSA 출처")));
+    if (summary.msa_provenance.method === "shared_parent_homologs")
+      evidence.append(el("p", I18N.term("공개 표적·WT 서열로 확보한 MSA를 사용했습니다. 변이별 첫 서열만 바꾸고 WT 상동 서열은 유지했습니다. 변이별 독립 검색은 하지 않았습니다.")));
+    evidence.append(el("pre", JSON.stringify(summary.msa_provenance, null, 2)));
+    $("result-input").append(evidence);
+  }
+  if (summary.reference_provenance?.role === "comparison_only")
+    $("result-input").append(el("p", I18N.format("WT 참조 구조: {0}. 구조 화면에서 ‘참조 구조’를 켜면 표적에 정렬해 비교합니다. 예측 입력이나 선별 기준으로 사용하지 않았습니다.", [summary.reference_provenance.source_id || I18N.term("미기록")])));
   const mockNotice = mockZeroSelectionNotice(summary, state.rows);
   if (mockNotice) $("result-input").prepend(mockNotice);
   I18N.text($("result-input-config"), JSON.stringify(summary.assessment
@@ -5923,7 +5949,7 @@ async function offlinePaeValues(pae, payload = window.NANOCOFOLD_OFFLINE) {
   const reference = pae.values_ref, record = payload?.pae_arrays?.[reference];
   const dimension = record?.dimension, expected = dimension * dimension * 8;
   if (!/^[a-f0-9]{64}$/.test(reference || "") || !record || record.sha256 !== reference ||
-      record.encoding !== "gzip-base64-float64le" || !Number.isSafeInteger(dimension) || dimension < 1 ||
+      !["gzip-base64-float64le", "gzip-base64-shuffled-float64le"].includes(record.encoding) || !Number.isSafeInteger(dimension) || dimension < 1 ||
       !Number.isSafeInteger(expected) || record.bytes !== expected ||
       !Array.isArray(pae.labels) || pae.labels.length !== dimension)
     throw Error("PAE 압축 데이터를 읽지 못했습니다. 표와 구조는 계속 확인할 수 있습니다.");
@@ -5950,6 +5976,11 @@ async function offlinePaeValues(pae, payload = window.NANOCOFOLD_OFFLINE) {
       if (total !== expected) throw Error("Truncated PAE array");
       const bytes = new Uint8Array(expected); let offset = 0;
       for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+      if (record.encoding === "gzip-base64-shuffled-float64le") {
+        const shuffled = bytes.slice(), count = expected / 8;
+        for (let lane = 0; lane < 8; lane++)
+          for (let index = 0; index < count; index++) bytes[index * 8 + lane] = shuffled[lane * count + index];
+      }
       const digest = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), value => value.toString(16).padStart(2,"0")).join("");
       if (digest !== reference) throw Error("PAE array hash mismatch");
       const view = new DataView(bytes.buffer), rows = [];
@@ -5973,6 +6004,47 @@ async function offlinePaeValues(pae, payload = window.NANOCOFOLD_OFFLINE) {
     offlinePaeCache.delete(reference);
     throw Error("PAE 압축 데이터를 읽지 못했습니다. 표와 구조는 계속 확인할 수 있습니다.", {cause:error});
   }
+}
+
+const offlineStructureCache = new Map();
+async function offlineStructure(binding, payload = window.NANOCOFOLD_OFFLINE) {
+  if (!binding?.structure_ref) return binding;
+  const reference = binding.structure_ref, record = payload?.structure_assets?.[reference];
+  if (!/^[a-f0-9]{64}$/.test(reference) || record?.sha256 !== reference || record.encoding !== "gzip-base64-json" ||
+      !Number.isSafeInteger(record.bytes) || record.bytes < 2 || record.bytes > 128 * 1024 * 1024 ||
+      typeof record.data !== "string" || record.data.length > Math.ceil((record.bytes + 65536) * 4 / 3))
+    throw Error("압축 구조 자료의 크기 또는 해시가 올바르지 않습니다.");
+  if (!offlineStructureCache.has(reference)) {
+    const pending = (async () => {
+      if (typeof DecompressionStream !== "function" || !globalThis.crypto?.subtle)
+        throw Error("압축 구조 보기는 최신 Chrome·Edge·Firefox에서 지원합니다.");
+      const compressed = Uint8Array.from(atob(record.data), value => value.charCodeAt(0));
+      const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip")).getReader();
+      const bytes = new Uint8Array(record.bytes); let total = 0;
+      try {
+        for (;;) {
+          const {value, done} = await stream.read(); if (done) break;
+          if (total + value.byteLength > bytes.length) throw Error("압축 구조 자료의 크기 또는 해시가 올바르지 않습니다.");
+          bytes.set(value, total); total += value.byteLength;
+        }
+      } catch (error) { await stream.cancel().catch(() => {}); throw error; }
+      finally { stream.releaseLock(); }
+      const digest = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)), value => value.toString(16).padStart(2,"0")).join("");
+      if (total !== bytes.length || digest !== reference) throw Error("압축 구조 자료의 크기 또는 해시가 올바르지 않습니다.");
+      const body = JSON.parse(new TextDecoder("utf-8", {fatal:true}).decode(bytes));
+      if (!body || typeof body.content !== "string" || !["pdb", "cif"].includes(body.format))
+        throw Error("압축 구조 자료의 크기 또는 해시가 올바르지 않습니다.");
+      if (body.raw_content_ref === "content") { body.raw_content = body.content; delete body.raw_content_ref; }
+      return body;
+    })();
+    offlineStructureCache.set(reference, pending);
+    while (offlineStructureCache.size > 2) offlineStructureCache.delete(offlineStructureCache.keys().next().value);
+  }
+  try {
+    const body = await offlineStructureCache.get(reference);
+    return {...body, ...binding,
+      pae:body.pae ? {...body.pae} : body.pae};
+  } catch (error) { offlineStructureCache.delete(reference); throw error; }
 }
 
 function setPaeErrorStatus(error = null) {
@@ -6010,11 +6082,11 @@ async function loadStructure() {
     request = ++state.structureRequest;
   try {
     const loaded = offline
-      ? (window.NANOCOFOLD_OFFLINE.structures || []).find(
+      ? await offlineStructure((window.NANOCOFOLD_OFFLINE.structures || []).find(
           (s) =>
             s.candidate_id === id &&
             (!observation || s.observation_id === observation),
-        )
+        ))
       : await api(
           `/api/results/${state.result.id}/structure?candidate_id=${encodeURIComponent(id)}${observation ? "&observation_id=" + encodeURIComponent(observation) : ""}`,
         );
@@ -6229,7 +6301,7 @@ async function renderStructure() {
   const reference = data.reference;
   const toggle = document.querySelector('[data-layer="reference"]');
   toggle.disabled = !reference?.available;
-  I18N.text($("reference-note"), reference?.available ? I18N.format("입력 좌표 중첩: 표적 Cα {0}개 · RMSD {1} Å. {2}", [reference.matched_ca, reference.rmsd.toFixed(2), (reference.note ? reference.note : "")]) : I18N.format("입력 좌표 중첩 미평가: {0}", [I18N.term(reference?.reason || "보존된 참조 좌표 없음")]));
+  I18N.text($("reference-note"), reference?.available ? I18N.format(reference.role === "comparison_only" ? "WT 참조 비교: 표적 Cα {0}개 · RMSD {1} Å. 예측 입력이나 선별 기준으로 사용하지 않았습니다." : "입력 좌표 중첩: 표적 Cα {0}개 · RMSD {1} Å. {2}", [reference.matched_ca, reference.rmsd.toFixed(2), I18N.term(reference.note || "")]) : I18N.format("입력 좌표 중첩 미평가: {0}", [I18N.term(reference?.reason || "보존된 참조 좌표 없음")]));
   const actions = $("structure-actions"); actions.replaceChildren();
   if (data.clashes?.length)
     actions.append(focusButton(`충돌 잔기쌍 · ${data.clashes.length}쌍 보기`, data.clashes.flatMap(p => [p.a, p.b])));

@@ -44,6 +44,19 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "보존된 입력 표적·파트너 좌표를 표적 Cα로 강체 정렬합니다. 실험 B-factor를 pLDDT로 해석하지 않습니다.": "Saved target and partner coordinates are aligned on target Cα atoms. Experimental B-factors are not treated as pLDDT.",
+  "WT 참조 비교: 표적 Cα {0}개 · RMSD {1} Å. 예측 입력이나 선별 기준으로 사용하지 않았습니다.": "WT reference comparison: {0} target Cα atoms · RMSD {1} Å. Not used as a prediction input or selection criterion.",
+  "참조 구조": "Reference structure",
+  "입력 서열의 {0}%만 제공 구조에 대응합니다 ({1}/{2}잔기). 나머지 {3}잔기는 제공 좌표로 평가하지 못합니다. 결손·부분 구조를 확인하세요. 전체 입력 서열은 보존합니다.": "The supplied structure covers {0}% of the input sequence ({1}/{2} residues). The remaining {3} residues have no supplied coordinates. Check the missing regions. The full input sequence is retained.",
+  "압축 구조 자료의 크기 또는 해시가 올바르지 않습니다.": "The compressed structure has an invalid size or hash.",
+  "압축 구조 보기는 최신 Chrome·Edge·Firefox에서 지원합니다.": "Use a current version of Chrome, Edge or Firefox to view compressed structures.",
+  "사전 준비 MSA · WT 상동 서열 재사용": "Precomputed MSA · Shared WT homologs",
+  "MSA 출처": "MSA provenance",
+  "공개 표적·WT 서열로 확보한 MSA를 사용했습니다. 변이별 첫 서열만 바꾸고 WT 상동 서열은 유지했습니다. 변이별 독립 검색은 하지 않았습니다.": "MSAs were obtained for the public target and WT sequences. Each variant replaces the first query sequence while retaining the WT homologs. Variants were not searched independently.",
+  "WT 참조 구조: {0}. 구조 화면에서 ‘참조 구조’를 켜면 표적에 정렬해 비교합니다. 예측 입력이나 선별 기준으로 사용하지 않았습니다.": "WT reference: {0}. Enable Reference structure in the structure viewer to compare after target alignment. It was not used as a prediction input or selection criterion.",
+  "보고서 출처 보완": "Report provenance update",
+  "기존 계산 결과에 MSA 출처와 WT 참조 구조를 연결한 사본입니다. 점수·순위·선별 판정은 그대로입니다.": "This copy links MSA provenance and the WT reference to the saved results. Scores, ranks and selection decisions are unchanged.",
+
   "검토 보류": "Held for review",
   "v2 서열 검토 보류는 fallback 설정으로 해제되지 않습니다.": "Fallback does not override v2 sequence review holds.",
   "서열 검토 항목 수": "Sequence review count",
