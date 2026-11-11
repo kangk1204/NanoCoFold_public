@@ -6,7 +6,7 @@
 
 **Already installed?** Follow the [update guide](docs/UPDATE.en.md). Keep the original workspace and run `bash update.sh` after obtaining the new source.
 
-**Source version:** this README describes the source build above. GitHub’s **Latest release** may be older than `main`; install the commit or tag shared with you and keep its own README. [Record the source and installed versions](docs/collaborator-guide.en.md#6-record-the-handoff).
+**Which source should I download?** Use **Code → Download ZIP** on `main` or on the commit page your collaborator shared. The older `v0.4.8rc12` release has the same version number but lacks the CDR3 range controls. [Record the source version](docs/collaborator-guide.en.md#6-record-the-handoff).
 
 Predict protein complexes, design new nanobodies, and compare existing candidates or variants. Explore candidate tables, 3D structures, PAE, and shareable HTML reports.
 
@@ -22,7 +22,8 @@ Predict protein complexes, design new nanobodies, and compare existing candidate
 |---|---|
 | Install on a new Ubuntu GPU computer | [1. Prepare and install](#1-prepare-and-install) |
 | Use a computer/server where NanoCoFold is already installed | [2. Open the browser](#2-open-the-browser), then [3. Try the example](#3-try-the-first-public-example) |
-| Read a report someone sent you | Extract the **whole Shareable report ZIP** and double-click **report.html**. No installation or GPU is needed. |
+| Evaluate 100 variants of an existing nanobody | [Set the CDR3 region, substitutions and WT control](#example-evaluate-100-cdr3-variants) |
+| Read a report someone sent you | Extract the whole **result ZIP**. Open **START_HERE.html** if present; otherwise open **report.html**. No installation or GPU is needed. |
 
 **Environment check → prepare input → review settings → run once → Open results.**
 
@@ -147,7 +148,7 @@ ssh -o ExitOnForwardFailure=yes -L 18766:127.0.0.1:18765 USER@SERVER
 
 ### Update an existing installation
 
-When no job is queued or running, stop the web server with **Ctrl+C** in its terminal. In the original source folder, run:
+When no job is queued or running, stop the web server with **Ctrl+C**. **Installed from a ZIP?** Follow the [ZIP update instructions](docs/UPDATE.en.md#2-get-the-source). **Installed with Git on `main`?** Run these commands in the original source folder:
 
 ```bash
 git pull --ff-only
@@ -155,7 +156,7 @@ bash update.sh
 bash start.sh --port 18765
 ```
 
-Reload the browser after updating. The workspace, models, inputs, and results are retained. For a source ZIP, save local changes, copy the new source into the original folder, then run `bash update.sh` and the start command. Keep `.nanocofold/` in place. Export a report again to use the updated interface.
+Reload the browser after updating. The workspace, models, inputs and results are retained. Export a new copy of an older report to use the updated interface.
 
 If an update is interrupted, rerun `bash update.sh`. Finish all jobs and close the web server before updating.
 
@@ -282,6 +283,16 @@ Use **amino-acid FASTA**: a `>name` line followed by the sequence. For nanobodie
 Enter a structure by **file upload** or **PDB ID**, and use **Change input method** to switch. Paste VHH / WT FASTA or import a file. **Load another file** replaces it; **Restore previous FASTA** restores it. After loading a draft, reselect structure files and review the input and transmission consent.
 
 For structure files, check chains, residue numbering, and missing residues. Public MSA sends sequences to an external server. Choose an MSA method that follows your institution's policy for research sequences.
+
+### Example: evaluate 100 CDR3 variants
+
+1. Choose **Evaluate nanobody variants**. Enter the target and the full parent nanobody (WT) sequence, then click **Review input & continue**.
+2. In **Run settings → Variant generation**, choose **Random multi-residue CDR substitutions → CDR3 only**. To use part of a CDR, choose **Custom CDR ranges** instead. Count from residue 1 of the input WT nanobody.
+3. Set **Number of variant candidates · Excluding WT** to **100**. Set **Minimum substitutions per candidate** and **Maximum substitutions per candidate** both to **4** for exactly four changed residues per variant (both to **2** for two). Set **Evaluate the WT control** to **Included**.
+4. With the four-engine starter preset and one seed, review the plan: **(100 variants + 1 WT) × 4 engines = 404 models**. If fewer than 100 variants are possible, reduce the count or widen the CDR range.
+5. Choose the MSA source for your sequences. Public MSA requires consent to send them to the server. Click **Review settings & continue → Review input → Run analysis**. Follow the job in **Jobs & logs**.
+
+In the results, **Held for review** means a sequence feature needs review before automatic selection. A model can pass the structural criteria and still be held. To compare the **same variants** again, use **Compare existing nanobodies** and supply each saved VHH sequence once.
 
 <details>
 <summary>Optional: practice variant evaluation in the terminal without a GPU</summary>

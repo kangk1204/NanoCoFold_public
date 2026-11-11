@@ -1,52 +1,44 @@
 # Update an existing installation
 
-The current release is **0.4.8rc12**. It updates the interface and guidance without rerunning saved analyses. Model weights and prediction engines do not need reinstallation.
+Use the original installation folder to keep your workspace, engines and saved results. Several source revisions share the package version **0.4.8rc12**.
 
 ## 1. Finish active jobs
 
-In **Jobs & logs**, check that no job is queued or running. To stop a job, confirm **Cancel job** and wait for **Cancelled**. Then press **Ctrl+C** in the web server terminal. For a remote installation, do this on the server.
+In **Jobs & logs**, wait until no jobs are queued or running. If you choose to cancel one, wait for **Cancelled**. Then press **Ctrl+C** in the web server terminal. For a remote installation, do this on the server.
 
-## 2. Get the new source
+## 2. Get the source
 
-Use the original source folder. Keep `.nanocofold/` and the workspace in place. Save any source changes you made separately.
+Choose the method you originally used. Save any local source changes first.
 
-### Installed with Git
+**Git installation on `main`.** In the original source folder, run:
 
 ```bash
 git pull --ff-only
+git rev-parse HEAD
 ```
 
-If local changes or conflicts block the update, read the message. Keep your changes rather than forcing a reset.
+Keep the printed commit with your run notes. If the pull fails, resolve the message before continuing. If you use a fixed tag or commit, follow the instructions for that revision.
 
-### Installed from a ZIP
+**ZIP installation.** Open the [public source on GitHub](https://github.com/kangk1204/NanoCoFold_public/tree/main), or the exact commit link your collaborator sent. Choose **Code → Download ZIP** on that page and extract it into a **separate folder**. The older `v0.4.8rc12` tag predates the CDR3 and custom mutation-range controls.
 
-Download `NanoCoFold_public-0.4.8rc12.zip` from the [new release](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8rc12) and **extract it into a separate folder**. Run the following in the original installation folder. Replace the path on the first line with the folder you just extracted.
+In the **original installation folder**, run the commands below. Replace the first path with the newly extracted folder containing `update.sh`. Keep the source link with your run notes.
 
 ```bash
-update_source="/path/to/extracted/NanoCoFold_public-0.4.8rc12"
+update_source="/path/to/extracted/NanoCoFold_public-main"
 rsync -a --exclude='.git/' --exclude='.nanocofold/' "$update_source/" ./
 ```
 
-Do not add `--delete`. This copies the new source while retaining `.nanocofold/`, the workspace and results. If `rsync` is unavailable, ask the server administrator to copy the updated source.
+Continue once the copy succeeds. Keep the existing `.nanocofold/` and workspace. Do not add `--delete`.
 
-## 3. Update the installed app and reopen it
+## 3. Update and reopen the app
 
-In the same original source folder, run:
+In the original folder, run the first command. Wait for **Update complete**, then run the second:
 
 ```bash
 bash update.sh
 bash start.sh --port 18765
 ```
 
-Wait for **Update complete / 업데이트 완료** before starting the server. `git pull` alone does not update the installed program. `update.sh` updates the app at its saved installation location and does not run GPU analysis.
+Open the address printed after **NanoCoFold:** and reload the browser. To check the update without starting a job, choose **Evaluate nanobody variants → Load public example for this purpose → Review input & continue**. Under **Variant generation**, choose **Random multi-residue CDR substitutions**. You should see **CDR3 only** and **Custom CDR ranges**. If you still see the old interface, press **Ctrl+Shift+R** (**Cmd+Shift+R** on macOS).
 
-Reload the browser and check **v0.4.8rc12** at the bottom of the page. If the old interface remains, use **Ctrl+Shift+R** (**Cmd+Shift+R** on macOS). Reopen saved results through **Explore results → Select run**. Existing HTML files retain their original interface; export a new report to use the updated one.
-
-## If the update stops
-
-- Active job or web server: wait for it to finish, then repeat the command.
-- Missing installation record: check that you are in the **original installation folder**, not the newly extracted source.
-- New computer without an installation: follow the [installation guide](../README.md#1-prepare-and-install).
-- Other failure: keep the message, resolve its cause and rerun `bash update.sh`. Keep the workspace and results.
-
-This version distinguishes current generation, evaluation and selection counts and explains hotspot exclusions. Default computation sizes and scientific selection criteria are retained.
+Reopen a saved run via **Explore results → Select run**. To use the updated interface for an old report, export a new copy. If the updater cannot find the installation, return to the folder you used the first time. For a new computer, use the [installation instructions](../README.md#1-prepare-and-install).
