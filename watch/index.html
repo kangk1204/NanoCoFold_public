@@ -51,12 +51,12 @@
   <div class="lang"><a id="ko" lang="ko" hreflang="ko" href="?v=intro&amp;lang=ko">한국어</a><a id="en" lang="en" hreflang="en" href="?v=intro&amp;lang=en">English</a></div>
 </div></header>
 <main>
-  <nav id="choices" aria-label="Videos"><a id="intro" href="?v=intro">Introduction</a><a id="install" href="?v=install">Ubuntu installation</a><a id="walkthrough" href="?v=walkthrough">Full walkthrough</a></nav>
+  <nav id="choices" aria-label="Videos"><a id="first-run" href="?v=first-run">First GPU experiment</a><a id="intro" href="?v=intro">Introduction</a><a id="install" href="?v=install">Ubuntu installation</a><a id="walkthrough" href="?v=walkthrough">Full walkthrough</a></nav>
   <h1 id="heading">NanoCoFold videos</h1><p id="meta"></p>
   <video controls playsinline preload="metadata" width="1920" height="1080" id="player" aria-labelledby="heading"></video>
   <div class="captionbar"><label><span id="cclabel">Subtitles</span><select id="cc"><option value="en">English</option><option value="ko">한국어</option><option value="off">Off</option></select></label><p id="spoken" aria-live="off"></p></div>
   <p id="status" role="status" hidden></p>
-  <div id="links"><a id="download">Download MP4</a><span id="captions"></span><a id="guide">Installation guide</a><a id="release" href="https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8">Release v0.4.8</a></div>
+  <div id="links"><a id="download">Download MP4</a><a id="example-data" hidden></a><a id="recorded-result" hidden></a><span id="captions"></span><a id="guide">Installation guide</a><a id="release" href="https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8">Release v0.4.8</a></div>
   <details id="chapters" hidden><summary></summary><ol></ol></details>
   <p id="legacy" hidden><a></a></p>
   <noscript><p><a href="https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8">Download the videos / 영상 내려받기</a></p></noscript>
@@ -71,19 +71,20 @@
   document.documentElement.lang = language;
   const repo = "https://github.com/kangk1204/NanoCoFold_public";
   const release = repo + "/releases/download/v0.4.8/";
-  const ids = ["intro","install","walkthrough"];
-  const id = ids.includes(q.get("v")) ? q.get("v") : "intro";
+  const ids = ["intro","install","walkthrough","first-run"];
+  const id = ids.includes(q.get("v")) ? q.get("v") : "first-run";
   const item = filmCatalog[id];
   const labels = ko ? {
-    intro:"플랫폼 소개", install:"Ubuntu 설치", walkthrough:"전체 실습", videos:"영상 선택", heading:["NanoCoFold 플랫폼 소개","Ubuntu에 NanoCoFold 설치하기","첫 분석부터 결과 DB 검색까지"],
+    "first-run":"첫 변이 실습", intro:"플랫폼 소개", install:"Ubuntu 설치 개요", walkthrough:"네 모드 소개", videos:"영상 선택", heading:["NanoCoFold 플랫폼 소개","Ubuntu에 NanoCoFold 설치하기","네 분석 모드 둘러보기","1부 · 설치부터 EGFR 나노바디 변이 10종 실행까지"],
     audio:"영어 음성 · 한국어·영어 자막", download:"MP4 내려받기", guide:"설치 명령어와 실습 안내", release:"v0.4.8 릴리스", chapters:"원하는 단계로 이동",
     legacy:"이전 한국어 음성 영상 내려받기", status:"영상을 열 수 없습니다. 아래에서 MP4를 내려받아 주세요."
   } : {
-    intro:"Introduction", install:"Ubuntu installation", walkthrough:"Full walkthrough", videos:"Choose a video", heading:["Introducing NanoCoFold","Install NanoCoFold on Ubuntu","Run an analysis and explore the results"],
+    "first-run":"First variant experiment", intro:"Introduction", install:"Installation overview", walkthrough:"Four-mode overview", videos:"Choose a video", heading:["Introducing NanoCoFold","Install NanoCoFold on Ubuntu","Explore the four analysis modes","Part 1 · Install NanoCoFold and run ten EGFR variants"],
     audio:"English narration · English and Korean subtitles", download:"Download MP4", guide:"Installation and walkthrough guide", release:"Release v0.4.8", chapters:"Jump to a chapter",
     legacy:"Download the earlier Korean-narrated recording", status:"The video could not load. Use the MP4 download below."
   };
-  const url = (v, lang) => "?v=" + v + "&lang=" + lang;
+  const openInputs = id === "first-run" && q.get("chapter") === "inputs";
+  const url = (v, lang) => "?v=" + v + "&lang=" + lang + (v === id && openInputs ? "&chapter=inputs" : "");
   const fmt = t => Math.floor(t/60)+":"+String(Math.floor(t%60)).padStart(2,"0");
   ids.forEach(key => {
     const a = get(key); a.textContent = labels[key]; a.href = url(key,language);
@@ -100,6 +101,16 @@
   get("download").textContent = labels.download; get("download").href = release + item.file;
   get("guide").textContent = labels.guide; get("guide").href = repo + "/blob/main/docs/walkthrough." + language + ".md";
   get("release").textContent = labels.release;
+  if(id==="first-run"){
+    const inputs=get("example-data");
+    inputs.hidden=false;
+    inputs.textContent=ko?"실습 입력 ZIP":"Download the input ZIP";
+    inputs.href=release+"NanoCoFold-EGFR-10-inputs.zip";
+    const result=get("recorded-result");
+    result.hidden=true;
+    result.href=release+"NanoCoFold-EGFR-10-report.zip";
+    result.textContent=ko?"영상의 결과 ZIP":"Download the recorded result";
+  }
   get("status").textContent = labels.status;
   video.poster = id + ".english.jpg";
   const cc=get("cc"), spoken=get("spoken"), tracks=[];
@@ -123,7 +134,7 @@
     track.addEventListener("load",refreshCaption);
     const sub = document.createElement("a");
     sub.id = "subtitle-"+code;
-    sub.href = release + item.file.replace(".mp4",".cc."+code+".srt");
+    sub.href = release + (id==="first-run" ? "NanoCoFold-first-run-part-1."+code+".srt" : item.file.replace(".mp4",".cc."+code+".srt"));
     sub.textContent = ko ? (code==="ko"?"한국어 자막":"영어 자막")+" (SRT)" : (code==="en"?"English":"Korean")+" subtitles (SRT)";
     get("captions").append(sub);
   }
@@ -144,15 +155,42 @@
       });
     }
   }
-  if(id!=="install"){
+  if(["intro","walkthrough"].includes(id)){
     const box=get("legacy"); box.hidden=false;
     box.firstElementChild.href=release+"NanoCoFold-"+id+"-ko.mp4";
     box.firstElementChild.textContent=labels.legacy;
   }
+  if (openInputs) {
+    const firstInput = item.chapters.find(mark => mark.en === "Get the example inputs");
+    if (firstInput) video.addEventListener("loadedmetadata", () => { video.currentTime = firstInput.start; }, {once:true});
+  }
   const sources=["media/"+item.file,release+item.file];
   let current=0;
   video.addEventListener("error",()=>{ if(++current<sources.length) video.src=sources[current]; else get("status").hidden=false; });
-  video.src=sources[0];
+  if (item.stream) {
+    const mp4Fallback = () => {
+      current = sources.length-1;
+      video.src = release + item.file;
+    };
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      current = 0;
+      video.src = item.stream;
+    } else {
+      const script = document.createElement("script");
+      script.src = "vendor/hls.light.min.js";
+      script.onerror = mp4Fallback;
+      script.onload = () => {
+        if (!window.Hls || !Hls.isSupported()) { mp4Fallback(); return; }
+        const hls = new Hls();
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          if (data.fatal) { hls.destroy(); mp4Fallback(); }
+        });
+        hls.loadSource(item.stream);
+        hls.attachMedia(video);
+      };
+      document.head.append(script);
+    }
+  } else video.src=sources[0];
 })();
 </script>
 </body>

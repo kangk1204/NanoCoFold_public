@@ -120,5 +120,78 @@ const filmCatalog = {
         "ko": "설치한 엔진 확인"
       }
     ]
+  },
+  "first-run": {
+    "file": "NanoCoFold-first-run-part-1-en.mp4",
+    "duration": 1238.8,
+    "chapters": [
+      {
+        "en": "Check Ubuntu and download NanoCoFold",
+        "ko": "우분투 확인 및 NanoCoFold 받기",
+        "start": 0.0,
+        "end": 50.875
+      },
+      {
+        "en": "Run the installer",
+        "ko": "설치 진행 확인",
+        "start": 50.875,
+        "end": 673.9583333333334
+      },
+      {
+        "en": "Start the web app",
+        "ko": "웹 앱 시작",
+        "start": 673.9583333333334,
+        "end": 691.125
+      },
+      {
+        "en": "Get the example inputs",
+        "ko": "실습 파일 받기",
+        "start": 691.125,
+        "end": 789.9583333333334
+      },
+      {
+        "en": "Understand the two proteins and their numbers",
+        "ko": "두 단백질과 잔기 번호 이해하기",
+        "start": 789.9583333333334,
+        "end": 871.2916666666666
+      },
+      {
+        "en": "Prepare the target and nanobody",
+        "ko": "표적과 나노바디 입력",
+        "start": 871.2916666666666,
+        "end": 1010.25
+      },
+      {
+        "en": "Set up ten variants",
+        "ko": "변이 10종 설정",
+        "start": 1010.25,
+        "end": 1083.4166666666667
+      },
+      {
+        "en": "Check the selected environment",
+        "ko": "선택한 실행 환경 확인",
+        "start": 1083.4166666666667,
+        "end": 1132.4583333333333
+      },
+      {
+        "en": "Submit the analysis",
+        "ko": "분석 제출",
+        "start": 1132.4583333333333,
+        "end": 1163.7916666666667
+      },
+      {
+        "en": "Find the submitted job",
+        "ko": "제출한 작업 찾기",
+        "start": 1163.7916666666667,
+        "end": 1190.5
+      },
+      {
+        "en": "Follow prediction progress",
+        "ko": "구조 예측 진행 확인",
+        "start": 1190.5,
+        "end": 1238.7083333333333
+      }
+    ],
+    "stream": "media/first-run/index.m3u8"
   }
 };

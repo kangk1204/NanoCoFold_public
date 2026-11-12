@@ -1,0 +1,460 @@
+WEBVTT
+
+1
+00:00:00.220 --> 00:00:09.073
+Open Terminal on Ubuntu. We will use this GPU to
+evaluate ten 7D12 nanobody variants against EGFR.
+
+2
+00:00:09.233 --> 00:00:13.671
+Run nvidia-smi and check that
+your GPU and driver appear.
+
+3
+00:00:14.137 --> 00:00:21.881
+Download the public release with Git.
+git clone --branch v0.4.8 https://github.com/kangk1204/NanoCoFold_public.git
+
+4
+00:00:22.041 --> 00:00:26.627
+If Ubuntu says Git is missing, run
+sudo apt install git and try again.
+
+5
+00:00:27.095 --> 00:00:31.788
+Wait for the terminal prompt,
+then type cd NanoCoFold_public.
+
+6
+00:00:35.762 --> 00:00:40.327
+Check the version. Your terminal should print v0.4.8.
+
+7
+00:00:43.053 --> 00:00:48.813
+Use the screen installation profile. The check-host
+option checks the hardware before installing.
+
+8
+00:00:51.095 --> 00:00:57.090
+For a fresh Ubuntu installation, run
+bash install.sh --profile screen.
+
+9
+00:00:57.250 --> 00:01:02.498
+This profile provides Boltz-2 for prediction
+and ANARCI for numbering the nanobody.
+
+10
+00:01:02.658 --> 00:01:08.290
+The install profile names the tools. In the
+app, you will choose Evaluate nanobody variants.
+
+11
+00:01:08.450 --> 00:01:14.594
+Omit --skip-system-packages on a new computer.
+Enter your sudo password if Ubuntu asks.
+
+12
+00:01:14.754 --> 00:01:19.490
+This computer already has the system
+packages, so its command includes that option.
+
+13
+00:01:19.650 --> 00:01:24.962
+Leave this terminal open while the installer
+prepares the tools and downloads their files.
+
+14
+00:01:25.122 --> 00:01:30.071
+Once installation finishes on your computer,
+you can jump to the Start the web app chapter.
+
+15
+00:11:08.132 --> 00:11:13.700
+Wait for the installation complete message
+and the instruction to run bash start.sh.
+
+16
+00:11:14.178 --> 00:11:20.173
+After installation finishes, run bash start.sh
+in this folder and keep the terminal open.
+
+17
+00:11:20.333 --> 00:11:24.621
+On the same computer, open the web
+address printed next to NanoCoFold.
+
+18
+00:11:31.345 --> 00:11:36.230
+Open the public NanoCoFold GitHub
+repository in a new browser tab.
+
+19
+00:11:36.390 --> 00:11:38.822
+On the repository page, click Releases.
+
+20
+00:11:41.891 --> 00:11:47.565
+Select release v0.4.8 to find the
+files that go with this lesson.
+
+21
+00:11:51.720 --> 00:11:58.525
+On the v0.4.8 release page, scroll down
+to Assets, the list of downloadable files.
+
+22
+00:12:04.740 --> 00:12:10.777
+Download NanoCoFold-EGFR-10-inputs.zip
+and save it in Downloads.
+
+23
+00:12:14.137 --> 00:12:17.785
+Keep the first terminal open.
+It is running NanoCoFold.
+
+24
+00:12:17.945 --> 00:12:23.086
+In Files, open Downloads. Right-click an
+empty area and choose Open in Terminal.
+
+25
+00:12:23.246 --> 00:12:28.131
+In this second terminal, extract the
+ZIP into a folder named EGFR-lesson.
+
+26
+00:12:35.647 --> 00:12:41.769
+Enter the extracted folder. Keep it open so you can
+select the structure and copy the two sequences.
+
+27
+00:12:45.407 --> 00:12:53.215
+This is the target protein. Copy both lines,
+including the greater-than sign and B, when the app
+asks for the full target sequence.
+
+28
+00:12:57.737 --> 00:13:05.033
+This second sequence is the original nanobody. It goes in
+the separate wild-type field. Keep the two files distinct.
+
+29
+00:13:10.178 --> 00:13:14.146
+This example uses the experimental structure 4KRL.
+
+30
+00:13:14.306 --> 00:13:21.368
+The larger protein is our target, EGFR. The
+smaller one is the original 7D12 nanobody.
+
+31
+00:13:25.008 --> 00:13:30.022
+A protein sequence is a list of letters.
+Each letter stands for one amino acid.
+
+32
+00:13:30.182 --> 00:13:34.662
+The practice ZIP contains the target
+and nanobody sequences from this entry.
+
+33
+00:13:38.053 --> 00:13:43.045
+Open hotspots.csv in a spreadsheet,
+or read it in the terminal with cat.
+
+34
+00:13:43.205 --> 00:13:47.728
+The first column contains the positions
+you will enter into NanoCoFold.
+
+35
+00:13:50.473 --> 00:13:55.444
+Count the target sequence from one. Its
+19th letter is L, which stands for leucine.
+
+36
+00:13:55.604 --> 00:14:03.156
+That same amino acid is residue 325 in the
+original structure. Type 19 in this exercise.
+
+37
+00:14:04.473 --> 00:14:12.132
+Use 19, 40 and 42. These three target residues are
+close to the nanobody in the experimental structure.
+
+38
+00:14:12.292 --> 00:14:15.535
+Leave the hotspot recommendation exclusion box empty.
+
+39
+00:14:18.473 --> 00:14:21.055
+Later you will change two letters on the nanobody.
+
+40
+00:14:21.215 --> 00:14:25.865
+The three target positions you just chose
+stay the same in all eleven predictions.
+
+41
+00:14:31.512 --> 00:14:35.181
+On the Input and run tab, choose
+the analysis you want to run.
+
+42
+00:14:37.220 --> 00:14:40.079
+In the web app, choose Evaluate nanobody variants.
+
+43
+00:14:40.239 --> 00:14:45.849
+We already have a nanobody, 7D12. We want
+to compare small changes to its sequence.
+
+44
+00:14:46.009 --> 00:14:52.559
+Name the run EGFR 10 variants walkthrough. We
+will use this name again in the results database.
+
+45
+00:14:53.012 --> 00:14:59.390
+Select structure input, then choose a file.
+In Downloads, open your EGFR-lesson folder.
+
+46
+00:14:59.550 --> 00:15:05.417
+Select 4KRL.cif. Back in
+NanoCoFold, click Load structure.
+
+47
+00:15:05.887 --> 00:15:11.327
+Choose the epidermal growth factor receptor
+as the target. The app displays it as chain B.
+
+48
+00:15:11.487 --> 00:15:17.503
+In the deposited structure, its author chain
+identifier is A. Use B for this input file.
+
+49
+00:15:17.663 --> 00:15:21.673
+Leave the partner boxes empty and
+click Review chains and exposure.
+
+50
+00:15:22.137 --> 00:15:27.065
+Choose Predict from full sequences. Keep
+Boltz-2 as the target structure engine.
+
+51
+00:15:27.225 --> 00:15:33.049
+Paste both lines from EGFR-target.fasta,
+including the header >B.
+
+52
+00:15:33.209 --> 00:15:40.761
+For this exercise, use all 214 amino acids
+of the EGFR fragment in the structure entry.
+
+53
+00:15:40.921 --> 00:15:47.811
+The first line names the chain. On the next line,
+each letter stands for one amino acid in EGFR.
+
+54
+00:15:48.262 --> 00:15:51.568
+Select Map selected hotspots
+to full-sequence positions.
+
+55
+00:15:51.728 --> 00:15:59.387
+Enter 19, 40, 42. These are three positions on
+EGFR where we want the nanobody to make contact.
+
+56
+00:15:59.547 --> 00:16:05.968
+Enter just the sites of interest. Leave the other
+positions out. The EGFR sequence stays the same.
+
+57
+00:16:06.128 --> 00:16:11.483
+If you have only a target sequence, NanoCoFold
+can suggest sites from its predicted structure.
+
+58
+00:16:11.928 --> 00:16:17.027
+Open the numbering table. The first residue
+of the input sequence is position one.
+
+59
+00:16:17.187 --> 00:16:26.680
+Positions 19, 40 and 42 correspond to
+author residue numbers 325, 346 and 348.
+
+60
+00:16:26.840 --> 00:16:29.848
+Use the input sequence numbers in the hotspot field.
+
+61
+00:16:31.095 --> 00:16:34.295
+Review the structure notes and
+tick the acknowledgment box.
+
+62
+00:16:34.455 --> 00:16:41.004
+Paste 7D12-WT.fasta into the wild-type
+nanobody field. Then open Run settings.
+
+63
+00:16:50.470 --> 00:16:55.291
+Under the exploration preset, choose
+Legacy default. Open the variant settings.
+
+64
+00:16:55.451 --> 00:17:01.339
+Choose random substitutions. For the
+region, choose CDR3, a loop on the nanobody.
+
+65
+00:17:01.499 --> 00:17:08.731
+This is where we change amino acids on 7D12.
+The EGFR hotspots you chose earlier stay fixed.
+
+66
+00:17:09.178 --> 00:17:15.002
+Request ten different variants. Set both the
+maximum and minimum number of substitutions to two.
+
+67
+00:17:15.162 --> 00:17:20.325
+Each variant will differ from the
+original at exactly two CDR3 positions.
+
+68
+00:17:22.387 --> 00:17:29.171
+Include WT, the original 7D12 with no changes.
+It gives us a reference to compare against.
+
+69
+00:17:29.331 --> 00:17:31.976
+Choose Boltz-2 as the evaluation engine.
+
+70
+00:17:32.136 --> 00:17:37.235
+Keep seed 42. It sets the starting point
+for choosing the random substitutions.
+
+71
+00:17:37.395 --> 00:17:41.235
+Ten variants plus one wild type
+give eleven planned models.
+
+72
+00:17:46.470 --> 00:17:52.891
+Continue to input review and review the applied
+settings. Check the run name, engine and eleven models.
+
+73
+00:17:53.051 --> 00:17:59.003
+MSA means multiple sequence alignment. This run
+looks for saved alignments on this computer.
+
+74
+00:17:59.163 --> 00:18:03.174
+No sequences are sent to a
+public MSA server for this run.
+
+75
+00:18:03.637 --> 00:18:08.309
+From this input review, choose Go to
+environment check, then Check environment.
+
+76
+00:18:08.469 --> 00:18:13.354
+The app now checks the tools needed for this
+specific run. Wait for Environment ready.
+
+77
+00:18:33.803 --> 00:18:38.689
+When Environment ready appears, choose Prepare
+analysis to return to the checked inputs.
+
+78
+00:18:52.678 --> 00:18:57.841
+Click Run analysis once. Leave the page
+open while the server accepts the request.
+
+79
+00:18:58.001 --> 00:19:03.910
+The structure file has coordinates
+for 205 of the 214 target residues.
+
+80
+00:19:04.070 --> 00:19:10.684
+This run uses the full protein sequence. Crystal
+sugars and other nonprotein components are omitted.
+
+81
+00:19:10.844 --> 00:19:16.625
+The form also confirms ten distinct variants
+are available, with one wild-type control added.
+
+82
+00:19:24.012 --> 00:19:29.814
+Here the browser could not confirm the request
+in time. The message directs us to Jobs and logs.
+
+83
+00:19:29.974 --> 00:19:34.518
+Before trying again, refresh the jobs
+list and look for your original run name.
+
+84
+00:19:37.137 --> 00:19:41.531
+If you are back at the home screen,
+open Jobs and logs, then click Refresh.
+
+85
+00:19:41.691 --> 00:19:45.915
+Look for EGFR 10 variants walkthrough,
+the name you entered earlier.
+
+86
+00:19:50.720 --> 00:19:55.776
+Select the entry. Running confirms that the
+server received this job. Leave it running.
+
+87
+00:19:55.936 --> 00:20:01.675
+Two out of three counts workflow stages. The
+prediction line below will count individual models.
+
+88
+00:20:04.012 --> 00:20:09.836
+The first model has finished. The line reads one
+of eleven and shows an estimated time remaining.
+
+89
+00:20:09.996 --> 00:20:13.665
+We will skip ahead through the time
+spent waiting for the other predictions.
+
+90
+00:20:14.137 --> 00:20:17.678
+The same job has now completed
+six of its eleven models.
+
+91
+00:20:22.470 --> 00:20:28.934
+The complete run took 17 minutes and 48
+seconds on this RTX 3060. Your time may differ.
+
+92
+00:20:29.094 --> 00:20:33.297
+When the status changes to Complete,
+click Open results on this same job.
+
+93
+00:20:33.457 --> 00:20:38.150
+The report will show which models were
+evaluated and which met the selection criteria.
+
