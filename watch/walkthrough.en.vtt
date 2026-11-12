@@ -1,0 +1,161 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:09.933
+Here are two proteins modeled in NanoCoFold.
+We'll install the app, run an analysis and find it in the database.
+
+2
+00:00:09.958 --> 00:00:19.475
+Start on Ubuntu with your GPU listed by nvidia-smi.
+Check the installation requirements in the GitHub README.
+
+3
+00:00:19.500 --> 00:00:26.642
+Open NanoCoFold_public on GitHub.
+The video follows the Korean README. You can use the English one.
+
+4
+00:00:26.667 --> 00:00:33.975
+Download the code with git clone. Run cd NanoCoFold_public.
+You should see install.sh and start.sh in that folder.
+
+5
+00:00:34.000 --> 00:00:41.725
+For the first complex, run bash install.sh --profile complex.
+This installs Boltz-2 and Chai-1.
+
+6
+00:00:41.750 --> 00:00:49.933
+For all four modes and all engines, run bash install.sh --profile all.
+Choose one install command for the analyses you want to run.
+
+7
+00:00:49.958 --> 00:00:57.392
+Wait for the installation-complete message
+before starting the web server.
+
+8
+00:00:57.417 --> 00:01:05.517
+Run bash start.sh --port 18765 and leave the terminal open.
+Open the NanoCoFold address printed in the terminal in your browser.
+
+9
+00:01:05.542 --> 00:01:16.808
+In Environment & setup, choose your analysis and check the environment.
+When the check finishes, click Prepare analysis.
+
+10
+00:01:16.833 --> 00:01:25.850
+Once the required checks pass, click Prepare analysis.
+You can now set up the protein prediction.
+
+11
+00:01:25.875 --> 00:01:37.850
+Load the public example to enter one copy each of Barnase and Barstar.
+For your own FASTA, enter >name, then the sequence on the next line.
+
+12
+00:01:37.875 --> 00:01:48.267
+Check for Boltz-2, no MSA, seed 42 and one planned model.
+If Run analysis is disabled, click Go to environment check.
+
+13
+00:01:48.292 --> 00:02:00.642
+Here we use CPU practice mode in Compare existing nanobodies.
+Click Run analysis once. Follow its progress in Jobs & logs.
+
+14
+00:02:00.667 --> 00:02:10.725
+This saved GPU run took about 57 seconds. One model succeeded, none failed.
+Click Open results to see its report.
+
+15
+00:02:10.750 --> 00:02:20.725
+The two input sequences produced one model.
+Rotate the 3D structure to see where the two colored chains meet.
+
+16
+00:02:20.750 --> 00:02:30.975
+PAE estimates the error in the relative positions of residues, in Å.
+Use the color scale to read the regions on either side of the chain boundary.
+
+17
+00:02:31.000 --> 00:02:43.267
+Whole-complex ipTM is 0.078 and mean interface PAE is 24.84 Å.
+The run finished with low confidence in the chains' relative positions.
+
+18
+00:02:43.292 --> 00:02:52.767
+Choose Design new nanobodies and load the public IL-6 example.
+New candidates are generated from a target sequence or structure.
+
+19
+00:02:52.792 --> 00:03:04.558
+One backbone per generator gives two candidates. Four engines can produce eight models.
+For public MSA, allow the app to send the example sequences.
+
+20
+00:03:04.583 --> 00:03:14.892
+This run evaluated eight models from two candidates.
+Neither candidate passed final selection.
+
+21
+00:03:14.917 --> 00:03:23.433
+In section 04, check exclusions by criterion, including ipSAE and ipTM.
+A single model can have more than one reason for exclusion.
+
+22
+00:03:23.458 --> 00:03:33.850
+In Compare existing nanobodies, enter the target and each full VHH sequence.
+Give every candidate a unique FASTA name.
+
+23
+00:03:33.875 --> 00:03:44.600
+One candidate produced four results, one per engine.
+The Boltz-2 ipSAE is 0.378. Check each engine's scores separately.
+
+24
+00:03:44.625 --> 00:03:55.142
+Read the 3D interface and its scores together.
+Binding and affinity require experimental measurements.
+
+25
+00:03:55.167 --> 00:04:07.017
+Enter the target and the original VHH, then check the variant settings.
+The original sequence, labeled WT, is your reference.
+
+26
+00:04:07.042 --> 00:04:17.850
+Set the evaluation limit to one variant and include WT.
+Before running, look for one variant plus WT, each with four engines.
+
+27
+00:04:17.875 --> 00:04:27.100
+WT and N100R produced eight models across four engines.
+N100R replaces asparagine (N) at position 100 with arginine (R).
+
+28
+00:04:27.125 --> 00:04:37.933
+Boltz-2 ipSAE is 0.378 for WT and 0.013 for N100R.
+An affinity change would need to be measured experimentally.
+
+29
+00:04:37.958 --> 00:04:49.225
+Completed web runs appear in Results database automatically. To add an older run,
+go to Explore results, enter its workspace path and click Open existing result.
+
+30
+00:04:49.250 --> 00:05:00.975
+In Results database, enter part of the run name or ID and click Search.
+Click the row for public-complex to open its report in a new tab.
+
+31
+00:05:01.000 --> 00:05:11.058
+Choose Shareable report ZIP, then Export.
+You can also save the candidate table or individual structure files.
+
+32
+00:05:11.083 --> 00:05:21.225
+Extract the whole ZIP and open report.html in a browser.
+Collaborators can explore the structure and results without installing NanoCoFold.

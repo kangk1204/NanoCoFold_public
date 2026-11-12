@@ -1,0 +1,21 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:06.750
+This is a protein complex predicted by NanoCoFold.
+Rotate it to see where the two chains meet.
+
+2
+00:00:06.750 --> 00:00:12.250
+Design new nanobodies or compare your existing sequences
+and their variants under the same conditions.
+
+3
+00:00:12.250 --> 00:00:19.417
+Four engines evaluated two candidates. The report shows how many models
+were produced and how many candidates passed final selection.
+
+4
+00:00:19.417 --> 00:00:28.792
+Find results by name and share reports as ZIP files.
+Follow the full walkthrough from installation to finding a saved run.
