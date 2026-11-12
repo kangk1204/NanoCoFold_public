@@ -75,16 +75,18 @@
   const id = ids.includes(q.get("v")) ? q.get("v") : "first-run";
   const item = filmCatalog[id];
   const labels = ko ? {
-    "first-run":"첫 변이 실습", intro:"플랫폼 소개", install:"Ubuntu 설치 개요", walkthrough:"네 모드 소개", videos:"영상 선택", heading:["NanoCoFold 플랫폼 소개","Ubuntu에 NanoCoFold 설치하기","네 분석 모드 둘러보기","1부 · 설치부터 EGFR 나노바디 변이 10종 실행까지"],
+    "first-run":"첫 변이 실습", intro:"플랫폼 소개", install:"Ubuntu 설치 개요", walkthrough:"네 모드 소개", videos:"영상 선택", heading:["NanoCoFold 플랫폼 소개","Ubuntu에 NanoCoFold 설치하기","네 분석 모드 둘러보기","EGFR 나노바디 변이 10종 실습"],
     audio:"영어 음성 · 한국어·영어 자막", download:"MP4 내려받기", guide:"설치 명령어와 실습 안내", release:"v0.4.8 릴리스", chapters:"원하는 단계로 이동",
     legacy:"이전 한국어 음성 영상 내려받기", status:"영상을 열 수 없습니다. 아래에서 MP4를 내려받아 주세요."
   } : {
-    "first-run":"First variant experiment", intro:"Introduction", install:"Installation overview", walkthrough:"Four-mode overview", videos:"Choose a video", heading:["Introducing NanoCoFold","Install NanoCoFold on Ubuntu","Explore the four analysis modes","Part 1 · Install NanoCoFold and run ten EGFR variants"],
+    "first-run":"First variant experiment", intro:"Introduction", install:"Installation overview", walkthrough:"Four-mode overview", videos:"Choose a video", heading:["Introducing NanoCoFold","Install NanoCoFold on Ubuntu","Explore the four analysis modes","Run ten EGFR nanobody variants"],
     audio:"English narration · English and Korean subtitles", download:"Download MP4", guide:"Installation and walkthrough guide", release:"Release v0.4.8", chapters:"Jump to a chapter",
     legacy:"Download the earlier Korean-narrated recording", status:"The video could not load. Use the MP4 download below."
   };
-  const openInputs = id === "first-run" && q.get("chapter") === "inputs";
-  const url = (v, lang) => "?v=" + v + "&lang=" + lang + (v === id && openInputs ? "&chapter=inputs" : "");
+  const chapterNames = {inputs:"Get the example inputs", hotspots:"Understand the two proteins and their numbers", variants:"Set up ten variants", results:"Read your result", database:"Search your database", zip:"Open the downloaded ZIP"};
+  const requestedChapter = q.get("chapter");
+  const firstChapter = id === "first-run" && Object.hasOwn(chapterNames,requestedChapter) ? requestedChapter : "";
+  const url = (v, lang) => "?v=" + v + "&lang=" + lang + (v === id && firstChapter ? "&chapter="+firstChapter : "");
   const fmt = t => Math.floor(t/60)+":"+String(Math.floor(t%60)).padStart(2,"0");
   ids.forEach(key => {
     const a = get(key); a.textContent = labels[key]; a.href = url(key,language);
@@ -107,7 +109,7 @@
     inputs.textContent=ko?"실습 입력 ZIP":"Download the input ZIP";
     inputs.href=release+"NanoCoFold-EGFR-10-inputs.zip";
     const result=get("recorded-result");
-    result.hidden=true;
+    result.hidden=false;
     result.href=release+"NanoCoFold-EGFR-10-report.zip";
     result.textContent=ko?"영상의 결과 ZIP":"Download the recorded result";
   }
@@ -134,7 +136,7 @@
     track.addEventListener("load",refreshCaption);
     const sub = document.createElement("a");
     sub.id = "subtitle-"+code;
-    sub.href = release + (id==="first-run" ? "NanoCoFold-first-run-part-1."+code+".srt" : item.file.replace(".mp4",".cc."+code+".srt"));
+    sub.href = release + (id==="first-run" ? "NanoCoFold-first-run."+code+".srt" : item.file.replace(".mp4",".cc."+code+".srt"));
     sub.textContent = ko ? (code==="ko"?"한국어 자막":"영어 자막")+" (SRT)" : (code==="en"?"English":"Korean")+" subtitles (SRT)";
     get("captions").append(sub);
   }
@@ -160,8 +162,8 @@
     box.firstElementChild.href=release+"NanoCoFold-"+id+"-ko.mp4";
     box.firstElementChild.textContent=labels.legacy;
   }
-  if (openInputs) {
-    const firstInput = item.chapters.find(mark => mark.en === "Get the example inputs");
+  if (firstChapter) {
+    const firstInput = item.chapters.find(mark => mark.en === chapterNames[firstChapter]);
     if (firstInput) video.addEventListener("loadedmetadata", () => { video.currentTime = firstInput.start; }, {once:true});
   }
   const sources=["media/"+item.file,release+item.file];

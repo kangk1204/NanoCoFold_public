@@ -122,8 +122,8 @@ const filmCatalog = {
     ]
   },
   "first-run": {
-    "file": "NanoCoFold-first-run-part-1-en.mp4",
-    "duration": 1238.8,
+    "file": "NanoCoFold-first-run-en.mp4",
+    "duration": 1609.9,
     "chapters": [
       {
         "en": "Check Ubuntu and download NanoCoFold",
@@ -190,6 +190,42 @@ const filmCatalog = {
         "ko": "구조 예측 진행 확인",
         "start": 1190.5,
         "end": 1238.7083333333333
+      },
+      {
+        "en": "Read your result",
+        "ko": "내 결과 읽기",
+        "start": 1238.7083333333333,
+        "end": 1465.3333333333333
+      },
+      {
+        "en": "Check handoff readiness",
+        "ko": "인계 준비 상태 확인",
+        "start": 1465.3333333333333,
+        "end": 1497.375
+      },
+      {
+        "en": "Search your database",
+        "ko": "내 결과 DB 검색",
+        "start": 1497.375,
+        "end": 1514.5
+      },
+      {
+        "en": "Download the report ZIP",
+        "ko": "보고서 ZIP 내려받기",
+        "start": 1514.5,
+        "end": 1558.3333333333333
+      },
+      {
+        "en": "Open the downloaded ZIP",
+        "ko": "내려받은 ZIP 열기",
+        "start": 1558.3333333333333,
+        "end": 1587.0416666666667
+      },
+      {
+        "en": "Read the offline report",
+        "ko": "오프라인 보고서 읽기",
+        "start": 1587.0416666666667,
+        "end": 1609.8333333333333
       }
     ],
     "stream": "media/first-run/index.m3u8"
