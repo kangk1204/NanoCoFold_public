@@ -166,33 +166,41 @@
     const firstInput = item.chapters.find(mark => mark.en === chapterNames[firstChapter]);
     if (firstInput) video.addEventListener("loadedmetadata", () => { video.currentTime = firstInput.start; }, {once:true});
   }
-  const sources=["media/"+item.file,release+item.file];
-  let current=0;
-  video.addEventListener("error",()=>{ if(++current<sources.length) video.src=sources[current]; else get("status").hidden=false; });
+  const directFile = release + item.file;
+  let fallbackStarted = false;
+  const useDirectFile = () => {
+    if (fallbackStarted) { get("status").hidden = false; return; }
+    fallbackStarted = true;
+    const position = video.currentTime;
+    const resume = !video.paused;
+    video.addEventListener("loadedmetadata", () => {
+      if (position > 0 && Number.isFinite(position)) video.currentTime = position;
+      if (resume) video.play().catch(() => {});
+    }, {once:true});
+    video.src = directFile;
+  };
+  video.addEventListener("error", useDirectFile);
   if (item.stream) {
-    const mp4Fallback = () => {
-      current = sources.length-1;
-      video.src = release + item.file;
-    };
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      current = 0;
-      video.src = item.stream;
+    const nativeHls = video.canPlayType("application/vnd.apple.mpegurl");
+    const useNative = () => { if (nativeHls) video.src = item.stream; else useDirectFile(); };
+    if (nativeHls && navigator.vendor === "Apple Computer, Inc.") {
+      useNative();
     } else {
       const script = document.createElement("script");
       script.src = "vendor/hls.light.min.js";
-      script.onerror = mp4Fallback;
+      script.onerror = useNative;
       script.onload = () => {
-        if (!window.Hls || !Hls.isSupported()) { mp4Fallback(); return; }
+        if (!window.Hls || !Hls.isSupported()) { useNative(); return; }
         const hls = new Hls();
         hls.on(Hls.Events.ERROR, (_event, data) => {
-          if (data.fatal) { hls.destroy(); mp4Fallback(); }
+          if (data.fatal && !fallbackStarted) { hls.destroy(); useDirectFile(); }
         });
         hls.loadSource(item.stream);
         hls.attachMedia(video);
       };
       document.head.append(script);
     }
-  } else video.src=sources[0];
+  } else video.src = "media/" + item.file;
 })();
 </script>
 </body>
