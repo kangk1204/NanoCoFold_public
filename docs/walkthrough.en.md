@@ -1,17 +1,35 @@
 # NanoCoFold walkthrough
 
-Follow a public example from installation to a searchable result and a report you can send to a collaborator. Both videos have Korean narration. The English player opens with English subtitles. This guide uses the English labels in NanoCoFold. [Watch the full walkthrough (5:21)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=walkthrough&lang=en) · [Watch the introduction (0:29)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=intro&lang=en)
+For a first installation, open the installation video and follow the commands below. The videos have English narration and selectable English and Korean captions.
 
-| Video time | Chapter |
-|---|---|
-| 00:00 | Introduction |
-| 00:09 | Install on Ubuntu |
-| 01:05 | Predict a protein complex |
-| 02:10 | Read the complex result |
-| 02:43 | Design new nanobodies |
-| 03:23 | Compare existing nanobodies |
-| 03:55 | Evaluate nanobody variants |
-| 04:37 | Search the results database and share a report |
+[Introduction (0:28)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=intro&lang=en) · [Ubuntu installation (2:30)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=install&lang=en) · [Full walkthrough (5:47)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=walkthrough&lang=en)
+
+### Installation video chapters
+
+- 0:00　Get the public release
+- 0:10　Check your GPU
+- 0:21　Download the source
+- 0:31　Open the release folder
+- 0:45　Choose an installation profile
+- 0:54　For a first protein complex
+- 1:05　For all four analysis modes
+- 1:15　Watch the installer run
+- 1:26　Recognize the completion message
+- 1:39　Finish a GPU installation
+- 1:52　Start the web app
+- 2:05　Open the printed address
+- 2:17　Check the installed engines
+
+### Full walkthrough chapters
+
+- 0:00　Welcome
+- 0:09　Install on Ubuntu
+- 1:18　Predict a complex
+- 2:20　Read the complex result
+- 2:57　Design new nanobodies
+- 3:42　Compare existing nanobodies
+- 4:13　Evaluate variants
+- 5:00　Search and share results
 
 ## 1. Install and start NanoCoFold
 
@@ -68,6 +86,6 @@ Select a model to inspect its structure, interface scores and PAE together. PAE 
 
 ## What was recorded
 
-The videos were recorded on 12 November 2026 using the Ubuntu terminal and NanoCoFold browser interface from public commit `93b94de`. The GitHub release is `v0.4.8`. The CLI and reports display the compute package version, `0.4.8rc12`. [Recording commit](https://github.com/kangk1204/NanoCoFold_public/tree/93b94de4f14e9a577f9d848cb2830a438b838b5e) · [GitHub release](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8)
+The installation video uses a separate copy of the v0.4.8 tag on an Ubuntu computer with an RTX 5070 Ti. The terminal recording shows the core app installing, its completion message and the first browser connection. The completion of the full GPU installation is shown from a saved log. The long engine and model downloads are omitted. To run predictions, choose the GPU profile for your task in the table above.
 
-Long model downloads were shortened in the edit. A saved installation log shows completion of the full installation. The **Run analysis** button and live progress were recorded in the CPU practice mode for existing nanobodies. The completed complex result comes from a saved GPU run that took 56.7 seconds on an RTX 3080 Ti Laptop GPU. The design, existing-candidate and variant examples reopen saved GPU predictions from `0.4.8rc5` in the report interface used for filming.
+The full walkthrough follows the public examples through data entry and result viewing. The Run button and progress were recorded in CPU practice mode for existing nanobodies. The completed complex result is a saved GPU run that took 56.7 seconds on an RTX 3080 Ti Laptop GPU. The design, screening and variant examples reopen saved GPU predictions from `0.4.8rc5` in the filmed public report interface. [Public release](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8)

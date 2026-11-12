@@ -6,11 +6,11 @@
 
 단백질 복합체를 예측하고, 새 나노바디를 설계하거나 보유한 후보와 변이를 비교합니다. 결과는 3D로 살펴보고 대화형 보고서로 공유할 수 있습니다.
 
-[29초 소개 영상 보기](https://kangk1204.github.io/NanoCoFold_public/watch/?v=intro&lang=ko) · [전체 실습 영상 보기 (5분 21초)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=walkthrough&lang=ko)
+[플랫폼 소개 (28초)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=intro&lang=ko) · [Ubuntu 설치 (2분 30초)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=install&lang=ko) · [전체 실습 (5분 47초)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=walkthrough&lang=ko)
 
-두 영상 모두 한국어로 설명하며 영어 자막을 켤 수 있습니다. 전체 실습에서는 Ubuntu 설치부터 네 가지 분석 모드, 결과 해석, 결과 DB 검색까지 따라 할 수 있습니다. [설치 명령어와 영상 목차](docs/walkthrough.ko.md)
+처음 설치한다면 **Ubuntu 설치**부터 보세요. **전체 실습**에서는 네 가지 분석 모드, 결과 해석, DB 검색과 보고서 ZIP 공유를 따라 할 수 있습니다. 세 영상은 영어 음성이며 재생기에서 한국어 자막을 켤 수 있습니다. [설치 명령어와 영상 목차](docs/walkthrough.ko.md)
 
-**내려받기** · [소개 영상 MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-intro-ko.mp4) · [전체 실습 MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-walkthrough-ko.mp4) · [한국어 자막 SRT](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-walkthrough-ko.srt) · [설치 안내 Markdown](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-walkthrough-guide-ko.md)
+**내려받기** · [소개 MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-intro-en.mp4) · [설치 MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-install-en.mp4) · [전체 실습 MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-walkthrough-en.mp4) · [자막 및 설치 안내](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8)
 
 **처음 설치하시나요?** [v0.4.8 소스 ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8.zip)을 내려받고 아래 공개 예제를 따라 하세요. 서열과 작은 시작 설정이 자동으로 채워집니다.
 

@@ -6,11 +6,11 @@
 
 Predict protein complexes, design nanobodies, and compare existing candidates or variants. Explore the models in 3D and share an interactive report.
 
-[Watch the 29-second introduction](https://kangk1204.github.io/NanoCoFold_public/watch/?v=intro&lang=en) · [Watch the full walkthrough (5:21)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=walkthrough&lang=en)
+[Introduction (0:28)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=intro&lang=en) · [Ubuntu installation (2:30)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=install&lang=en) · [Full walkthrough (5:47)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=walkthrough&lang=en)
 
-Both videos have Korean narration and optional English subtitles. The walkthrough covers Ubuntu installation, all four analysis modes, result interpretation, and searching the results database. [English step-by-step guide](docs/browser_quickstart.en.md#follow-the-screenshots) · [Install commands and chapter times](docs/walkthrough.en.md)
+Start with **Ubuntu installation** if this is your first setup. The **full walkthrough** covers the four analysis modes, how to read predictions, database search and report export. All three recordings have English narration and selectable English and Korean captions. [Installation commands and chapters](docs/walkthrough.en.md) · [Step-by-step screenshots](docs/browser_quickstart.en.md#follow-the-screenshots)
 
-**Downloads** · [Introduction MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-intro-ko.mp4) · [Walkthrough MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-walkthrough-ko.mp4) · [English subtitles (SRT)](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-walkthrough-en.srt) · [Installation guide (Markdown)](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-walkthrough-guide-en.md)
+**Downloads** · [Introduction MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-intro-en.mp4) · [Installation MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-install-en.mp4) · [Walkthrough MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-walkthrough-en.mp4) · [Captions and installation guides](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8)
 
 **First installation?** [Download the v0.4.8 source ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8.zip) and follow the public example below. It loads the sequences and a small starter preset.
 
