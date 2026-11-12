@@ -23,3 +23,42 @@ test('chain labels preserve original names and IDs through language changes',()=
  for(const language of ['en','ko','en']){context.I18N.setLanguage(language,{persist:false});assert.equal(context.I18N.value(message),`B · ${language==='en'?'Original':'원본'} 표적{0} · Lysozyme · 129 aa`);}
  assert.equal(JSON.stringify(chain),saved);
 });
+
+test('full-sequence prediction review preserves counts, mapping choices and source warnings', () => {
+  const cases = [
+    ["체인 B: 관측된 표준 잔기 205개, 기록된 전체 서열 214개입니다. 말단·내부 결손과 수정 잔기 여부를 확인하세요.",
+     "Chain B: 205 standard residues have coordinates. The recorded full sequence contains 214 residues. Check for missing terminal or internal segments and for modified residues."],
+    ["전체 서열로 새 단백질 구조를 예측합니다. 원본 좌표는 참조로만 보존하며 미관측 좌표를 채운 실험 구조로 표시하지 않습니다.",
+     "NanoCoFold predicts a new structure from the full protein sequence. The original coordinates are retained for reference. Any newly modeled positions are predictions."],
+    ["원본의 수정 잔기·chromophore·당질·리간드·핵산·막 환경은 이 단백질 서열 예측에 재현되지 않습니다.",
+     "This protein-sequence prediction omits modified residues, chromophores, glycans, ligands, nucleic acids, and the membrane environment from the original structure."],
+    ["선택한 원본 결합 부위를 전체 서열 위치로 대응했습니다. 노출도와 접촉은 예측 구조에서 다시 평가합니다.",
+     "The selected hotspots from the original structure were mapped to positions in the full sequence. Solvent exposure and contacts are reassessed on the predicted structure."],
+    ["결합 부위는 예측 구조에서 다시 계산합니다.",
+     "Hotspots are recalculated from the predicted structure."],
+    ["체인 B: 일부 관측 잔기의 전체 서열 위치가 불명확합니다. 원본 번호·결합 부위를 임의 대응하지 않았습니다.",
+     "Chain B: some observed residues could not be mapped unambiguously to the full sequence. Their original residue numbers and hotspots remain unmapped."],
+    ["결합 부위 미지정: 결합 위치를 제한하지 않고 탐색합니다.",
+     "No binding site specified: exploration does not constrain the binding location."],
+  ];
+  for (const [source, expected] of cases) {
+    const message = context.I18N.term(source);
+    context.I18N.setLanguage('en', {persist: false});
+    assert.equal(context.I18N.value(message), expected);
+    context.I18N.setLanguage('ko', {persist: false});
+    assert.equal(context.I18N.value(message), source);
+  }
+});
+
+test('pending submission and recovery are distinct in both languages', () => {
+  for (const [source, expected] of [
+    ['분석 요청을 보내는 중입니다. 접수되면 작업 화면이 열립니다.', 'Submitting your analysis. The job will open when it is accepted.'],
+    ['서버에서 이 요청의 작업을 찾고 있습니다.', 'Checking whether the server accepted this analysis.'],
+  ]) {
+    const message = context.I18N.term(source);
+    context.I18N.setLanguage('en', {persist: false});
+    assert.equal(context.I18N.value(message), expected);
+    context.I18N.setLanguage('ko', {persist: false});
+    assert.equal(context.I18N.value(message), source);
+  }
+});

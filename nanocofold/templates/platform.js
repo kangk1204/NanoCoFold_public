@@ -750,6 +750,22 @@ function applyAnalysisSettings(cfg) {
   if ($('novice-consent')) $('novice-consent').checked = false;
   invalidateInput(); fields();
 }
+async function findAcceptedAnalysis(submissionId, stillCurrent) {
+  // A lost response is ambiguous. Only attach a job carrying this exact receipt.
+  for (let attempt = 0; attempt < 8 && stillCurrent(); attempt++) {
+    if (attempt) await new Promise(resolve => setTimeout(resolve, 2000));
+    if (!stillCurrent()) return null;
+    try {
+      const page = await api('/api/jobs?limit=100', undefined, {timeoutMs: 5000});
+      const job = [...(page.active_jobs || []), ...page.jobs].find(
+        item => item.kind === 'analysis' && item.submission_id === submissionId);
+      if (job) return job;
+    } catch (error) {
+      if (error.responseRejected) throw error;
+    }
+  }
+  return null;
+}
 async function submitReviewedAnalysis() {
   if (state.analysisSubmitting) return;
   if (!state.input) throw Error('먼저 입력·적용 설정을 확인하세요.');
@@ -768,10 +784,28 @@ async function submitReviewedAnalysis() {
     }
     if (revision !== state.inputRevision || input !== state.input) throw Error('입력이나 설정이 변경되었습니다. 다시 검토하세요.');
     const budget = $('budget').value;
-    const job = await api('/api/jobs', {submission_id:state.submissionId || (state.submissionId=crypto.randomUUID().replaceAll('-','')),
-      reuse_results:!$('force-rerun').checked,input_id:input.id,mode,name:$('job-name').value,mock:input.config.run.mock,
-      ...(budget ? {budget_seconds:Number(budget)*60}: {})}, {timeoutMs:30000});
-    await selectJob(job.id); view('jobs'); state.submissionNoticeJob=job.id;
+    const submissionId = state.submissionId || (state.submissionId = crypto.randomUUID().replaceAll('-', ''));
+    const navigation = state.navigationRequest;
+    const stillCurrent = () => state.input === input && revision === state.inputRevision && navigation === state.navigationRequest;
+    const payload = {submission_id:submissionId, reuse_results:!$('force-rerun').checked,
+      input_id:input.id, mode, name:$('job-name').value, mock:input.config.run.mock,
+      ...(budget ? {budget_seconds:Number(budget)*60}: {})};
+    notice('분석 요청을 보내는 중입니다. 접수되면 작업 화면이 열립니다.');
+    let job;
+    try {
+      // A first admission can spend more than 30 s verifying model provenance.
+      job = await api('/api/jobs', payload, {timeoutMs:120000});
+    } catch (error) {
+      if (error.responseRejected) throw error;
+      if (!stillCurrent()) return;
+      notice('서버에서 이 요청의 작업을 찾고 있습니다.');
+      job = await findAcceptedAnalysis(submissionId, stillCurrent);
+      if (!stillCurrent()) return;
+      if (!job) throw error;
+    }
+    if (!stillCurrent()) return;
+    view('jobs'); state.submissionNoticeJob=job.id;
+    await selectJob(job.id);
     notice('작업을 등록했습니다. 브라우저를 닫아도 실행됩니다.');
   } finally { state.analysisSubmitting=false; renderInputReadiness(); }
 }
@@ -3506,6 +3540,7 @@ async function boot() {
       fields();
     }
     view("input"); state.showInputReview?.();
+    if (state.input && state.readiness) notice("입력 확인 완료 · 분석 실행을 선택하세요.");
   });
   $("environment-mode").onchange = () => { state.environmentTarget = null; refreshEnvironmentStatus().catch(e => notice(e.message, true)); };
   action("diagnose-environment", submitDiagnostic);

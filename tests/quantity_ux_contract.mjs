@@ -88,3 +88,40 @@ test('complex small comparison uses four engines while inactive VHH paths stay i
 test('custom complex seed lists and sample conditions remain explicit',()=>{const{c}=fixture();const cfg={run:{seed:42},complex:{seeds:[7,9],models_per_seed:2,comparison_engines:['boltz2']}};const saved=JSON.stringify(cfg),p=c.analysisQuantityPlan(cfg,'complex');assert.equal(p.modelUpper,4);assert.deepEqual(Array.from(p.conditions.boltz2.seeds),[7,9]);assert.equal(p.conditions.boltz2.modelsPerSeed,2);assert.equal(JSON.stringify(cfg),saved);});
 test('draft restoration keeps counts and marks the restored seed source',()=>{const{c,get}=fixture();c.draft={fields:{mode:'design','analysis-preset':'standard',advanced:'{"design":{"engine":"rfantibody","num_designs":7}}',seed:'99','design-count':'','candidate-limit':''}};c.host={contains:()=>true};c.restoring=false;const begin=source.indexOf('restoring=true;for(const [id,value]of Object.entries(draft.fields||{}))');vm.runInContext(source.slice(begin,source.indexOf('if(draft.fields?.comparison_engines)',begin)),c);assert.equal(c.inputSettings(false).run.seed,99);assert.equal(c.inputSettings(false).design.num_designs,7);assert.equal(c.quantitySource('seed','run.seed'),'복원한 입력');get('seed').value='';c.state.planningDefaults.run={seed:83};assert.equal(c.inputSettings(false).run.seed,83);assert.equal(c.inputSettings(true).run.seed,83);});
 test('bilingual quantity labels and confirmation text are translated without losing numbers',()=>{const{c}=fixture();const ko=c.noviceModelPlan(design,'design',0);const en=c.I18N.value(c.I18N.term(ko));assert.match(en,/500 models/);assert.ok(!/[가-힣]/.test(en));assert.match(c.I18N.value(c.I18N.format('적용값: {0} · 출처: {1}',[1,c.I18N.term('작은 시작 설정')])),/Effective value: 1/);});
+
+test('lost analysis receipt finds the exact accepted job with GET and never resubmits', async () => {
+ const {c}=fixture();
+ ready({c}, design);
+ const calls=[],selected=[];
+ c.setTimeout=fn=>fn();
+ c.selectJob=async id=>selected.push(id);
+ c.api=async (path, body)=>{
+   calls.push({path, body});
+   if(body) throw Error('lost');
+   const unrelated={kind:'analysis',name:'opaque',id:'other',submission_id:'different'};
+   return {active_jobs:[unrelated],jobs:calls.length===2?[]:[{...unrelated,id:'accepted',submission_id:c.state.submissionId}]};
+ };
+ await c.submitReviewedAnalysis();
+ assert.deepEqual(selected,['accepted']);
+ assert.equal(calls.filter(x=>x.body).length,1);
+ assert.equal(calls.length,3);
+});
+test('missing or rejected analysis receipts never open a different job', async () => {
+ for(const rejected of [false,true]) {
+   const {c}=fixture();ready({c},design);c.setTimeout=fn=>fn();
+   let posts=0,reads=0;c.selectJob=async ()=>assert.fail('opened an unrelated job');
+   c.api=async (path,body)=>{
+     if(body){posts++;const err=Error('submission not confirmed');err.responseRejected=rejected;throw err;}
+     reads++;return {jobs:[{kind:'analysis',name:'opaque',id:'older',submission_id:'old'}]};
+   };
+   await assert.rejects(c.submitReviewedAnalysis(),/submission not confirmed/);
+   assert.equal(posts,1);assert.equal(reads,rejected?0:8);
+ }
+});
+test('a late accepted job leaves later navigation intact',async()=>{
+ const {c}=fixture();ready({c},design);
+ c.api=async()=>{c.state.navigationRequest=4;return{id:'saved'};};
+ c.view=()=>assert.fail('overrode later navigation');
+ c.selectJob=()=>assert.fail('overrode selected job');
+ await c.submitReviewedAnalysis();
+});
