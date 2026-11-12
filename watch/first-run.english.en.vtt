@@ -596,182 +596,192 @@ This shows the predicted orientation
 for the selected candidate.
 
 124
-00:22:57.887 --> 00:23:05.140
+00:22:57.065 --> 00:23:02.569
+The yellow notice means status updates are
+delayed. This completed result is already saved.
+
+125
+00:23:02.729 --> 00:23:07.636
+If the page closes, open Jobs and
+logs and select this analysis again.
+
+126
+00:23:08.095 --> 00:23:15.348
 Below the viewer, click CDR3 97–113. This
 highlights a loop at the tip of the nanobody.
 
-125
-00:23:05.300 --> 00:23:07.412
+127
+00:23:15.508 --> 00:23:17.620
 We allowed changes only in this loop.
 
-126
-00:23:07.572 --> 00:23:10.644
+128
+00:23:17.780 --> 00:23:20.852
 See where it sits relative to the EGFR surface.
 
-127
-00:23:11.095 --> 00:23:13.228
-Turn on the hotspot and contact layers.
-
-128
-00:23:13.388 --> 00:23:16.716
-The hotspot marks the place you
-asked the nanobody to reach.
-
 129
-00:23:16.876 --> 00:23:22.807
-Contacts show where the predicted proteins actually
-meet. Use Full structure to see them in context.
+00:23:21.303 --> 00:23:27.063
+Turn on the hotspot and contact layers. The hotspot
+marks the place you asked the nanobody to reach.
 
 130
-00:23:31.553 --> 00:23:36.631
+00:23:27.223 --> 00:23:30.402
+Contacts show where the
+predicted proteins actually meet.
+
+131
+00:23:30.562 --> 00:23:33.719
+Click Fit entire structure to see them in context.
+
+132
+00:23:41.762 --> 00:23:46.839
 The mean interface PAE for this
 mutant is 12.419 angstroms.
 
-131
-00:23:36.791 --> 00:23:42.487
+133
+00:23:46.999 --> 00:23:52.695
 Each square estimates uncertainty in the
 position of one amino acid relative to another.
 
-132
-00:23:42.647 --> 00:23:44.289
+134
+00:23:52.855 --> 00:23:54.498
 Lower means less uncertainty.
 
-133
-00:23:44.449 --> 00:23:48.481
+135
+00:23:54.658 --> 00:23:58.690
 To read the interface, compare a point
 on one chain with a point on the other.
 
-134
-00:23:48.928 --> 00:23:52.960
+136
+00:23:59.137 --> 00:24:03.169
 Open the saved selection criteria
 in this candidate’s details.
 
-135
-00:23:53.120 --> 00:23:57.494
+137
+00:24:03.329 --> 00:24:07.702
 Read the measured value, the threshold,
 and the pass or fail column together.
 
-136
-00:23:57.654 --> 00:24:00.214
+138
+00:24:07.862 --> 00:24:10.422
 This mutant is recorded as ineligible.
 
-137
-00:24:02.220 --> 00:24:07.255
+139
+00:24:12.428 --> 00:24:17.463
 Open section four, Exclusions. One model
 can be counted for several reasons.
 
-138
-00:24:07.415 --> 00:24:13.303
+140
+00:24:17.623 --> 00:24:23.511
 All ten mutants fell below both the
 ipSAE and ipTM thresholds for this run.
 
-139
-00:24:13.463 --> 00:24:18.668
+141
+00:24:23.671 --> 00:24:28.876
 All ten were also flagged for developability
 review. Three had a predicted clash.
 
-140
-00:24:18.828 --> 00:24:25.079
+142
+00:24:29.036 --> 00:24:35.287
 All eleven models were calculated. Zero selected
 means no mutant passed the saved selection rules.
 
-141
-00:24:25.553 --> 00:24:28.988
+143
+00:24:35.762 --> 00:24:39.196
 Before sharing, return to section
 two and find Handoff check.
 
-142
-00:24:29.148 --> 00:24:30.599
+144
+00:24:39.356 --> 00:24:40.807
 Handoff is incomplete.
 
-143
-00:24:30.759 --> 00:24:35.985
+145
+00:24:40.967 --> 00:24:46.194
 You can export the report for discussion and review
 the listed blockers before approving release.
 
-144
-00:24:36.145 --> 00:24:38.641
+146
+00:24:46.354 --> 00:24:48.850
 Here it records 7 errors and 1 warning.
 
-145
-00:24:38.801 --> 00:24:40.529
+147
+00:24:49.010 --> 00:24:50.738
 This checks the files you can share.
 
-146
-00:24:40.689 --> 00:24:44.401
+148
+00:24:50.898 --> 00:24:54.610
 To learn whether the proteins really
 bind, you need a lab experiment.
 
-147
-00:24:44.845 --> 00:24:46.872
+149
+00:24:55.053 --> 00:24:57.080
 Here the expression vector is missing.
 
-148
-00:24:47.032 --> 00:24:51.426
+150
+00:24:57.240 --> 00:25:01.635
 This is the DNA carrier the laboratory
 would use to produce the nanobody.
 
-149
-00:24:51.586 --> 00:24:57.133
+151
+00:25:01.795 --> 00:25:07.341
 You can share the report for discussion, then
 resolve the listed items before ordering synthesis.
 
-150
-00:24:57.595 --> 00:25:04.379
+152
+00:25:07.803 --> 00:25:14.587
 Open Results database. Enter the same name you
 typed at the start: EGFR 10 variants walkthrough.
 
-151
-00:25:04.539 --> 00:25:09.638
+153
+00:25:14.747 --> 00:25:19.846
 Click Search. In the first column, click
 the analysis name to open the saved result.
 
-152
-00:25:14.720 --> 00:25:19.776
+154
+00:25:24.928 --> 00:25:30.198
 The link opens the same saved result in
-a new tab. Scroll to Save all results.
+a new tab. Scroll to Export all results.
 
-153
-00:25:19.936 --> 00:25:25.205
-Choose the delivery report ZIP, which includes
+155
+00:25:30.358 --> 00:25:35.307
+Choose Shareable report ZIP, which includes
 the structures and PAE, then click Save.
 
-154
-00:25:58.553 --> 00:26:02.628
+156
+00:26:08.762 --> 00:26:12.836
 On the computer where you downloaded
 the ZIP, open a terminal in Downloads.
 
-155
-00:26:02.788 --> 00:26:08.313
+157
+00:26:12.996 --> 00:26:18.522
 The Python command on screen extracts the
 entire archive into NanoCoFold-report.
 
-156
-00:26:08.473 --> 00:26:15.151
+158
+00:26:18.682 --> 00:26:25.359
 Inside are report.html, the report, and
 candidates.csv, the table of candidates.
 
-157
-00:26:17.762 --> 00:26:21.346
+159
+00:26:27.970 --> 00:26:31.554
 Open report.html in the extracted folder.
 
-158
-00:26:21.506 --> 00:26:26.818
+160
+00:26:31.714 --> 00:26:37.026
 You can double-click the file, or use the terminal
 command shown here to open it in your browser.
 
-159
-00:26:27.262 --> 00:26:31.422
+161
+00:26:37.470 --> 00:26:41.630
 This report is open from the extracted
 file, with the browser offline.
 
-160
-00:26:31.582 --> 00:26:37.512
+162
+00:26:41.790 --> 00:26:47.721
 The same analysis name, model counts, rotatable
 structure and PAE map are still available.
 
-161
-00:26:37.672 --> 00:26:40.979
+163
+00:26:47.881 --> 00:26:51.187
 Send the full ZIP so your
 colleague can open the same report.
 
