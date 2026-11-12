@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="nanocofold-media" content="local">
+<title>NanoCoFold · Videos</title>
+<style>
+  :root {font-family: Inter, "Apple SD Gothic Neo", "Malgun Gothic", Arial, sans-serif; color:#122f35; background:#f4f7f4; line-height:1.5;}
+  * {box-sizing:border-box}
+  body {margin:0}
+  header {border-bottom:1px solid #c9d7d0}
+  .bar, main {width:min(100% - 32px, 960px); margin:auto}
+  .bar {display:flex; align-items:center; justify-content:space-between; min-height:64px; gap:12px}
+  a {color:#00675e; text-underline-offset:.2em}
+  .brand {color:#123239; font-weight:750; font-size:1.18rem; text-decoration:none}
+  .lang {display:flex; gap:4px}
+  button,.lang a,nav a {font:inherit; cursor:pointer}
+  .lang a {padding:5px 9px; font-size:.875rem; border-radius:4px; text-decoration:none; color:#334f4c}
+  .lang a[aria-current="true"] {background:#dce9e1; color:#123239; font-weight:700}
+  main {padding:30px 0 44px}
+  nav {display:flex; gap:9px; flex-wrap:wrap}
+  nav a {border:1px solid #b6c9c1; color:#22534c; background:white; border-radius:5px; padding:7px 12px; text-decoration:none; font-size:.92rem}
+  nav a[aria-current="page"] {background:#113b3f;color:#fff;border-color:#113b3f}
+  h1 {font-weight:680; font-size:clamp(1.7rem,4.3vw,2.5rem); letter-spacing:-.035em; line-height:1.14; margin:22px 0 7px}
+  #meta {margin:0 0 14px; color:#41635e; font-size:.96rem}
+  video {display:block;width:100%;height:auto;aspect-ratio:16/9;border-radius:7px;background:#0d2931}
+  #links {display:flex;flex-wrap:wrap;gap:9px 22px;margin:16px 0}
+  details {border-top:1px solid #c4d0c8;padding-top:12px}
+  summary {cursor:pointer;font-weight:650}
+  ol {display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:2px 12px; padding:0;list-style:none}
+  li button {padding:6px 0;border:none;background:transparent;text-align:left;color:#156256}
+  li time {font-size:.88rem; font-variant-numeric:tabular-nums; padding-right:8px;color:#4e6d63}
+  a:focus-visible,button:focus-visible,summary:focus-visible,video:focus-visible {outline:3px solid #008375;outline-offset:3px}
+  [hidden] {display:none!important}
+  @media(max-width:480px){.bar{min-height:54px}main{padding-top:20px}.bar,main{width:calc(100% - 24px)}}
+</style>
+</head>
+<body>
+<header><div class="bar">
+  <a class="brand" href="https://github.com/kangk1204/NanoCoFold_public">NanoCoFold</a>
+  <div class="lang"><a id="ko" lang="ko" hreflang="ko" href="?v=intro&amp;lang=ko">한국어</a><a id="en" lang="en" hreflang="en" href="?v=intro&amp;lang=en">English</a></div>
+</div></header>
+<main>
+  <nav id="choices" aria-label="Videos"><a id="intro" href="?v=intro">Overview</a><a id="walkthrough" href="?v=walkthrough">Full walkthrough</a></nav>
+  <h1 id="heading">NanoCoFold videos</h1><p id="meta"></p>
+  <video controls playsinline preload="metadata" width="1920" height="1080" id="player" aria-labelledby="heading"></video>
+  <p id="status" role="status" hidden></p>
+  <div id="links"><a id="download" href="https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8">Download video</a><a id="captions" hidden></a><a id="guide" href="https://github.com/kangk1204/NanoCoFold_public/blob/v0.4.8/docs/walkthrough.ko.md">Installation guide</a><a id="release" href="https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8">Release v0.4.8</a></div>
+  <details id="chapters" hidden><summary></summary><ol></ol></details>
+  <noscript><p>Open the release above to download both videos. 위 릴리스에서 두 영상을 내려받으실 수 있습니다.</p></noscript>
+</main>
+<script>
+(() => {
+  const q = new URLSearchParams(location.search);
+  const id = q.get("v") === "walkthrough" ? "walkthrough" : "intro";
+  const language = ["en","ko"].includes(q.get("lang")) ? q.get("lang") : (navigator.language.startsWith("ko") ? "ko" : "en");
+  const ko = language === "ko";
+  const el = key => document.getElementById(key);
+  const words = ko ? {
+    intro:"플랫폼 소개", walkthrough:"전체 실습 영상", heading:["NanoCoFold 플랫폼 소개","설치부터 결과 DB 검색까지"],
+    meta:"한국어 음성 · 한국어 화면 자막", download:"MP4 내려받기", guide:"설치 명령어와 목차", srt:"한국어 자막 (SRT)",
+    release:"v0.4.8 릴리스", chapters:"원하는 단계로 이동", status:"브라우저에서 영상을 불러오지 못했습니다. 아래 MP4 링크로 열어 주세요.",
+    names:["시작","설치","복합체 예측","복합체 결과","새 나노바디 설계","보유 나노바디 비교","기존 나노바디 변이 평가","결과 DB와 공유"]
+  } : {
+    intro:"Overview", walkthrough:"Full walkthrough", heading:["NanoCoFold overview","From installation to searching the results database"],
+    meta:"Korean narration and on-screen captions", download:"Download MP4", guide:"Installation commands and chapters (Korean)", srt:"Korean subtitles (SRT)",
+    release:"Release v0.4.8", chapters:"Jump to a chapter", status:"The video could not load in this browser. Use the MP4 link below.",
+    names:["Introduction","Install","Predict a complex","Read complex results","Design new nanobodies","Compare existing nanobodies","Evaluate nanobody variants","Search and share results"]
+  };
+  const repo = "https://github.com/kangk1204/NanoCoFold_public";
+  const release = repo + "/releases/download/v0.4.8/";
+  const file = "NanoCoFold-" + id + "-ko.mp4";
+  const full = id === "walkthrough";
+  const video = el("player");
+  for (const key of ["intro","walkthrough"]) {
+    el(key).textContent = words[key]; el(key).href = "?v=" + key + "&lang=" + language;
+    if (key === id) el(key).setAttribute("aria-current","page");
+  }
+  for (const key of ["ko","en"]) {
+    el(key).href = "?v=" + id + "&lang=" + key;
+    if (key === language) el(key).setAttribute("aria-current","true");
+  }
+  document.documentElement.lang = language;
+  el("choices").setAttribute("aria-label",ko ? "영상 선택" : "Choose a video");
+  el("heading").textContent = words.heading[full ? 1 : 0];
+  document.title = el("heading").textContent + " · NanoCoFold";
+  el("meta").textContent = (full ? "5:21" : "0:29") + "  ·  " + words.meta;
+  el("download").textContent = words.download; el("download").href = release + file;
+  el("guide").textContent = words.guide;
+  el("release").textContent = words.release;
+  el("status").textContent = words.status;
+  video.poster = id + "-poster.jpg";
+  if (full) {
+    el("captions").hidden = false; el("captions").href = release + "NanoCoFold-walkthrough-ko.srt"; el("captions").textContent = words.srt;
+    const track = document.createElement("track");
+    track.kind = "subtitles"; track.srclang = "ko"; track.label = "한국어"; track.src = "walkthrough.ko.vtt"; video.append(track);
+    el("chapters").hidden = false; el("chapters").querySelector("summary").textContent = words.chapters;
+    const times = [0,9.96,65.54,130.75,163.29,203.46,235.17,277.96];
+    const list = el("chapters").querySelector("ol");
+    times.forEach((at,i) => {
+      const row = document.createElement("li"), button = document.createElement("button"), time = document.createElement("time");
+      time.textContent = Math.floor(at/60) + ":" + String(Math.floor(at%60)).padStart(2,"0");
+      button.type = "button"; button.append(time,words.names[i]); row.append(button); list.append(row);
+      button.addEventListener("click",() => {
+        const seek = () => {video.currentTime = at; video.play().catch(() => {});};
+        if (video.readyState >= 1) seek();
+        else {video.addEventListener("loadedmetadata",seek,{once:true}); video.play().catch(() => {});}
+      });
+    });
+  }
+  const mirror = "media/" + file;
+  const sources = document.querySelector('meta[name="nanocofold-media"]').content === "local" ? [mirror,release + file] : [release + file,mirror];
+  let sourceIndex = 0;
+  video.addEventListener("error",() => {
+    if (++sourceIndex < sources.length) video.src = sources[sourceIndex];
+    else el("status").hidden = false;
+  });
+  video.src = sources[0];
+})();
+</script>
+</body>
+</html>
