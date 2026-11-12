@@ -1,0 +1,184 @@
+WEBVTT
+
+1
+00:00:00.200 --> 00:00:02.867
+Open the NanoCoFold release on GitHub.
+
+2
+00:00:02.987 --> 00:00:08.661
+On an Ubuntu computer with an NVIDIA GPU, you can
+install it from the source ZIP or with Git.
+
+3
+00:00:08.781 --> 00:00:09.891
+Here we use Git.
+
+4
+00:00:10.658 --> 00:00:13.346
+Open a terminal and run nvidia-smi.
+
+5
+00:00:13.466 --> 00:00:16.112
+Check that it lists your GPU and its driver.
+
+6
+00:00:16.232 --> 00:00:21.266
+Before installing, check the memory and free disk
+space required in the release README.
+
+7
+00:00:22.033 --> 00:00:24.145
+Copy the Git clone command from the guide.
+
+8
+00:00:24.265 --> 00:00:29.044
+It downloads the release into a folder called
+NanoCoFold_public.
+
+9
+00:00:29.164 --> 00:00:31.105
+Wait for the command prompt to return.
+
+10
+00:00:31.867 --> 00:00:33.296
+Change into that folder.
+
+11
+00:00:33.416 --> 00:00:36.701
+Check that Git prints v0.4.8.
+
+12
+00:00:36.821 --> 00:00:39.403
+You should see the installer and the start script
+here.
+
+13
+00:00:39.523 --> 00:00:44.472
+If you downloaded the ZIP, extract it and open a
+terminal inside the extracted folder.
+
+14
+00:00:45.242 --> 00:00:48.527
+Choose one installation command for the work you
+want to do.
+
+15
+00:00:48.647 --> 00:00:53.426
+The guide lists the first complex example and the
+full installation side by side.
+
+16
+00:00:54.200 --> 00:00:58.253
+For the first complex example, type the complex
+command and press Enter.
+
+17
+00:00:58.373 --> 00:01:01.424
+It installs the application, Boltz-2 and Chai-1.
+
+18
+00:01:01.544 --> 00:01:04.595
+If Ubuntu asks for a password, enter it in the
+terminal.
+
+19
+00:01:05.367 --> 00:01:08.478
+For all four modes, including new nanobody design
+
+20
+00:01:08.503 --> 00:01:11.895
+and variant evaluation, use the all command
+instead.
+
+21
+00:01:12.015 --> 00:01:14.468
+You only need to choose one of these two profiles.
+
+22
+00:01:15.242 --> 00:01:18.548
+Here is the installer running on a fresh copy of
+the release.
+
+23
+00:01:18.668 --> 00:01:21.868
+For this demonstration we install the application
+alone.
+
+24
+00:01:21.988 --> 00:01:26.234
+Our Ubuntu computer already has the system
+packages, so it skips that step.
+
+25
+00:01:26.992 --> 00:01:32.176
+Wait for the final line that says installation
+complete, followed by bash start.sh.
+
+26
+00:01:32.296 --> 00:01:35.090
+The core installation shown here prepares the web
+app.
+
+27
+00:01:35.210 --> 00:01:38.901
+A GPU profile also installs its prediction
+engines.
+
+28
+00:01:39.658 --> 00:01:44.992
+With a GPU profile, leave the terminal open while
+it downloads the engines and models.
+
+29
+00:01:45.112 --> 00:01:48.610
+Here is the completion message from a saved full
+installation.
+
+30
+00:01:48.730 --> 00:01:51.760
+Wait for it on your own computer before starting
+the server.
+
+31
+00:01:52.533 --> 00:01:54.880
+In the same folder, run the start command.
+
+32
+00:01:55.000 --> 00:01:59.715
+Keep this terminal open and copy the web address
+printed after NanoCoFold.
+
+33
+00:01:59.835 --> 00:02:04.528
+This first launch was recorded on a fresh
+installation of the application itself.
+
+34
+00:02:05.283 --> 00:02:08.078
+Open the address in a browser on the same
+computer.
+
+35
+00:02:08.198 --> 00:02:12.187
+If the port is busy, use port zero and open the
+new address it prints.
+
+36
+00:02:12.307 --> 00:02:16.489
+For a remote computer, follow the SSH instructions
+in the README.
+
+37
+00:02:17.242 --> 00:02:22.554
+For your first analysis, open the environment
+check and choose Predict protein complexes.
+
+38
+00:02:22.674 --> 00:02:26.002
+After your selected engines pass, click Prepare
+analysis.
+
+39
+00:02:26.122 --> 00:02:29.706
+You can now load the public example and follow the
+full walkthrough.

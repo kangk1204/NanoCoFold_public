@@ -36,6 +36,13 @@
   a:focus-visible,button:focus-visible,summary:focus-visible,video:focus-visible {outline:3px solid #008375;outline-offset:3px}
   [hidden] {display:none!important}
   @media(max-width:480px){.bar{min-height:54px}main{padding-top:20px}.bar,main{width:calc(100% - 24px)}}
+  #legacy {font-size:.9rem;color:#41635e}
+  #captions {display:inline-flex;gap:1em;flex-wrap:wrap}
+  video {object-fit:contain}
+  .captionbar {display:flex;gap:16px;align-items:baseline;padding:10px 0 4px;flex-wrap:wrap;color:#294d50}
+  .captionbar label {font-size:.88rem}
+  .captionbar select {font:inherit;padding:4px 6px;border:1px solid #9eb7af;border-radius:4px;margin-left:5px}
+  #spoken {margin:0;min-height:2.9em;max-width:78ch;font-size:1rem;line-height:1.45}
 </style>
 </head>
 <body>
@@ -44,91 +51,108 @@
   <div class="lang"><a id="ko" lang="ko" hreflang="ko" href="?v=intro&amp;lang=ko">한국어</a><a id="en" lang="en" hreflang="en" href="?v=intro&amp;lang=en">English</a></div>
 </div></header>
 <main>
-  <nav id="choices" aria-label="Videos"><a id="intro" href="?v=intro">Overview</a><a id="walkthrough" href="?v=walkthrough">Full walkthrough</a></nav>
+  <nav id="choices" aria-label="Videos"><a id="intro" href="?v=intro">Introduction</a><a id="install" href="?v=install">Ubuntu installation</a><a id="walkthrough" href="?v=walkthrough">Full walkthrough</a></nav>
   <h1 id="heading">NanoCoFold videos</h1><p id="meta"></p>
   <video controls playsinline preload="metadata" width="1920" height="1080" id="player" aria-labelledby="heading"></video>
+  <div class="captionbar"><label><span id="cclabel">Subtitles</span><select id="cc"><option value="en">English</option><option value="ko">한국어</option><option value="off">Off</option></select></label><p id="spoken" aria-live="off"></p></div>
   <p id="status" role="status" hidden></p>
-  <div id="links"><a id="download" href="https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8">Download video</a><a id="captions" hidden></a><a id="guide" href="https://github.com/kangk1204/NanoCoFold_public/blob/v0.4.8/docs/walkthrough.ko.md">Installation guide</a><a id="release" href="https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8">Release v0.4.8</a></div>
+  <div id="links"><a id="download">Download MP4</a><span id="captions"></span><a id="guide">Installation guide</a><a id="release" href="https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8">Release v0.4.8</a></div>
   <details id="chapters" hidden><summary></summary><ol></ol></details>
-  <noscript><p>Open the release above to download both videos. 위 릴리스에서 두 영상을 내려받으실 수 있습니다.</p></noscript>
+  <p id="legacy" hidden><a></a></p>
+  <noscript><p><a href="https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8">Download the videos / 영상 내려받기</a></p></noscript>
 </main>
+<script src="english-edition.js"></script>
 <script>
 (() => {
+  const get = id => document.getElementById(id);
   const q = new URLSearchParams(location.search);
-  const id = q.get("v") === "walkthrough" ? "walkthrough" : "intro";
   const language = ["en","ko"].includes(q.get("lang")) ? q.get("lang") : (navigator.language.startsWith("ko") ? "ko" : "en");
   const ko = language === "ko";
-  const el = key => document.getElementById(key);
-  const words = ko ? {
-    intro:"플랫폼 소개", walkthrough:"전체 실습 영상", heading:["NanoCoFold 플랫폼 소개","설치부터 결과 DB 검색까지"],
-    meta:"한국어 음성 · 한국어·영어 자막", download:"MP4 내려받기", guide:"설치 명령어와 목차", srt:"한국어 자막 (SRT)",
-    release:"v0.4.8 릴리스", chapters:"원하는 단계로 이동", status:"브라우저에서 영상을 불러오지 못했습니다. 아래 MP4 링크로 열어 주세요.",
-    names:["시작","설치","복합체 예측","복합체 결과","새 나노바디 설계","보유 나노바디 비교","기존 나노바디 변이 평가","결과 DB와 공유"]
-  } : {
-    intro:"Overview", walkthrough:"Full walkthrough", heading:["NanoCoFold overview","From installation to searching the results database"],
-    meta:"Korean narration · English and Korean subtitles", download:"Download MP4", guide:"Installation commands and chapters", srt:"Korean subtitles (SRT)",
-    release:"Release v0.4.8", chapters:"Jump to a chapter", status:"The video could not load in this browser. Use the MP4 link below.",
-    names:["Introduction","Install","Predict a complex","Read complex results","Design new nanobodies","Compare existing nanobodies","Evaluate nanobody variants","Search and share results"]
-  };
+  document.documentElement.lang = language;
   const repo = "https://github.com/kangk1204/NanoCoFold_public";
   const release = repo + "/releases/download/v0.4.8/";
-  const file = "NanoCoFold-" + id + "-ko.mp4";
-  const full = id === "walkthrough";
-  const video = el("player");
-  for (const key of ["intro","walkthrough"]) {
-    el(key).textContent = words[key]; el(key).href = "?v=" + key + "&lang=" + language;
-    if (key === id) el(key).setAttribute("aria-current","page");
-  }
-  for (const key of ["ko","en"]) {
-    el(key).href = "?v=" + id + "&lang=" + key;
-    if (key === language) el(key).setAttribute("aria-current","true");
-  }
-  document.documentElement.lang = language;
-  el("choices").setAttribute("aria-label",ko ? "영상 선택" : "Choose a video");
-  el("heading").textContent = words.heading[full ? 1 : 0];
-  document.title = el("heading").textContent + " · NanoCoFold";
-  el("meta").textContent = (full ? "5:21" : "0:29") + "  ·  " + words.meta;
-  el("download").textContent = words.download; el("download").href = release + file;
-  el("guide").textContent = words.guide; el("guide").href = repo + "/blob/v0.4.8/docs/walkthrough." + language + ".md";
-  el("release").textContent = words.release;
-  el("status").textContent = words.status;
-  video.poster = id + "-poster.jpg";
-  const subtitles = el("captions");
-  subtitles.hidden = false;
-  subtitles.href = release + "NanoCoFold-" + id + "-" + language + ".srt";
-  subtitles.textContent = ko ? "한국어 자막 (SRT)" : "English subtitles (SRT)";
-  for (const code of ["en", "ko"]) {
-    const track = document.createElement("track");
-    track.kind = "subtitles";
-    track.srclang = code;
-    track.label = code === "ko" ? "한국어" : "English";
-    track.src = id + "." + code + ".vtt";
-    if (!ko && code === "en") track.default = true;
-    video.append(track);
-  }
-  if (full) {
-    el("chapters").hidden = false; el("chapters").querySelector("summary").textContent = words.chapters;
-    const times = [0,9.96,65.54,130.75,163.29,203.46,235.17,277.96];
-    const list = el("chapters").querySelector("ol");
-    times.forEach((at,i) => {
-      const row = document.createElement("li"), button = document.createElement("button"), time = document.createElement("time");
-      time.textContent = Math.floor(at/60) + ":" + String(Math.floor(at%60)).padStart(2,"0");
-      button.type = "button"; button.append(time,words.names[i]); row.append(button); list.append(row);
-      button.addEventListener("click",() => {
-        const seek = () => {video.currentTime = at; video.play().catch(() => {});};
-        if (video.readyState >= 1) seek();
-        else {video.addEventListener("loadedmetadata",seek,{once:true}); video.play().catch(() => {});}
-      });
-    });
-  }
-  const mirror = "media/" + file;
-  const sources = document.querySelector('meta[name="nanocofold-media"]').content === "local" ? [mirror,release + file] : [release + file,mirror];
-  let sourceIndex = 0;
-  video.addEventListener("error",() => {
-    if (++sourceIndex < sources.length) video.src = sources[sourceIndex];
-    else el("status").hidden = false;
+  const ids = ["intro","install","walkthrough"];
+  const id = ids.includes(q.get("v")) ? q.get("v") : "intro";
+  const item = filmCatalog[id];
+  const labels = ko ? {
+    intro:"플랫폼 소개", install:"Ubuntu 설치", walkthrough:"전체 실습", videos:"영상 선택", heading:["NanoCoFold 플랫폼 소개","Ubuntu에 NanoCoFold 설치하기","첫 분석부터 결과 DB 검색까지"],
+    audio:"영어 음성 · 한국어·영어 자막", download:"MP4 내려받기", guide:"설치 명령어와 실습 안내", release:"v0.4.8 릴리스", chapters:"원하는 단계로 이동",
+    legacy:"이전 한국어 음성 영상 내려받기", status:"영상을 열 수 없습니다. 아래에서 MP4를 내려받아 주세요."
+  } : {
+    intro:"Introduction", install:"Ubuntu installation", walkthrough:"Full walkthrough", videos:"Choose a video", heading:["Introducing NanoCoFold","Install NanoCoFold on Ubuntu","Run an analysis and explore the results"],
+    audio:"English narration · English and Korean subtitles", download:"Download MP4", guide:"Installation and walkthrough guide", release:"Release v0.4.8", chapters:"Jump to a chapter",
+    legacy:"Download the earlier Korean-narrated recording", status:"The video could not load. Use the MP4 download below."
+  };
+  const url = (v, lang) => "?v=" + v + "&lang=" + lang;
+  const fmt = t => Math.floor(t/60)+":"+String(Math.floor(t%60)).padStart(2,"0");
+  ids.forEach(key => {
+    const a = get(key); a.textContent = labels[key]; a.href = url(key,language);
+    if (key === id) a.setAttribute("aria-current","page");
   });
-  video.src = sources[0];
+  for (const lang of ["ko","en"]) {
+    const a = get(lang); a.href = url(id,lang); if (lang === language) a.setAttribute("aria-current","true");
+  }
+  const video = get("player");
+  get("choices").setAttribute("aria-label",labels.videos);
+  get("heading").textContent = labels.heading[ids.indexOf(id)];
+  document.title = get("heading").textContent + " · NanoCoFold";
+  get("meta").textContent = fmt(Math.round(item.duration)) + " · " + labels.audio;
+  get("download").textContent = labels.download; get("download").href = release + item.file;
+  get("guide").textContent = labels.guide; get("guide").href = repo + "/blob/main/docs/walkthrough." + language + ".md";
+  get("release").textContent = labels.release;
+  get("status").textContent = labels.status;
+  video.poster = id + ".english.jpg";
+  const cc=get("cc"), spoken=get("spoken"), tracks=[];
+  get("cclabel").textContent=ko?"자막":"Subtitles";
+  cc.querySelector('[value="off"]').textContent=ko?"끄기":"Off";
+  cc.value=language;
+  const placeCaptions = () => {
+    const native=Boolean(document.fullscreenElement || video.webkitDisplayingFullscreen);
+    for (const track of tracks) track.mode=track.language===cc.value?(native?"showing":"hidden"):"disabled";
+    spoken.hidden=native || cc.value==="off"; refreshCaption();
+  };
+  const refreshCaption = () => {
+    const active=tracks.find(t=>t.language===cc.value);
+    spoken.textContent=active && active.activeCues ? Array.from(active.activeCues,c=>c.text).join(" ").replace(/\s*\n\s*/g," ") : "";
+  };
+  for (const code of [language, language==="ko" ? "en" : "ko"]) {
+    const track = document.createElement("track");
+    track.kind="subtitles"; track.srclang=code; track.label=code==="ko"?"한국어":"English"; track.src=id+".english."+code+".vtt";
+    video.append(track); tracks.push(track.track);
+    track.track.addEventListener("cuechange",refreshCaption);
+    track.addEventListener("load",refreshCaption);
+    const sub = document.createElement("a");
+    sub.id = "subtitle-"+code;
+    sub.href = release + item.file.replace(".mp4",".cc."+code+".srt");
+    sub.textContent = ko ? (code==="ko"?"한국어 자막":"영어 자막")+" (SRT)" : (code==="en"?"English":"Korean")+" subtitles (SRT)";
+    get("captions").append(sub);
+  }
+  cc.addEventListener("change",placeCaptions);
+  document.addEventListener("fullscreenchange",placeCaptions);
+  video.addEventListener("webkitbeginfullscreen",placeCaptions);
+  video.addEventListener("webkitendfullscreen",placeCaptions);
+  placeCaptions();
+  if (item.chapters.length > 1) {
+    const details=get("chapters"); details.hidden=false; details.querySelector("summary").textContent=labels.chapters;
+    for (const mark of item.chapters) {
+      const li=document.createElement("li"), btn=document.createElement("button"), time=document.createElement("time");
+      time.textContent=fmt(mark.start); btn.type="button"; btn.append(time,mark[language]); li.append(btn); details.querySelector("ol").append(li);
+      btn.addEventListener("click",() => {
+        const seek=()=>{video.currentTime=mark.start;video.play().catch(()=>{});};
+        if(video.readyState>=1) seek();
+        else {video.addEventListener("loadedmetadata",seek,{once:true});video.play().catch(()=>{});}
+      });
+    }
+  }
+  if(id!=="install"){
+    const box=get("legacy"); box.hidden=false;
+    box.firstElementChild.href=release+"NanoCoFold-"+id+"-ko.mp4";
+    box.firstElementChild.textContent=labels.legacy;
+  }
+  const sources=["media/"+item.file,release+item.file];
+  let current=0;
+  video.addEventListener("error",()=>{ if(++current<sources.length) video.src=sources[current]; else get("status").hidden=false; });
+  video.src=sources[0];
 })();
 </script>
 </body>
