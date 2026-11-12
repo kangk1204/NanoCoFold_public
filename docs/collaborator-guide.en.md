@@ -38,7 +38,7 @@ Depending on the settings, you can add CDR substitution candidates or use ESM/An
 
 ## 1. Download the software
 
-Use the [public repository](https://github.com/kangk1204/NanoCoFold_public) at the commit or tag shared with you. GitHub’s **Latest release** may contain an older build than `main`. On the chosen source page, click **Code → Download ZIP** and extract the entire archive. Open the folder containing `README.md`, `install.sh`, and `start.sh`, then open a terminal inside that folder.
+Download the [v0.4.8 source ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8.zip) and extract the entire archive. If your collaborator specified another tag or commit, choose **Code → Download ZIP** on that revision’s source page. Open the folder containing `README.md`, `install.sh`, and `start.sh`, then open a terminal inside that folder.
 
 Install on Ubuntu x86_64 with an NVIDIA GPU. The first four-engine example requires at least 16 GB GPU memory, 32 GB RAM, and 150 GiB free SSD space. Check the operating system and driver requirements in the [README](../README.md#1-prepare-and-install). On Windows or macOS, connect to an installed server or open a report someone sent you.
 

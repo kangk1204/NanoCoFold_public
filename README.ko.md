@@ -2,15 +2,19 @@
 
 [English](README.md) · **한국어**
 
-**Build: 0.4.8rc12**
+**정식 릴리스 [v0.4.8](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8)** · 계산 패키지 `0.4.8rc12`
 
-**이미 설치했다면** [업데이트 안내](docs/UPDATE.ko.md)를 따르세요. 기존 작업 공간을 유지하고 새 소스를 받은 뒤 `bash update.sh`로 설치본을 갱신합니다.
+단백질 복합체를 예측하고, 새 나노바디를 설계하거나 보유한 후보와 변이를 비교합니다. 결과는 3D로 살펴보고 대화형 보고서로 공유할 수 있습니다.
 
-**어디서 내려받나요?** `main` 또는 공동연구자가 보낸 커밋 페이지에서 **Code → Download ZIP**을 누르세요. 예전 `v0.4.8rc12` 릴리스는 버전 번호가 같지만 CDR3 구간 선택 기능이 없습니다. [소스 버전 기록 방법](docs/collaborator-guide.ko.md#6-전달-기록-남기기)
+[29초 소개 영상 보기](https://kangk1204.github.io/NanoCoFold_public/watch/?v=intro&lang=ko) · [전체 실습 영상 보기 (5분 21초)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=walkthrough&lang=ko)
 
-단백질 복합체를 예측하고, 새 나노바디를 설계하거나 보유 후보와 변이를 비교하는 프로그램입니다. 결과는 후보 표, 3D 구조, PAE와 전달용 HTML 보고서로 확인합니다.
+두 영상 모두 한국어로 설명하며 영어 자막을 켤 수 있습니다. 전체 실습에서는 Ubuntu 설치부터 네 가지 분석 모드, 결과 해석, 결과 DB 검색까지 따라 할 수 있습니다. [설치 명령어와 영상 목차](docs/walkthrough.ko.md)
 
-**처음 사용하는 경우 아래 공개 예제로 시작하세요.** 서열과 기본 실행 조건이 자동으로 채워집니다.
+**내려받기** · [소개 영상 MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-intro-ko.mp4) · [전체 실습 MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-walkthrough-ko.mp4) · [한국어 자막 SRT](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-walkthrough-ko.srt) · [설치 안내 Markdown](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-walkthrough-guide-ko.md)
+
+**처음 설치하시나요?** [v0.4.8 소스 ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8.zip)을 내려받고 아래 공개 예제를 따라 하세요. 서열과 작은 시작 설정이 자동으로 채워집니다.
+
+**이미 설치했다면** [업데이트 안내](docs/UPDATE.ko.md)에 따라 기존 작업 공간과 결과를 그대로 사용하세요.
 
 | 사용하는 컴퓨터 | 사용하는 방법 |
 |---|---|
@@ -54,8 +58,8 @@ GPU 메모리가 16 GB 미만이면 서버 관리자와 사용할 엔진·입력
 
 설치기가 Python 환경, 엔진, 모델을 자동으로 준비합니다. NVIDIA 드라이버는 서버 관리자가 미리 설치합니다.
 
-1. 현재 GitHub 페이지의 **Code → Download ZIP**을 눌러 받은 ZIP **전체를 압축 해제**합니다. 소스 ZIP을 따로 받았다면 그것을 사용하세요. Git으로 clone했다면 그 저장소 폴더를 사용합니다.
-2. GitHub clone은 **`NanoCoFold_public` 폴더**, **Download ZIP**은 압축을 푼 **`NanoCoFold_public-main` 폴더**를 엽니다. 태그나 별도 소스 ZIP은 폴더 이름이 다를 수 있습니다.
+1. [v0.4.8 소스 ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8.zip)을 내려받아 전체를 압축 해제합니다. Git으로 clone했다면 그 저장소 폴더를 사용합니다.
+2. 릴리스 ZIP은 **`NanoCoFold_public-0.4.8` 폴더**, Git clone은 **`NanoCoFold_public` 폴더**를 엽니다.
 3. 이 폴더 안에서 터미널을 엽니다. `README.md`, `install.sh`, `start.sh`가 보이면 맞습니다.
 4. 첫 복합체 예제의 네 엔진을 준비하려면 아래 **세 명령을 순서대로, 같은 폴더에서** 실행합니다. 한 명령이 `[설치 완료]`로 끝난 뒤 다음 명령을 실행하세요.
 

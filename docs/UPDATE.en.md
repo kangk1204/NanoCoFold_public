@@ -1,6 +1,6 @@
 # Update an existing installation
 
-Use the original installation folder to keep your workspace, engines and saved results. Several source revisions share the package version **0.4.8rc12**.
+Update in the original installation folder to keep your workspace, prediction engines and saved results. The GitHub release is **v0.4.8**. Its compute package reports **0.4.8rc12**.
 
 ## 1. Finish active jobs
 
@@ -10,21 +10,29 @@ In **Jobs & logs**, wait until no jobs are queued or running. If you choose to c
 
 Choose the method you originally used. Save any local source changes first.
 
-**Git installation on `main`.** In the original source folder, run:
+**Git installation.** To install the exact version shown in the walkthrough, open the original source folder and run the following commands. The last command should print `v0.4.8`.
+
+```bash
+git fetch origin tag v0.4.8
+git switch --detach v0.4.8
+git describe --tags --exact-match
+```
+
+If your installation follows the `main` branch and you want to keep it there, use these commands instead.
 
 ```bash
 git pull --ff-only
 git rev-parse HEAD
 ```
 
-Keep the printed commit with your run notes. If the pull fails, resolve the message before continuing. If you use a fixed tag or commit, follow the instructions for that revision.
+Keep the tag or commit with your run notes. If Git reports an error, resolve it before continuing.
 
-**ZIP installation.** Open the [public source on GitHub](https://github.com/kangk1204/NanoCoFold_public/tree/main), or the exact commit link your collaborator sent. Choose **Code → Download ZIP** on that page and extract it into a **separate folder**. The older `v0.4.8rc12` tag predates the CDR3 and custom mutation-range controls.
+**ZIP installation.** Download the [v0.4.8 source ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8.zip) and extract it into a **separate folder**. If your collaborator shared a specific revision, use **Code → Download ZIP** on that revision’s source page.
 
 In the **original installation folder**, run the commands below. Replace the first path with the newly extracted folder containing `update.sh`. Keep the source link with your run notes.
 
 ```bash
-update_source="/path/to/extracted/NanoCoFold_public-main"
+update_source="/path/to/extracted/NanoCoFold_public-0.4.8"
 rsync -a --exclude='.git/' --exclude='.nanocofold/' "$update_source/" ./
 ```
 

@@ -38,7 +38,7 @@ NanoCoFold는 표적 단백질에 대한 나노바디 후보를 설계하고, �
 
 ## 1. 설치 파일 받기
 
-[공개 저장소](https://github.com/kangk1204/NanoCoFold_public)에서 전달받은 커밋·태그의 소스를 사용하세요. GitHub의 **Latest release**에는 `main`보다 이전 빌드가 있을 수 있습니다. 선택한 소스 페이지에서 **Code → Download ZIP**을 누르고 전체 압축을 풉니다. `README.md`, `install.sh`, `start.sh`가 있는 폴더를 연 뒤, 그 폴더에서 터미널을 엽니다.
+[v0.4.8 소스 ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8.zip)을 내려받고 전체 압축을 풉니다. 공동연구자가 다른 태그나 커밋을 지정했다면 해당 페이지에서 **Code → Download ZIP**을 선택하세요. `README.md`, `install.sh`, `start.sh`가 있는 폴더에서 터미널을 엽니다.
 
 새 설치는 NVIDIA GPU가 있는 Ubuntu x86_64 컴퓨터에서 진행합니다. 첫 네 엔진 예제의 기준은 GPU 메모리 16 GB, RAM 32 GB, SSD 여유 공간 150 GiB 이상입니다. 운영체제·드라이버 조건은 [README](../README.ko.md#1-준비와-설치)에서 확인하세요. Windows·macOS에서는 설치된 서버에 접속하거나 받은 보고서를 열 수 있습니다.
 
