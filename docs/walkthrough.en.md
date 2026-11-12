@@ -1,10 +1,12 @@
 # NanoCoFold walkthrough
 
-For your first experiment, follow the variant tutorial below. Part 1 shows installation through opening the completed run. The written instructions continue through delivery. The videos have English narration and selectable English and Korean captions.
+For your first experiment, follow the variant tutorial below. It follows one named analysis from installation through report delivery. The videos have English narration and selectable English and Korean captions.
 
 ## First experiment · ten EGFR nanobody variants
 
-[Watch the experiment](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=en) · [Download the exercise inputs](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-inputs.zip)
+[Watch the experiment](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=en) · [Download the exercise inputs](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-inputs.zip) · [Open the recorded result](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-report.zip)
+
+[Prepare the inputs (11:31)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=en&chapter=inputs) · [Read hotspot numbers (13:09)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=en&chapter=hotspots) · [Set the mutations (16:50)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=en&chapter=variants) · [Interpret results (20:38)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=en&chapter=results) · [Search the DB (25:07)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=en&chapter=database) · [Open the ZIP (26:08)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=en&chapter=zip)
 
 ### Know your four input files
 

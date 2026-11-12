@@ -1,10 +1,12 @@
 # NanoCoFold 실습 안내
 
-처음 설치한다면 아래 변이 실습을 따라 하세요. 1부 영상은 설치부터 완료한 작업 열기까지 보여 줍니다. 이후 결과 공유까지는 아래 순서대로 따라 하세요. 영상은 영어 음성이며 재생기에서 한영 자막을 선택할 수 있습니다.
+처음 설치한다면 아래 변이 실습을 따라 하세요. 한 작업을 설치부터 보고서 공유까지 진행합니다. 영상은 영어 음성이며 재생기에서 한영 자막을 선택할 수 있습니다.
 
 ## 첫 실습 · EGFR 나노바디 변이 10종
 
-[실습 영상](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=ko) · [실습 입력 ZIP](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-inputs.zip)
+[실습 영상](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=ko) · [실습 입력 ZIP](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-inputs.zip) · [영상의 결과 보고서 ZIP](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-report.zip)
+
+[입력 파일 준비 (11:31)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=ko&chapter=inputs) · [결합 부위 번호 읽기 (13:09)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=ko&chapter=hotspots) · [변이 설정 (16:50)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=ko&chapter=variants) · [결과 해석 (20:38)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=ko&chapter=results) · [DB 검색 (25:07)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=ko&chapter=database) · [ZIP 열기 (26:08)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=ko&chapter=zip)
 
 ### 입력 파일 네 개 알아보기
 
