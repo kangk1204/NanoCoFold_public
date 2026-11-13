@@ -567,10 +567,21 @@ class ResultCatalog:
                 CREATE INDEX IF NOT EXISTS results_retention_created ON results(retention,created DESC,id DESC);
                 CREATE INDEX IF NOT EXISTS results_mode_retention_created ON results(mode,retention,created DESC,id DESC);
                 CREATE INDEX IF NOT EXISTS results_reuse ON results(identity_digest,can_reuse,status,updated DESC,id DESC);
+                CREATE TABLE IF NOT EXISTS vhh_sequences (
+                    id INTEGER PRIMARY KEY, sequence TEXT NOT NULL UNIQUE);
+                CREATE TABLE IF NOT EXISTS vhh_entries (
+                    result_id TEXT NOT NULL REFERENCES results(id) ON DELETE CASCADE,
+                    candidate_id TEXT NOT NULL, sequence_id INTEGER REFERENCES vhh_sequences(id),
+                    PRIMARY KEY(result_id,candidate_id)) WITHOUT ROWID;
+                CREATE INDEX IF NOT EXISTS vhh_by_sequence ON vhh_entries(sequence_id,result_id);
             """)
             # This also handles catalogs created during an older installation;
             # adding materialized fields never rereads the source directories.
+            connection.execute("BEGIN IMMEDIATE")
             columns = {row[1] for row in connection.execute("PRAGMA table_info(results)")}
+            if "vhh_index" not in columns:
+                connection.execute("ALTER TABLE results ADD COLUMN vhh_index INTEGER NOT NULL DEFAULT 0")
+            connection.execute("CREATE INDEX IF NOT EXISTS results_vhh_pending ON results(vhh_index,id) WHERE vhh_index!=1")
             for name in SORT_FIELDS - {"created", "updated", "name", "mode", "retention", "status"}:
                 if name not in columns:
                     connection.execute(f"ALTER TABLE results ADD COLUMN {name} " + ("REAL" if name == "elapsed_seconds" else "INTEGER"))
@@ -596,6 +607,55 @@ class ResultCatalog:
             raise
         finally:
             connection.close()
+
+    @staticmethod
+    def _index_vhh(connection, identifier, rows):
+        old = {r[0] for r in connection.execute("SELECT DISTINCT sequence_id FROM vhh_entries WHERE result_id=? AND sequence_id IS NOT NULL", (identifier,))}
+        connection.execute("DELETE FROM vhh_entries WHERE result_id=?", (identifier,))
+        entries = [(row["candidate_id"], row["sequence"].strip().upper() if isinstance(row.get("sequence"), str) else "")
+                   for row in rows if row.get("candidate_id")]
+        connection.executemany("INSERT OR IGNORE INTO vhh_sequences(sequence) VALUES(?)", ((seq,) for seq in {seq for _, seq in entries if seq}))
+        connection.executemany("INSERT INTO vhh_entries VALUES(?,?,(SELECT id FROM vhh_sequences WHERE sequence=?))",
+                               ((identifier, name, seq) for name, seq in entries))
+        connection.executemany("DELETE FROM vhh_sequences WHERE id=? AND NOT EXISTS (SELECT 1 FROM vhh_entries WHERE sequence_id=vhh_sequences.id)",
+                               ((key,) for key in old))
+        connection.execute("UPDATE results SET vhh_index=1 WHERE id=?", (identifier,))
+
+    def backfill_vhh(self, limit=8):
+        """Index older registrations without rewriting their results, timestamps or artifacts."""
+        with self.connect() as connection:
+            batch = connection.execute("SELECT id,updated,mode,payload FROM results WHERE vhh_index!=1 AND vhh_index=0 ORDER BY id LIMIT ?", (limit,)).fetchall()
+        for result in batch:
+            rows = []
+            try:
+                if result["mode"] in {"mature", "design", "screen"}:
+                    root = contained(self.workspace, json.loads(result["payload"])["run_root"], exists=True)
+                    reader = ResultReader(root)
+                    if reader.config.get("run", {}).get("mode") != result["mode"]:
+                        raise ValueError("Saved run mode changed")
+                    if not reader.retained:
+                        with self.connect() as connection:
+                            hashes = dict(connection.execute("SELECT path,sha256 FROM artifacts WHERE result_id=?", (result["id"],)))
+                        for path in TABLES:
+                            source = contained(root, path)
+                            if (source.is_file() or path in hashes) and (not source.is_file() or provenance.file_digest(source) != hashes.get(path)):
+                                raise ValueError("Saved candidate table changed")
+                    rows = reader.all_rows()
+                    if reader.issues and not rows:
+                        raise ValueError("Saved candidate table unavailable")
+                available = True
+            except (OSError, ValueError, KeyError):
+                available = False
+            with self.connect() as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                current = connection.execute("SELECT updated,vhh_index FROM results WHERE id=?", (result["id"],)).fetchone()
+                if not current or current["updated"] != result["updated"] or current["vhh_index"] != 0:
+                    continue
+                if available:
+                    self._index_vhh(connection, result["id"], rows)
+                else:
+                    connection.execute("UPDATE results SET vhh_index=-1 WHERE id=?", (result["id"],))
+        return len(batch)
 
     def register(self, identifier, run_root, identity=None, state="complete", retention="full"):
         if not isinstance(identifier, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,200}", identifier):
@@ -735,6 +795,7 @@ class ResultCatalog:
                  payload["elapsed_seconds"], payload["storage_bytes"], identifier))
             connection.execute("DELETE FROM artifacts WHERE result_id=?", (identifier,))
             connection.executemany("INSERT INTO artifacts(result_id,path,sha256,bytes) VALUES(?,?,?,?)", manifest)
+            self._index_vhh(connection, identifier, rows if payload["mode"] in {"mature","design","screen"} else [])
         return payload
 
     def get(self, identifier):
@@ -765,7 +826,7 @@ class ResultCatalog:
     def list(self, limit=25, cursor=None, search="", mode="", retention="", sort="created", descending=True, researcher=""):
         if type(limit) is not int or not 1 <= limit <= MAX_PAGE_SIZE:
             raise ValueError("페이지 크기는 1–100이어야 합니다.")
-        if any(not isinstance(value, str) for value in (search, mode, retention)) or len(search) > 200:
+        if any(not isinstance(value, str) for value in (search, mode, retention)) or len(search) > 2000:
             raise ValueError("결과 검색 조건 형식이 잘못되었습니다.")
         if mode and mode not in {"complex", "design", "screen", "mature", "unknown"}:
             raise ValueError("잘못된 분석 모드입니다.")
@@ -787,11 +848,15 @@ class ResultCatalog:
         if search:
             # Bound output and avoid LIKE wildcard expansion from user input.
             # Arbitrary substring search may scan metadata; never source files.
-            clauses.append("(instr(lower(name),lower(?))>0 OR instr(lower(id),lower(?))>0)")
-            parameters.extend((search, search))
+            segment = "".join(search.split()).upper()
+            segment = segment if len(segment) >= 3 else None
+            clauses.append("(instr(lower(name),lower(?))>0 OR instr(lower(id),lower(?))>0 OR id IN "
+                           "(SELECT result_id FROM vhh_entries WHERE instr(lower(candidate_id),lower(?))>0 UNION "
+                           "SELECT result_id FROM vhh_entries WHERE sequence_id IN (SELECT id FROM vhh_sequences WHERE instr(sequence,upper(?))>0)))")
+            parameters.extend((search, search, search, segment))
         if cursor:
             try:
-                if not isinstance(cursor, str) or len(cursor) > 2048:
+                if not isinstance(cursor, str) or len(cursor) > 32768:
                     raise ValueError
                 position = json.loads(base64.urlsafe_b64decode(cursor.encode()).decode())
                 if (not isinstance(position, dict) or position.get("filters") != filters
@@ -841,6 +906,15 @@ class ResultCatalog:
                         values.append(position["id"])
                     rows.extend(query(connection, additions, values, limit + 1 - len(rows)))
             items = {row["id"]: json.loads(row["payload"]) for row in rows[:limit]}
+            if search:
+                for key, item in items.items():
+                    match = connection.execute("SELECT e.candidate_id,count(*) OVER () FROM vhh_entries e LEFT JOIN vhh_sequences s ON s.id=e.sequence_id "
+                                               "WHERE e.result_id=? AND (instr(lower(e.candidate_id),lower(?))>0 OR instr(s.sequence,upper(?))>0) "
+                                               "ORDER BY (lower(e.candidate_id)=lower(?)) DESC,e.candidate_id LIMIT 1", (key,search,segment,search)).fetchone()
+                    if match:
+                        item["matching_candidate"] = match[0]
+                        item["matching_candidate_count"] = match[1]
+            index_status = dict(connection.execute("SELECT vhh_index,count(*) FROM results WHERE vhh_index!=1 GROUP BY vhh_index"))
             if usage and items:
                 placeholders = ",".join("?" for _ in items)
                 for row in connection.execute("SELECT DISTINCT result_id,researcher FROM activity.lab_usage "
@@ -851,7 +925,10 @@ class ResultCatalog:
             position = rows[limit - 1]
             next_cursor = base64.urlsafe_b64encode(_json({"id": position["id"], "value": position["sort_value"],
                                                         "filters": filters}).encode()).decode()
-        return {"items": list(items.values()), "next_cursor": next_cursor}
+        page = {"items": list(items.values()), "next_cursor": next_cursor}
+        if index_status:
+            page.update(sequence_index_pending=index_status.get(0, 0), sequence_index_unavailable=index_status.get(-1, 0))
+        return page
 
     def _source_active(self, root):
         """Bounded, read-only lookup; never initialize/import the job manager."""

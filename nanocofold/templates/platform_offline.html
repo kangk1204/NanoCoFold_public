@@ -565,6 +565,10 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
               aria-label="기존 결과 경로"
              hidden><button id="open-result" class="secondary" hidden>기존 결과 열기</button>
           </div>
+          <section id="selection-leads" class="vhh-sequence-panel" hidden aria-labelledby="selection-leads-title">
+            <h2 id="selection-leads-title">이 실행의 우선 검토 후보</h2>
+            <div id="selection-lead-list"></div>
+          </section>
           <h2 id="report-input">01 입력·설정</h2>
           <div id="result-input"></div>
           <details><summary>입력과 실행 설정 원문</summary><pre id="result-input-config"></pre></details>
@@ -1792,6 +1796,19 @@ const NCF_TRANSLATIONS = Object.freeze({
   "새로고침": "Refresh",
   "작업 선택": "Select job",
   "실시간 로그": "Live log",
+  "분석명, 결과 ID, 후보 ID 또는 VHH 서열": "Analysis name, result ID, candidate ID or VHH sequence",
+  "일치 후보 열기 · {0}": "Open matching candidate · {0}",
+  "일치 후보 {0}개 보기": "View {0} matching candidates",
+  " · 이전 결과 {0}건의 후보 검색을 준비하고 있습니다.": " · Indexing candidates from {0} older results.",
+  " · 이전 결과 {0}건의 후보 색인을 읽지 못했습니다. 원본 폴더를 확인한 뒤 기존 결과 열기를 사용하세요.": " · Candidate search is unavailable for {0} older results. Check the original folders and use Open existing result.",
+  "이 실행의 우선 검토 후보": "Lead candidates in this run",
+  "연습 실행입니다. 예시 서열과 구조는 03 후보 비교에서 볼 수 있습니다.": "This is a practice run. Open section 03 to explore the example sequences and structures.",
+  "완료된 최종 선별 기록이 필요합니다. 현재 결과는 03 후보 비교에서 볼 수 있습니다.": "Final selection is incomplete. Open section 03 to inspect the results so far.",
+  "기록된 적격 VHH 후보가 없습니다. 04 제외·미평가에서 이유를 확인하세요.": "No VHH candidate was recorded as eligible. Open section 04 to see exclusions and missing evaluations.",
+  "적격 후보는 있지만 확인할 수 있는 최종 선별 1위가 없습니다. 03 후보 비교에서 개별 후보를 확인하세요.": "Eligible candidates are available, but the final selection has no verifiable first-ranked candidate. Open section 03 to inspect individual candidates.",
+  "최종 선별표에 기록된 1위입니다. 여러 엔진을 사용한 경우 엔진별로 표시합니다. 실제 결합력은 실험으로 확인하세요.": "These candidates ranked first in the final selection. Each prediction engine has its own ranking. Binding strength requires experimental measurement.",
+  "서열과 예측 구조 보기": "View sequence and predicted structure",
+  "분석이 끝나면 이 표에 저장됩니다. 분석명, 후보 ID 또는 VHH 서열 일부(아미노산 3개 이상)를 입력하세요. 열 제목을 누르면 정렬됩니다.": "Completed runs are added to this table. Search by analysis name, candidate ID or a VHH sequence fragment of at least three amino acids. Click a column heading to sort.",
   "저장된 결과 DB": "Saved results database",
   "핵심 정보로 검색하고 제목을 눌러 정렬하세요. 결과는 새 탭에서 열립니다.": "Search key information and click column headings to sort. Results open in a new tab.",
   "분석 이름 또는 결과 ID": "Analysis name or result ID",
@@ -4086,13 +4103,23 @@ async function refreshCatalog() {
         const link = el("a", (item.name || item.id) + (item.mock ? " · MOCK" : ""));
         link.href = "/?result=" + encodeURIComponent(item.id); link.target = "_blank"; link.rel = "noopener";
         td.append(link);
+        if (item.matching_candidate) {
+          const multiple = item.matching_candidate_count > 1;
+          const match = el("a", multiple ? I18N.format("일치 후보 {0}개 보기", [item.matching_candidate_count]) : I18N.format("일치 후보 열기 · {0}", [item.matching_candidate]));
+          match.href = link.href + "&candidate=" + encodeURIComponent(item.matching_candidate);
+          if (multiple) match.hash = new URLSearchParams({matches:params.get("search")}).toString();
+          match.target = "_blank"; match.rel = "noopener"; td.append(el("br"), match);
+        }
       } else I18N.text(td, key === "elapsed_seconds" ? item[key] === null || item[key] === undefined ? I18N.term("미기록") : I18N.concat([Math.round(item[key]), I18N.term("초")]) : key === "storage_bytes" ? I18N.term(bytesLabel(item[key])) : key === "created" ? new Date(item[key] * 1000).toLocaleString() : key === "retention" ? item[key] === "minimal" ? I18N.term("핵심 보관") : I18N.term("원본 보관") : key === "status" ? (states[item[key]] ? I18N.term(states[item[key]]) : item[key]) : fmt(item[key]));
       tr.append(td);
     }
     body.append(tr);
   }
   table.append(head, body); $("catalog-table").replaceChildren(table, el("p", I18N.term("저장 구조 관측은 1차 평가 구조도 포함합니다. 최종 평가 모델 수는 결과 보고서에서 따로 확인하세요."), "muted"));
-  I18N.text(status, I18N.format("{0}개 표시 · 용량은 색인 시점의 측정값", [page.items.length]));
+  const notes = [I18N.format("{0}개 표시 · 용량은 색인 시점의 측정값", [page.items.length])];
+  if (page.sequence_index_pending) notes.push(I18N.format(" · 이전 결과 {0}건의 후보 검색을 준비하고 있습니다.", [page.sequence_index_pending]));
+  if (page.sequence_index_unavailable) notes.push(I18N.format(" · 이전 결과 {0}건의 후보 색인을 읽지 못했습니다. 원본 폴더를 확인한 뒤 기존 결과 열기를 사용하세요.", [page.sequence_index_unavailable]));
+  I18N.text(status, I18N.concat(notes));
 }
 let usageRequest = 0, usageCursor = null, usageOwner = "";
 async function refreshLabUsage(nextPage = false) {
@@ -5454,6 +5481,7 @@ async function loadResult(id) {
   }
   if (request !== state.resultRequest) return;
   state.result = summary;
+  state.catalogCandidateSearch = null;
   $("notice").hidden = true;  // A successfully opened result dismisses the prior completion notice.
   state.retentionPlan = null;
   if ($("retention-plan")) $("retention-plan").replaceChildren();
@@ -5473,7 +5501,7 @@ async function loadResult(id) {
     const checkbox = document.querySelector(`[data-layer="${layer}"]`);
     if (checkbox) checkbox.parentElement.replaceChildren(checkbox, el("span", I18N.term(caption)));
   }
-  state.rows = rows.map(row => ({...row, seed: recordedCandidateSeed({...row, predictor_engine: row.predictor_engine || row.engine || summary.conditions?.engine}, observations), predictor_engine: row.predictor_engine || row.engine || summary.conditions?.engine || "unknown", design_origin: row.design_origin || row.parent_engine || row.source || null}));
+  state.rows = rows.map(row => ({...row, recorded_engine: row.predictor_engine || row.engine, seed: recordedCandidateSeed({...row, predictor_engine: row.predictor_engine || row.engine || summary.conditions?.engine}, observations), predictor_engine: row.predictor_engine || row.engine || summary.conditions?.engine || "unknown", design_origin: row.design_origin || row.parent_engine || row.source || null}));
   syncResultModeControls();
   refreshMetricCaptions(state.rows, state.result?.mode);
   const savedSort = offline ? window.NANOCOFOLD_OFFLINE.filters?.sort : null;
@@ -5563,9 +5591,56 @@ async function loadResult(id) {
     null,
     2,
   ));
+  const leads = renderSelectionLeads(summary, state.rows);
   renderCandidates();
-  if (state.filtered.length)
-    await selectCandidate(state.filtered[0].candidate_id);
+  if (state.filtered.length) {
+    const preferred = leads.length === 1 && state.filtered.includes(leads[0]) ? leads[0] : state.filtered[0];
+    await selectCandidate(preferred.candidate_id);
+  }
+}
+function renderSelectionLeads(summary, rows) {
+  const panel = $("selection-leads"), list = $("selection-lead-list");
+  panel.hidden = summary.mode === "complex";
+  list.replaceChildren();
+  if (panel.hidden) return [];
+  const eligible = rows.filter(row => row.evaluated === true && row.final_eligible === true && !recordedEvaluationError(row)
+    && row.prediction_status !== "failed" && !row.is_parent_control && row.candidate_id !== "WT" && row.source_sequence_id !== "WT");
+  const mixed = summary.config?.screen?.comparison?.enabled === true || new Set(rows.filter(row => row.evaluated).map(row => row.predictor_engine)).size > 1;
+  const ranked = rows.filter(row => row.selected === true && row.selection_rank === 1);
+  const rankCounts = new Map();
+  for (const row of ranked) rankCounts.set(row.predictor_engine, (rankCounts.get(row.predictor_engine) || 0) + 1);
+  const leads = eligible.filter(row => row.selected === true && row.selection_rank === 1 && typeof row.sequence === "string" && row.sequence.trim()
+    && ["boltz2","colabfold","chai1","opendde"].includes(row.recorded_engine) && rankCounts.get(row.predictor_engine) === 1
+    && (!mixed || row.ranking_scope === row.predictor_engine)
+    && row.ranking_status !== "held" && (row.dev_assessment_policy !== "sequence_liability_screen_v2" || row.dev_assessment_status === "screen_pass"));
+  const reason = summary.mock ? "연습 실행입니다. 예시 서열과 구조는 03 후보 비교에서 볼 수 있습니다."
+    : !summary.complete ? "완료된 최종 선별 기록이 필요합니다. 현재 결과는 03 후보 비교에서 볼 수 있습니다."
+    : !eligible.length ? "기록된 적격 VHH 후보가 없습니다. 04 제외·미평가에서 이유를 확인하세요."
+    : !leads.length ? "적격 후보는 있지만 확인할 수 있는 최종 선별 1위가 없습니다. 03 후보 비교에서 개별 후보를 확인하세요." : null;
+  if (reason) {
+    list.append(el("p", I18N.term(reason)));
+    const exclusions = !summary.mock && summary.complete && !eligible.length;
+    const link = el("a", I18N.term(exclusions ? "04 제외·미평가" : "03 후보 비교"));
+    link.href = exclusions ? "#report-exclusions" : "#report-comparison"; list.append(link); return [];
+  }
+  list.append(el("p", I18N.term("최종 선별표에 기록된 1위입니다. 여러 엔진을 사용한 경우 엔진별로 표시합니다. 실제 결합력은 실험으로 확인하세요.")));
+  for (const row of leads) {
+    const line = el("p"), button = el("button", I18N.term("서열과 예측 구조 보기"), "secondary");
+    line.append(el("strong", row.candidate_id), el("span", " · " + row.predictor_engine + " · ipSAE " + fmt(row.ipsae) + " "));
+    button.type = "button"; button.onclick = () => openExactCandidate(row.candidate_id).catch(e => notice(e.message, true));
+    line.append(button); list.append(line);
+  }
+  return leads;
+}
+async function openExactCandidate(id, matches = "") {
+  if (!state.rows.some(row => row.candidate_id === id)) return;
+  state.catalogCandidateSearch = matches || null;
+  $("candidate-search").value = matches; $("engine-filter").value = "all";
+  $("hotspot-filter").checked = false; $("eligibility").value = "all"; $("eligibility-basis").value = "recorded";
+  renderCandidates();
+  const selection = selectCandidate(id);
+  $(matches ? "report-comparison" : "candidate-title").scrollIntoView({block:"start"});
+  await selection;
 }
 function filters() {
   return {
@@ -5795,11 +5870,13 @@ function renderCandidates() {
     notice("최소 결합 부위 접촉률은 0–100% 사이로 입력하세요.", true);
     return;
   }
+  const search = f.search.toLowerCase(), fragment = search.replace(/\s/g, "");
+  const catalogSearch = Boolean(search) && state.catalogCandidateSearch === f.search;
   state.filtered = state.rows.filter(
     (row) =>
       (f.engine_filter === "all" || row.predictor_engine === f.engine_filter) &&
-      (!f.search ||
-        candidateSearchText(row).includes(f.search.toLowerCase())) &&
+      (!search || (catalogSearch ? row.candidate_id.toLowerCase().includes(search) ||
+        (fragment.length >= 3 && row.sequence?.toLowerCase().includes(fragment)) : candidateSearchText(row).includes(search))) &&
       (status === "all" || status === "missing"
         ? status === "all" || candidateEligibility(row) == null
         : candidateEligibility(row) === f.eligible) &&
@@ -6760,6 +6837,7 @@ function renderDiagnostics(diagnosis) {
 }
 /* DIAGNOSTIC_PRESENTATION_END */
 function setupExplorer() {
+  $("candidate-search").addEventListener("input", () => { state.catalogCandidateSearch = null; });
   $("recorded-eligible").onclick = () => {
     $("candidate-search").value = "";
     $("engine-filter").value = "all";
@@ -7393,6 +7471,11 @@ async function boot() {
   if (requested) await loadResult(requested);
   state.navigationReady = true;
   await restoreNavigation();
+  const requestedCandidate = new URLSearchParams(window.location.search).get("candidate");
+  if (requested && requestedCandidate && state.currentView === "results") {
+    const matches = new URLSearchParams(window.location.hash.slice(1)).get("matches") || "";
+    await openExactCandidate(requestedCandidate, matches);
+  }
   rememberLocation();
   window.addEventListener("popstate", () => restoreNavigation().catch(error => notice(error.message, true)));
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshJobs(); });

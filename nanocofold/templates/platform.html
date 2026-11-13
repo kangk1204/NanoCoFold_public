@@ -389,9 +389,9 @@
       </section>
       <section id="view-catalog" hidden>
         <h1>저장된 결과 DB</h1>
-        <p>핵심 정보로 검색하고 제목을 눌러 정렬하세요. 결과는 새 탭에서 열립니다.</p>
+        <p>분석이 끝나면 이 표에 저장됩니다. 분석명, 후보 ID 또는 VHH 서열 일부(아미노산 3개 이상)를 입력하세요. 열 제목을 누르면 정렬됩니다.</p>
         <div class="inline">
-          <input id="catalog-search" placeholder="분석 이름 또는 결과 ID" aria-label="결과 검색" />
+          <input id="catalog-search" placeholder="분석명, 결과 ID, 후보 ID 또는 VHH 서열" aria-label="결과 검색" />
           <label id="catalog-owner-label" hidden>담당자 <input id="catalog-owner" maxlength="48" placeholder="계정 이름" /></label>
           <select id="catalog-retention" aria-label="보관 상태">
             <option value="">모든 보관 상태</option><option value="full">원본 보관</option><option value="minimal">핵심 보관</option>
@@ -427,6 +427,10 @@
               aria-label="기존 결과 경로"
             ><button id="open-result" class="secondary">기존 결과 열기</button>
           </div>
+          <section id="selection-leads" class="vhh-sequence-panel" hidden aria-labelledby="selection-leads-title">
+            <h2 id="selection-leads-title">이 실행의 우선 검토 후보</h2>
+            <div id="selection-lead-list"></div>
+          </section>
           <h2 id="report-input">01 입력·설정</h2>
           <div id="result-input"></div>
           <details><summary>입력과 실행 설정 원문</summary><pre id="result-input-config"></pre></details>

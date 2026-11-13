@@ -444,13 +444,23 @@ async function refreshCatalog() {
         const link = el("a", (item.name || item.id) + (item.mock ? " · MOCK" : ""));
         link.href = "/?result=" + encodeURIComponent(item.id); link.target = "_blank"; link.rel = "noopener";
         td.append(link);
+        if (item.matching_candidate) {
+          const multiple = item.matching_candidate_count > 1;
+          const match = el("a", multiple ? I18N.format("일치 후보 {0}개 보기", [item.matching_candidate_count]) : I18N.format("일치 후보 열기 · {0}", [item.matching_candidate]));
+          match.href = link.href + "&candidate=" + encodeURIComponent(item.matching_candidate);
+          if (multiple) match.hash = new URLSearchParams({matches:params.get("search")}).toString();
+          match.target = "_blank"; match.rel = "noopener"; td.append(el("br"), match);
+        }
       } else I18N.text(td, key === "elapsed_seconds" ? item[key] === null || item[key] === undefined ? I18N.term("미기록") : I18N.concat([Math.round(item[key]), I18N.term("초")]) : key === "storage_bytes" ? I18N.term(bytesLabel(item[key])) : key === "created" ? new Date(item[key] * 1000).toLocaleString() : key === "retention" ? item[key] === "minimal" ? I18N.term("핵심 보관") : I18N.term("원본 보관") : key === "status" ? (states[item[key]] ? I18N.term(states[item[key]]) : item[key]) : fmt(item[key]));
       tr.append(td);
     }
     body.append(tr);
   }
   table.append(head, body); $("catalog-table").replaceChildren(table, el("p", I18N.term("저장 구조 관측은 1차 평가 구조도 포함합니다. 최종 평가 모델 수는 결과 보고서에서 따로 확인하세요."), "muted"));
-  I18N.text(status, I18N.format("{0}개 표시 · 용량은 색인 시점의 측정값", [page.items.length]));
+  const notes = [I18N.format("{0}개 표시 · 용량은 색인 시점의 측정값", [page.items.length])];
+  if (page.sequence_index_pending) notes.push(I18N.format(" · 이전 결과 {0}건의 후보 검색을 준비하고 있습니다.", [page.sequence_index_pending]));
+  if (page.sequence_index_unavailable) notes.push(I18N.format(" · 이전 결과 {0}건의 후보 색인을 읽지 못했습니다. 원본 폴더를 확인한 뒤 기존 결과 열기를 사용하세요.", [page.sequence_index_unavailable]));
+  I18N.text(status, I18N.concat(notes));
 }
 let usageRequest = 0, usageCursor = null, usageOwner = "";
 async function refreshLabUsage(nextPage = false) {
@@ -1812,6 +1822,7 @@ async function loadResult(id) {
   }
   if (request !== state.resultRequest) return;
   state.result = summary;
+  state.catalogCandidateSearch = null;
   $("notice").hidden = true;  // A successfully opened result dismisses the prior completion notice.
   state.retentionPlan = null;
   if ($("retention-plan")) $("retention-plan").replaceChildren();
@@ -1831,7 +1842,7 @@ async function loadResult(id) {
     const checkbox = document.querySelector(`[data-layer="${layer}"]`);
     if (checkbox) checkbox.parentElement.replaceChildren(checkbox, el("span", I18N.term(caption)));
   }
-  state.rows = rows.map(row => ({...row, seed: recordedCandidateSeed({...row, predictor_engine: row.predictor_engine || row.engine || summary.conditions?.engine}, observations), predictor_engine: row.predictor_engine || row.engine || summary.conditions?.engine || "unknown", design_origin: row.design_origin || row.parent_engine || row.source || null}));
+  state.rows = rows.map(row => ({...row, recorded_engine: row.predictor_engine || row.engine, seed: recordedCandidateSeed({...row, predictor_engine: row.predictor_engine || row.engine || summary.conditions?.engine}, observations), predictor_engine: row.predictor_engine || row.engine || summary.conditions?.engine || "unknown", design_origin: row.design_origin || row.parent_engine || row.source || null}));
   syncResultModeControls();
   refreshMetricCaptions(state.rows, state.result?.mode);
   const savedSort = offline ? window.NANOCOFOLD_OFFLINE.filters?.sort : null;
@@ -1921,9 +1932,56 @@ async function loadResult(id) {
     null,
     2,
   ));
+  const leads = renderSelectionLeads(summary, state.rows);
   renderCandidates();
-  if (state.filtered.length)
-    await selectCandidate(state.filtered[0].candidate_id);
+  if (state.filtered.length) {
+    const preferred = leads.length === 1 && state.filtered.includes(leads[0]) ? leads[0] : state.filtered[0];
+    await selectCandidate(preferred.candidate_id);
+  }
+}
+function renderSelectionLeads(summary, rows) {
+  const panel = $("selection-leads"), list = $("selection-lead-list");
+  panel.hidden = summary.mode === "complex";
+  list.replaceChildren();
+  if (panel.hidden) return [];
+  const eligible = rows.filter(row => row.evaluated === true && row.final_eligible === true && !recordedEvaluationError(row)
+    && row.prediction_status !== "failed" && !row.is_parent_control && row.candidate_id !== "WT" && row.source_sequence_id !== "WT");
+  const mixed = summary.config?.screen?.comparison?.enabled === true || new Set(rows.filter(row => row.evaluated).map(row => row.predictor_engine)).size > 1;
+  const ranked = rows.filter(row => row.selected === true && row.selection_rank === 1);
+  const rankCounts = new Map();
+  for (const row of ranked) rankCounts.set(row.predictor_engine, (rankCounts.get(row.predictor_engine) || 0) + 1);
+  const leads = eligible.filter(row => row.selected === true && row.selection_rank === 1 && typeof row.sequence === "string" && row.sequence.trim()
+    && ["boltz2","colabfold","chai1","opendde"].includes(row.recorded_engine) && rankCounts.get(row.predictor_engine) === 1
+    && (!mixed || row.ranking_scope === row.predictor_engine)
+    && row.ranking_status !== "held" && (row.dev_assessment_policy !== "sequence_liability_screen_v2" || row.dev_assessment_status === "screen_pass"));
+  const reason = summary.mock ? "연습 실행입니다. 예시 서열과 구조는 03 후보 비교에서 볼 수 있습니다."
+    : !summary.complete ? "완료된 최종 선별 기록이 필요합니다. 현재 결과는 03 후보 비교에서 볼 수 있습니다."
+    : !eligible.length ? "기록된 적격 VHH 후보가 없습니다. 04 제외·미평가에서 이유를 확인하세요."
+    : !leads.length ? "적격 후보는 있지만 확인할 수 있는 최종 선별 1위가 없습니다. 03 후보 비교에서 개별 후보를 확인하세요." : null;
+  if (reason) {
+    list.append(el("p", I18N.term(reason)));
+    const exclusions = !summary.mock && summary.complete && !eligible.length;
+    const link = el("a", I18N.term(exclusions ? "04 제외·미평가" : "03 후보 비교"));
+    link.href = exclusions ? "#report-exclusions" : "#report-comparison"; list.append(link); return [];
+  }
+  list.append(el("p", I18N.term("최종 선별표에 기록된 1위입니다. 여러 엔진을 사용한 경우 엔진별로 표시합니다. 실제 결합력은 실험으로 확인하세요.")));
+  for (const row of leads) {
+    const line = el("p"), button = el("button", I18N.term("서열과 예측 구조 보기"), "secondary");
+    line.append(el("strong", row.candidate_id), el("span", " · " + row.predictor_engine + " · ipSAE " + fmt(row.ipsae) + " "));
+    button.type = "button"; button.onclick = () => openExactCandidate(row.candidate_id).catch(e => notice(e.message, true));
+    line.append(button); list.append(line);
+  }
+  return leads;
+}
+async function openExactCandidate(id, matches = "") {
+  if (!state.rows.some(row => row.candidate_id === id)) return;
+  state.catalogCandidateSearch = matches || null;
+  $("candidate-search").value = matches; $("engine-filter").value = "all";
+  $("hotspot-filter").checked = false; $("eligibility").value = "all"; $("eligibility-basis").value = "recorded";
+  renderCandidates();
+  const selection = selectCandidate(id);
+  $(matches ? "report-comparison" : "candidate-title").scrollIntoView({block:"start"});
+  await selection;
 }
 function filters() {
   return {
@@ -2153,11 +2211,13 @@ function renderCandidates() {
     notice("최소 결합 부위 접촉률은 0–100% 사이로 입력하세요.", true);
     return;
   }
+  const search = f.search.toLowerCase(), fragment = search.replace(/\s/g, "");
+  const catalogSearch = Boolean(search) && state.catalogCandidateSearch === f.search;
   state.filtered = state.rows.filter(
     (row) =>
       (f.engine_filter === "all" || row.predictor_engine === f.engine_filter) &&
-      (!f.search ||
-        candidateSearchText(row).includes(f.search.toLowerCase())) &&
+      (!search || (catalogSearch ? row.candidate_id.toLowerCase().includes(search) ||
+        (fragment.length >= 3 && row.sequence?.toLowerCase().includes(fragment)) : candidateSearchText(row).includes(search))) &&
       (status === "all" || status === "missing"
         ? status === "all" || candidateEligibility(row) == null
         : candidateEligibility(row) === f.eligible) &&
@@ -3118,6 +3178,7 @@ function renderDiagnostics(diagnosis) {
 }
 /* DIAGNOSTIC_PRESENTATION_END */
 function setupExplorer() {
+  $("candidate-search").addEventListener("input", () => { state.catalogCandidateSearch = null; });
   $("recorded-eligible").onclick = () => {
     $("candidate-search").value = "";
     $("engine-filter").value = "all";
@@ -3751,6 +3812,11 @@ async function boot() {
   if (requested) await loadResult(requested);
   state.navigationReady = true;
   await restoreNavigation();
+  const requestedCandidate = new URLSearchParams(window.location.search).get("candidate");
+  if (requested && requestedCandidate && state.currentView === "results") {
+    const matches = new URLSearchParams(window.location.hash.slice(1)).get("matches") || "";
+    await openExactCandidate(requestedCandidate, matches);
+  }
   rememberLocation();
   window.addEventListener("popstate", () => restoreNavigation().catch(error => notice(error.message, true)));
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshJobs(); });

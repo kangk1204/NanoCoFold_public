@@ -399,7 +399,7 @@ class ResultReader:
                         if issue not in self.issues:self.issues.append(issue)
             return [model_observation_record(row, mode=mode) for row in rows]
         # Begin with all generated sequences; add evaluated metrics without dropping unscored rows.
-        records, order = {}, []
+        records, order, ambiguous_models = {}, [], set()
         sources = [path for path in TABLES[1:] if self._path(path).exists()]
         comparison = self.config.get("screen", {}).get("comparison", {}).get("enabled") is True
         # Comparison IDs represent independent observations of the same source
@@ -414,13 +414,18 @@ class ResultReader:
                 if identifier not in records:
                     records[identifier] = {}
                     order.append(identifier)
+                elif relative == TABLES[0] and records[identifier].get("model_record") is True:
+                    ambiguous_models.add(identifier)
                 records[identifier].update(row)
                 if relative == TABLES[0]:
                     records[identifier]["model_record"] = True
                     records[identifier]["evaluated"] = row.get("final_evaluated", True) is True
                     if row.get("cif_path") and not row.get("structure_stage"):
                         records[identifier]["structure_stage"] = "final_prediction"
-        selected = {self._identifier(row, i) for i, row in enumerate(self._csv("05_final/selected_candidates.csv"))}
+        selected = {}
+        for i, pick in enumerate(self._csv("05_final/selected_candidates.csv")):
+            key = self._identifier(pick, i)
+            selected[key] = pick if key not in selected else None
         result = []
         for identifier in order:
             row = records[identifier]
@@ -445,6 +450,17 @@ class ResultReader:
                         row.setdefault("input_structure_stage", row["structure_stage"])
                     row.update(self._observation_stage({**row, "structure_stage": predictor}))
             row["selected"] = identifier in selected
+            # Only the saved final selection table establishes a selection rank.
+            pick = selected.get(identifier)
+            row.pop("selection_rank", None)
+            pick_engine = (pick or {}).get("predictor_engine") or (pick or {}).get("engine")
+            row_engine = row.get("predictor_engine") or row.get("engine")
+            if (pick and identifier not in ambiguous_models and type(pick.get("selection_rank")) is int and pick["selection_rank"] > 0
+                    and any(pick.get(key) for key in ("candidate_id", "design_id", "variant_id", "label"))
+                    and (not pick_engine or not row_engine or pick_engine == row_engine)
+                    and all(not pick.get(key) or not row.get(key) or pick[key] == row[key]
+                            for key in ("sequence", "ranking_scope"))):
+                row["selection_rank"] = pick["selection_rank"]
             row["exclusion_reasons"] = [reason for reason in str(row.get("exclusion_reason") or "").split(";") if reason]
             if not row["evaluated"] and row.get("design_screening_reason"):
                 row["exclusion_reasons"].append(row["design_screening_reason"])

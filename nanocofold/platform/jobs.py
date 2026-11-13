@@ -522,6 +522,7 @@ class JobManager:
         self.lockfile = None
         self.catalog_thread = None
         self.catalog_retry_after = {}
+        self.next_vhh_backfill = 0.0
         self.gpu_retry = {}
 
     def start(self):
@@ -1164,6 +1165,18 @@ class JobManager:
                                                    name="nanocofold-result-index", daemon=True)
             self.catalog_thread.start()
             return
+
+        if time.monotonic() >= self.next_vhh_backfill:
+            self.next_vhh_backfill = time.monotonic() + 10
+            self.catalog_thread = threading.Thread(target=self._backfill_vhh, name="nanocofold-sequence-index", daemon=True)
+            self.catalog_thread.start()
+
+    def _backfill_vhh(self):
+        try:
+            if not self.catalog.backfill_vhh():
+                self.next_vhh_backfill = float("inf")  # New registrations maintain the index in their transaction.
+        except (OSError, sqlite3.Error) as exc:
+            print(f"[platform sequence index] {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
 
     def _recover_catalog(self, snapshot):
         identifier = snapshot["id"]
