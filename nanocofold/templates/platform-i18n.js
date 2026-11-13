@@ -2538,8 +2538,11 @@ globalThis.I18N = (() => {
         }
       }
     }
-    document.getElementById('language-select')?.addEventListener('change',event=>setLanguage(event.target.value));
+    const languageSelect=document.getElementById('language-select');
+    languageSelect?.addEventListener('change',event=>setLanguage(event.target.value));
     apply();
+    // Large local reports can paint this control before their scripts finish loading.
+    if(languageSelect)languageSelect.disabled=false;
   }
   return Object.freeze({init,setLanguage,term,format,concat,bilingual:message,text:(node,value)=>bind(node,'textContent',value),
     attribute:(node,name,value)=>bind(node,name,value),attributeValue:(node,name)=>bindingIndex.get(node)?.get(name) ?? node.getAttribute(name),value:value=>at(value,language),get language(){return language;}});

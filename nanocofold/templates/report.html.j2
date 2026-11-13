@@ -55,7 +55,7 @@
 <body>
 <p data-terminology="binding-site"><span data-report-i18n>결합 부위(hotspot)는 나노바디 설계와 접촉 평가에 사용할 표적 잔기입니다. 일반 복합체의 관심 잔기는 참조 구조 비교에 사용합니다.</span></p>
 <div class="wrap">
-  <div class="report-language"><label for="language-select">Language / 언어</label> <select id="language-select" aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div>
+  <div class="report-language"><label for="language-select">Language / 언어</label> <select id="language-select" disabled aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div>
   <p role="status" aria-live="polite" class="muted"><span data-report-i18n>점수·구조·평가 기록을 확인하고 필요한 파일을 저장하세요.</span></p>
   <h1>{{ title }}</h1>
   <div class="sub"><span data-report-i18n>실행 ID:</span> {{ run_id }} <span data-report-i18n>· 모드:</span> <b>{{ mode }}</b> · {{ report_term("기준 단백질" if mode == "complex" else "표적") }}: <b>{{ target_name }}</b> <span data-report-i18n>· 생성:</span> {{ generated_at }} <span data-report-i18n>· 보고서 버전:</span> {{ reporting_version|default(report_term("미기록"), true) }} <span data-report-i18n>· 계산 버전:</span> {{ computation_version|default(report_term("미기록"), true) }}</div>

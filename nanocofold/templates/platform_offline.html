@@ -554,7 +554,7 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
 #vhh-sequence-record { display:block; overflow-wrap:anywhere; }
 #vhh-sequence-value { display:block; box-sizing:border-box; width:100%; min-height:4.5em; margin:.3rem 0 .5rem; font-family:ui-monospace,monospace; }
 #vhh-sequence-feedback:empty { display:none; }
-</style></head><body><header class="offline-header"><div class="offline-brand"><strong>NanoCoFold · 오프라인 결과 탐색</strong><span>전체 후보 · 관측 · 구조 · 출처 포함</span></div><div class="language-switch"><label for="language-select">Language</label> <select id="language-select" aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div></header><main><div id="notice" role="status" aria-live="polite" hidden></div><section id="view-results">
+</style></head><body><header class="offline-header"><div class="offline-brand"><strong>NanoCoFold · 오프라인 결과 탐색</strong><span>전체 후보 · 관측 · 구조 · 출처 포함</span></div><div class="language-switch"><label for="language-select">Language</label> <select id="language-select" disabled aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div></header><main><div id="notice" role="status" aria-live="polite" hidden></div><section id="view-results">
 
         <h1>분석 결과 보고서</h1><p class="muted">NanoCoFold · 저장된 분석 결과</p><nav class="report-nav" aria-label="보고서 내 탐색"><a href="#report-input">01 입력·설정</a><a href="#result-summary">02 후보·모델 수</a><a href="#report-comparison">03 후보 비교</a><a href="#report-exclusions">04 제외·미평가</a><a href="#candidate-title">05 구조·PAE</a><a href="#report-provenance">06 출처·산출물</a></nav>
         <p>
@@ -3720,8 +3720,11 @@ globalThis.I18N = (() => {
         }
       }
     }
-    document.getElementById('language-select')?.addEventListener('change',event=>setLanguage(event.target.value));
+    const languageSelect=document.getElementById('language-select');
+    languageSelect?.addEventListener('change',event=>setLanguage(event.target.value));
     apply();
+    // Large local reports can paint this control before their scripts finish loading.
+    if(languageSelect)languageSelect.disabled=false;
   }
   return Object.freeze({init,setLanguage,term,format,concat,bilingual:message,text:(node,value)=>bind(node,'textContent',value),
     attribute:(node,name,value)=>bind(node,name,value),attributeValue:(node,name)=>bindingIndex.get(node)?.get(name) ?? node.getAttribute(name),value:value=>at(value,language),get language(){return language;}});

@@ -2,13 +2,15 @@
 
 [English](README.md) · **한국어**
 
-**최신 설치본 [v0.4.8-install.9](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8-install.9)** · 계산 패키지 `0.4.8rc12`
+**최신 설치본 [v0.4.8-install.10](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8-install.10)** · 계산 패키지 `0.4.8rc12`
 
 단백질 복합체를 예측하고, 새 나노바디를 설계하거나 보유한 후보와 변이를 비교합니다. 결과는 3D로 살펴보고 대화형 보고서로 공유할 수 있습니다.
 
 **처음 설치하는 컴퓨터**에서는 [1. 준비와 설치](#1-준비와-설치)부터 진행하세요. **이미 설치했다면** 처음 설치한 폴더에서 [기존 설치 업데이트](docs/UPDATE.ko.md)를 따라 하세요. **연구실 서버를 함께 쓰는 분**은 관리자가 알려준 계정으로 [내 자리에서 접속](docs/shared-lab.ko.md#사용자-pc)하세요.
 
-**처음이라면 [EGFR 나노바디 변이 10종 실습 영상](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=ko)부터 보세요.** 영상은 27분, 17개 장입니다. Ubuntu에서 설치한 뒤 표적 서열과 결합 부위를 입력하고, 후보마다 CDR3 잔기 두 곳을 바꾼 변이 10종을 원래 나노바디(WT)와 비교합니다. 같은 작업을 결과 DB에서 찾아 전달 상태를 확인하고 보고서 ZIP을 여는 과정까지 담았습니다. [실습 입력 ZIP](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-inputs.zip) · [영상 MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-first-run-en.mp4) · [입력 준비 장부터 보기](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=ko&chapter=inputs) · [영상의 결과 보고서 ZIP](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-report.zip)
+**결과부터 보려면:** [예제 보고서 ZIP](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-report.zip) 전체를 압축 해제한 뒤 **report.html**을 브라우저로 여세요. 설치나 GPU가 필요 없습니다. [새 실습 영상](https://kangk1204.github.io/NanoCoFold_public/quickstart/?lang=ko)에서 같은 방식으로 결과를 열고, 새 분석의 후보 서열과 3D 구조를 찾아 Excel로 저장하는 과정을 볼 수 있습니다.
+
+**상세 설치와 입력 설명은 [EGFR 나노바디 변이 10종 실습 영상](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=ko)을 보세요.** 영상은 27분, 17개 장입니다. Ubuntu에서 설치한 뒤 표적 서열과 결합 부위를 입력하고, 후보마다 CDR3 잔기 두 곳을 바꾼 변이 10종을 원래 나노바디(WT)와 비교합니다. 같은 작업을 결과 DB에서 찾아 전달 상태를 확인하고 보고서 ZIP을 여는 과정까지 담았습니다. [실습 입력 ZIP](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-inputs.zip) · [영상 MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-first-run-en.mp4) · [입력 준비 장부터 보기](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=ko&chapter=inputs) · [영상의 결과 보고서 ZIP](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-report.zip)
 
 [플랫폼 소개 (28초)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=intro&lang=ko) · [Ubuntu 설치 개요 (2분 30초)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=install&lang=ko) · [네 모드 소개 (5분 47초)](https://kangk1204.github.io/NanoCoFold_public/watch/?v=walkthrough&lang=ko)
 
@@ -58,8 +60,8 @@ GPU 메모리가 16 GB 미만이면 서버 관리자와 사용할 엔진·입력
 
 설치기가 Python 환경, 엔진, 모델을 자동으로 준비합니다. NVIDIA 드라이버는 서버 관리자가 미리 설치합니다.
 
-1. [v0.4.8 소스 ZIP (설치 수정판 9)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.9.zip)을 내려받아 전체를 압축 해제합니다. Git으로 clone했다면 그 저장소 폴더를 사용합니다.
-2. 릴리스 ZIP은 **`NanoCoFold_public-0.4.8-install.9` 폴더**, Git clone은 **`NanoCoFold_public` 폴더**를 엽니다.
+1. [v0.4.8 소스 ZIP (설치 수정판 10)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.10.zip)을 내려받아 전체를 압축 해제합니다. Git으로 clone했다면 그 저장소 폴더를 사용합니다.
+2. 릴리스 ZIP은 **`NanoCoFold_public-0.4.8-install.10` 폴더**, Git clone은 **`NanoCoFold_public` 폴더**를 엽니다.
 3. 이 폴더 안에서 터미널을 엽니다. `README.md`, `install.sh`, `start.sh`가 보이면 맞습니다.
 4. 첫 복합체 예제의 네 엔진을 준비하려면 아래 **세 명령을 순서대로, 같은 폴더에서** 실행합니다. 한 명령이 `[설치 완료]`로 끝난 뒤 다음 명령을 실행하세요.
 
