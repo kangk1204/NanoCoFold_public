@@ -1,6 +1,6 @@
 # NanoCoFold collaborator guide
 
-Already installed? Use the [update guide](UPDATE.en.md) to keep your workspace and results.
+Already installed? Follow the [update guide](UPDATE.en.md). If your lab shares a GPU server, ask your administrator for an account and [connect from your desk](shared-lab.en.md#at-each-desk).
 
 NanoCoFold designs nanobody candidates for a target protein and compares their predicted structures and sequence properties. Start with the public example to install the software and find the results. To view results someone sent you, go to [Opening ZIP files](#5-open-and-share-zip-files).
 
@@ -38,7 +38,7 @@ Depending on the settings, you can add CDR substitution candidates or use ESM/An
 
 ## 1. Download the software
 
-Download the [v0.4.8 source ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8.zip) and extract the entire archive. If your collaborator specified another tag or commit, choose **Code → Download ZIP** on that revision’s source page. Open the folder containing `README.md`, `install.sh`, and `start.sh`, then open a terminal inside that folder.
+Open [Prepare and install in the README](../README.md#1-prepare-and-install), download the **source ZIP in step 1**, and extract the entire archive. Open the folder containing `README.md`, `install.sh`, and `start.sh`, then open a terminal in that folder.
 
 Install on Ubuntu x86_64 with an NVIDIA GPU. The first four-engine example requires at least 16 GB GPU memory, 32 GB RAM, and 150 GiB free SSD space. Check the operating system and driver requirements in the [README](../README.md#1-prepare-and-install). On Windows or macOS, connect to an installed server or open a report someone sent you.
 
@@ -93,6 +93,8 @@ While analysis runs, **Jobs & logs** shows **Running**, the current stage, model
 
 When analysis completes, check the completed, failed, and unevaluated model counts. Select a candidate/model row to view its scores, 3D structure, and PAE. Reopen saved analyses through **Explore results → Select run**.
 
+To find a nanobody sequence, go to **Results database → Candidate sequences and structures** and search by target or candidate ID. Select a candidate ID to open its sequence and 3D structure. Choose **Save this candidate as FASTA** for the sequence or **Export all matches to Excel** for the table.
+
 `diagnostics · Complete` is the environment-check record. Continue with **Prepare analysis**. If the results button is out of view, scroll down in the job details.
 
 After the public example, choose your research purpose and enter your own amino acid sequences.
@@ -100,6 +102,8 @@ After the public example, choose your research purpose and enter your own amino 
 To stop analysis, click **Cancel job**, check the job in the confirmation dialog, and confirm. Wait for **Cancelling → Cancelled** while resources are released. **Keep running** or Esc returns to the job. Saved results remain available. For a failed, interrupted, or cancelled job, read the log, resolve the cause, then use **Verify and resume** if available. See the [job controls](../README.md#6-follow-jobs-cancel-and-resume).
 
 ## 5. Open and share ZIP files
+
+To explore a completed analysis, download the [EGFR result ZIP from the video](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-report.zip). Extract the entire archive and open `report.html` to see the structures and scores for the original nanobody (WT) and ten CDR3 variants.
 
 GitHub's **Download ZIP** contains the source for installation. The sample ZIPs below are provided separately. `START_HERE.html` is included in the combined sample ZIP and the complex sample ZIP.
 

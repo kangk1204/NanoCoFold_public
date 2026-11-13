@@ -3,6 +3,12 @@
 영어를 README와 웹 플랫폼의 기본 언어로 사용합니다. README 상단에서 한국어판으로 이동할 수 있고, 플랫폼 및 새 오프라인 보고서는 English/한국어를 즉시 전환하고 선택을 저장합니다. 입력·후보 ID·서열·수치·원본 로그·설정은 번역하거나 변경하지 않습니다. 언어 전환 시 사본 수 입력·체인 체크박스·선택한 모델과 PAE를 유지합니다. (2026-10-15)
 
 
+## v0.4.8-install.9 — 2026-11-13
+
+The collaborator guides now lead to the current installer. The English and Korean READMEs give separate starting points for a new installation, an update, and access to a shared lab server.
+
+한영 공동연구자 안내에서 현재 설치본을 받을 수 있습니다. README 첫 화면에서 새 설치, 기존 설치본 업데이트, 연구실 서버 접속 중 필요한 경로를 고를 수 있습니다.
+
 ## v0.4.8-install.8 — 2026-11-13
 
 Lab administrators and researchers can change their own password after signing in. The change signs that account out on every device. Running analyses and saved results are unaffected.
