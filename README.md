@@ -61,7 +61,7 @@ For GPUs with less than 16 GB of memory, ask your server administrator to select
 The installer prepares the Python environments, engines, and models automatically. Your server administrator installs the NVIDIA driver beforehand.
 
 1. [Download the v0.4.8 source ZIP (installation revision 13)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.13.zip) and extract the entire archive. If you cloned the repository, use your checkout.
-2. Open **`NanoCoFold_public-0.4.8-install.12`** for the release ZIP or **`NanoCoFold_public`** for a Git clone.
+2. Open **`NanoCoFold_public-0.4.8-install.13`** for the release ZIP or **`NanoCoFold_public`** for a Git clone.
 3. Open a terminal inside that folder. You should see `README.md`, `install.sh`, and `start.sh`.
 4. To prepare all four engines for the first complex example, run these **three commands in order, in the same folder**. Wait for each command to finish with **`[설치 완료]`** (installation complete) before starting the next.
 
