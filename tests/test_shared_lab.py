@@ -219,3 +219,52 @@ def test_queue_runs_two_analyses_and_releases_one_reservation(tmp_path, monkeypa
         for handles in owned:
             for descriptor in handles:
                 os.close(descriptor)
+
+
+def test_shared_login_burst_queues_without_parallel_password_hashes(tmp_path, monkeypatch):
+    import threading
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    root = tmp_path / "lab"
+    app = create_app(root, start_workers=False)
+    accounts = LabAccounts(root)
+    for name in ("Ada", "Bea", "Chen"):
+        accounts.set_password(name, "correct-password-" + name)
+    original = LabAccounts.login
+    release = threading.Event()
+    running = 0
+    peak = 0
+
+    def delayed(self, name, password):
+        nonlocal running, peak
+        running += 1
+        peak = max(running, peak)
+        try:
+            if not release.wait(10):
+                raise RuntimeError("queued login never released")
+            return original(self, name, password)
+        finally:
+            running -= 1
+
+    monkeypatch.setattr(LabAccounts, "login", delayed)
+    async def exercise():
+        origin = "http://127.0.0.1"
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=origin) as client:
+            names = ["Ada", "Bea", "Chen"] * 3
+            requests = [asyncio.create_task(client.post("/lab/login", headers={"origin":origin},
+                        data={"name":name, "password":"correct-password-"+name})) for name in names]
+            done, _ = await asyncio.wait(requests, timeout=5, return_when=asyncio.FIRST_COMPLETED)
+            release.set()
+            responses = await asyncio.gather(*requests)
+            assert len(done) == 1
+            assert sorted(r.status_code for r in responses) == [303]*8 + [429]
+            busy = next(r for r in responses if r.status_code == 429)
+            assert busy.headers["retry-after"] and '<form' in busy.text
+            for name, response in zip(names, responses):
+                if response.status_code == 303:
+                    assert accounts.user(response.cookies[accounts.cookie]) == name
+            assert peak == 1
+    try:
+        asyncio.run(exercise())
+    finally:
+        release.set()
+        app.state.inputs.close()

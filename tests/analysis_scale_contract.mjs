@@ -75,3 +75,18 @@ test('unfiltered random libraries do not restore the unused prefilter cap captio
  assert.match(c.noviceModelPlan(cfg,'mature'),/101모델/);
  cfg.run.mock=true;c.renderAnalysisScale(cfg,'mature');assert.equal(get('candidate-limit-help').hidden,false);
 });
+
+
+test('changing the single prediction engine leaves the trusted installation paths on the server',()=>{
+ const {c,get}=fixture();get('mode').value='screen';get('analysis-preset').value='standard';
+ c.state.presets.standard={screen:{comparison:{enabled:false}}};
+ for(const engine of ['boltz2','chai1','colabfold','opendde']){
+  get('screen-engine').value=engine;
+  const submission=c.inputSettings(false);
+  assert.equal(submission.screen.engine,engine);
+  assert.equal(submission.screen.env,undefined);
+ }
+ get('advanced').value=JSON.stringify({screen:{env:'/registered/chai1'}});
+ get('screen-engine').value='boltz2';
+ assert.equal(c.inputSettings(false).screen.env,'/registered/chai1');
+});

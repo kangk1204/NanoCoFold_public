@@ -32,6 +32,8 @@ Creating the first account turns on lab sign-in for this workspace. Older result
 4. In **Jobs & logs**, a queued job shows why it is waiting. It starts automatically when the GPU becomes available. You can cancel your own queued job.
 5. In **Results database → Candidate sequences and structures**, search for a target or candidate ID. Filter by engine and recorded decision. To include practice runs, select **Include practice runs** and search again. Click a metric heading to sort, a candidate ID to see its sequence and structure, or the analysis name for the report. **Export all matches to Excel** includes every matching page. Open **Analyses → Lab usage history** to see submissions, including pending, cancelled and reused jobs.
 
+After you click **Run analysis**, leave the tab open until the job appears. The first submission may take a few minutes while the server checks model files. Click only once. Once listed in **Jobs & logs**, the analysis continues if you close the browser.
+
 ## Sequence transfer and storage
 
 - Under **Run settings**, choosing the public MSA service sends input sequences to the external service to search for related sequences and requires consent. The verified cache option needs an existing alignment for the sequence. Local search needs a configured database. Boltz-2 follows the selected MSA settings.

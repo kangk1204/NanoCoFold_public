@@ -148,3 +148,15 @@ test('public MSA needs fresh consent even for a workspace default with Boltz-2',
  c.state.planningDefaults.complex={msa_source:'public_api'};
  assert.doesNotThrow(()=>c.inputSettings());
 });
+
+test('a cold shared-server check can finish after three minutes without a second submission',async()=>{
+ const {c}=fixture();ready({c},design);const accepted=[];let posts=0;
+ c.selectJob=async id=>accepted.push(id);
+ c.api=async (path,body,opts)=>{
+  assert.equal(path,'/api/jobs');assert.ok(body.submission_id);posts++;
+  assert.ok(opts.timeoutMs>220000,'allow enough time for measured concurrent cold admissions');
+  return {id:'cold-verified'};
+ };
+ await c.submitReviewedAnalysis();
+ assert.equal(posts,1);assert.deepEqual(accepted,['cold-verified']);
+});

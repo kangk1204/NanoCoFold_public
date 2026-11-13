@@ -1565,6 +1565,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "선택한 엔진의 환경 확인이 필요합니다.": "The selected engines need an environment check.",
   "처음 사용하시나요?": "First time here?",
   "설치 환경은 처음 한 번 확인합니다. 그다음 입력 확인 → 분석 실행 → 결과 열기 순서로 진행하세요.": "Check the installation once. Then review your input → run the analysis → open the results.",
+  "서버에서 분석 입력과 설치 파일을 확인 중입니다. 몇 분 걸릴 수 있습니다. 다시 누르지 않아도 접수되면 작업 화면이 열립니다.": "The server is checking your input and installed files. This can take a few minutes. The job will open automatically; you only need to click once.",
   "분석 요청을 보내는 중입니다. 접수되면 작업 화면이 열립니다.": "Submitting your analysis. The job will open when it is accepted.",
   "서버에서 이 요청의 작업을 찾고 있습니다.": "Checking whether the server accepted this analysis.",
   "처음 한 번 환경 확인": "Check environment once",
@@ -4380,7 +4381,7 @@ function inputSettings(forPlan = false) {
     },
     screen: cfg.screen?.comparison?.enabled ? {} : {
       engine: $("screen-engine").value,
-      env: "envs/" + $("screen-engine").value,
+      // The server resolves the selected engine using its registered installation.
     },
   });
 }
@@ -4628,11 +4629,11 @@ async function submitReviewedAnalysis() {
     const payload = {submission_id:submissionId, reuse_results:!$('force-rerun').checked,
       input_id:input.id, mode, name:$('job-name').value, mock:input.config.run.mock,
       ...(budget ? {budget_seconds:Number(budget)*60}: {})};
-    notice('분석 요청을 보내는 중입니다. 접수되면 작업 화면이 열립니다.');
+    notice('서버에서 분석 입력과 설치 파일을 확인 중입니다. 몇 분 걸릴 수 있습니다. 다시 누르지 않아도 접수되면 작업 화면이 열립니다.');
     let job;
     try {
-      // A first admission can spend more than 30 s verifying model provenance.
-      job = await api('/api/jobs', payload, {timeoutMs:120000});
+      // Cold verification of shared model files can take several minutes on a lab server.
+      job = await api('/api/jobs', payload, {timeoutMs:600000});
     } catch (error) {
       if (error.responseRejected) throw error;
       if (!stillCurrent()) return;

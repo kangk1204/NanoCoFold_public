@@ -672,7 +672,7 @@ function inputSettings(forPlan = false) {
     },
     screen: cfg.screen?.comparison?.enabled ? {} : {
       engine: $("screen-engine").value,
-      env: "envs/" + $("screen-engine").value,
+      // The server resolves the selected engine using its registered installation.
     },
   });
 }
@@ -920,11 +920,11 @@ async function submitReviewedAnalysis() {
     const payload = {submission_id:submissionId, reuse_results:!$('force-rerun').checked,
       input_id:input.id, mode, name:$('job-name').value, mock:input.config.run.mock,
       ...(budget ? {budget_seconds:Number(budget)*60}: {})};
-    notice('분석 요청을 보내는 중입니다. 접수되면 작업 화면이 열립니다.');
+    notice('서버에서 분석 입력과 설치 파일을 확인 중입니다. 몇 분 걸릴 수 있습니다. 다시 누르지 않아도 접수되면 작업 화면이 열립니다.');
     let job;
     try {
-      // A first admission can spend more than 30 s verifying model provenance.
-      job = await api('/api/jobs', payload, {timeoutMs:120000});
+      // Cold verification of shared model files can take several minutes on a lab server.
+      job = await api('/api/jobs', payload, {timeoutMs:600000});
     } catch (error) {
       if (error.responseRejected) throw error;
       if (!stillCurrent()) return;

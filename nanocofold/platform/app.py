@@ -80,6 +80,7 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
     lab = LabAccounts(workspace)
     token = secrets.token_urlsafe(32)
     login_gate = asyncio.Lock()
+    pending_signins = 0  # Includes the active scrypt check; count is owned by the event loop.
     account_inputs = {}
     account_lock = threading.Lock()
 
@@ -450,11 +451,15 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         path = result_directory(path)
         return ResultReader(path)
 
-    def login_page(failed=False):
+    def login_page(failed=False, *, busy=False):
         template = Path(__file__).resolve().parents[1] / "templates/lab_login.html"
         error = '<p role="alert">계정과 비밀번호를 확인하세요. / Check your account and password.</p>' if failed else ""
-        return HTMLResponse(template.read_text().replace("<!--LOGIN_ERROR-->", error), status_code=401 if failed else 200,
-                            headers={"Referrer-Policy": "same-origin"})
+        headers = {"Referrer-Policy": "same-origin"}
+        if busy:
+            error = '<p role="alert">로그인이 몰렸습니다. 잠시 뒤 다시 로그인하세요. / Sign-in is busy. Please try again shortly.</p>'
+            headers["Retry-After"] = "3"
+        return HTMLResponse(template.read_text().replace("<!--LOGIN_ERROR-->", error),
+                            status_code=429 if busy else 401 if failed else 200, headers=headers)
 
     def activation_page(failed=False):
         page = (Path(__file__).resolve().parents[1] / "templates/lab_activate.html").read_text()
@@ -513,13 +518,20 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
             form = parse_qs(data.decode(), max_num_fields=2)
         except (UnicodeError, ValueError):
             raise HTTPException(400)
-        if login_gate.locked():
-            return JSONResponse({"error":"잠시 뒤 로그인하세요. / Try signing in again shortly."}, status_code=429)
-        async with login_gate:
-            key = await asyncio.to_thread(lab.login, form.get("name",[""])[0], form.get("password",[""])[0])
-            if not key:
-                await asyncio.sleep(.35)
-                return login_page(True)
+        nonlocal pending_signins
+        if pending_signins >= 8:
+            return login_page(busy=True)
+        pending_signins += 1
+        try:
+            # Several researchers can arrive together. Serialize password hashing
+            # and keep the existing failed-login delay and a bounded queue.
+            async with login_gate:
+                key = await asyncio.to_thread(lab.login, form.get("name",[""])[0], form.get("password",[""])[0])
+                if not key:
+                    await asyncio.sleep(.35)
+                    return login_page(True)
+        finally:
+            pending_signins -= 1
         response = RedirectResponse("/", status_code=303)
         response.set_cookie(lab.cookie, key, max_age=12*3600, httponly=True, samesite="strict")
         return response

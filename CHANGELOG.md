@@ -3,6 +3,12 @@
 영어를 README와 웹 플랫폼의 기본 언어로 사용합니다. README 상단에서 한국어판으로 이동할 수 있고, 플랫폼 및 새 오프라인 보고서는 English/한국어를 즉시 전환하고 선택을 저장합니다. 입력·후보 ID·서열·수치·원본 로그·설정은 번역하거나 변경하지 않습니다. 언어 전환 시 사본 수 입력·체인 체크박스·선택한 모델과 PAE를 유지합니다. (2026-10-15)
 
 
+## v0.4.8-install.7 — 2026-11-13
+
+Several researchers can sign in at the same time. Single-engine analysis uses the installation configured by the lab administrator. The submission screen waits while the server verifies large model files.
+
+연구원 여러 명이 동시에 로그인할 수 있습니다. 단일 엔진 분석에서는 관리자가 설치한 엔진을 그대로 사용합니다. 모델 파일 검증이 오래 걸려도 제출 화면에서 접수를 기다릴 수 있습니다.
+
 ## v0.4.8-install.6 — 2026-11-13
 
 A searchable candidate table links each VHH sequence to its saved structure, metrics and report. Excel exports include all filtered rows. GPU jobs can run together when measured utilization and reserved memory allow. Researchers see their own submissions by default. One locally activated administrator can review all results and change lab-wide visibility.
