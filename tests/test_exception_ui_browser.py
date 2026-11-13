@@ -65,6 +65,62 @@ def test_shared_lab_browser_form_uses_same_origin(request, tmp_path, monkeypatch
         browser.close()
 
 
+@pytest.mark.skipif(os.environ.get('NANOCOFOLD_BROWSER_TEST') != '1', reason='Real Chromium password change')
+def test_shared_lab_password_dialog_both_languages(request, tmp_path, monkeypatch):
+    from nanocofold.platform.lab import LabAccounts
+    from playwright.sync_api import expect, sync_playwright
+
+    monkeypatch.setattr(Path, 'home', classmethod(lambda cls: tmp_path / 'local-home'))
+    lab = LabAccounts(tmp_path)
+    code = lab.initialize_admin()
+    assert lab.activate(code, 'browser-initial-pass')
+    _, url = request.getfixturevalue('exception_app')
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = browser.new_page(viewport={'width': 375, 'height': 750})
+        page.goto(url)
+
+        def sign_in(password):
+            page.locator('[name=name]').fill('admin')
+            page.locator('[name=password]').fill(password)
+            page.get_by_role('button', name='로그인 / Sign in').click()
+
+        sign_in('browser-initial-pass')
+        dialog = page.locator('#lab-password-dialog')
+        for lang, title, current_label, new_label, confirmation, close in [
+                ('en', 'Change password', 'Current password', 'New password (10–256 characters)', 'Confirm new password', 'Close'),
+                ('ko', '비밀번호 변경', '현재 비밀번호', '새 비밀번호 (10~256자)', '새 비밀번호 확인', '닫기')]:
+            page.locator('#language-select').select_option(lang)
+            page.get_by_role('button', name=title, exact=True).click()
+            expect(dialog.get_by_role('heading')).to_have_text(title)
+            expect(dialog.get_by_label(current_label, exact=True)).to_be_focused()
+            expect(dialog.get_by_label(new_label, exact=True)).to_be_visible()
+            expect(dialog.get_by_label(confirmation, exact=True)).to_be_visible()
+            dialog.get_by_label(current_label, exact=True).fill('not-persisted-on-close')
+            box = dialog.bounding_box()
+            assert box['x'] >= 0 and box['x'] + box['width'] <= 375
+            dialog.get_by_role('button', name=close, exact=True).click()
+            expect(dialog).not_to_be_visible()
+            expect(dialog.locator('[name=current]')).to_have_value('')
+        page.get_by_role('button', name='비밀번호 변경', exact=True).click()
+        dialog.locator('[name=current]').fill('wrong-current-pass')
+        dialog.locator('[name=new]').fill('browser-replacement-pass')
+        dialog.locator('[name=confirm]').fill('different-confirmation')
+        dialog.get_by_role('button', name='비밀번호 변경').click()
+        expect(dialog.get_by_role('alert')).to_have_text('두 번 입력한 새 비밀번호가 다릅니다.')
+        dialog.locator('[name=confirm]').fill('browser-replacement-pass')
+        dialog.get_by_role('button', name='비밀번호 변경').click()
+        expect(dialog.get_by_role('alert')).to_have_text('현재 비밀번호를 확인하세요.')
+        dialog.locator('[name=current]').fill('browser-initial-pass')
+        dialog.get_by_role('button', name='비밀번호 변경').click()
+        expect(page.get_by_role('status')).to_contain_text('새 비밀번호로 로그인하세요.')
+        sign_in('browser-initial-pass')
+        expect(page.get_by_role('alert')).to_be_visible()
+        sign_in('browser-replacement-pass')
+        expect(page.locator('#lab-user')).to_have_text('admin')
+        browser.close()
+
+
 def browser_fixture(page, jobs, posts):
     def route(request):
         path = request.request.url.split('/api/jobs', 1)[1]

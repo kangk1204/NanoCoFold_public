@@ -17,9 +17,11 @@ The **server** is the Ubuntu computer with NanoCoFold installed. Each **client**
 
 The server prints a one-time activation code. Sign in with **admin / admin** and enter the code and a new password (at least 10 characters). Sign in again with your new password to view all results. If you lose the code before activation, run `init-admin` again. If an existing researcher is named `admin`, verify the account owner on the server, then run `python3 scripts/lab_account.py promote-admin` to promote that account.
 
+**To change your password later**, sign in and select **Change password** next to your account name. Enter your current password and the new one twice. Then sign in again on each device. Running analyses and saved results stay in place. Researchers can use the same steps for their own account.
+
 Under **Results database → Administrator · Result access**, check **Allow all researchers to view all lab results** and choose **Save permissions**. Clear it and save to restore private access for subsequent requests and downloads. Previously downloaded files stay with their recipients. This controls NanoCoFold web access. The server operator manages SSH and filesystem permissions separately.
 
-Creating the first account turns on lab sign-in for this workspace. Older results keep their original files and have no researcher assigned. Use `python3 scripts/lab_account.py list` to list accounts. Use `password NAME` to change a password or `disable NAME` to revoke access and keep the submission history. A disabled name stays reserved for that researcher. Back up the workspace and the server operator’s `~/.config/nanocofold/labs/` directory.
+Creating the first account turns on lab sign-in for this workspace. Older results keep their original files and have no researcher assigned. Use `python3 scripts/lab_account.py list` to list accounts. If someone forgets their password, use `python3 scripts/lab_account.py password NAME` on the server to reset it or `disable NAME` to revoke access and keep the submission history. A disabled name stays reserved for that researcher. Back up the workspace and the server operator’s `~/.config/nanocofold/labs/` directory.
 
 ## At each desk
 

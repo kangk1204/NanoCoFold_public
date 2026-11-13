@@ -2,7 +2,7 @@
 
 **English** · [한국어](README.ko.md)
 
-**Current installer [v0.4.8-install.7](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8-install.7)** · Compute package `0.4.8rc12`
+**Current installer [v0.4.8-install.8](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8-install.8)** · Compute package `0.4.8rc12`
 
 Predict protein complexes, design nanobodies, and compare existing candidates or variants. Explore the models in 3D and share an interactive report.
 
@@ -16,7 +16,7 @@ For an overview of the four analysis modes, watch the **four-mode overview**. Th
 
 [Share a lab GPU · Accounts, queue and result search by researcher](docs/shared-lab.en.md)
 
-**First installation?** [Download the v0.4.8 source ZIP (installation revision 7)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.7.zip) and follow the public example below. It loads the sequences and a small starter preset.
+**First installation?** [Download the v0.4.8 source ZIP (installation revision 8)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.8.zip) and follow the public example below. It loads the sequences and a small starter preset.
 
 **Already installed?** Follow the [update guide](docs/UPDATE.en.md) to keep your workspace and saved results.
 
@@ -62,8 +62,8 @@ For GPUs with less than 16 GB of memory, ask your server administrator to select
 
 The installer prepares the Python environments, engines, and models automatically. Your server administrator installs the NVIDIA driver beforehand.
 
-1. [Download the v0.4.8 source ZIP (installation revision 7)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.7.zip) and extract the entire archive. If you cloned the repository, use your checkout.
-2. Open **`NanoCoFold_public-0.4.8-install.7`** for the release ZIP or **`NanoCoFold_public`** for a Git clone.
+1. [Download the v0.4.8 source ZIP (installation revision 8)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.8.zip) and extract the entire archive. If you cloned the repository, use your checkout.
+2. Open **`NanoCoFold_public-0.4.8-install.8`** for the release ZIP or **`NanoCoFold_public`** for a Git clone.
 3. Open a terminal inside that folder. You should see `README.md`, `install.sh`, and `start.sh`.
 4. To prepare all four engines for the first complex example, run these **three commands in order, in the same folder**. Wait for each command to finish with **`[설치 완료]`** (installation complete) before starting the next.
 
@@ -363,7 +363,7 @@ Open **Explore results → Lead candidates in this run**. Select **View sequence
 
 **Find candidates across your analyses.** Open **Results database → Candidate sequences and structures**, choose the target and prediction engine, select **Recorded decision → Eligible**, and click **Search**. Click **Final selection rank** for first picks within each run and engine. Click a candidate ID for its sequence, 3D structure and metrics, or an analysis name for the full report. **Export all matches to Excel** saves every matching page in the displayed sort order.
 
-The server registers new results and indexes earlier registrations in the background. Researchers initially see their own submissions. The `admin` account can review all runs, including runs without a recorded owner, and can grant or revoke lab-wide viewing. [Set up lab access](docs/shared-lab.en.md)
+The server registers new results and indexes earlier registrations in the background. Researchers initially see their own submissions. The `admin` account can review all runs, including runs without a recorded owner, and can grant or revoke lab-wide viewing. After signing in, select **Change password** next to your account name to change your own password. [Set up lab access](docs/shared-lab.en.md)
 
 Use section links and browser **Back / Forward** to move through the report while analysis continues. Keep the same candidate selected when comparing languages.
 

@@ -29,7 +29,7 @@
         <strong>NanoCoFold</strong><span>단백질 복합체·나노바디 분석 · 개인 작업 공간</span>
       </div>
       <div class="language-switch"><label for="language-select">Language</label> <select id="language-select" aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div>
-      <div id="lab-account" hidden><span id="lab-user" data-i18n-ignore></span> <button id="lab-logout" type="button">로그아웃</button></div>
+      <div id="lab-account" hidden><span id="lab-user" data-i18n-ignore></span><button id="lab-change-password" type="button">비밀번호 변경</button><button id="lab-logout" type="button">로그아웃</button></div>
       <nav aria-label="주 메뉴">
         <button data-view="input" aria-current="page">입력·실행</button
         ><button data-view="batch">배치 분석</button
@@ -39,6 +39,17 @@
         ><button data-view="environment">환경·설치</button>
       </nav>
     </header>
+    <dialog id="lab-password-dialog" aria-labelledby="lab-password-title">
+      <h2 id="lab-password-title">비밀번호 변경</h2>
+      <p>변경하면 이 계정으로 로그인한 모든 기기에서 다시 로그인해야 합니다. 실행 중인 분석은 계속됩니다.</p>
+      <form id="lab-password-form" method="dialog">
+        <label>현재 비밀번호<input type="password" name="current" autocomplete="current-password" maxlength="256" required></label>
+        <label>새 비밀번호 (10~256자)<input type="password" name="new" autocomplete="new-password" minlength="10" maxlength="256" required></label>
+        <label>새 비밀번호 확인<input type="password" name="confirm" autocomplete="new-password" minlength="10" maxlength="256" required></label>
+        <p id="lab-password-feedback" role="alert"></p>
+        <div class="inline"><button type="button" class="secondary" id="lab-password-cancel">닫기</button><button type="submit">비밀번호 변경</button></div>
+      </form>
+    </dialog>
     <main>
       <div id="notice" role="status" aria-live="polite" hidden></div>
       <div id="platform-startup" class="card" role="status" aria-live="polite">

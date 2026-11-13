@@ -2,7 +2,7 @@
 
 [English](README.md) · **한국어**
 
-**최신 설치본 [v0.4.8-install.7](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8-install.7)** · 계산 패키지 `0.4.8rc12`
+**최신 설치본 [v0.4.8-install.8](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8-install.8)** · 계산 패키지 `0.4.8rc12`
 
 단백질 복합체를 예측하고, 새 나노바디를 설계하거나 보유한 후보와 변이를 비교합니다. 결과는 3D로 살펴보고 대화형 보고서로 공유할 수 있습니다.
 
@@ -16,7 +16,7 @@
 
 [연구실 GPU 한 대를 여러 자리에서 사용하기 · 계정, GPU 대기, 담당자별 결과 검색](docs/shared-lab.ko.md)
 
-**처음 설치하시나요?** [v0.4.8 소스 ZIP (설치 수정판 7)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.7.zip)을 내려받고 아래 공개 예제를 따라 하세요. 서열과 작은 시작 설정이 자동으로 채워집니다.
+**처음 설치하시나요?** [v0.4.8 소스 ZIP (설치 수정판 8)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.8.zip)을 내려받고 아래 공개 예제를 따라 하세요. 서열과 작은 시작 설정이 자동으로 채워집니다.
 
 **이미 설치했다면** [업데이트 안내](docs/UPDATE.ko.md)에 따라 기존 작업 공간과 결과를 그대로 사용하세요.
 
@@ -62,8 +62,8 @@ GPU 메모리가 16 GB 미만이면 서버 관리자와 사용할 엔진·입력
 
 설치기가 Python 환경, 엔진, 모델을 자동으로 준비합니다. NVIDIA 드라이버는 서버 관리자가 미리 설치합니다.
 
-1. [v0.4.8 소스 ZIP (설치 수정판 7)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.7.zip)을 내려받아 전체를 압축 해제합니다. Git으로 clone했다면 그 저장소 폴더를 사용합니다.
-2. 릴리스 ZIP은 **`NanoCoFold_public-0.4.8-install.7` 폴더**, Git clone은 **`NanoCoFold_public` 폴더**를 엽니다.
+1. [v0.4.8 소스 ZIP (설치 수정판 8)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.8.zip)을 내려받아 전체를 압축 해제합니다. Git으로 clone했다면 그 저장소 폴더를 사용합니다.
+2. 릴리스 ZIP은 **`NanoCoFold_public-0.4.8-install.8` 폴더**, Git clone은 **`NanoCoFold_public` 폴더**를 엽니다.
 3. 이 폴더 안에서 터미널을 엽니다. `README.md`, `install.sh`, `start.sh`가 보이면 맞습니다.
 4. 첫 복합체 예제의 네 엔진을 준비하려면 아래 **세 명령을 순서대로, 같은 폴더에서** 실행합니다. 한 명령이 `[설치 완료]`로 끝난 뒤 다음 명령을 실행하세요.
 
@@ -363,7 +363,7 @@ nanocofold run --mode mature --mock \
 
 **내 분석에서 후보 찾기.** **결과 DB → 후보 서열·구조**에서 표적 이름과 예측 엔진을 고르고, **기록 판정 → 적격 → 검색**을 누르세요. **최종 선별 순위**를 누르면 각 분석·엔진의 선별 1위부터 볼 수 있습니다. 후보 ID를 누르면 해당 서열, 3D 구조와 지표가 열립니다. **검색 결과 전체 Excel 저장**은 다음 페이지까지 포함해 현재 조건과 정렬로 저장합니다. 분석 전체를 보려면 분석명을 누르세요.
 
-새 결과는 자동 등록되며 이전 등록 결과도 서버가 순차적으로 색인합니다. 연구원은 기본적으로 본인 제출분을 봅니다. `admin`은 전체 연구원과 담당자 미기록 결과를 조회하고, 필요할 때 전체 열람을 허용하거나 회수할 수 있습니다. [연구실 관리자 등록과 접속](docs/shared-lab.ko.md)
+새 결과는 자동 등록되며 이전 등록 결과도 서버가 순차적으로 색인합니다. 연구원은 기본적으로 본인 제출분을 봅니다. `admin`은 전체 연구원과 담당자 미기록 결과를 조회하고, 필요할 때 전체 열람을 허용하거나 회수할 수 있습니다. 로그인 후 계정 이름 옆 **비밀번호 변경**에서 내 비밀번호를 바꿀 수 있습니다. [연구실 관리자 등록과 접속](docs/shared-lab.ko.md)
 
 구간 링크와 브라우저 **뒤로 / 앞으로**로 보고서 안을 이동합니다. 분석은 계속 진행됩니다. 언어를 비교할 때는 같은 후보를 선택하세요.
 

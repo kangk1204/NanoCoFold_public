@@ -149,6 +149,32 @@ class LabAccounts:
     def _hash(password, salt):
         return hashlib.scrypt(password.encode(), salt=salt, n=2**15, r=8, p=1, dklen=32, maxmem=64*1024**2)
 
+    def change_own_password(self, token, current, new):
+        """Only a live session and its current password can rotate this account."""
+        if not token or len(token) > 128 or not 1 <= len(current) <= 256 or not 10 <= len(new) <= 256 or current == new:
+            return False
+        session = self._token_hash(token)
+        with self.connect() as db:
+            row = db.execute("""SELECT a.name,a.salt,a.verifier FROM accounts a JOIN sessions s ON s.name=a.name
+                                WHERE s.token=? AND s.expires>?""", (session, int(time.time()))).fetchone()
+        if not row:
+            return False
+        name, salt, verifier = row
+        if not hmac.compare_digest(self._hash(current, salt), verifier):
+            return False
+        fresh_salt = secrets.token_bytes(16)
+        fresh_verifier = self._hash(new, fresh_salt)
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            # A logout, reset or competing change during hashing takes precedence.
+            changed = db.execute("""UPDATE accounts SET salt=?,verifier=? WHERE name=? AND verifier=?
+                                    AND EXISTS(SELECT 1 FROM sessions WHERE token=? AND name=? AND expires>?)""",
+                                 (fresh_salt, fresh_verifier, name, verifier, session, name, int(time.time())))
+            if not changed.rowcount:
+                return False
+            db.execute("DELETE FROM sessions WHERE name=?", (name,))
+            return True
+
     def login(self, name, password):
         try:
             name = account_name(name)

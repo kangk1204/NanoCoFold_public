@@ -1,6 +1,6 @@
 # 기존 설치 업데이트
 
-처음 설치한 폴더에서 업데이트하면 기존 작업 공간과 예측 엔진, 저장된 결과를 그대로 사용할 수 있습니다. 최신 설치본은 **v0.4.8-install.7**이며 계산 패키지 버전은 **0.4.8rc12**로 표시됩니다.
+처음 설치한 폴더에서 업데이트하면 기존 작업 공간과 예측 엔진, 저장된 결과를 그대로 사용할 수 있습니다. 최신 설치본은 **v0.4.8-install.8**이며 계산 패키지 버전은 **0.4.8rc12**로 표시됩니다.
 
 ## 1. 진행 중인 작업 마치기
 
@@ -10,11 +10,11 @@
 
 처음 설치한 방식에 맞는 방법 하나를 선택하세요. 직접 수정한 소스가 있으면 먼저 따로 보관합니다.
 
-**Git으로 설치한 경우.** 처음 설치한 소스 폴더에서 아래 명령을 실행하세요. 마지막 명령에서 `v0.4.8-install.7`이 표시됩니다. 공동 사용 시 업데이트 후 [관리자 계정과 열람 범위](shared-lab.ko.md)를 설정하세요.
+**Git으로 설치한 경우.** 처음 설치한 소스 폴더에서 아래 명령을 실행하세요. 마지막 명령에서 `v0.4.8-install.8`이 표시됩니다. 공동 사용 시 업데이트 후 [관리자 계정과 열람 범위](shared-lab.ko.md)를 설정하세요.
 
 ```bash
-git fetch origin tag v0.4.8-install.7
-git switch --detach v0.4.8-install.7
+git fetch origin tag v0.4.8-install.8
+git switch --detach v0.4.8-install.8
 git describe --tags --exact-match
 ```
 
@@ -27,12 +27,12 @@ git rev-parse HEAD
 
 확인한 태그나 커밋을 실행 기록에 남기세요. Git 오류가 표시되면 원인을 해결한 뒤 계속하세요.
 
-**ZIP으로 설치한 경우.** [v0.4.8-install.7 소스 ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.7.zip)을 내려받아 **별도 폴더**에 압축을 푸세요. 공동연구자가 특정 커밋을 지정했다면 해당 페이지에서 **Code → Download ZIP**을 선택하세요.
+**ZIP으로 설치한 경우.** [v0.4.8-install.8 소스 ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.8.zip)을 내려받아 **별도 폴더**에 압축을 푸세요. 공동연구자가 특정 커밋을 지정했다면 해당 페이지에서 **Code → Download ZIP**을 선택하세요.
 
 **처음 설치한 폴더**에서 아래 명령을 실행하세요. 첫 줄의 경로는 방금 압축을 푼 폴더(`update.sh`가 있는 곳)로 바꿉니다. 소스 링크는 실행 기록에 남기세요.
 
 ```bash
-update_source="/path/to/extracted/NanoCoFold_public-0.4.8-install.7"
+update_source="/path/to/extracted/NanoCoFold_public-0.4.8-install.8"
 rsync -a --exclude='.git/' --exclude='.nanocofold/' "$update_source/" ./
 ```
 

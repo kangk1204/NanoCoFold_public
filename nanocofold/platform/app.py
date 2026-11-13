@@ -79,8 +79,24 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
     from .lab import LabAccounts
     lab = LabAccounts(workspace)
     token = secrets.token_urlsafe(32)
+    password_notice = secrets.token_urlsafe(24)  # One-time browser notice; never used for authentication.
+    notice_cookie = lab.cookie + "_changed"
     login_gate = asyncio.Lock()
-    pending_signins = 0  # Includes the active scrypt check; count is owned by the event loop.
+    pending_password_checks = 0  # Shared by login and password changes; owned by the event loop.
+
+    @contextlib.asynccontextmanager
+    async def password_check_slot():
+        nonlocal pending_password_checks
+        if pending_password_checks >= 8:
+            yield False
+            return
+        pending_password_checks += 1
+        try:
+            async with login_gate:
+                yield True
+        finally:
+            pending_password_checks -= 1
+
     account_inputs = {}
     account_lock = threading.Lock()
 
@@ -158,7 +174,11 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
             access = await asyncio.to_thread(lab.access, session_key)
             if access is None:
                 if request.url.path == "/" and request.method == "GET":
-                    return secure(login_page())
+                    changed = secrets.compare_digest(request.cookies.get(notice_cookie, "").encode(), password_notice.encode())
+                    response = login_page(changed=changed)
+                    if changed:
+                        response.delete_cookie(notice_cookie, httponly=True, samesite="strict")
+                    return secure(response)
                 return secure(JSONResponse({"error":"연구실 로그인이 필요합니다. / Please sign in to the lab."}, status_code=401))
             researcher, request.state.admin, request.state.shared, pending = access
             request.state.researcher = researcher
@@ -451,10 +471,12 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         path = result_directory(path)
         return ResultReader(path)
 
-    def login_page(failed=False, *, busy=False):
+    def login_page(failed=False, *, busy=False, changed=False):
         template = Path(__file__).resolve().parents[1] / "templates/lab_login.html"
         error = '<p role="alert">계정과 비밀번호를 확인하세요. / Check your account and password.</p>' if failed else ""
         headers = {"Referrer-Policy": "same-origin"}
+        if changed:
+            error = '<p role="status">비밀번호를 변경했습니다. 새 비밀번호로 로그인하세요.<br><span lang="en">Password changed. Sign in with your new password.</span></p>'
         if busy:
             error = '<p role="alert">로그인이 몰렸습니다. 잠시 뒤 다시 로그인하세요. / Sign-in is busy. Please try again shortly.</p>'
             headers["Retry-After"] = "3"
@@ -518,22 +540,51 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
             form = parse_qs(data.decode(), max_num_fields=2)
         except (UnicodeError, ValueError):
             raise HTTPException(400)
-        nonlocal pending_signins
-        if pending_signins >= 8:
-            return login_page(busy=True)
-        pending_signins += 1
-        try:
-            # Several researchers can arrive together. Serialize password hashing
-            # and keep the existing failed-login delay and a bounded queue.
-            async with login_gate:
-                key = await asyncio.to_thread(lab.login, form.get("name",[""])[0], form.get("password",[""])[0])
-                if not key:
-                    await asyncio.sleep(.35)
-                    return login_page(True)
-        finally:
-            pending_signins -= 1
+        async with password_check_slot() as available:
+            if not available:
+                return login_page(busy=True)
+            key = await asyncio.to_thread(lab.login, form.get("name",[""])[0], form.get("password",[""])[0])
+            if not key:
+                await asyncio.sleep(.35)
+                return login_page(True)
         response = RedirectResponse("/", status_code=303)
         response.set_cookie(lab.cookie, key, max_age=12*3600, httponly=True, samesite="strict")
+        return response
+
+    @app.post("/api/lab/password")
+    async def change_password(request: Request):
+        if not request.state.researcher:
+            raise HTTPException(403)
+        if request.headers.get("content-type", "").partition(";")[0].strip().lower() != "application/json":
+            raise HTTPException(415)
+        data = bytearray()
+        async for chunk in request.stream():
+            if len(data) + len(chunk) > 16384:
+                raise HTTPException(413)
+            data.extend(chunk)
+        try:
+            form = json.loads(data)
+            if not isinstance(form, dict) or set(form) != {"current", "new", "confirm"}:
+                raise ValueError
+            current, new, confirm = (form[k] for k in ("current", "new", "confirm"))
+            if not all(isinstance(p, str) and len(p) <= 256 and p.encode("utf-8") for p in (current, new, confirm)):
+                raise ValueError
+        except (ValueError, RecursionError):
+            return JSONResponse({"error": "비밀번호 입력란을 다시 확인하세요."}, status_code=400)
+        if new != confirm:
+            return JSONResponse({"error": "두 번 입력한 새 비밀번호가 다릅니다."}, status_code=400)
+        if not 10 <= len(new) <= 256 or new == current:
+            return JSONResponse({"error": "현재 비밀번호와 다른 10~256자 비밀번호를 입력하세요."}, status_code=400)
+        async with password_check_slot() as available:
+            if not available:
+                return JSONResponse({"error": "잠시 후 다시 시도하세요."}, status_code=429, headers={"Retry-After": "3"})
+            ok = await asyncio.to_thread(lab.change_own_password, request.cookies[lab.cookie], current, new)
+            if not ok:
+                await asyncio.sleep(.35)
+                return JSONResponse({"error": "현재 비밀번호를 확인하세요."}, status_code=400)
+        response = JSONResponse({"ok": True})
+        response.delete_cookie(lab.cookie, httponly=True, samesite="strict")
+        response.set_cookie(notice_cookie, password_notice, max_age=60, httponly=True, samesite="strict")
         return response
 
     @app.post("/api/lab/logout")

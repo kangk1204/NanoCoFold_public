@@ -3874,6 +3874,38 @@ async function boot() {
     $("lab-account").hidden = false;
     I18N.text(document.querySelector(".platform-brand span"), I18N.term("단백질 복합체·나노바디 분석 · 연구실 공유 작업 공간"));
     $("lab-user").textContent = session.researcher;
+    const dialog = $("lab-password-dialog");
+    const form = $("lab-password-form");
+    const feedback = $("lab-password-feedback");
+    const submit = form.querySelector('[type="submit"]');
+    const cancel = $("lab-password-cancel");
+    $("lab-change-password").onclick = () => {
+      dialog.showModal();
+      form.elements.current.focus();
+    };
+    dialog.onclose = () => { form.reset(); I18N.text(feedback, ""); };
+    cancel.onclick = () => dialog.close();
+    dialog.oncancel = event => { if (submit.disabled) event.preventDefault(); };
+    form.onsubmit = async event => {
+      event.preventDefault();
+      if (submit.disabled) return;
+      const {current, new: next, confirm} = form.elements;
+      if (next.value !== confirm.value) {
+        I18N.text(feedback, I18N.term("두 번 입력한 새 비밀번호가 다릅니다."));
+        confirm.focus();
+        return;
+      }
+      submit.disabled = cancel.disabled = true;
+      try {
+        await api("/api/lab/password", {current:current.value, new:next.value, confirm:confirm.value});
+        form.reset();
+        window.location.replace("/");
+      } catch (error) {
+        I18N.text(feedback, I18N.term(error.responseRejected ? error.message : "연결을 확인한 뒤 새 비밀번호로 로그인을 시도하세요."));
+      } finally {
+        submit.disabled = cancel.disabled = false;
+      }
+    };
     $("catalog-owner-label").hidden = $("db-vhh-owner-label").hidden = !state.canBrowseLab;
     $("catalog-visibility").hidden=false;
     I18N.text($("catalog-visibility"),I18N.term(session.lab_admin?"관리자 · 연구실 전체 결과를 조회합니다.":session.lab_shared?"연구실 전체 결과를 조회할 수 있습니다.":"내가 제출한 분석 결과를 조회합니다."));

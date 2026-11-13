@@ -501,6 +501,13 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
 /* Stable bilingual navigation: the header has the same two rows in each language. */
 .platform-header{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px 24px;padding:18px 28px}
 .platform-header .platform-brand{min-width:0}.platform-header .platform-brand span{font-size:14px;overflow-wrap:anywhere}
+#lab-account:not([hidden]){grid-column:1/-1;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#lab-account span{overflow-wrap:anywhere;min-width:0}
+#lab-password-dialog{box-sizing:border-box;width:min(28rem,calc(100% - 2rem));max-height:90vh;overflow:auto;padding:1.5rem;border:1px solid #b6c6ca;border-radius:8px;color:#1c2c38}
+#lab-password-dialog::backdrop{background:rgb(9 36 46 / 55%)}
+#lab-password-form label,#lab-password-form input{display:block;width:100%}
+#lab-password-form label{margin:.7rem 0}
+#lab-password-feedback:not(:empty){color:#912d20}
 .platform-header>nav{grid-column:1/-1;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;width:100%}
 .platform-header>nav button{padding:10px 12px;min-height:48px;font-size:16px;line-height:1.35;overflow-wrap:normal}
 .report-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:20px 0}

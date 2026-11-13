@@ -501,6 +501,13 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
 /* Stable bilingual navigation: the header has the same two rows in each language. */
 .platform-header{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px 24px;padding:18px 28px}
 .platform-header .platform-brand{min-width:0}.platform-header .platform-brand span{font-size:14px;overflow-wrap:anywhere}
+#lab-account:not([hidden]){grid-column:1/-1;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#lab-account span{overflow-wrap:anywhere;min-width:0}
+#lab-password-dialog{box-sizing:border-box;width:min(28rem,calc(100% - 2rem));max-height:90vh;overflow:auto;padding:1.5rem;border:1px solid #b6c6ca;border-radius:8px;color:#1c2c38}
+#lab-password-dialog::backdrop{background:rgb(9 36 46 / 55%)}
+#lab-password-form label,#lab-password-form input{display:block;width:100%}
+#lab-password-form label{margin:.7rem 0}
+#lab-password-feedback:not(:empty){color:#912d20}
 .platform-header>nav{grid-column:1/-1;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;width:100%}
 .platform-header>nav button{padding:10px 12px;min-height:48px;font-size:16px;line-height:1.35;overflow-wrap:normal}
 .report-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:20px 0}
@@ -1919,6 +1926,18 @@ const NCF_TRANSLATIONS = Object.freeze({
   " 자리가 나면 자동으로 시작합니다.": " This job will start automatically when the GPU is available.",
   "계정 이름": "Account name",
   "로그아웃": "Sign out",
+  "비밀번호 변경": "Change password",
+  "닫기": "Close",
+  "변경하면 이 계정으로 로그인한 모든 기기에서 다시 로그인해야 합니다. 실행 중인 분석은 계속됩니다.": "After you change your password, sign in again on each device. Running analyses will continue.",
+  "현재 비밀번호": "Current password",
+  "새 비밀번호 (10~256자)": "New password (10–256 characters)",
+  "새 비밀번호 확인": "Confirm new password",
+  "비밀번호 입력란을 다시 확인하세요.": "Check the password fields.",
+  "두 번 입력한 새 비밀번호가 다릅니다.": "The new passwords do not match.",
+  "현재 비밀번호와 다른 10~256자 비밀번호를 입력하세요.": "Choose a new password of 10–256 characters that differs from your current password.",
+  "현재 비밀번호를 확인하세요.": "Check your current password.",
+  "잠시 후 다시 시도하세요.": "Please try again shortly.",
+  "연결을 확인한 뒤 새 비밀번호로 로그인을 시도하세요.": "Check your connection, then try signing in with your new password.",
   "이 배치는 처음 제출한 담당자가 다시 제출해야 합니다.": "The researcher who first submitted this batch must retry it.",
   "작은 화면에서는 표를 좌우로 이동해 나머지 항목을 볼 수 있습니다.": "On a small screen, scroll the table horizontally to see the remaining columns.",
   "처음": "First page",
@@ -7583,6 +7602,38 @@ async function boot() {
     $("lab-account").hidden = false;
     I18N.text(document.querySelector(".platform-brand span"), I18N.term("단백질 복합체·나노바디 분석 · 연구실 공유 작업 공간"));
     $("lab-user").textContent = session.researcher;
+    const dialog = $("lab-password-dialog");
+    const form = $("lab-password-form");
+    const feedback = $("lab-password-feedback");
+    const submit = form.querySelector('[type="submit"]');
+    const cancel = $("lab-password-cancel");
+    $("lab-change-password").onclick = () => {
+      dialog.showModal();
+      form.elements.current.focus();
+    };
+    dialog.onclose = () => { form.reset(); I18N.text(feedback, ""); };
+    cancel.onclick = () => dialog.close();
+    dialog.oncancel = event => { if (submit.disabled) event.preventDefault(); };
+    form.onsubmit = async event => {
+      event.preventDefault();
+      if (submit.disabled) return;
+      const {current, new: next, confirm} = form.elements;
+      if (next.value !== confirm.value) {
+        I18N.text(feedback, I18N.term("두 번 입력한 새 비밀번호가 다릅니다."));
+        confirm.focus();
+        return;
+      }
+      submit.disabled = cancel.disabled = true;
+      try {
+        await api("/api/lab/password", {current:current.value, new:next.value, confirm:confirm.value});
+        form.reset();
+        window.location.replace("/");
+      } catch (error) {
+        I18N.text(feedback, I18N.term(error.responseRejected ? error.message : "연결을 확인한 뒤 새 비밀번호로 로그인을 시도하세요."));
+      } finally {
+        submit.disabled = cancel.disabled = false;
+      }
+    };
     $("catalog-owner-label").hidden = $("db-vhh-owner-label").hidden = !state.canBrowseLab;
     $("catalog-visibility").hidden=false;
     I18N.text($("catalog-visibility"),I18N.term(session.lab_admin?"관리자 · 연구실 전체 결과를 조회합니다.":session.lab_shared?"연구실 전체 결과를 조회할 수 있습니다.":"내가 제출한 분석 결과를 조회합니다."));
