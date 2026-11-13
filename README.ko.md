@@ -2,7 +2,7 @@
 
 [English](README.md) · **한국어**
 
-**최신 설치본 [v0.4.8-install.10](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8-install.10)** · 계산 패키지 `0.4.8rc12`
+**최신 설치본 [v0.4.8-install.11](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8-install.11)** · 계산 패키지 `0.4.8rc12`
 
 단백질 복합체를 예측하고, 새 나노바디를 설계하거나 보유한 후보와 변이를 비교합니다. 결과는 3D로 살펴보고 대화형 보고서로 공유할 수 있습니다.
 
@@ -60,8 +60,8 @@ GPU 메모리가 16 GB 미만이면 서버 관리자와 사용할 엔진·입력
 
 설치기가 Python 환경, 엔진, 모델을 자동으로 준비합니다. NVIDIA 드라이버는 서버 관리자가 미리 설치합니다.
 
-1. [v0.4.8 소스 ZIP (설치 수정판 10)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.10.zip)을 내려받아 전체를 압축 해제합니다. Git으로 clone했다면 그 저장소 폴더를 사용합니다.
-2. 릴리스 ZIP은 **`NanoCoFold_public-0.4.8-install.10` 폴더**, Git clone은 **`NanoCoFold_public` 폴더**를 엽니다.
+1. [v0.4.8 소스 ZIP (설치 수정판 11)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.11.zip)을 내려받아 전체를 압축 해제합니다. Git으로 clone했다면 그 저장소 폴더를 사용합니다.
+2. 릴리스 ZIP은 **`NanoCoFold_public-0.4.8-install.11` 폴더**, Git clone은 **`NanoCoFold_public` 폴더**를 엽니다.
 3. 이 폴더 안에서 터미널을 엽니다. `README.md`, `install.sh`, `start.sh`가 보이면 맞습니다.
 4. 첫 복합체 예제의 네 엔진을 준비하려면 아래 **세 명령을 순서대로, 같은 폴더에서** 실행합니다. 한 명령이 `[설치 완료]`로 끝난 뒤 다음 명령을 실행하세요.
 

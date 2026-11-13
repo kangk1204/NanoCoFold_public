@@ -2,7 +2,7 @@
 
 **English** · [한국어](README.ko.md)
 
-**Current installer [v0.4.8-install.10](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8-install.10)** · Compute package `0.4.8rc12`
+**Current installer [v0.4.8-install.11](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8-install.11)** · Compute package `0.4.8rc12`
 
 Predict protein complexes, design nanobodies, and compare existing candidates or variants. Explore the models in 3D and share an interactive report.
 
@@ -60,8 +60,8 @@ For GPUs with less than 16 GB of memory, ask your server administrator to select
 
 The installer prepares the Python environments, engines, and models automatically. Your server administrator installs the NVIDIA driver beforehand.
 
-1. [Download the v0.4.8 source ZIP (installation revision 10)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.10.zip) and extract the entire archive. If you cloned the repository, use your checkout.
-2. Open **`NanoCoFold_public-0.4.8-install.10`** for the release ZIP or **`NanoCoFold_public`** for a Git clone.
+1. [Download the v0.4.8 source ZIP (installation revision 11)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.11.zip) and extract the entire archive. If you cloned the repository, use your checkout.
+2. Open **`NanoCoFold_public-0.4.8-install.11`** for the release ZIP or **`NanoCoFold_public`** for a Git clone.
 3. Open a terminal inside that folder. You should see `README.md`, `install.sh`, and `start.sh`.
 4. To prepare all four engines for the first complex example, run these **three commands in order, in the same folder**. Wait for each command to finish with **`[설치 완료]`** (installation complete) before starting the next.
 
