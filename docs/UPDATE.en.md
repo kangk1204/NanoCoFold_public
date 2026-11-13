@@ -1,6 +1,6 @@
 # Update an existing installation
 
-Update in the original installation folder to keep your workspace, prediction engines and saved results. The current installer is **v0.4.8-install.12**. Its compute package reports **0.4.8rc12**.
+Update in the original installation folder to keep your workspace, prediction engines and saved results. The current installer is **v0.4.8-install.13**. Its compute package reports **0.4.8rc12**.
 
 ## 1. Finish active jobs
 
@@ -10,11 +10,11 @@ In **Jobs & logs**, wait until no jobs are queued or running. If you choose to c
 
 Choose the method you originally used. Save any local source changes first.
 
-**Git installation.** Run the commands below in the original source folder. The last command should print `v0.4.8-install.12`. For a shared installation, [set up the administrator and result access](shared-lab.en.md) after updating.
+**Git installation.** Run the commands below in the original source folder. The last command should print `v0.4.8-install.13`. For a shared installation, [set up the administrator and result access](shared-lab.en.md) after updating.
 
 ```bash
-git fetch origin tag v0.4.8-install.12
-git switch --detach v0.4.8-install.12
+git fetch origin tag v0.4.8-install.13
+git switch --detach v0.4.8-install.13
 git describe --tags --exact-match
 ```
 
@@ -27,12 +27,12 @@ git rev-parse HEAD
 
 Keep the tag or commit with your run notes. If Git reports an error, resolve it before continuing.
 
-**ZIP installation.** Download the [v0.4.8-install.12 source ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.12.zip) and extract it into a **separate folder**. If your collaborator shared a specific revision, use **Code → Download ZIP** on that revision’s source page.
+**ZIP installation.** Download the [v0.4.8-install.13 source ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.13.zip) and extract it into a **separate folder**. If your collaborator shared a specific revision, use **Code → Download ZIP** on that revision’s source page.
 
 In the **original installation folder**, run the commands below. Replace the first path with the newly extracted folder containing `update.sh`. Keep the source link with your run notes.
 
 ```bash
-update_source="/path/to/extracted/NanoCoFold_public-0.4.8-install.12"
+update_source="/path/to/extracted/NanoCoFold_public-0.4.8-install.13"
 rsync -a --exclude='.git/' --exclude='.nanocofold/' "$update_source/" ./
 ```
 

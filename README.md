@@ -2,7 +2,7 @@
 
 **English** · [한국어](README.ko.md)
 
-**Current installer [v0.4.8-install.12](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8-install.12)** · Compute package `0.4.8rc12`
+**Current installer [v0.4.8-install.13](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8-install.13)** · Compute package `0.4.8rc12`
 
 Predict protein complexes, design nanobodies, and compare existing candidates or variants. Explore the models in 3D and share an interactive report.
 
@@ -60,7 +60,7 @@ For GPUs with less than 16 GB of memory, ask your server administrator to select
 
 The installer prepares the Python environments, engines, and models automatically. Your server administrator installs the NVIDIA driver beforehand.
 
-1. [Download the v0.4.8 source ZIP (installation revision 12)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.12.zip) and extract the entire archive. If you cloned the repository, use your checkout.
+1. [Download the v0.4.8 source ZIP (installation revision 13)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.13.zip) and extract the entire archive. If you cloned the repository, use your checkout.
 2. Open **`NanoCoFold_public-0.4.8-install.12`** for the release ZIP or **`NanoCoFold_public`** for a Git clone.
 3. Open a terminal inside that folder. You should see `README.md`, `install.sh`, and `start.sh`.
 4. To prepare all four engines for the first complex example, run these **three commands in order, in the same folder**. Wait for each command to finish with **`[설치 완료]`** (installation complete) before starting the next.
@@ -360,6 +360,8 @@ The **Full original ZIP · For local archiving** includes server paths and execu
 **Find a VHH sequence and see its structure**
 
 Open **Explore results → Lead candidates in this run**. Select **View sequence and predicted structure** to open the recorded first-ranked eligible candidate for that engine. Copy its amino acids or save it as FASTA. If no candidate passed, open section 04 to see why. Section 03 lets you inspect any candidate. The shareable ZIP lists all sequences in `sequences.fasta`. The original run lists the final selection in `05_final/selected_candidates.csv`.
+
+Choose English or 한국어 before saving the **shareable report ZIP**. Extract the entire ZIP and open `report.html`; it opens in the chosen language. You can also change the language inside the report.
 
 **Find candidates across your analyses.** Open **Results database → Candidate sequences and structures**, choose the target and prediction engine, select **Recorded decision → Eligible**, and click **Search**. Click **Final selection rank** for first picks within each run and engine. Click a candidate ID for its sequence, 3D structure and metrics, or an analysis name for the full report. **Export all matches to Excel** saves every matching page in the displayed sort order.
 

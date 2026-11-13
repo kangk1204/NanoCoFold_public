@@ -2,7 +2,7 @@
 
 [English](README.md) · **한국어**
 
-**최신 설치본 [v0.4.8-install.12](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8-install.12)** · 계산 패키지 `0.4.8rc12`
+**최신 설치본 [v0.4.8-install.13](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8-install.13)** · 계산 패키지 `0.4.8rc12`
 
 단백질 복합체를 예측하고, 새 나노바디를 설계하거나 보유한 후보와 변이를 비교합니다. 결과는 3D로 살펴보고 대화형 보고서로 공유할 수 있습니다.
 
@@ -60,7 +60,7 @@ GPU 메모리가 16 GB 미만이면 서버 관리자와 사용할 엔진·입력
 
 설치기가 Python 환경, 엔진, 모델을 자동으로 준비합니다. NVIDIA 드라이버는 서버 관리자가 미리 설치합니다.
 
-1. [v0.4.8 소스 ZIP (설치 수정판 12)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.12.zip)을 내려받아 전체를 압축 해제합니다. Git으로 clone했다면 그 저장소 폴더를 사용합니다.
+1. [v0.4.8 소스 ZIP (설치 수정판 13)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.13.zip)을 내려받아 전체를 압축 해제합니다. Git으로 clone했다면 그 저장소 폴더를 사용합니다.
 2. 릴리스 ZIP은 **`NanoCoFold_public-0.4.8-install.12` 폴더**, Git clone은 **`NanoCoFold_public` 폴더**를 엽니다.
 3. 이 폴더 안에서 터미널을 엽니다. `README.md`, `install.sh`, `start.sh`가 보이면 맞습니다.
 4. 첫 복합체 예제의 네 엔진을 준비하려면 아래 **세 명령을 순서대로, 같은 폴더에서** 실행합니다. 한 명령이 `[설치 완료]`로 끝난 뒤 다음 명령을 실행하세요.
@@ -360,6 +360,8 @@ nanocofold run --mode mature --mock \
 **후보 서열과 구조 확인하기**
 
 **결과 탐색 → 이 실행의 우선 검토 후보**에서 **서열과 예측 구조 보기**를 누르면 해당 엔진의 최종 선별 1위를 확인할 수 있습니다. 서열을 복사하거나 FASTA로 저장하세요. 적격 후보가 없으면 04에서 이유를, 다른 후보는 03에서 확인하세요. 전달 ZIP의 `sequences.fasta`에는 전체 서열이, 원본의 `05_final/selected_candidates.csv`에는 최종 선별 목록이 있습니다.
+
+보고서를 보내기 전에 화면에서 한국어 또는 English를 선택하세요. **전달용 보고서 ZIP**을 저장하고 전체 압축을 풀어 `report.html`을 열면 선택한 언어로 시작합니다. 보고서 안에서도 언어를 바꿀 수 있습니다.
 
 **내 분석에서 후보 찾기.** **결과 DB → 후보 서열·구조**에서 표적 이름과 예측 엔진을 고르고, **기록 판정 → 적격 → 검색**을 누르세요. **최종 선별 순위**를 누르면 각 분석·엔진의 선별 1위부터 볼 수 있습니다. 후보 ID를 누르면 해당 서열, 3D 구조와 지표가 열립니다. **검색 결과 전체 Excel 저장**은 다음 페이지까지 포함해 현재 조건과 정렬로 저장합니다. 분석 전체를 보려면 분석명을 누르세요.
 

@@ -111,6 +111,11 @@ def _exploration(filters):
     if not isinstance(filters, dict):
         raise ValueError("탐색 조건은 JSON 객체여야 합니다.")
     allowed = {}
+    if "language" in filters:
+        language = filters["language"]
+        if not isinstance(language, str) or language not in {"ko", "en"}:
+            raise ValueError("language에는 ko 또는 en을 입력하세요. / Use ko or en for language.")
+        allowed["language"] = language
     text_limits = {"search": 10000, "sort": 100, "selected_candidate_id": 1000,
                    "selected_observation_id": 2048, "plot_x": 100, "plot_y": 100,
                    "engine_filter": 100}
@@ -1498,8 +1503,13 @@ class ResultReader:
         from .offline_assets import compact_payload
         template = Path(__file__).resolve().parents[1] / "templates/platform_offline.html"
         encoded = json.dumps(compact_payload(native(payload)), ensure_ascii=False, allow_nan=False, separators=(",", ":")).replace("<", "\\u003c").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
+        language = _exploration(payload.get("filters", {})).get("language")
+        def delivered_language(document):
+            if language:
+                return document.replace("<html ", f'<html data-nanocofold-report-language="{language}" ', 1)
+            return document
         if not template.exists():
-            return _offline_fallback(encoded).encode()
+            return delivered_language(_offline_fallback(encoded)).encode()
         document = template.read_text()
         for token, filename in (("__PLOTLY_JS__", "plotly.min.js"), ("__3DMOL_JS__", "3dmol-min.js"),
                                 ("__MOLSTAR_JS__", "molstar.js"), ("__MOLSTAR_CSS__", "molstar.css")):
@@ -1513,7 +1523,7 @@ class ResultReader:
             document = document.replace(token, re.sub(r"</(script|style)", r"<\\/\1", content, flags=re.I))
         # Inject records last: literal asset placeholders in names/errors must
         # remain data rather than being replaced by vendor source code.
-        return document.replace("__RESULT_DATA__", encoded, 1).encode()
+        return delivered_language(document.replace("__RESULT_DATA__", encoded, 1)).encode()
 
     def _delivery_export(self, all_table, filters, filtered_table):
         import hashlib

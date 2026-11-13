@@ -1289,11 +1289,14 @@ async function prepareInput() {
   if ($("novice-reviewed-summary")) {
     const cfg=result.config, mode=cfg.run.mode, complex=mode==="complex", summary=$("novice-reviewed-summary");
     const engines=complex?cfg.complex.comparison_engines||[cfg.complex.engine]:cfg.screen.comparison?.enabled?cfg.screen.comparison.engines:[cfg.screen.engine];
+    const msaSource = complex ? (cfg.complex.msa_source || cfg.complex.msa)
+      : cfg.screen.comparison?.enabled || cfg.screen.engine === "colabfold" ? cfg.screen.colabfold?.msa_source
+      : cfg.screen.engine === "chai1" ? cfg.screen.msa_mode : cfg.structure?.msa?.backend;
     const entries=complex?result.review.proteins:[{id:"A",sequence:cfg.target.sequence}];
     summary.replaceChildren(el("h3",I18N.term("이번에 실행할 입력과 조건")),
       el("p",`${mode} · ${entries.map(p=>`${p.id}: ${p.sequence.length} aa`).join(" · ")} · Seed ${cfg.run.seed}`),
       el("p",I18N.format("평가 엔진: {0} · 엔진 점수를 합산하지 않습니다.", [engines.join(" · ")])),
-      el("p",I18N.format("MSA: {0} · 공용 전송 동의: {1}", [complex ? (cfg.complex.msa_source ? cfg.complex.msa_source : cfg.complex.msa) : (cfg.screen.engine === "colabfold" ? cfg.screen.colabfold?.msa_source : cfg.screen.engine === "chai1" ? cfg.screen.msa_mode : cfg.structure?.msa?.backend), cfg.screen.allow_public_msa_server===true ? I18N.term("현재 입력에 동의") : I18N.term("외부 전송 없음")])),
+      el("p",I18N.format("MSA: {0} · 공용 전송 동의: {1}", [msaSource, cfg.screen.allow_public_msa_server===true ? I18N.term("현재 입력에 동의") : I18N.term("외부 전송 없음")])),
       el("p",I18N.term(noviceModelPlan(cfg,mode,mode==="screen"?noviceFasta($("vhh-fasta").value).length:0))));
   }
   warnings($("review-summary"), result.review?.warnings);
@@ -1743,20 +1746,33 @@ async function refreshJobs() {
     }
   }
 }
+function resultChoice(result) {
+  return {value: result.id, label: `${result.name || result.id} · ${result.mode || "기존"}${result.mock ? " · MOCK" : ""}`};
+}
+function selectLoadedResult(summary) {
+  const select = $("result-select");
+  // The recent list is bounded; a database link can open an older analysis.
+  for (const option of select.querySelectorAll('[data-current-result]')) option.remove();
+  if (![...select.options].some(option => option.value === summary.id)) {
+    const choice = resultChoice(summary), option = el("option", I18N.term(choice.label));
+    option.value = choice.value;
+    option.dataset.currentResult = "true";
+    select.append(option);
+  }
+  select.value = summary.id;
+}
 async function refreshResults() {
   if (offline) return;
   try {
     const data = await api("/api/results");
     const current = state.result?.id;
-    const choices = data.results.map((r) => ({
-      value: r.id,
-      label: `${r.name || r.id} · ${r.mode || "기존"}${r.mock ? " · MOCK" : ""}`,
-    }));
+    const choices = data.results.map(resultChoice);
     options(
       $("result-select"),
       [{ value: "", label: "실행을 선택하세요" }, ...choices],
       current,
     );
+    if (state.result) selectLoadedResult(state.result);
     options($("compare-select"), [
       { value: "", label: "비교할 실행을 선택하세요" },
       ...choices,
@@ -1902,6 +1918,12 @@ async function loadResult(id) {
     }
   }
   if (request !== state.resultRequest) return;
+  if (!offline && state.result?.id !== id) {
+    $("candidate-search").value = "";
+    $("eligibility").value = "all";
+    $("eligibility-basis").value = "recorded";
+    $("hotspot-filter").checked = false;
+  }
   state.result = summary;
   state.catalogCandidateSearch = null;
   $("notice").hidden = true;  // A successfully opened result dismisses the prior completion notice.
@@ -1937,7 +1959,7 @@ async function loadResult(id) {
   options($("engine-filter"), [{value:"all",label:"전체 엔진"}, ...[...new Set(state.rows.map(row => row.predictor_engine))].sort().map(engine => ({value:engine,label:engine}))], offline ? (window.NANOCOFOLD_OFFLINE.filters?.engine_filter || "all") : "all");
   state.observations = observations;
   clearCandidate();
-  $("result-select").value = id;
+  selectLoadedResult(summary);
   $("explorer").hidden = false;
   state.displayAliases = reportAliases(state.rows);
   const counts = reportModelCounts(state.rows, summary.mode, summary.config);
@@ -2066,6 +2088,7 @@ async function openExactCandidate(id, matches = "") {
 }
 function filters() {
   return {
+    language: I18N.language,
     eligibility: $("eligibility").value,
     eligibility_basis: $("eligibility-basis").value,
     hotspot_min: $("hotspot-filter").checked ? $("hotspot-min").valueAsNumber / 100 : null,
