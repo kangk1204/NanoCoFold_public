@@ -64,6 +64,7 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "지표 이름에 마우스를 올리거나 누르면 값의 의미와 읽는 방향을 볼 수 있습니다.": "Hover over or tap a metric name to see what it measures and how to read it.",
   "보존된 입력 표적·파트너 좌표를 표적 Cα로 강체 정렬합니다. 실험 B-factor를 pLDDT로 해석하지 않습니다.": "Saved target and partner coordinates are aligned on target Cα atoms. Experimental B-factors are not treated as pLDDT.",
   "WT 참조 비교: 표적 Cα {0}개 · RMSD {1} Å. 예측 입력이나 선별 기준으로 사용하지 않았습니다.": "WT reference comparison: {0} target Cα atoms · RMSD {1} Å. Not used as a prediction input or selection criterion.",
   "참조 구조": "Reference structure",

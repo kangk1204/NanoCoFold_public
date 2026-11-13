@@ -2370,7 +2370,10 @@ function renderCandidates() {
       $("descending").checked = f.sort === k ? !f.descending : !["candidate_id","predictor_engine","design_origin","seed","model","hotspot_site_status","pass_hotspot","site_selection_eligible","pose_consensus_status","design_consistency_status","review_priority","candidate_review_priority","design_binder_rmsd_A","review_rank"].includes(k);
       select.value = k; renderCandidates();
     };
-    th.append(button);head.append(th);
+    th.append(button);
+    th.dataset.ncfCaption = captions[k] || k;
+    globalThis.NanoMetricGuide?.decorate(th, k, false, true);
+    head.append(th);
   });
   $("candidate-table").querySelector("thead").replaceChildren(head);
   const body = $("candidate-table").querySelector("tbody");
@@ -2524,6 +2527,7 @@ async function selectCandidate(id) {
   if (row.structure_stage === "rf2") detail.append(el("p", I18N.format("RF2 설계 단계 구조 · PAE {0} Å · pLDDT {1} · 설계–RF2 RMSD {2} Å. 최종 복합체 재예측 지표와 구분하세요.", [fmt(row.rf2_pae), fmt(row.rf2_plddt), fmt(row.rmsd)]), "muted"));
   for (const key of metricKeys) {
     const term = el("dt", I18N.term(metricCaption(key, row, state.result.mode)));term.dataset.columnKey = key;
+    globalThis.NanoMetricGuide?.decorate(term, key, row[key] == null);
     dl.append(term, el("dd", row[key] == null ? I18N.term("미평가") : fmt(row[key])));
   }
   detail.append(dl);

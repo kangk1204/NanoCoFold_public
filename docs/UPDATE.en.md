@@ -1,6 +1,6 @@
 # Update an existing installation
 
-Update in the original installation folder to keep your workspace, prediction engines and saved results. The current installer is **v0.4.8-install.11**. Its compute package reports **0.4.8rc12**.
+Update in the original installation folder to keep your workspace, prediction engines and saved results. The current installer is **v0.4.8-install.12**. Its compute package reports **0.4.8rc12**.
 
 ## 1. Finish active jobs
 
@@ -10,11 +10,11 @@ In **Jobs & logs**, wait until no jobs are queued or running. If you choose to c
 
 Choose the method you originally used. Save any local source changes first.
 
-**Git installation.** Run the commands below in the original source folder. The last command should print `v0.4.8-install.11`. For a shared installation, [set up the administrator and result access](shared-lab.en.md) after updating.
+**Git installation.** Run the commands below in the original source folder. The last command should print `v0.4.8-install.12`. For a shared installation, [set up the administrator and result access](shared-lab.en.md) after updating.
 
 ```bash
-git fetch origin tag v0.4.8-install.11
-git switch --detach v0.4.8-install.11
+git fetch origin tag v0.4.8-install.12
+git switch --detach v0.4.8-install.12
 git describe --tags --exact-match
 ```
 
@@ -27,12 +27,12 @@ git rev-parse HEAD
 
 Keep the tag or commit with your run notes. If Git reports an error, resolve it before continuing.
 
-**ZIP installation.** Download the [v0.4.8-install.11 source ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.11.zip) and extract it into a **separate folder**. If your collaborator shared a specific revision, use **Code → Download ZIP** on that revision’s source page.
+**ZIP installation.** Download the [v0.4.8-install.12 source ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.12.zip) and extract it into a **separate folder**. If your collaborator shared a specific revision, use **Code → Download ZIP** on that revision’s source page.
 
 In the **original installation folder**, run the commands below. Replace the first path with the newly extracted folder containing `update.sh`. Keep the source link with your run notes.
 
 ```bash
-update_source="/path/to/extracted/NanoCoFold_public-0.4.8-install.11"
+update_source="/path/to/extracted/NanoCoFold_public-0.4.8-install.12"
 rsync -a --exclude='.git/' --exclude='.nanocofold/' "$update_source/" ./
 ```
 
@@ -50,3 +50,5 @@ bash start.sh --port 18765
 Open the address printed after **NanoCoFold:** and reload the browser. To check the update without starting a job, choose **Evaluate nanobody variants → Load public example for this purpose → Review input & continue**. Under **Variant generation**, choose **Random multi-residue CDR substitutions**. You should see **CDR3 only** and **Custom CDR ranges**. If you still see the old interface, press **Ctrl+Shift+R** (**Cmd+Shift+R** on macOS).
 
 Reopen a saved run via **Explore results → Select run**. To use the updated interface for an old report, export a new copy. If the updater cannot find the installation, return to the folder you used the first time. For a new computer, use the [installation instructions](../README.md#1-prepare-and-install).
+
+After updating, open a saved analysis in **Explore results** and select a **?** in the candidate details. Previously downloaded HTML and ZIPs stay unchanged. To share the new explanations, export a fresh report ZIP; no new prediction is needed.

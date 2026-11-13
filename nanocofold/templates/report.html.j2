@@ -50,6 +50,7 @@
   @media(prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
   @media print { .wrap { padding:0; max-width:none; } .report-nav,.viewer-tabs { display:none; } .scroll { overflow:visible; } table { font-size:10px; } th,.scroll td:first-child { position:static; } .card,.warnbox { break-inside:avoid; } pre { max-height:none; } }
 </style>
+<script data-ncf-metric-guide>{% include "metric-guide.js" %}</script>
 <script id="report-i18n-runtime">{{ report_i18n_script|safe }}</script>
 </head>
 <body>
@@ -323,6 +324,9 @@
 </div>
 <script>
 I18N.init({explicit:true});
+for (const header of document.querySelectorAll("th[data-column-key]")) {
+  NanoMetricGuide.decorate(header, header.dataset.columnKey);
+}
 // Keep a report's chosen language when opening its separate offline explorer.
 const explorerLink=document.getElementById('complete-result-explorer');
 if(explorerLink) explorerLink.addEventListener('click',()=>{

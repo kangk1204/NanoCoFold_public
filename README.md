@@ -2,13 +2,13 @@
 
 **English** · [한국어](README.ko.md)
 
-**Current installer [v0.4.8-install.11](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8-install.11)** · Compute package `0.4.8rc12`
+**Current installer [v0.4.8-install.12](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8-install.12)** · Compute package `0.4.8rc12`
 
 Predict protein complexes, design nanobodies, and compare existing candidates or variants. Explore the models in 3D and share an interactive report.
 
 **Installing for the first time?** Follow [1. Prepare and install](#1-prepare-and-install). **Already installed?** Follow the [update guide](docs/UPDATE.en.md) in the original installation folder. **Joining a shared lab server?** Use the account your administrator provides and [connect from your desk](docs/shared-lab.en.md#at-each-desk).
 
-**Start with a result:** Extract the entire [example report ZIP](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-report.zip) and open **report.html** in your browser. No installation or GPU is needed. The [new hands-on video](https://kangk1204.github.io/NanoCoFold_public/quickstart/?lang=en) also shows how to run your own analysis, find a candidate sequence and structure, and save your search to Excel.
+**Start with a result:** Extract the entire [example report ZIP](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8-install.12/NanoCoFold-EGFR-10-metric-guide.zip) and open **report.html** in your browser. No installation or GPU is needed. The [new hands-on video](https://kangk1204.github.io/NanoCoFold_public/quickstart/?lang=en) also shows how to run your own analysis, find a candidate sequence and structure, and save your search to Excel.
 
 **For the full installation and input tutorial, [follow one EGFR nanobody experiment](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=en).** The 27-minute video has 17 chapters. Install NanoCoFold on Ubuntu, enter the target sequence and binding site, and compare ten CDR3 variants with the original nanobody (WT). Each variant has two substitutions. Follow the same analysis through database search, handoff review and opening the report ZIP. [Download the exercise inputs](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-inputs.zip) · [Download the video](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-first-run-en.mp4) · [Start at input preparation](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=en&chapter=inputs) · [Open the recorded result](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-report.zip)
 
@@ -60,8 +60,8 @@ For GPUs with less than 16 GB of memory, ask your server administrator to select
 
 The installer prepares the Python environments, engines, and models automatically. Your server administrator installs the NVIDIA driver beforehand.
 
-1. [Download the v0.4.8 source ZIP (installation revision 11)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.11.zip) and extract the entire archive. If you cloned the repository, use your checkout.
-2. Open **`NanoCoFold_public-0.4.8-install.11`** for the release ZIP or **`NanoCoFold_public`** for a Git clone.
+1. [Download the v0.4.8 source ZIP (installation revision 12)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.12.zip) and extract the entire archive. If you cloned the repository, use your checkout.
+2. Open **`NanoCoFold_public-0.4.8-install.12`** for the release ZIP or **`NanoCoFold_public`** for a Git clone.
 3. Open a terminal inside that folder. You should see `README.md`, `install.sh`, and `start.sh`.
 4. To prepare all four engines for the first complex example, run these **three commands in order, in the same folder**. Wait for each command to finish with **`[설치 완료]`** (installation complete) before starting the next.
 
@@ -324,6 +324,8 @@ For a short practice run, use `max_variants=3` and `top_n=2` as shown above. The
 </details>
 
 ## 5. Read and share results
+
+**Read a score:** Select a candidate and open its details. Hover over or tap a metric name marked **?**, or move to it with Tab and dismiss it with Esc. ↑ and ↓ explain how to read higher or lower values. Atom-pair counts have no preferred direction.
 
 **To open your result:** **Jobs & logs → select your analysis job → Open results**. On a small screen, scroll below the job details to find its actions. You can also use **Explore results → Select run** to reopen a saved analysis in the same workspace.
 

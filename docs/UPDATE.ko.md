@@ -1,6 +1,6 @@
 # 기존 설치 업데이트
 
-처음 설치한 폴더에서 업데이트하면 기존 작업 공간과 예측 엔진, 저장된 결과를 그대로 사용할 수 있습니다. 최신 설치본은 **v0.4.8-install.11**이며 계산 패키지 버전은 **0.4.8rc12**로 표시됩니다.
+처음 설치한 폴더에서 업데이트하면 기존 작업 공간과 예측 엔진, 저장된 결과를 그대로 사용할 수 있습니다. 최신 설치본은 **v0.4.8-install.12**이며 계산 패키지 버전은 **0.4.8rc12**로 표시됩니다.
 
 ## 1. 진행 중인 작업 마치기
 
@@ -10,11 +10,11 @@
 
 처음 설치한 방식에 맞는 방법 하나를 선택하세요. 직접 수정한 소스가 있으면 먼저 따로 보관합니다.
 
-**Git으로 설치한 경우.** 처음 설치한 소스 폴더에서 아래 명령을 실행하세요. 마지막 명령에서 `v0.4.8-install.11`이 표시됩니다. 공동 사용 시 업데이트 후 [관리자 계정과 열람 범위](shared-lab.ko.md)를 설정하세요.
+**Git으로 설치한 경우.** 처음 설치한 소스 폴더에서 아래 명령을 실행하세요. 마지막 명령에서 `v0.4.8-install.12`이 표시됩니다. 공동 사용 시 업데이트 후 [관리자 계정과 열람 범위](shared-lab.ko.md)를 설정하세요.
 
 ```bash
-git fetch origin tag v0.4.8-install.11
-git switch --detach v0.4.8-install.11
+git fetch origin tag v0.4.8-install.12
+git switch --detach v0.4.8-install.12
 git describe --tags --exact-match
 ```
 
@@ -27,12 +27,12 @@ git rev-parse HEAD
 
 확인한 태그나 커밋을 실행 기록에 남기세요. Git 오류가 표시되면 원인을 해결한 뒤 계속하세요.
 
-**ZIP으로 설치한 경우.** [v0.4.8-install.11 소스 ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.11.zip)을 내려받아 **별도 폴더**에 압축을 푸세요. 공동연구자가 특정 커밋을 지정했다면 해당 페이지에서 **Code → Download ZIP**을 선택하세요.
+**ZIP으로 설치한 경우.** [v0.4.8-install.12 소스 ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.12.zip)을 내려받아 **별도 폴더**에 압축을 푸세요. 공동연구자가 특정 커밋을 지정했다면 해당 페이지에서 **Code → Download ZIP**을 선택하세요.
 
 **처음 설치한 폴더**에서 아래 명령을 실행하세요. 첫 줄의 경로는 방금 압축을 푼 폴더(`update.sh`가 있는 곳)로 바꿉니다. 소스 링크는 실행 기록에 남기세요.
 
 ```bash
-update_source="/path/to/extracted/NanoCoFold_public-0.4.8-install.11"
+update_source="/path/to/extracted/NanoCoFold_public-0.4.8-install.12"
 rsync -a --exclude='.git/' --exclude='.nanocofold/' "$update_source/" ./
 ```
 
@@ -50,3 +50,5 @@ bash start.sh --port 18765
 터미널의 **NanoCoFold:** 뒤에 표시된 주소를 열고 브라우저를 새로고침하세요. 계산을 시작하지 않고 업데이트를 확인하려면 **기존 나노바디 변이 평가 → 이 목적의 공개 예제 불러오기 → 입력 확인 후 다음**을 누릅니다. **변이 생성 설정**에서 **CDR 무작위 다중 잔기 치환**을 선택하면 **CDR3만**과 **지정 CDR 구간**이 보입니다. 예전 화면이 남아 있으면 **Ctrl+Shift+R**(macOS: **Cmd+Shift+R**)로 새로고침하세요.
 
 저장된 작업은 **결과 탐색 → 실행 선택**에서 다시 엽니다. 기존 보고서에 새 화면을 적용하려면 별도 사본으로 내보내세요. 설치 기록을 찾지 못했다는 메시지가 나오면 처음 설치한 폴더로 돌아가세요. 새 컴퓨터에서는 [처음 설치 안내](../README.ko.md#1-준비와-설치)를 따릅니다.
+
+업데이트 후 기존 분석을 **결과 탐색**에서 열고 후보 상세의 **?**를 눌러 보세요. 이미 내려받은 HTML과 ZIP은 그대로 유지됩니다. 새 설명을 전달할 때는 보고서 ZIP을 다시 내보내세요. 예측을 다시 돌릴 필요는 없습니다.
