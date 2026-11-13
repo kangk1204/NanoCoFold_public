@@ -23,6 +23,7 @@ from pathlib import Path
 
 from .. import diagnostics, provenance
 from ..config import cfg_get, resolve_path
+from . import candidate_catalog
 from .inputs import INPUT_PATHS
 from .paths import contained
 from .results import ResultReader, TABLES
@@ -582,6 +583,7 @@ class ResultCatalog:
             if "vhh_index" not in columns:
                 connection.execute("ALTER TABLE results ADD COLUMN vhh_index INTEGER NOT NULL DEFAULT 0")
             connection.execute("CREATE INDEX IF NOT EXISTS results_vhh_pending ON results(vhh_index,id) WHERE vhh_index!=1")
+            candidate_catalog.initialize(connection)
             for name in SORT_FIELDS - {"created", "updated", "name", "mode", "retention", "status"}:
                 if name not in columns:
                     connection.execute(f"ALTER TABLE results ADD COLUMN {name} " + ("REAL" if name == "elapsed_seconds" else "INTEGER"))
@@ -609,24 +611,26 @@ class ResultCatalog:
             connection.close()
 
     @staticmethod
-    def _index_vhh(connection, identifier, rows):
+    def _index_vhh(connection, identifier, rows, target_name=None):
         old = {r[0] for r in connection.execute("SELECT DISTINCT sequence_id FROM vhh_entries WHERE result_id=? AND sequence_id IS NOT NULL", (identifier,))}
         connection.execute("DELETE FROM vhh_entries WHERE result_id=?", (identifier,))
         entries = [(row["candidate_id"], row["sequence"].strip().upper() if isinstance(row.get("sequence"), str) else "")
                    for row in rows if row.get("candidate_id")]
         connection.executemany("INSERT OR IGNORE INTO vhh_sequences(sequence) VALUES(?)", ((seq,) for seq in {seq for _, seq in entries if seq}))
-        connection.executemany("INSERT INTO vhh_entries VALUES(?,?,(SELECT id FROM vhh_sequences WHERE sequence=?))",
-                               ((identifier, name, seq) for name, seq in entries))
+        connection.executemany("""INSERT INTO vhh_entries(result_id,candidate_id,sequence_id,engine,decision,selection_rank,ipsae,iptm,interface_pae)
+                               VALUES(?,?,(SELECT id FROM vhh_sequences WHERE sequence=?),?,?,?,?,?,?)""",
+                               ((identifier, name, seq, *candidate_catalog.metrics(row))
+                                for (name, seq), row in zip(entries,(r for r in rows if r.get("candidate_id")))))
         connection.executemany("DELETE FROM vhh_sequences WHERE id=? AND NOT EXISTS (SELECT 1 FROM vhh_entries WHERE sequence_id=vhh_sequences.id)",
                                ((key,) for key in old))
-        connection.execute("UPDATE results SET vhh_index=1 WHERE id=?", (identifier,))
+        connection.execute("UPDATE results SET vhh_index=1,target_name=? WHERE id=?", (target_name,identifier))
 
     def backfill_vhh(self, limit=8):
         """Index older registrations without rewriting their results, timestamps or artifacts."""
         with self.connect() as connection:
             batch = connection.execute("SELECT id,updated,mode,payload FROM results WHERE vhh_index!=1 AND vhh_index=0 ORDER BY id LIMIT ?", (limit,)).fetchall()
         for result in batch:
-            rows = []
+            rows, target_name = [], None
             try:
                 if result["mode"] in {"mature", "design", "screen"}:
                     root = contained(self.workspace, json.loads(result["payload"])["run_root"], exists=True)
@@ -636,10 +640,11 @@ class ResultCatalog:
                     if not reader.retained:
                         with self.connect() as connection:
                             hashes = dict(connection.execute("SELECT path,sha256 FROM artifacts WHERE result_id=?", (result["id"],)))
-                        for path in TABLES:
+                        for path in (*TABLES,"05_final/selected_candidates.csv","run_config.yaml"):
                             source = contained(root, path)
                             if (source.is_file() or path in hashes) and (not source.is_file() or provenance.file_digest(source) != hashes.get(path)):
                                 raise ValueError("Saved candidate table changed")
+                    target_name = cfg_get(reader.config,"target.name") or cfg_get(reader.config,"input_review.target_name")
                     rows = reader.all_rows()
                     if reader.issues and not rows:
                         raise ValueError("Saved candidate table unavailable")
@@ -652,7 +657,7 @@ class ResultCatalog:
                 if not current or current["updated"] != result["updated"] or current["vhh_index"] != 0:
                     continue
                 if available:
-                    self._index_vhh(connection, result["id"], rows)
+                    self._index_vhh(connection, result["id"], rows,target_name)
                 else:
                     connection.execute("UPDATE results SET vhh_index=-1 WHERE id=?", (result["id"],))
         return len(batch)
@@ -795,7 +800,8 @@ class ResultCatalog:
                  payload["elapsed_seconds"], payload["storage_bytes"], identifier))
             connection.execute("DELETE FROM artifacts WHERE result_id=?", (identifier,))
             connection.executemany("INSERT INTO artifacts(result_id,path,sha256,bytes) VALUES(?,?,?,?)", manifest)
-            self._index_vhh(connection, identifier, rows if payload["mode"] in {"mature","design","screen"} else [])
+            self._index_vhh(connection, identifier, rows if payload["mode"] in {"mature","design","screen"} else [],
+                            cfg_get(reader.config,"target.name") or cfg_get(reader.config,"input_review.target_name"))
         return payload
 
     def get(self, identifier):
@@ -822,6 +828,17 @@ class ResultCatalog:
         if row is None:
             raise KeyError("실행 identity가 없습니다.")
         return _valid_identity(json.loads(row["payload"]))
+
+    @staticmethod
+    def sequence_index_status(connection, researcher, usage):
+        if researcher and not usage:
+            return {}
+        where = " WHERE vhh_index!=1"
+        if researcher:
+            where += " AND id IN (SELECT result_id FROM activity.lab_usage WHERE researcher=?)"
+        counts = dict(connection.execute("SELECT vhh_index,count(*) FROM results" + where + " GROUP BY vhh_index",
+                                         (researcher,) if researcher else ()))
+        return {"sequence_index_pending": counts.get(0, 0), "sequence_index_unavailable": counts.get(-1, 0)} if counts else {}
 
     def list(self, limit=25, cursor=None, search="", mode="", retention="", sort="created", descending=True, researcher=""):
         if type(limit) is not int or not 1 <= limit <= MAX_PAGE_SIZE:
@@ -914,7 +931,7 @@ class ResultCatalog:
                     if match:
                         item["matching_candidate"] = match[0]
                         item["matching_candidate_count"] = match[1]
-            index_status = dict(connection.execute("SELECT vhh_index,count(*) FROM results WHERE vhh_index!=1 GROUP BY vhh_index"))
+            index_status = self.sequence_index_status(connection, researcher, usage)
             if usage and items:
                 placeholders = ",".join("?" for _ in items)
                 for row in connection.execute("SELECT DISTINCT result_id,researcher FROM activity.lab_usage "
@@ -926,8 +943,7 @@ class ResultCatalog:
             next_cursor = base64.urlsafe_b64encode(_json({"id": position["id"], "value": position["sort_value"],
                                                         "filters": filters}).encode()).decode()
         page = {"items": list(items.values()), "next_cursor": next_cursor}
-        if index_status:
-            page.update(sequence_index_pending=index_status.get(0, 0), sequence_index_unavailable=index_status.get(-1, 0))
+        page.update(index_status)
         return page
 
     def _source_active(self, root):

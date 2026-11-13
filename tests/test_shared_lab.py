@@ -97,23 +97,63 @@ def test_two_researchers_reuse_one_result_and_page_filtered_metadata(tmp_path):
         m.close()
 
 
-@pytest.mark.parametrize(("metrics","pids","reason"),[
-    ("12000, 11300, 1","",""), ("12000, 11300, 1","1234","process"),
-    ("12000, 6100, 0","","memory"), ("12000, 12000, 82","","utilization"),
-    ("12000, [N/A], 0","","telemetry"), ("12000, 12001, 0","","telemetry"),
-    ("12000, 10000, 2","[Not Supported]","telemetry"),
+UUID = "GPU-12345678-abcd-abcd-abcd-123456789abc"
+
+
+@pytest.mark.parametrize(("metrics","reason"),[
+    ("12000, 11300, 1",None), ("12000, 5000, 0","capacity"),
+    ("12000, 12000, 90","utilization"), ("12000, [N/A], 0","telemetry"),
+    ("12000, 12001, 0","telemetry"),
 ])
-def test_only_the_selected_gpu_is_probed(monkeypatch,metrics,pids,reason):
+def test_only_selected_device_is_probed_with_external_work(tmp_path,monkeypatch,metrics,reason):
     from xml.etree.ElementTree import fromstring
     def fake(gpu):
         assert gpu == "7"
         total, free, util = metrics.split(", ")
-        kind = "C" if pids == "1234" else pids or "C+G"
-        return fromstring(f"<gpu><fb_memory_usage><total>{total} MiB</total><free>{free} MiB</free></fb_memory_usage>"
+        return fromstring(f"<gpu><uuid>{UUID}</uuid><fb_memory_usage><total>{total} MiB</total><free>{free} MiB</free></fb_memory_usage>"
                           f"<utilization><gpu_util>{util} %</gpu_util></utilization>"
-                          f"<processes><process_info><type>{kind}</type></process_info></processes></gpu>")
+                          "<processes><process_info><type>C</type><pid>1234</pid></process_info></processes></gpu>")
     monkeypatch.setattr(gpu_admission,"_snapshot",fake)
-    assert (gpu_admission.availability("7")["reason"] or "")==reason
+    with gpu_admission.shared_reservation("7",tmp_path) as (reading,handles):
+        assert reading["reason"] == reason
+        assert bool(handles) == (reason is None)
+
+
+def test_reservations_across_servers_and_device_aliases(tmp_path,monkeypatch):
+    import fcntl
+    import os
+    monkeypatch.setattr(gpu_admission,"shared_snapshot",lambda gpu:(UUID,"0",16000,15300,10,{}))
+    with gpu_admission.shared_reservation("0",tmp_path) as (first,leases):
+        assert first["reason"] is None
+        with gpu_admission.shared_reservation(UUID,tmp_path) as (second,more):
+            assert second["reason"] is None and second["reservations"]==1
+            with gpu_admission.shared_reservation("0",tmp_path) as (third,empty):
+                assert third["reason"]=="capacity" and not empty
+            # Old installations and maintenance keep exclusive access until all shared workers exit.
+            for alias in ["0",UUID]:
+                with (tmp_path/f"gpu-{alias}.lock").open("a+") as old:
+                    with pytest.raises(BlockingIOError):fcntl.flock(old,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            import subprocess, sys
+            child = subprocess.Popen([sys.executable,"-c","import sys; sys.stdin.read()"],stdin=subprocess.PIPE,
+                                     pass_fds=tuple(h.fileno() for h in more))
+        try:
+            with gpu_admission.shared_reservation("0",tmp_path) as (reading,_):
+                assert reading["reason"]=="capacity"  # exited parent, living descendant
+        finally:
+            child.stdin.close()
+            child.wait(timeout=5)
+        with gpu_admission.shared_reservation("0",tmp_path) as (replacement,_):
+            assert replacement["reason"] is None
+    with (tmp_path/f"gpu-{UUID}.lock").open("a+") as old:
+        fcntl.flock(old,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        with gpu_admission.shared_reservation("0",tmp_path) as (reading,_):
+            assert reading["reason"]=="exclusive"
+    # A measured allocation is already subtracted by the driver. Only reserve the remainder.
+    used = gpu_admission.reservation_budget(16000,10500,{"a":6144},{"a":5400},6144)
+    assert used["available_mib"] == 8156 and used["reason"] is None
+    monkeypatch.setenv("NANOCOFOLD_GPU_JOB_MIB","invalid")
+    with gpu_admission.shared_reservation("0",tmp_path) as (reading,_):
+        assert reading["reason"]=="policy"
 
 
 def test_busy_gpu_wait_cancel_and_admit_without_starting_an_engine(tmp_path, monkeypatch):
@@ -122,8 +162,8 @@ def test_busy_gpu_wait_cancel_and_admit_without_starting_an_engine(tmp_path, mon
     probes=[]
     def reading(_gpu):
         probes.append(1)
-        return {"reason":"process" if len(probes)==1 else None,"free_mib":10000,"total_mib":12000,"utilization":1}
-    monkeypatch.setattr(gpu_admission,"availability",reading)
+        return (UUID,"0",16000,2000 if len(probes)==1 else 15000,1,{})
+    monkeypatch.setattr(gpu_admission,"shared_snapshot",reading)
     jobs=[manager.create({**analysis(name),"reuse_results":False}) for name in ("a","b")]
     for job in jobs:
         manager.store.update(job["id"],mock=False)
@@ -131,7 +171,7 @@ def test_busy_gpu_wait_cancel_and_admit_without_starting_an_engine(tmp_path, mon
         assert not manager._spawn(manager.store.get(job["id"]))
         wait=manager.store.get(job["id"])
         assert wait["state"]=="queued" and wait["phase"]=="waiting_for_gpu" and wait["started"] is None
-        assert wait["gpu_reading"]["reason"]=="process"
+        assert wait["gpu_reading"]["reason"]=="capacity"
     assert len(probes)==1
     assert manager.cancel(jobs[0]["id"])["state"]=="cancelled"
     manager.gpu_retry.clear()
@@ -144,3 +184,38 @@ def test_busy_gpu_wait_cancel_and_admit_without_starting_an_engine(tmp_path, mon
     assert manager.store.get(jobs[1]["id"])["state"]=="running"
     assert manager.store.get(jobs[0]["id"])["state"]=="cancelled"
     assert len(probes)==2
+
+
+def test_queue_runs_two_analyses_and_releases_one_reservation(tmp_path, monkeypatch):
+    import os
+    from types import SimpleNamespace
+    from nanocofold.platform import jobs as module
+
+    manager = JobManager(tmp_path)
+    monkeypatch.setenv("NANOCOFOLD_GPU_LOCK_DIR", str(tmp_path / "locks"))
+    monkeypatch.setattr(gpu_admission, "shared_snapshot", lambda _gpu: (UUID, "0", 16000, 15500, 5, {}))
+    submitted = [manager.create({**analysis(name), "reuse_results": False}) for name in ("first","second","third")]
+    for job in submitted:
+        manager.store.update(job["id"], mock=False)
+    owned = []
+    def spawn(*args, pass_fds, **kwargs):
+        owned.append([os.dup(fd) for fd in pass_fds])
+        return SimpleNamespace(pid=9999910+len(owned), poll=lambda: None)
+    monkeypatch.setattr(module.subprocess, "Popen", spawn)
+    monkeypatch.setattr(module, "process_stamp", lambda _pid: "fixture-birth")
+    monkeypatch.setattr(manager, "_start_catalog_recovery", lambda: None)
+    try:
+        manager._tick()
+        first, second, third = [manager.store.get(row["id"]) for row in submitted]
+        assert [x["state"] for x in (first,second,third)] == ["running","running","queued"]
+        assert third["gpu_reading"]["reason"] == "capacity" and third["started"] is None
+        for descriptor in owned[0]:
+            os.close(descriptor)
+        owned[0] = []
+        manager.gpu_retry.clear()
+        assert manager._spawn(manager.store.get(third["id"]))
+        assert manager.store.get(second["id"])["state"] == "running"
+    finally:
+        for handles in owned:
+            for descriptor in handles:
+                os.close(descriptor)

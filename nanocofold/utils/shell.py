@@ -197,12 +197,15 @@ def _budgeted_process(argv, *, cwd, env, timeout, stdin_text: str | None = None,
         raise ExecutionCancelled("분석 실행이 취소되었습니다.")
     # The detached platform worker owns this user-wide GPU reservation. Keep
     # it alive in engine children as well if their parent is forcibly killed.
-    gpu_descriptor = (env or os.environ).get("NANOCOFOLD_GPU_LOCK_FD")
+    gpu_descriptor = (env or {}).get("NANOCOFOLD_GPU_LOCK_FD") or os.environ.get("NANOCOFOLD_GPU_LOCK_FD")
     inherited = ()
     if gpu_descriptor is not None:
         descriptor = int(gpu_descriptor)
         os.fstat(descriptor)
-        inherited = (descriptor,)
+        extra = (env or os.environ).get("NANOCOFOLD_GPU_RESERVATION_FDS") or os.environ.get("NANOCOFOLD_GPU_RESERVATION_FDS", "")
+        inherited = (descriptor, *(int(value) for value in extra.split(",") if value))
+        for lease in inherited:
+            os.fstat(lease)
     from ..platform.maintenance import CORE_LEASE_ENV, core_lease_handoffs
     leases = core_lease_handoffs()
     if leases:

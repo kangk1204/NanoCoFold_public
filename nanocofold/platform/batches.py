@@ -153,9 +153,10 @@ class BatchManager:
         except (OSError, ValueError):
             return False
 
-    def list(self):
+    def list(self, researcher=None):
         with self.jobs.store.connect() as db:
-            rows = db.execute("SELECT payload FROM batches ORDER BY created DESC,id LIMIT 50").fetchall()
+            where = " WHERE json_extract(payload,'$.researcher')=?" if researcher else ""
+            rows = db.execute("SELECT payload FROM batches" + where + " ORDER BY created DESC,id LIMIT 50", (researcher,) if researcher else ()).fetchall()
         return [json.loads(row["payload"]) for row in rows]
 
     def _files(self, cfg):
@@ -216,7 +217,7 @@ class BatchManager:
         self._save(batch)
         return batch
 
-    def submit(self, identifier, payload, *, researcher=None):
+    def submit(self, identifier, payload, *, researcher=None, legacy_inputs=None):
         path = self.jobs.store.root / f"batch-{identifier}.lock"
         # Validate ID before using it as a filename.
         self.get(identifier)
@@ -248,7 +249,14 @@ class BatchManager:
                     continue
                 if row.get("error"):
                     raise ValueError(f"{row['id']}: 입력 검토 오류를 먼저 수정하거나 제외하세요.")
-                value = self.inputs.get(row["input_id"])
+                try:
+                    value = self.inputs.get(row["input_id"])
+                except FileNotFoundError:
+                    # Earlier shared installs saved the same reviewed input outside personal folders.
+                    # Only the recorded submitter may reuse it, with all original digests checked below.
+                    if not researcher or legacy_inputs is None or legacy_inputs is self.inputs:
+                        raise
+                    value = legacy_inputs.get(row["input_id"])
                 if digest(value) != row["input_sha256"] or self._files(value["config"]) != row["input_files"] or sha256(Path(value["config_path"])) != row["config_file_sha256"]:
                     raise ValueError(f"{row['id']}: 검토 이후 입력 또는 설정이 바뀌었습니다.")
                 prepared[row["id"]] = value

@@ -248,9 +248,9 @@ def environment_scope(workspace: Path, cfg: dict, *, gpu: str | None = None) -> 
     return {"digest": hashlib.sha256(encoded.encode()).hexdigest(), "engines": engines}
 
 
-def readiness(workspace: Path, cfg: dict, store, *, gpu: str | None = None) -> dict:
+def readiness(workspace: Path, cfg: dict, store, *, gpu: str | None = None, researcher=None) -> dict:
     scope = environment_scope(workspace, cfg, gpu=gpu)
-    for job in store.list(kind="diagnostics", limit=1000):
+    for job in store.list(kind="diagnostics", limit=1000, **({"researcher":researcher} if researcher else {})):
         report = job.get("diagnostics") or {}
         if (job.get("kind") != "diagnostics" or not job.get("environment_only") or
                 (report.get("environment_scope") or job.get("environment_scope") or {}).get("digest") != scope["digest"]):

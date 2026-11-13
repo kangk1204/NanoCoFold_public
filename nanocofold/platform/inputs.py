@@ -239,9 +239,9 @@ def preserve_failed_review(method):
 
 
 class InputManager:
-    def __init__(self, workspace: Path):
+    def __init__(self, workspace: Path, *, root=None):
         self.workspace = workspace
-        self.root = workspace / "inputs"
+        self.root = root or workspace / "inputs"
         self.root.mkdir(parents=True, exist_ok=True)
         self.wizard = WizardSession(self.root)
         self.lock = threading.RLock()

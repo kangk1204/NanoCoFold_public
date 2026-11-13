@@ -10,11 +10,11 @@
 
 처음 설치한 방식에 맞는 방법 하나를 선택하세요. 직접 수정한 소스가 있으면 먼저 따로 보관합니다.
 
-**Git으로 설치한 경우.** 처음 설치한 소스 폴더에서 아래 명령을 실행하세요. 마지막 명령에서 `v0.4.8-install.5`가 표시됩니다. 이 수정판에는 기록 적격 후보 바로 보기, 선택한 VHH 서열 복사와 개별 FASTA 저장, 새 작업의 첫 단계 복귀, GPU 자원 대기, [연구실 계정과 담당자별 검색](shared-lab.ko.md)이 포함됩니다. GPU 실습 영상은 원래 `v0.4.8` 태그의 `screen` 설치 프로필로 촬영했습니다. 이번 수정판에서는 후보 ID와 VHH 서열을 검색하고 엔진별 최종 선별 1위의 구조를 바로 열 수 있습니다.
+**Git으로 설치한 경우.** 처음 설치한 소스 폴더에서 아래 명령을 실행하세요. 마지막 명령에서 `v0.4.8-install.6`가 표시됩니다. 공동 사용 시 업데이트 후 [관리자 계정과 열람 범위](shared-lab.ko.md)를 설정하세요.
 
 ```bash
-git fetch origin tag v0.4.8-install.5
-git switch --detach v0.4.8-install.5
+git fetch origin tag v0.4.8-install.6
+git switch --detach v0.4.8-install.6
 git describe --tags --exact-match
 ```
 
@@ -27,12 +27,12 @@ git rev-parse HEAD
 
 확인한 태그나 커밋을 실행 기록에 남기세요. Git 오류가 표시되면 원인을 해결한 뒤 계속하세요.
 
-**ZIP으로 설치한 경우.** [v0.4.8-install.5 소스 ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.5.zip)을 내려받아 **별도 폴더**에 압축을 푸세요. 공동연구자가 특정 커밋을 지정했다면 해당 페이지에서 **Code → Download ZIP**을 선택하세요.
+**ZIP으로 설치한 경우.** [v0.4.8-install.6 소스 ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.6.zip)을 내려받아 **별도 폴더**에 압축을 푸세요. 공동연구자가 특정 커밋을 지정했다면 해당 페이지에서 **Code → Download ZIP**을 선택하세요.
 
 **처음 설치한 폴더**에서 아래 명령을 실행하세요. 첫 줄의 경로는 방금 압축을 푼 폴더(`update.sh`가 있는 곳)로 바꿉니다. 소스 링크는 실행 기록에 남기세요.
 
 ```bash
-update_source="/path/to/extracted/NanoCoFold_public-0.4.8-install.5"
+update_source="/path/to/extracted/NanoCoFold_public-0.4.8-install.6"
 rsync -a --exclude='.git/' --exclude='.nanocofold/' "$update_source/" ./
 ```
 

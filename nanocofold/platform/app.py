@@ -80,6 +80,32 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
     lab = LabAccounts(workspace)
     token = secrets.token_urlsafe(32)
     login_gate = asyncio.Lock()
+    account_inputs = {}
+    account_lock = threading.Lock()
+
+    def input_manager(request):
+        owner = request.state.researcher
+        if not owner:
+            return inputs
+        with account_lock:
+            if owner not in account_inputs:
+                folder = workspace / "inputs" / "lab" / hashlib.sha256(owner.encode()).hexdigest()
+                account_inputs[owner] = InputManager(workspace, root=folder)
+            return account_inputs[owner]
+
+    def read_owner(request, requested=""):
+        return request.state.owner or requested
+
+    def result_access(request, identifier):
+        owner = request.state.owner
+        if not owner:
+            return
+        with manager.store.connect() as db:
+            if db.execute("SELECT 1 FROM lab_usage WHERE researcher=? AND (result_id=? OR job_id=?) LIMIT 1",
+                          (owner,identifier,identifier)).fetchone():
+                return
+        raise HTTPException(404)
+
     with manager.store.connect() as db:
         db.execute("CREATE TABLE IF NOT EXISTS result_paths (id TEXT PRIMARY KEY,path TEXT NOT NULL UNIQUE)")
 
@@ -96,6 +122,8 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
                     manager.close()
         finally:
             inputs.close()
+            for personal in account_inputs.values():
+                personal.close()
 
     app = FastAPI(title="NanoCoFold", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(GZipMiddleware, minimum_size=1024)
@@ -119,17 +147,26 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         if parsed.hostname not in {"localhost", "127.0.0.1", "::1"} or (origin is not None and origin != "http://" + host):
             return secure(JSONResponse({"error": "loopback 주소 또는 SSH 포트포워딩으로 접속하세요."}, status_code=403))
         request.state.researcher = None
+        request.state.admin = request.state.shared = False
+        request.state.owner = None
         request.state.api_token = token
         if lab.enabled and not lab.db.is_file():
             return secure(JSONResponse({"error":"연구실 계정 DB를 복원하세요. / Restore the lab account database."}, status_code=503))
         if lab.enabled and request.url.path not in {"/lab/login", "/favicon.ico"}:
             session_key = request.cookies.get(lab.cookie, "")
-            researcher = await asyncio.to_thread(lab.user, session_key)
-            if researcher is None:
+            access = await asyncio.to_thread(lab.access, session_key)
+            if access is None:
                 if request.url.path == "/" and request.method == "GET":
                     return secure(login_page())
                 return secure(JSONResponse({"error":"연구실 로그인이 필요합니다. / Please sign in to the lab."}, status_code=401))
+            researcher, request.state.admin, request.state.shared, pending = access
             request.state.researcher = researcher
+            if pending and request.url.path not in {"/lab/activate","/api/lab/logout"}:
+                if request.url.path == "/":
+                    return secure(activation_page())
+                return secure(JSONResponse({"error":"Activate the administrator account first."},status_code=403))
+            if not request.state.admin and not request.state.shared:
+                request.state.owner = researcher
             import hmac
             request.state.api_token = hmac.digest(token.encode(), session_key.encode(), "sha256").hex()
         if request.url.path.startswith("/api/"):
@@ -203,6 +240,50 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         logging.getLogger(__name__).warning("YAML input error: %s", exc)
         return JSONResponse({"error": "YAML 설정 구문을 읽지 못했습니다. 들여쓰기·키와 값 형식을 확인하세요."}, status_code=400)
 
+    def lab_payload_paths(request, payload):
+        """Lab users upload scientific files. Server filenames belong to the operator."""
+        if not request.state.researcher:
+            return
+        from .inputs import INPUT_PATHS, RUNTIME_PATHS
+        from ..config import load_config
+        personal = input_manager(request).root
+        trusted = None
+        def check_config(config):
+            nonlocal trusted
+            if not isinstance(config,dict):
+                return
+            for name in (*INPUT_PATHS,"input_review.residue_mapping_path","input_review.mapping_path"):
+                value = cfg_get(config,name)
+                if value and (not isinstance(value,str) or not contained(workspace,value).is_relative_to(personal)):
+                    raise HTTPException(403,"Upload input files with your own account.")
+            for name in (*RUNTIME_PATHS,"screen.colabfold.msa_dir","screen.colabfold.msa_cache_dir","structure.msa.cache_dir"):
+                value=cfg_get(config,name)
+                if not value:
+                    continue
+                if trusted is None:
+                    default=workspace/"config/default.yaml"
+                    trusted=load_config(default if default.is_file() else None)
+                    env=workspace/"config/environment.yaml"
+                    if env.is_file():
+                        trusted=_deep_merge(trusted,read_config_yaml(env.read_text()) or {})
+                expected=cfg_get(trusted,name)
+                if not isinstance(value,str) or not isinstance(expected,str) or (workspace/value).resolve()!=(workspace/expected).resolve():
+                    raise HTTPException(403,"Use a runtime location configured by the server administrator.")
+        def visit(value):
+            if isinstance(value, list):
+                for item in value: visit(item)
+            elif isinstance(value,dict):
+                if value.get("config_path"):
+                    path = contained(workspace,value["config_path"])
+                    if not path.is_relative_to(personal):
+                        raise HTTPException(403,"Use a configuration from your own reviewed input.")
+                check_config(value.get("config"))
+                if "settings" in value:
+                    check_config({"complex": value["settings"]})
+                for nested in value.values():
+                    if isinstance(nested,(list,dict)): visit(nested)
+        visit(payload)
+
     async def body(request):
         if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
             raise HTTPException(415, "JSON 요청만 지원합니다.")
@@ -229,11 +310,13 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
                 raise ValueError(f"{key} 입력은 JSON 객체여야 합니다.")
         if "mock" in payload and type(payload["mock"]) is not bool:
             raise ValueError("mock는 true/false여야 합니다.")
+        if request.url.path.startswith(("/api/jobs","/api/inputs","/api/batches","/api/diagnostics","/api/environment","/api/configs")):
+            lab_payload_paths(request,payload)
         return payload
 
     @app.post("/api/inputs/complex")
     async def complex_input(request: Request):
-        return await asyncio.to_thread(inputs.complex, await body(request))
+        return await asyncio.to_thread(input_manager(request).complex, await body(request))
 
     @app.get("/api/starter-presets")
     async def starter_presets():
@@ -270,31 +353,37 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         return {"saved": True, "version": 1}
 
     @app.get("/api/batches")
-    def batch_list():
-        return {"batches": batches.list()}
+    def batch_list(request: Request):
+        return {"batches": batches.list(request.state.owner)}
 
     @app.post("/api/batches/review")
     async def batch_review(request: Request):
-        return await asyncio.to_thread(batches.review, await body(request), researcher=request.state.researcher)
+        batch_manager = BatchManager(input_manager(request),manager) if request.state.researcher else batches
+        return await asyncio.to_thread(batch_manager.review, await body(request), researcher=request.state.researcher)
 
     @app.get("/api/batches/{identifier}")
-    def batch_get(identifier: str):
-        return batches.get(identifier)
+    def batch_get(identifier: str, request: Request):
+        batch = batches.get(identifier)
+        if request.state.owner and batch.get("researcher") != request.state.owner:
+            raise HTTPException(404)
+        return batch
 
     @app.post("/api/batches/{identifier}/submit")
     async def batch_submit(identifier: str, request: Request):
-        return await asyncio.to_thread(batches.submit, identifier, await body(request), researcher=request.state.researcher)
+        batch_manager = BatchManager(input_manager(request),manager) if request.state.researcher else batches
+        return await asyncio.to_thread(batch_manager.submit, identifier, await body(request),
+                                       researcher=request.state.researcher, legacy_inputs=inputs)
 
     @app.post("/api/batches/{identifier}/cancel")
     async def batch_cancel(identifier: str, request: Request):
         payload = await body(request) if await request.body() else {}
         return await asyncio.to_thread(batches.cancel, identifier, expected_cancel=payload.get("expected_cancel"), researcher=request.state.researcher)
 
-    def effective(payload):
+    def effective(request, payload):
         cfg = payload.get("config", {})
         reviewed = None
         if payload.get("input_id"):
-            reviewed = inputs.reviewed(payload["input_id"])
+            reviewed = input_manager(request).reviewed(payload["input_id"])
             cfg = _deep_merge(reviewed["config"], cfg)
         if payload.get("config_path"):
             path = contained(workspace, payload["config_path"], exists=True)
@@ -342,7 +431,8 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
             raise ValueError("분석 결과 파일이 없는 폴더입니다. 개별 분석 결과 폴더를 선택하세요.")
         return path
 
-    def reader(identifier):
+    def reader(identifier, request):
+        result_access(request,identifier)
         if (not isinstance(identifier, str) or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", identifier)
                 or identifier in {".", ".."} or ".." in identifier):
             raise ValueError("결과 ID는 작업 디렉터리의 단일 이름이어야 합니다.")
@@ -365,6 +455,42 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         error = '<p role="alert">계정과 비밀번호를 확인하세요. / Check your account and password.</p>' if failed else ""
         return HTMLResponse(template.read_text().replace("<!--LOGIN_ERROR-->", error), status_code=401 if failed else 200,
                             headers={"Referrer-Policy": "same-origin"})
+
+    def activation_page(failed=False):
+        page = (Path(__file__).resolve().parents[1] / "templates/lab_activate.html").read_text()
+        return HTMLResponse(page.replace("<!--ERROR-->", '<p role="alert">코드 또는 비밀번호를 확인하세요. / Check the code and password.</p>' if failed else ""),
+                            headers={"Referrer-Policy": "same-origin"})
+
+    @app.post("/lab/activate")
+    async def activate_admin(request: Request):
+        from urllib.parse import parse_qs
+        from fastapi.responses import RedirectResponse
+        if request.state.researcher != "admin" or request.headers.get("origin") != "http://" + request.headers["host"]:
+            raise HTTPException(403)
+        data = bytearray()
+        async for chunk in request.stream():
+            data.extend(chunk)
+            if len(data)>4096:
+                raise HTTPException(413)
+        try:
+            form = parse_qs(data.decode(),max_num_fields=3)
+            password = form["password"][0]
+            ok = password == form["confirm"][0] and await asyncio.to_thread(lab.activate,form["code"][0],password)
+        except (KeyError,ValueError):
+            ok = False
+        if not ok:
+            return activation_page(True)
+        response = RedirectResponse("/",status_code=303)
+        response.delete_cookie(lab.cookie)
+        return response
+
+    @app.post("/api/lab/sharing")
+    async def sharing(request: Request):
+        if not request.state.admin:
+            raise HTTPException(403)
+        shared = (await body(request)).get("shared")
+        await asyncio.to_thread(lab.set_shared,request.state.researcher,shared)
+        return {"shared":shared}
 
     @app.get("/favicon.ico")
     def favicon():
@@ -443,13 +569,13 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
             # A broken installation remains inspectable through Environment.
             # Do not invent numeric defaults before input review succeeds.
             defaults = {}
-        return {"workspace": str(workspace), "researcher": request.state.researcher, "version": __version__, "modes": ["complex", "design", "screen", "mature"], "poll_interval_ms": 2000,
+        return {"workspace": str(workspace), "researcher": request.state.researcher, "lab_admin":request.state.admin, "lab_shared":request.state.shared, "version": __version__, "modes": ["complex", "design", "screen", "mature"], "poll_interval_ms": 2000,
                 "presets": {"researcher_exploration": exploration_config(), "standard": {}},
                 "planning_defaults": defaults}
 
     @app.get("/api/inputs")
-    def input_list():
-        return native({"inputs": inputs.list()})
+    def input_list(request: Request):
+        return native({"inputs": input_manager(request).list()})
 
     @app.get("/api/tutorials/{mode}")
     def public_tutorial(mode: str):
@@ -469,6 +595,7 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
             raise ValueError("YAML 설정을 읽지 못했습니다.") from exc
         if not isinstance(cfg, dict):
             raise ValueError("YAML 설정은 객체여야 합니다.")
+        lab_payload_paths(request,{"config":cfg})
         return {"config": native(normalized_config(workspace, cfg))}
 
     @app.post("/api/inputs")
@@ -476,56 +603,61 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         payload = await body(request)
         if payload.get("kind") != "fasta":
             raise ValueError("FASTA 입력은 kind=fasta로 지정하세요. 구조 파일은 /api/inputs/load를 사용하세요.")
-        return native(await asyncio.to_thread(inputs.fasta, payload))
+        return native(await asyncio.to_thread(input_manager(request).fasta, payload))
 
     @app.post("/api/inputs/load")
     async def input_load(request: Request):
-        return native(await asyncio.to_thread(inputs.load, await body(request)))
+        return native(await asyncio.to_thread(input_manager(request).load, await body(request)))
 
     @app.post("/api/inputs/analyze")
     async def input_analyze(request: Request):
-        return native(await asyncio.to_thread(inputs.analyze, await body(request)))
+        return native(await asyncio.to_thread(input_manager(request).analyze, await body(request)))
 
     @app.post("/api/inputs/review")
     async def input_review(request: Request):
-        return native(await asyncio.to_thread(inputs.review, await body(request)))
+        return native(await asyncio.to_thread(input_manager(request).review, await body(request)))
 
     @app.get("/api/inputs/{identifier}/structure")
-    def input_structure(identifier: str):
-        return Response(inputs.structure(identifier), media_type="chemical/x-pdb")
+    def input_structure(identifier: str, request: Request):
+        return Response(input_manager(request).structure(identifier), media_type="chemical/x-pdb")
 
     @app.get("/api/inputs/{identifier}")
-    def input_get(identifier: str):
-        return native(inputs.get(identifier))
+    def input_get(identifier: str, request: Request):
+        return native(input_manager(request).get(identifier))
 
     @app.get("/api/jobs")
-    def job_list(limit: int = 100, before: float | None = None, before_id: str | None = None, active: bool = False):
+    def job_list(request: Request, limit: int = 100, before: float | None = None, before_id: str | None = None, active: bool = False):
         active_states = {"queued", "running", "cancelling"}
-        history = manager.store.list(limit=limit, before=before, before_id=before_id,
+        history = manager.store.list(researcher=request.state.owner,limit=limit, before=before, before_id=before_id,
                                      states=active_states if active else None)
         cursor = lambda rows: {"before": rows[-1]["created"], "before_id": rows[-1]["id"]} if len(rows) == limit else None
         result = {"jobs": history, "next_cursor": cursor(history)}
         # Keep old active work visible without making a two-second poll return
         # an unbounded queue. Each stream has its own bounded cursor.
         if before is None and not active:
-            running = manager.store.list(states=active_states, limit=limit)
+            running = manager.store.list(states=active_states, limit=limit,researcher=request.state.owner)
             result.update(active_jobs=running, active_next_cursor=cursor(running))
         return result
 
     @app.post("/api/jobs")
     async def job_create(request: Request):
-        payload = effective(await body(request))
+        payload = effective(request, await body(request))
         payload.pop("researcher", None)
         if request.state.researcher:
             payload["researcher"] = request.state.researcher
         return native(await asyncio.to_thread(manager.create, payload))
 
     @app.get("/api/jobs/{identifier}")
-    def job_get(identifier: str):
-        return native(manager.store.get(identifier))
+    def job_get(identifier: str, request: Request):
+        record = manager.store.get(identifier)
+        if request.state.owner and record.get("researcher") != request.state.owner:
+            result_access(request,identifier)
+        return native(record)
 
     @app.get("/api/jobs/{identifier}/logs")
-    def job_logs(identifier: str, offset: int = 0):
+    def job_logs(identifier: str, request: Request, offset: int = 0):
+        if request.state.owner:
+            job_get(identifier,request)
         from .errors import public_log
         result = manager.logs(identifier, offset)
         return {**result, "text": public_log(result["text"])}
@@ -550,13 +682,13 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
 
     @app.post("/api/diagnostics")
     async def diagnostics(request: Request):
-        payload = effective(await body(request))
+        payload = effective(request, await body(request))
         payload["researcher"] = request.state.researcher
         return native(await asyncio.to_thread(manager.create, payload, kind="diagnostics"))
 
     @app.post("/api/environment/check")
     async def environment_check(request: Request):
-        payload = effective(await body(request))
+        payload = effective(request, await body(request))
         payload["researcher"] = request.state.researcher
         payload["environment_only"] = True
         return native(await asyncio.to_thread(manager.create, payload, kind="diagnostics"))
@@ -564,15 +696,15 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
     @app.post("/api/environment/status")
     async def environment_status(request: Request):
         from .environment import readiness, normalized_installation_config
-        payload = effective(await body(request))
+        payload = effective(request, await body(request))
         cfg = normalized_installation_config(workspace, payload.get("config"), mode=payload.get("mode"))
         from .jobs import allowed_gpu
         gpu = allowed_gpu(payload.get("gpu", os.environ.get("NANOCOFOLD_GPU", "0")))
-        return native(await asyncio.to_thread(readiness, workspace, cfg, manager.store, gpu=gpu))
+        return native(await asyncio.to_thread(readiness, workspace, cfg, manager.store, gpu=gpu, researcher=request.state.owner))
 
     @app.get("/api/diagnostics")
-    def diagnostic_list():
-        return {"jobs": [job for job in manager.store.list(limit=100) if job["kind"] == "diagnostics"]}
+    def diagnostic_list(request: Request):
+        return {"jobs": [job for job in manager.store.list(limit=100,researcher=request.state.owner) if job["kind"] == "diagnostics"]}
 
     @app.post("/api/setup")
     async def setup(request: Request):
@@ -581,11 +713,11 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         return await asyncio.to_thread(manager.create, await body(request), kind="setup")
 
     @app.get("/api/results")
-    def results_list(limit: int = 25, cursor: str | None = None, search: str = "", mode: str = "", retention: str = "",
+    def results_list(request: Request, limit: int = 25, cursor: str | None = None, search: str = "", mode: str = "", retention: str = "",
                      sort: str = "created", descending: bool = True):
-        page = manager.catalog.list(limit=limit, cursor=cursor, search=search, mode=mode, retention=retention,
+        page = manager.catalog.list(researcher=read_owner(request),limit=limit, cursor=cursor, search=search, mode=mode, retention=retention,
                                     sort=sort, descending=descending)
-        if not page["items"] and not any((cursor, search, mode, retention)):
+        if not request.state.owner and not page["items"] and not any((cursor, search, mode, retention)):
             # Compatibility discovery is bounded. Index an older workspace
             # explicitly with `nanocofold catalog --index-existing`.
             import itertools
@@ -596,7 +728,7 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
                     for entry in itertools.islice((e for e in entries if e.is_dir(follow_symlinks=False)), limit):
                         with contextlib.suppress(ValueError, OSError):
                             manager.catalog.register(entry.name, entry.path, state="complete")
-            page = manager.catalog.list(limit=limit, search=search, mode=mode, retention=retention,
+            page = manager.catalog.list(researcher=read_owner(request),limit=limit, search=search, mode=mode, retention=retention,
                                         sort=sort, descending=descending)
         return native({"results": page["items"], "next_cursor": page["next_cursor"]})
 
@@ -604,17 +736,35 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
     def lab_usage(request: Request, researcher: str="", before: float | None=None, before_id: str="", limit: int=25):
         if not request.state.researcher:
             raise HTTPException(403)
-        return manager.store.usage(researcher, before, before_id, limit)
+        return manager.store.usage(read_owner(request,researcher), before, before_id, limit)
 
     @app.get("/api/result-catalog")
-    def result_catalog(researcher: str = "", limit: int = 25, cursor: str | None = None, search: str = "", mode: str = "", retention: str = "",
+    def result_catalog(request: Request, researcher: str = "", limit: int = 25, cursor: str | None = None, search: str = "", mode: str = "", retention: str = "",
                        sort: str = "created", descending: bool = True):
         return native(manager.catalog.list(limit=limit, cursor=cursor, search=search, mode=mode, retention=retention,
-                                           sort=sort, descending=descending, researcher=researcher))
+                                           sort=sort, descending=descending, researcher=read_owner(request,researcher)))
+
+    @app.get("/api/candidate-catalog")
+    def candidate_rows(request: Request, search: str="", target: str="", researcher: str="", engine: str="", decision: str="",
+                       sort: str="created", descending: bool=True, include_mock: bool=False, offset: int=0, limit: int=25):
+        from .candidate_catalog import page
+        return page(manager.catalog,search=search,target=target,researcher=read_owner(request,researcher),engine=engine,
+                    decision=decision,sort=sort,descending=descending,include_mock=include_mock,offset=offset,limit=limit)
+
+    @app.get("/api/candidate-catalog/export")
+    def candidate_excel(request: Request, search: str="", target: str="", researcher: str="", engine: str="", decision: str="",
+                        sort: str="created", descending: bool=True, include_mock: bool=False, lang: str="en"):
+        from .candidate_catalog import workbook
+        path=workbook(manager.catalog,lang,search=search,target=target,researcher=read_owner(request,researcher),engine=engine,
+                      decision=decision,sort=sort,descending=descending,include_mock=include_mock)
+        return ExportFileResponse(path,filename="NanoCoFold-candidates.xlsx",media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                  background=BackgroundTask(path.unlink,missing_ok=True))
 
     @app.post("/api/results/open")
     async def results_open(request: Request):
         payload = await body(request)
+        if request.state.owner:
+            raise HTTPException(403, "Open your submitted analyses from Results database.")
         def open_result():
             path = result_directory(payload.get("path", ""))
             summary = ResultReader(path).summary()
@@ -630,22 +780,22 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         return await asyncio.to_thread(open_result)
 
     @app.get("/api/results/{identifier}")
-    def result_summary(identifier: str):
-        summary = reader(identifier).summary()
+    def result_summary(identifier: str, request: Request):
+        summary = reader(identifier, request).summary()
         summary["id"] = identifier
         return native(summary)
 
     @app.get("/api/results/{identifier}/retention")
-    def retention_plan(identifier: str):
+    def retention_plan(identifier: str, request: Request):
         from .retention import RetentionManager
-        return native(RetentionManager(workspace).plan(reader(identifier).root))
+        return native(RetentionManager(workspace).plan(reader(identifier, request).root))
 
     @app.post("/api/results/{identifier}/retention")
     async def retention_apply(identifier: str, request: Request):
         from .retention import RetentionManager
         payload = await body(request)
         def apply_retention():
-            root = reader(identifier).root
+            root = reader(identifier, request).root
             if request.state.researcher:
                 try:
                     owner_job = manager.store.get(root.name)
@@ -659,35 +809,35 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
             result = RetentionManager(workspace).apply(root, payload.get("plan_digest"), payload.get("confirmation"))
             # A verified compact snapshot is already authoritative even if bounded
             # file cleanup needs a retry. Report those states independently.
-            manager.catalog.register(original_id, root, identity, state=reader(original_id).summary().get("status", "incomplete"), retention="minimal")
+            manager.catalog.register(original_id, root, identity, state=reader(original_id, request).summary().get("status", "incomplete"), retention="minimal")
             return native(result)
         return await asyncio.to_thread(apply_retention)
 
     @app.get("/api/results/{identifier}/candidates")
-    def candidates(identifier: str, search: str = "", sort: str = "composite_score", descending: bool = True,
+    def candidates(identifier: str, request: Request, search: str = "", sort: str = "composite_score", descending: bool = True,
                    eligible: bool | None = None, eligibility_basis: str = "recorded", hotspot_min: float | None = None,
                    offset: int = 0, limit: int = 100):
         if not 0 <= offset or not 1 <= limit <= 10000:
             raise ValueError("페이지 크기는 1–10,000개여야 합니다.")
-        return native(reader(identifier).candidates(search=search, sort=sort, descending=descending, eligible=eligible,
+        return native(reader(identifier, request).candidates(search=search, sort=sort, descending=descending, eligible=eligible,
                       eligibility_basis=eligibility_basis, hotspot_min=hotspot_min, offset=offset, limit=limit))
 
     @app.get("/api/results/{identifier}/observations")
-    def observations(identifier: str, candidate_id: str | None = None):
-        return native(reader(identifier).observations(candidate_id))
+    def observations(identifier: str, request: Request, candidate_id: str | None = None):
+        return native(reader(identifier, request).observations(candidate_id))
 
     @app.get("/api/results/{identifier}/structure")
-    def structure(identifier: str, candidate_id: str, observation_id: str | None = None):
-        return native(reader(identifier).structure(candidate_id, observation_id))
+    def structure(identifier: str, request: Request, candidate_id: str, observation_id: str | None = None):
+        return native(reader(identifier, request).structure(candidate_id, observation_id))
 
     @app.get("/api/results/{identifier}/artifacts")
-    def artifacts(identifier: str, provenance_only: bool = False):
-        result = reader(identifier)
+    def artifacts(identifier: str, request: Request, provenance_only: bool = False):
+        result = reader(identifier, request)
         return {"provenance": result.provenance()} if provenance_only else result.artifacts()
 
     @app.get("/api/results/{identifier}/download")
-    def download(identifier: str, path: str):
-        file = reader(identifier).artifact_path(path)
+    def download(identifier: str, request: Request, path: str):
+        file = reader(identifier, request).artifact_path(path)
         if not file.is_file():
             raise FileNotFoundError("산출물 파일이 없습니다.")
         if file.suffix.lower() == ".html" and "_explorer" not in file.stem:
@@ -704,7 +854,7 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
     @app.post("/api/results/{identifier}/export")
     async def export(identifier: str, request: Request):
         payload = await body(request)
-        result = reader(identifier)
+        result = reader(identifier, request)
         format = payload.get("format", "zip")
         if format == "zip":
             task = asyncio.create_task(asyncio.to_thread(result.export_to_file, format, payload.get("filters")))

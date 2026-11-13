@@ -374,7 +374,7 @@
           브라우저를 닫아도 실행됩니다. 중단된 작업은 입력·설정과 완료 단계의
           출처를 확인한 뒤 직접 재개하세요.
         </p>
-        <p class="muted">GPU가 사용 중이면 작업은 대기합니다. 사용 가능해지면 자동으로 시작합니다.</p>
+        <p class="muted">한 GPU에서 여러 분석을 실행할 수 있습니다. 여유 메모리나 계산 여력이 부족하면 대기한 뒤 자동으로 시작합니다.</p>
         <button id="jobs-next-analysis" type="button">다음 분석 준비</button>
         <button id="refresh-jobs" class="secondary">새로고침</button>
         <div class="grid">
@@ -389,6 +389,25 @@
       </section>
       <section id="view-catalog" hidden>
         <h1>저장된 결과 DB</h1>
+        <p id="catalog-visibility" hidden></p>
+        <details id="lab-sharing" hidden><summary>관리자 · 결과 열람 권한</summary>
+          <label class="check"><input type="checkbox" id="share-lab-results">모든 연구원에게 연구실 전체 결과 열람 허용</label>
+          <button id="apply-lab-sharing" class="secondary">권한 저장</button><span id="sharing-feedback" role="status"></span>
+        </details>
+        <div class="inline" aria-label="결과 표 선택"><button id="show-run-table" aria-pressed="true">분석 목록</button><button id="show-candidate-table" aria-pressed="false">후보 서열·구조</button></div>
+        <section id="catalog-candidate-panel" hidden><h2>후보 서열·구조</h2>
+          <p>표적과 엔진을 고르고 선별 순위 또는 지표 제목을 눌러 정렬하세요. 후보 ID를 누르면 해당 모델의 서열과 구조가 열립니다. 선별 순위는 각 분석과 엔진 안에서 부여됩니다.</p>
+          <div class="inline">
+            <label>후보 검색<input id="db-vhh-search" placeholder="분석명, 결과 ID, 후보 ID 또는 VHH 서열"></label>
+            <label>표적 이름<input id="db-vhh-target"></label>
+            <label id="db-vhh-owner-label" hidden>담당자<input id="db-vhh-owner" maxlength="48"></label>
+            <label>예측 엔진<select id="db-vhh-engine"><option value="">전체 엔진</option><option value="boltz2">Boltz-2</option><option value="chai1">Chai-1</option><option value="colabfold">ColabFold</option><option value="opendde">OpenDDE</option></select></label>
+            <label>기록 판정<select id="db-vhh-decision"><option value="">전체</option><option value="eligible">적격</option><option value="held">검토 보류</option><option value="ineligible">부적격</option><option value="unassessed">미평가</option><option value="control">WT·대조군</option><option value="failed">평가 오류</option></select></label>
+            <label class="check"><input id="db-vhh-mock" type="checkbox">연습 결과 포함</label>
+            <button id="db-vhh-apply">검색</button><button id="db-vhh-export" class="secondary" disabled>검색 결과 전체 Excel 저장</button>
+          </div><p id="db-vhh-status" role="status" aria-live="polite"></p><div class="table-scroll" id="db-vhh-table" tabindex="0" role="region" aria-label="후보 검색 결과"></div>
+          <div class="inline"><button id="db-vhh-prev" class="secondary">이전</button><button id="db-vhh-next" class="secondary">다음</button></div>
+        </section><div id="catalog-run-panel">
         <p>분석이 끝나면 이 표에 저장됩니다. 분석명, 후보 ID 또는 VHH 서열 일부(아미노산 3개 이상)를 입력하세요. 열 제목을 누르면 정렬됩니다.</p>
         <div class="inline">
           <input id="catalog-search" placeholder="분석명, 결과 ID, 후보 ID 또는 VHH 서열" aria-label="결과 검색" />
@@ -408,6 +427,7 @@
           <button type="button" class="secondary" id="lab-usage-next" hidden>다음 25개</button>
         </details>
         <p class="muted">용량은 해당 서버 결과 폴더의 측정값입니다. 공용 캐시·모델 가중치·클라우드 사본 용량은 포함하지 않습니다.</p>
+        </div>
       </section>
       <section id="view-results" hidden>
 

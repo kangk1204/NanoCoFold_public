@@ -399,7 +399,7 @@ function view(name, remember = true) {
   if (name === "batch") refreshBatchHistory().catch(e => notice(e.message, true));
   if (name === "jobs") refreshJobs();
   if (name === "results") refreshResults();
-  if (name === "catalog") refreshCatalog().catch(e => notice(e.message, true));
+  if (name === "catalog") ($("catalog-candidate-panel").hidden ? refreshCatalog() : refreshVhhTable()).catch(e => notice(e.message, true));
 }
 const bytesLabel = value => value === null || value === undefined ? "미측정" :
   value >= 1024 ** 3 ? `${(value / 1024 ** 3).toFixed(2)} GiB` : `${(value / 1024 ** 2).toFixed(2)} MiB`;
@@ -421,8 +421,8 @@ async function refreshCatalog() {
   const columns = [["name", "분석"], ["mode", "모드"], ["created", "실행일"], ["candidate_count", "서열"],
     ["model_count", "저장 구조 관측"], ["eligible_model_count", "기준 통과"], ["status", "계산 상태"],
     ["retention", "보관"], ["elapsed_seconds", "계산 시간"], ["storage_bytes", "서버 용량"]];
-  if (state.researcher || page.items.some(item => item.researchers?.length)) {
-    $("catalog-owner-label").hidden = false;
+  if (state.canBrowseLab || page.items.some(item => item.researchers?.length)) {
+    $("catalog-owner-label").hidden = !state.canBrowseLab;
     columns.splice(1, 0, ["researchers", "담당자"]);
   }
   for (const [key, label] of columns) {
@@ -461,6 +461,85 @@ async function refreshCatalog() {
   if (page.sequence_index_pending) notes.push(I18N.format(" · 이전 결과 {0}건의 후보 검색을 준비하고 있습니다.", [page.sequence_index_pending]));
   if (page.sequence_index_unavailable) notes.push(I18N.format(" · 이전 결과 {0}건의 후보 색인을 읽지 못했습니다. 원본 폴더를 확인한 뒤 기존 결과 열기를 사용하세요.", [page.sequence_index_unavailable]));
   I18N.text(status, I18N.concat(notes));
+}
+const vhhGrid = {sort:"created", descending:true, offset:0, revision:0, applied:null};
+const vhhColumns = [["candidate_id","후보 ID"],["name","분석"],["target","표적"],["researchers","담당자"],["engine","예측 엔진"],
+  ["decision","기록 판정"],["selection_rank","최종 선별 순위"],["ipsae","ipSAE"],["iptm","ipTM"],["interface_pae","계면 PAE (Å)"],["sequence","VHH 서열"],["created","실행일"]];
+const vhhDecisions = {eligible:"적격",ineligible:"부적격",unassessed:"미평가",held:"검토 보류",failed:"평가 오류",control:"WT·대조군"};
+function vhhParams() {
+  const p = new URLSearchParams({sort:vhhGrid.sort,descending:String(vhhGrid.descending)});
+  for (const [key,id] of [["search","search"],["target","target"],["researcher","owner"],["engine","engine"],["decision","decision"]]) {
+    const value=$("db-vhh-"+id).value.trim();
+    if(value) p.set(key,value);
+  }
+  if ($("db-vhh-mock").checked) p.set("include_mock","true");
+  return p;
+}
+async function refreshVhhTable() {
+  const revision=++vhhGrid.revision, params=vhhParams();
+  const status=$("db-vhh-status"), output=$("db-vhh-table");
+  vhhGrid.applied=null; $("db-vhh-export").disabled=true;
+  I18N.text(status,I18N.term("결과 DB를 조회하고 있습니다…"));
+  output.replaceChildren();
+  const data=await api("/api/candidate-catalog?"+params+"&offset="+vhhGrid.offset);
+  if(revision!==vhhGrid.revision) return;
+  if(vhhGrid.offset && !data.items.length) {vhhGrid.offset=0;return refreshVhhTable();}
+  const table=el("table"), header=el("tr"), body=el("tbody");
+  for(const [key,label] of vhhColumns) {
+    const th=el("th"), btn=el("button",I18N.concat([I18N.term(label),key===vhhGrid.sort?(vhhGrid.descending?" ↓":" ↑"):""]),"sort-header");
+    th.scope="col";th.setAttribute("aria-sort",key===vhhGrid.sort?(vhhGrid.descending?"descending":"ascending"):"none");
+    btn.onclick=()=>{vhhGrid.descending=key===vhhGrid.sort?!vhhGrid.descending:["ipsae","iptm","created"].includes(key);vhhGrid.sort=key;vhhGrid.offset=0;refreshVhhTable().catch(e=>notice(e.message,true));};
+    th.append(btn);header.append(th);
+  }
+  const head=el("thead");head.append(header);table.append(head,body);
+  for(const row of data.items) {
+    const tr=el("tr");
+    for(const [key] of vhhColumns) {
+      const td=el("td"), v=row[key];
+      if(key==="candidate_id" || key==="name"){
+        const link=el("a",String(v)+(key==="name"&&row.mock?" · MOCK":""));
+        link.href="/?"+new URLSearchParams(key==="name"?{result:row.result_id}:{result:row.result_id,candidate:row.candidate_id});
+        link.target="_blank";link.rel="noopener";td.append(link);
+      } else if(key==="sequence" && v) {
+        const show=el("details");show.append(el("summary",I18N.term("서열 보기")),el("code",v));td.append(show);
+      } else if(key==="decision") I18N.text(td,I18N.term(vhhDecisions[v]||"미평가"));
+      else td.textContent=v==null?"—":key==="created"?new Date(v*1000).toLocaleDateString():typeof v==="number"?fmt(v):String(v);
+      tr.append(td);
+    }
+    body.append(tr);
+  }
+  output.append(table);
+  const notes=[I18N.format("전체 {0}건 중 {1}–{2}",[data.total,data.total?vhhGrid.offset+1:0,vhhGrid.offset+data.items.length])];
+  if (data.sequence_index_pending) notes.push(I18N.format(" · 이전 결과 {0}건의 후보 검색을 준비하고 있습니다.",[data.sequence_index_pending]));
+  if (data.sequence_index_unavailable) notes.push(I18N.format(" · 이전 결과 {0}건의 색인을 읽지 못했습니다. 서버 관리자에게 문의하세요.",[data.sequence_index_unavailable]));
+  I18N.text(status,I18N.concat(notes));
+  $("db-vhh-prev").disabled=!vhhGrid.offset;
+  $("db-vhh-next").disabled=vhhGrid.offset+data.items.length>=data.total;
+  vhhGrid.applied=params.toString();$("db-vhh-export").disabled=!data.total;
+}
+function setupCandidateCatalog() {
+  for (const [id,candidates] of [["show-run-table",false],["show-candidate-table",true]]) action(id,async()=>{
+    $("catalog-run-panel").hidden=candidates;$("catalog-candidate-panel").hidden=!candidates;
+    $("show-run-table").setAttribute("aria-pressed",String(!candidates));$("show-candidate-table").setAttribute("aria-pressed",String(candidates));
+    if(candidates)await refreshVhhTable();else await refreshCatalog();
+  });
+  action("db-vhh-apply",()=>{vhhGrid.offset=0;return refreshVhhTable();});
+  for (const id of ["search","target","owner","engine","decision","mock"]) {
+    const input=$("db-vhh-"+id);
+    input.onkeydown=e=>{if(e.key==="Enter")$("db-vhh-apply").click();};
+    input.oninput=()=>{++vhhGrid.revision;vhhGrid.applied=null;$("db-vhh-export").disabled=true;I18N.text($("db-vhh-status"),I18N.term("검색을 눌러 변경한 조건을 적용하세요."));};
+  }
+  for(const [id,step] of [["prev",-25],["next",25]]) $("db-vhh-"+id).onclick=()=>{
+    $("db-vhh-prev").disabled=$("db-vhh-next").disabled=true;
+    vhhGrid.offset=Math.max(0,vhhGrid.offset+step);refreshVhhTable().catch(e=>notice(e.message,true));
+  };
+  action("db-vhh-export",async()=>{
+    if(vhhGrid.applied===null) return;
+    const p=new URLSearchParams(vhhGrid.applied);p.set("lang",I18N.language);
+    const response=await fetch("/api/candidate-catalog/export?"+p,{headers:{"X-Platform-Token":window.PLATFORM_TOKEN}});
+    if(!response.ok)throw Error("Excel 내보내기에 실패했습니다. 다시 로그인한 뒤 검색하세요.");
+    saveBlob(await response.blob(),"NanoCoFold-candidates.xlsx");
+  });
 }
 let usageRequest = 0, usageCursor = null, usageOwner = "";
 async function refreshLabUsage(nextPage = false) {
@@ -1532,11 +1611,13 @@ async function refreshJobs() {
       if (job.researcher) $("job-detail").append(el("p", I18N.concat([I18N.term("담당자"), " · ", job.researcher])));
       if (job.state === "queued" && job.phase === "waiting_for_gpu") {
         const reading = job.gpu_reading || {};
-        const label = {process:"다른 계산이 GPU를 사용하고 있습니다.", memory:"GPU 여유 메모리를 기다립니다.",
+        const label = {capacity:"다음 분석을 시작할 GPU 메모리를 기다립니다.", exclusive:"설치 또는 단독 GPU 작업이 끝나기를 기다립니다.", admission:"앞선 작업의 GPU 메모리 예약을 확인하고 있습니다.", policy:"서버의 GPU 메모리 예약 설정을 확인하세요.", process:"다른 계산이 GPU를 사용하고 있습니다.", memory:"GPU 여유 메모리를 기다립니다.",
           utilization:"GPU 사용률이 낮아지기를 기다립니다.", telemetry:"GPU 상태를 읽을 수 없어 다시 확인합니다."};
         const note = el("p", I18N.term(label[reading.reason] || "앞선 작업이 GPU를 사용하고 있습니다."));
         if (Number.isFinite(reading.free_mib))
           note.append(el("span", I18N.format(" 여유 {0}/{1} MiB · 사용률 {2}%", [reading.free_mib, reading.total_mib, reading.utilization])));
+        if (Number.isFinite(reading.available_mib))
+          note.append(el("span", I18N.format(" · 예약 반영 후 여유 {0} MiB / 이 작업에 필요한 예약 {1} MiB", [reading.available_mib, reading.job_mib])));
         note.append(el("span", I18N.term(" 자리가 나면 자동으로 시작합니다.")));
         $("job-detail").append(note);
       }
@@ -3522,6 +3603,7 @@ async function boot() {
 
 
   initBatch();
+  setupCandidateCatalog();
   for (const button of document.querySelectorAll("[data-view]"))
     button.onclick = () => view(button.dataset.view);
   for (const id of ["catalog-search", "catalog-owner"]) {
@@ -3787,11 +3869,24 @@ async function boot() {
   $("seed").addEventListener("input", () => { $("seed").dataset.quantitySource = "direct"; });
   const session = await api("/api/session");
   state.researcher = session.researcher;
+  state.canBrowseLab = Boolean(session.lab_admin || session.lab_shared);
   if (session.researcher) {
     $("lab-account").hidden = false;
     I18N.text(document.querySelector(".platform-brand span"), I18N.term("단백질 복합체·나노바디 분석 · 연구실 공유 작업 공간"));
     $("lab-user").textContent = session.researcher;
-    $("catalog-owner-label").hidden = false;
+    $("catalog-owner-label").hidden = $("db-vhh-owner-label").hidden = !state.canBrowseLab;
+    $("catalog-visibility").hidden=false;
+    I18N.text($("catalog-visibility"),I18N.term(session.lab_admin?"관리자 · 연구실 전체 결과를 조회합니다.":session.lab_shared?"연구실 전체 결과를 조회할 수 있습니다.":"내가 제출한 분석 결과를 조회합니다."));
+    if(session.lab_admin) {
+      $("lab-sharing").hidden=false;$("share-lab-results").checked=session.lab_shared;
+      action("apply-lab-sharing",async()=>{
+        await api("/api/lab/sharing",{shared:$("share-lab-results").checked});
+        I18N.text($("sharing-feedback"),I18N.term("열람 권한을 저장했습니다."));
+      });
+    }
+    if(!state.canBrowseLab) {
+      $("open-result").hidden=$("result-path").hidden=true;
+    }
     $("lab-usage").hidden = false;
     $("lab-usage").ontoggle = () => refreshLabUsage().catch(e => notice(e.message, true));
     action("lab-usage-next", () => refreshLabUsage(true));

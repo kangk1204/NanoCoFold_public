@@ -1,11 +1,12 @@
 # Share one lab GPU from several desks
 
-The **server** is the Ubuntu computer with NanoCoFold installed. Each **client** needs a browser and SSH access to that computer. The lab workspace shares results among its members.
+The **server** is the Ubuntu computer with NanoCoFold installed. Each **client** needs a browser and SSH access to that computer. Researchers initially see their own submissions. The administrator can review every result.
 
 ## On the server
 
-1. [Update the existing installation](UPDATE.en.md). In the original source directory, create an account for each researcher. Enter each password twice when prompted.
+1. [Update the existing installation](UPDATE.en.md). In the original source directory, initialize the administrator and create an account for each researcher. Enter each researcher’s password twice when prompted.
    ```bash
+   python3 scripts/lab_account.py init-admin
    python3 scripts/lab_account.py add Song
    python3 scripts/lab_account.py add Kim
    ```
@@ -14,7 +15,11 @@ The **server** is the Ubuntu computer with NanoCoFold installed. Each **client**
    bash start.sh --no-browser --port 18765
    ```
 
-Creating the first account turns on lab sign-in for this workspace. Older results keep their original files and have no researcher assigned. Use `python3 scripts/lab_account.py list` to list accounts. Use `password NAME` to change a password or `disable NAME` to revoke access and keep the submission history. Back up the workspace and the server operator’s `~/.config/nanocofold/labs/` directory.
+The server prints a one-time activation code. Sign in with **admin / admin** and enter the code and a new password (at least 10 characters). Sign in again with your new password to view all results. If you lose the code before activation, run `init-admin` again. If an existing researcher is named `admin`, verify the account owner on the server, then run `python3 scripts/lab_account.py promote-admin` to promote that account.
+
+Under **Results database → Administrator · Result access**, check **Allow all researchers to view all lab results** and choose **Save permissions**. Clear it and save to restore private access for subsequent requests and downloads. Previously downloaded files stay with their recipients. This controls NanoCoFold web access. The server operator manages SSH and filesystem permissions separately.
+
+Creating the first account turns on lab sign-in for this workspace. Older results keep their original files and have no researcher assigned. Use `python3 scripts/lab_account.py list` to list accounts. Use `password NAME` to change a password or `disable NAME` to revoke access and keep the submission history. A disabled name stays reserved for that researcher. Back up the workspace and the server operator’s `~/.config/nanocofold/labs/` directory.
 
 ## At each desk
 
@@ -25,12 +30,13 @@ Creating the first account turns on lab sign-in for this workspace. Older result
 2. Leave that terminal open. Open **http://127.0.0.1:18765** and sign in with your NanoCoFold account.
 3. Open **Environment & setup → Use one server from several desks** to see the connection instructions again. Submit your analysis. Opening **Input & run** after acceptance takes you to step **1/4**. You can reuse the previous sequences. Review the input and give fresh consent if using the public MSA service. Switching tabs before submitting keeps your place.
 4. In **Jobs & logs**, a queued job shows why it is waiting. It starts automatically when the GPU becomes available. You can cancel your own queued job.
-5. In **Results database**, enter an exact account name under **Researcher** and choose **Search**. Leave the field empty for all lab results. Click a name to open the report, or the storage column heading to find the largest runs. Expand **Lab usage history** for submissions, including pending, cancelled and reused jobs. Each researcher has a separate input draft.
+5. In **Results database → Candidate sequences and structures**, search for a target or candidate ID. Filter by engine and recorded decision. To include practice runs, select **Include practice runs** and search again. Click a metric heading to sort, a candidate ID to see its sequence and structure, or the analysis name for the report. **Export all matches to Excel** includes every matching page. Open **Analyses → Lab usage history** to see submissions, including pending, cancelled and reused jobs.
 
 ## Sequence transfer and storage
 
 - Under **Run settings**, choosing the public MSA service sends input sequences to the external service to search for related sequences and requires consent. The verified cache option needs an existing alignment for the sequence. Local search needs a configured database. Boltz-2 follows the selected MSA settings.
 - SQLite stores result summaries, file references and hashes. Eligible, identical requests can reference one saved result. Under **Explore results**, preview storage cleanup before confirming. Compact retention keeps metrics, sequences and final structures. Keep the full original if you need PAE, MSA or intermediate files for resuming. Cleanup is explicit.
-- Before starting a real analysis, the queue checks the selected GPU. Admission requires at least 80% free device memory, utilization at or below 20%, and no compute-only or MPS process. Graphics and mixed graphics processes count toward the memory and utilization checks. When busy or unreadable, the queue checks again in about ten seconds. Waiting does not consume the run budget. External launches do not participate in the platform lock, and peak memory usage depends on the analysis.
+- Before each real launch or resume, the server checks free memory and utilization on the selected GPU. Several analyses can run on the same GPU when capacity is available. Jobs wait if utilization is at least 90%, telemetry is unavailable, or an exclusive task is running. The queue checks again after about ten seconds. Waiting does not consume the run time budget.
+- The default reservation is 6 GiB per analysis. The device keeps the larger of 10% or 1 GiB in reserve. On smaller GPUs, the job reservation is reduced to the remaining capacity. An active NanoCoFold job counts against available memory even before it loads its model. This is an admission estimate. Actual peak memory depends on the engine and sequence length. For analyses that typically use 10 GiB, for example, start the server with `NANOCOFOLD_GPU_JOB_MIB=10240 bash start.sh --no-browser --port 18765`.
 
 In Results database, search for a candidate ID or a VHH sequence fragment (three or more consecutive amino acids). Add a researcher filter if needed. Open a matching candidate to see its sequence and predicted structure. Identical sequences are stored once in the search database.

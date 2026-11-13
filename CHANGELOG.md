@@ -3,6 +3,12 @@
 영어를 README와 웹 플랫폼의 기본 언어로 사용합니다. README 상단에서 한국어판으로 이동할 수 있고, 플랫폼 및 새 오프라인 보고서는 English/한국어를 즉시 전환하고 선택을 저장합니다. 입력·후보 ID·서열·수치·원본 로그·설정은 번역하거나 변경하지 않습니다. 언어 전환 시 사본 수 입력·체인 체크박스·선택한 모델과 PAE를 유지합니다. (2026-10-15)
 
 
+## v0.4.8-install.6 — 2026-11-13
+
+A searchable candidate table links each VHH sequence to its saved structure, metrics and report. Excel exports include all filtered rows. GPU jobs can run together when measured utilization and reserved memory allow. Researchers see their own submissions by default. One locally activated administrator can review all results and change lab-wide visibility.
+
+후보 표에서 검색·정렬한 서열의 구조와 보고서를 열고 검색 결과 전체를 Excel로 저장할 수 있습니다. GPU의 실제 사용률과 작업별 메모리 예약을 확인해 여유가 있으면 동시 실행합니다. 연구원은 기본적으로 본인 제출분을 보고, 관리자는 전체 결과 조회와 연구실 열람 권한 설정을 담당합니다.
+
 ## v0.4.8-install.5 — 2026-11-13
 
 Search saved runs by candidate ID or VHH sequence, then open the corresponding structure. Completed runs display eligible candidates ranked first in each engine’s saved final selection.

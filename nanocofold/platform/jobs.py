@@ -303,8 +303,11 @@ class JobStore:
             connection.execute("DELETE FROM job_processes WHERE job_id=? AND pid=? AND stamp=?",
                                (identifier, pid, stamp))
 
-    def list(self, *, states=None, kind=None, limit=None, before=None, before_id=None, cleanup=False, catalog_pending=False) -> list[dict]:
+    def list(self, *, states=None, kind=None, limit=None, before=None, before_id=None, cleanup=False, catalog_pending=False, researcher=None) -> list[dict]:
         clauses, values = [], []
+        if researcher:
+            clauses.append("(json_extract(payload,'$.researcher')=? OR id IN (SELECT job_id FROM lab_usage WHERE researcher=?))")
+            values.extend((researcher,researcher))
         if kind is not None:
             clauses.append("json_extract(payload, '$.kind')=?")
             values.append(kind)
@@ -921,25 +924,29 @@ class JobManager:
             return False
         path = gpu_lock_path(job["gpu"])
         path.parent.mkdir(parents=True, exist_ok=True)
-        lock = path.open("a+")
-        try:
-            try:
-                fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                self._gpu_wait(job)
-                return False
-            if job["kind"] == "analysis" and not job.get("mock"):
-                from .gpu_admission import availability
-                gpu = job["gpu"]
-                until, reading = self.gpu_retry.get(gpu, (0, None))
-                if time.monotonic() >= until:
-                    reading = availability(gpu)
-                    if reading["reason"]:
-                        self.gpu_retry[gpu] = (time.monotonic() + 10, reading)
-                    else:
-                        self.gpu_retry.pop(gpu, None)
+        from .gpu_admission import is_shared_analysis, shared_reservation
+        with contextlib.ExitStack() as lifetime:
+            gpu = job["gpu"]
+            reading = None
+            if is_shared_analysis(job):
+                until, previous = self.gpu_retry.get(gpu, (0, None))
+                if time.monotonic() < until:
+                    self._gpu_wait(job, previous)
+                    return False
+                reading, handles = lifetime.enter_context(shared_reservation(gpu, path.parent))
                 if reading["reason"]:
+                    self.gpu_retry[gpu] = (time.monotonic() + 10, reading)
                     self._gpu_wait(job, reading)
+                    return False
+                self.gpu_retry.pop(gpu, None)
+                lock = handles[0]
+            else:
+                lock = lifetime.enter_context(path.open("a+"))
+                handles = [lock]
+                try:
+                    fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    self._gpu_wait(job)
                     return False
             identity = os.fstat(lock.fileno())
             with self.store.connect() as connection:
@@ -949,8 +956,11 @@ class JobManager:
                 if current["state"] != "queued" or len(current.get("history", [])) != len(job.get("history", [])):
                     return False
                 current.update(state="running", phase="starting", started=time.time(), finished=None, updated=time.time(),
-                               waiting_for=None, gpu_reading=None, gpu_lock={"path": str(path), "device": identity.st_dev,
+                               waiting_for=None, gpu_reading=reading, gpu_lock={"path": str(path), "device": identity.st_dev,
                                                          "inode": identity.st_ino, "scope": "user_host"})
+                if reading is not None:
+                    # The primary shared lock uses the NVIDIA UUID, even when the user selected its index.
+                    current["gpu_lock"]["path"] = str(path.parent / ("gpu-" + reading["uuid"] + ".lock"))
                 connection.execute("UPDATE jobs SET state='running',updated=?,payload=? WHERE id=?", (current["updated"], json.dumps(current), job["id"]))
                 job = current
             environment = os.environ.copy()
@@ -964,10 +974,15 @@ class JobManager:
             environment["PYTHONUNBUFFERED"] = "1"
             environment["CUDA_VISIBLE_DEVICES"] = job["gpu"]
             environment["NANOCOFOLD_GPU_LOCK_FD"] = str(lock.fileno())
+            inherited = tuple(handle.fileno() for handle in handles)
+            if len(handles) > 1:
+                environment["NANOCOFOLD_GPU_RESERVATION_FDS"] = ",".join(map(str, inherited[1:]))
+            else:
+                environment.pop("NANOCOFOLD_GPU_RESERVATION_FDS", None)
             with Path(job["log_path"]).open("ab", buffering=0) as log:
                 child = subprocess.Popen([sys.executable, "-u", "-c", bootstrap, package_root, "nanocofold.platform.worker", "--workspace", str(self.workspace), "--job", job["id"]],
                                          cwd=self.workspace, env=environment, stdout=log, stderr=subprocess.STDOUT,
-                                         start_new_session=True, pass_fds=(lock.fileno(),))
+                                         start_new_session=True, pass_fds=inherited)
             self.children[job["id"]] = child
             try:
                 stamp = process_stamp(child.pid)
@@ -982,11 +997,6 @@ class JobManager:
                 self._reap_failed_launch(job["id"], child)
                 raise
             return True
-        finally:
-            # The inherited descriptor shares this flock's open-file description.
-            # LOCK_UN here would release the live worker's lock too. Closing only
-            # the parent's descriptor retains it until the detached worker exits.
-            lock.close()
 
     def _reap_failed_launch(self, identifier: str, child: subprocess.Popen):
         targets = list(self.observed_descendants.get(identifier, []))
@@ -1130,12 +1140,14 @@ class JobManager:
                 progress = {**self._progress(job), **msa_acquisition_status(job["run_dir"])} if job.get("run_dir") else self._progress(job)
                 self.store.update(identifier, expected_states={"running"}, expected_attempt=(job.get("pid"), job.get("process_stamp")), elapsed_seconds=elapsed, descendants=observed, **progress)
         jobs = self.store.list(states=ACTIVE)
+        from .gpu_admission import is_shared_analysis
+        exclusive = {job["gpu"] for job in jobs if job["state"] in {"running","cancelling"} and not is_shared_analysis(job)}
         occupied = {job["gpu"] for job in jobs if job["kind"] in {"analysis", "diagnostics"} and job["state"] in {"running", "cancelling"}}
         cpu_kinds = {job["kind"] for job in jobs if job["kind"] != "analysis" and job["state"] in {"running", "cancelling"}}
         for job in reversed(jobs):
             if job["state"] != "queued":
                 continue
-            if job["kind"] in {"analysis", "diagnostics"} and job["gpu"] in occupied:
+            if job["kind"] in {"analysis", "diagnostics"} and job["gpu"] in (exclusive if is_shared_analysis(job) else occupied):
                 self._gpu_wait(job)
                 continue
             if job["kind"] in {"analysis", "diagnostics"} and "setup" in cpu_kinds:
@@ -1148,6 +1160,8 @@ class JobManager:
                 continue
             if job["kind"] in {"analysis", "diagnostics"}:
                 occupied.add(job["gpu"])
+                if not is_shared_analysis(job):
+                    exclusive.add(job["gpu"])
             else:
                 cpu_kinds.add(job["kind"])
 
