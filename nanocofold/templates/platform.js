@@ -1921,7 +1921,7 @@ async function loadResult(id) {
   if (!offline && state.result?.id !== id) {
     $("candidate-search").value = "";
     $("eligibility").value = "all";
-    $("eligibility-basis").value = "recorded";
+    $("eligibility-basis").value = "quality";
     $("hotspot-filter").checked = false;
   }
   state.result = summary;
