@@ -40,6 +40,8 @@ def planning_defaults(workspace: Path) -> dict:
     cfg = normalized_config(workspace)
     result = {}
     for dotted in (
+        "screen.colabfold.msa_source", "screen.msa_mode", "structure.provider", "structure.chai1.msa_mode",
+        "structure.msa.backend", "complex.msa_source",
         "run.seed", "score.boltz2.seed", "screen.opendde.samples",
         "design.engine", "design.num_designs", "design.mpnn.seqs_per_struct",
         "design.boltzgen.inverse_fold_num_sequences", "design.filters.top_n_to_score",

@@ -16,7 +16,7 @@ For an overview of the four analysis modes, watch the **four-mode overview**. Th
 
 [Share a lab GPU · Accounts, queue and result search by researcher](docs/shared-lab.en.md)
 
-**First installation?** [Download the v0.4.8 source ZIP (installation revision 3)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.3.zip) and follow the public example below. It loads the sequences and a small starter preset.
+**First installation?** [Download the v0.4.8 source ZIP (installation revision 4)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.4.zip) and follow the public example below. It loads the sequences and a small starter preset.
 
 **Already installed?** Follow the [update guide](docs/UPDATE.en.md) to keep your workspace and saved results.
 
@@ -62,8 +62,8 @@ For GPUs with less than 16 GB of memory, ask your server administrator to select
 
 The installer prepares the Python environments, engines, and models automatically. Your server administrator installs the NVIDIA driver beforehand.
 
-1. [Download the v0.4.8 source ZIP (installation revision 3)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.3.zip) and extract the entire archive. If you cloned the repository, use your checkout.
-2. Open **`NanoCoFold_public-0.4.8-install.3`** for the release ZIP or **`NanoCoFold_public`** for a Git clone.
+1. [Download the v0.4.8 source ZIP (installation revision 4)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.4.zip) and extract the entire archive. If you cloned the repository, use your checkout.
+2. Open **`NanoCoFold_public-0.4.8-install.4`** for the release ZIP or **`NanoCoFold_public`** for a Git clone.
 3. Open a terminal inside that folder. You should see `README.md`, `install.sh`, and `start.sh`.
 4. To prepare all four engines for the first complex example, run these **three commands in order, in the same folder**. Wait for each command to finish with **`[설치 완료]`** (installation complete) before starting the next.
 
@@ -359,7 +359,7 @@ The **Full original ZIP · For local archiving** includes server paths and execu
 
 **Get the sequence of an eligible VHH**
 
-Open **Explore results → 03 Compare candidates**, select **Eligibility recorded at execution** and set **Eligibility** to **Eligible**. Click a candidate row. **VHH sequence for the selected candidate** appears above the structure. **Copy sequence** copies only the amino acids. **Save this candidate as FASTA** includes its ID. The shareable ZIP contains all candidates in `sequences.fasta`. The original run stores only the final selection in `05_final/selected_candidates.fasta`.
+Open **Explore results → 03 Compare candidates**, click **Show eligible candidates from this run**. Click a candidate row. **VHH sequence for the selected candidate** appears above the structure. **Copy sequence** copies only the amino acids. **Save this candidate as FASTA** includes its ID. The shareable ZIP contains all candidates in `sequences.fasta`. The original run stores only the final selection in `05_final/selected_candidates.fasta`.
 
 Use section links and browser **Back / Forward** to move through the report while analysis continues. Keep the same candidate selected when comparing languages.
 

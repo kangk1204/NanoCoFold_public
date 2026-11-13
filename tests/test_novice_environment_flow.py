@@ -49,7 +49,15 @@ def test_environment_once_then_review_and_explicit_analysis(supplied_server,lang
         assert posts.count("environment/check")==1
         page.locator("#environment-continue").click()
         page.locator("#load-tutorial").click()
-        page.locator("#novice-next").click();page.locator("#novice-consent").check();page.locator("#novice-next").click()
+        page.locator("#novice-next").click()
+        msa, consent = page.locator("#novice-msa"), page.locator("#novice-consent")
+        expect(consent).to_be_visible()
+        msa.select_option("cache")
+        expect(consent).to_be_hidden()
+        expect(page.locator("#msa-transfer-note")).to_contain_text("캐시" if language=="ko" else "cache")
+        msa.select_option("local_mmseqs2")
+        expect(page.locator("#msa-transfer-note")).to_contain_text("데이터베이스" if language=="ko" else "database")
+        msa.select_option("public_api");consent.check();page.locator("#novice-next").click()
         page.locator("#review-input").click()
         expect(page.locator("#start-job")).to_be_enabled()
         assert posts.count("environment/check")==1 and "jobs" not in posts
@@ -65,6 +73,9 @@ def test_environment_once_then_review_and_explicit_analysis(supplied_server,lang
         assert not page.locator(".job-log-details").evaluate("e=>e.open")
         page.locator('[data-view="input"]').click()
         expect(page.locator(".novice-heading")).to_contain_text("1/4")
+        page.locator('[data-view="jobs"]').click()
+        page.locator("#jobs-next-analysis").click()
+        expect(page.locator(".novice-heading")).to_contain_text("1/4")
         expect(page.locator("#job-name")).to_have_value("another-input")
         expect(page.locator("#novice-consent")).not_to_be_checked()
         page.locator(".novice-purpose-choice").first.click()
@@ -72,6 +83,10 @@ def test_environment_once_then_review_and_explicit_analysis(supplied_server,lang
         page.locator('[data-view="input"]').click()
         expect(page.locator(".novice-heading")).to_contain_text("2/4")
         assert posts.count("jobs") == 1
+        page.locator('[data-view="environment"]').click()
+        page.locator("#shared-server-help summary").click()
+        expect(page.locator("#shared-server-help")).to_contain_text("ssh -N")
+        expect(page.locator("#shared-server-help")).to_contain_text("사용자 PC" if language == "ko" else "At each desk")
         page.locator('[data-view="jobs"]').click()
         # A real linked result is required before the UI offers Open results.
         jobs[0].update(state="complete",result_id="fixture-result")

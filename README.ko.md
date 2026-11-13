@@ -16,7 +16,7 @@
 
 [연구실 GPU 한 대를 여러 자리에서 사용하기 · 계정, GPU 대기, 담당자별 결과 검색](docs/shared-lab.ko.md)
 
-**처음 설치하시나요?** [v0.4.8 소스 ZIP (설치 수정판 3)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.3.zip)을 내려받고 아래 공개 예제를 따라 하세요. 서열과 작은 시작 설정이 자동으로 채워집니다.
+**처음 설치하시나요?** [v0.4.8 소스 ZIP (설치 수정판 4)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.4.zip)을 내려받고 아래 공개 예제를 따라 하세요. 서열과 작은 시작 설정이 자동으로 채워집니다.
 
 **이미 설치했다면** [업데이트 안내](docs/UPDATE.ko.md)에 따라 기존 작업 공간과 결과를 그대로 사용하세요.
 
@@ -62,8 +62,8 @@ GPU 메모리가 16 GB 미만이면 서버 관리자와 사용할 엔진·입력
 
 설치기가 Python 환경, 엔진, 모델을 자동으로 준비합니다. NVIDIA 드라이버는 서버 관리자가 미리 설치합니다.
 
-1. [v0.4.8 소스 ZIP (설치 수정판 3)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.3.zip)을 내려받아 전체를 압축 해제합니다. Git으로 clone했다면 그 저장소 폴더를 사용합니다.
-2. 릴리스 ZIP은 **`NanoCoFold_public-0.4.8-install.3` 폴더**, Git clone은 **`NanoCoFold_public` 폴더**를 엽니다.
+1. [v0.4.8 소스 ZIP (설치 수정판 4)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.4.zip)을 내려받아 전체를 압축 해제합니다. Git으로 clone했다면 그 저장소 폴더를 사용합니다.
+2. 릴리스 ZIP은 **`NanoCoFold_public-0.4.8-install.4` 폴더**, Git clone은 **`NanoCoFold_public` 폴더**를 엽니다.
 3. 이 폴더 안에서 터미널을 엽니다. `README.md`, `install.sh`, `start.sh`가 보이면 맞습니다.
 4. 첫 복합체 예제의 네 엔진을 준비하려면 아래 **세 명령을 순서대로, 같은 폴더에서** 실행합니다. 한 명령이 `[설치 완료]`로 끝난 뒤 다음 명령을 실행하세요.
 
@@ -359,7 +359,7 @@ nanocofold run --mode mature --mock \
 
 **적격 VHH 서열 가져오기**
 
-**결과 탐색 → 03 후보 비교**에서 **적격 판정 → 실행 당시 기록 적격**, **적격 여부 → 적격**을 선택하세요. 후보 행을 누르면 구조 그림 위에 **선택한 후보의 VHH 서열**이 나옵니다. **서열 복사**는 아미노산 문자만 복사하고, **이 후보 FASTA 저장**은 후보 ID와 서열을 함께 저장합니다. 전달 ZIP의 `sequences.fasta`에는 전체 후보가 들어 있습니다. 전체 원본에서 최종 선별 목록만 필요하면 `05_final/selected_candidates.fasta`를 여세요.
+**결과 탐색 → 03 후보 비교**에서 **기록 적격 후보 보기**를 누르세요. 후보 행을 누르면 구조 그림 위에 **선택한 후보의 VHH 서열**이 나옵니다. **서열 복사**는 아미노산 문자만 복사하고, **이 후보 FASTA 저장**은 후보 ID와 서열을 함께 저장합니다. 전달 ZIP의 `sequences.fasta`에는 전체 후보가 들어 있습니다. 전체 원본에서 최종 선별 목록만 필요하면 `05_final/selected_candidates.fasta`를 여세요.
 
 구간 링크와 브라우저 **뒤로 / 앞으로**로 보고서 안을 이동합니다. 분석은 계속 진행됩니다. 언어를 비교할 때는 같은 후보를 선택하세요.
 

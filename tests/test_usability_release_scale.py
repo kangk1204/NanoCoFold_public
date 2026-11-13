@@ -38,8 +38,9 @@ def test_invalid_workspace_config_keeps_environment_screen_accessible(tmp_path):
         assert response.status_code==200 and response.json()['planning_defaults']=={}
 
 
-def test_missing_installation_update_gives_next_action_without_internal_path(tmp_path):
+def test_missing_installation_update_gives_next_action_without_internal_path(tmp_path, monkeypatch):
     import runpy
+    monkeypatch.syspath_prepend(str(ROOT / "scripts"))
     update=runpy.run_path(str(ROOT/'scripts/update_runtime.py'))['update']
     import pytest
     with pytest.raises(ValueError) as caught:

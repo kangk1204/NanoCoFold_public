@@ -134,3 +134,17 @@ test('a late acceptance preserves edits to the next analysis',async()=>{
  c.view=()=>assert.fail('overrode the new form');
  await c.submitReviewedAnalysis();
 });
+
+test('public MSA needs fresh consent even for a workspace default with Boltz-2',()=>{
+ const {c,get}=fixture();
+ get('analysis-preset').value='standard';
+ get('screen-engine').value='boltz2';
+ c.state.planningDefaults.screen.colabfold={msa_source:'public_api'};
+ assert.throws(()=>c.inputSettings(),/동의/);
+ get('novice-consent').checked=true;
+ assert.equal(c.inputSettings().screen.allow_public_msa_server,true);
+ get('novice-consent').checked=false;
+ c.state.planningDefaults.screen.colabfold.msa_source='cache';
+ c.state.planningDefaults.complex={msa_source:'public_api'};
+ assert.doesNotThrow(()=>c.inputSettings());
+});

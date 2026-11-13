@@ -23,7 +23,7 @@ Creating the first account turns on lab sign-in for this workspace. Older result
    ssh -N -o ExitOnForwardFailure=yes -L 18765:127.0.0.1:18765 USER@SERVER
    ```
 2. Leave that terminal open. Open **http://127.0.0.1:18765** and sign in with your NanoCoFold account.
-3. Submit your analysis. Opening **Input & run** after acceptance takes you to step **1/4**. You can reuse the previous sequences. Review the input and give fresh consent if using the public MSA service. Switching tabs before submitting keeps your place.
+3. Open **Environment & setup → Use one server from several desks** to see the connection instructions again. Submit your analysis. Opening **Input & run** after acceptance takes you to step **1/4**. You can reuse the previous sequences. Review the input and give fresh consent if using the public MSA service. Switching tabs before submitting keeps your place.
 4. In **Jobs & logs**, a queued job shows why it is waiting. It starts automatically when the GPU becomes available. You can cancel your own queued job.
 5. In **Results database**, enter an exact account name under **Researcher** and choose **Search**. Leave the field empty for all lab results. Click a name to open the report, or the storage column heading to find the largest runs. Expand **Lab usage history** for submissions, including pending, cancelled and reused jobs. Each researcher has a separate input draft.
 

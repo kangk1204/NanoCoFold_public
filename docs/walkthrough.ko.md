@@ -68,17 +68,17 @@ ZIP을 전부 푼 뒤 아래 네 파일을 사용합니다. FASTA는 단백질 �
 
 ## 1. Ubuntu에 설치
 
-이 실습은 `nvidia-smi`가 동작하는 Ubuntu x86_64의 GPU 한 개를 기준으로 합니다. 네 엔진 예제의 공개 안내 기준은 NVIDIA 드라이버 580 이상, VRAM 16 GB 이상, RAM 32 GB 이상, SSD 여유 150 GiB 이상, 인터넷과 sudo 권한입니다. GPU가 여러 개이거나 처음 실행할 컴퓨터의 사양이 다르면 [한글 설치 안내](https://github.com/kangk1204/NanoCoFold_public/blob/v0.4.8-install.3/README.ko.md#1-준비와-설치)를 참고하세요.
+이 실습은 `nvidia-smi`가 동작하는 Ubuntu x86_64의 GPU 한 개를 기준으로 합니다. 네 엔진 예제의 공개 안내 기준은 NVIDIA 드라이버 580 이상, VRAM 16 GB 이상, RAM 32 GB 이상, SSD 여유 150 GiB 이상, 인터넷과 sudo 권한입니다. GPU가 여러 개이거나 처음 실행할 컴퓨터의 사양이 다르면 [한글 설치 안내](https://github.com/kangk1204/NanoCoFold_public/blob/v0.4.8-install.4/README.ko.md#1-준비와-설치)를 참고하세요.
 
 Git이 설치된 터미널에서 소스를 내려받습니다.
 
 ```bash
-git clone --branch v0.4.8-install.3 https://github.com/kangk1204/NanoCoFold_public.git
+git clone --branch v0.4.8-install.4 https://github.com/kangk1204/NanoCoFold_public.git
 cd NanoCoFold_public
 git describe --tags --exact-match
 ```
 
-마지막 명령에서 `v0.4.8-install.3`가 표시되면 연구실 공유 기능이 포함된 수정판입니다. 영상은 원래 `v0.4.8`로 촬영했습니다. [Git 없이 ZIP으로 설치하기](https://github.com/kangk1204/NanoCoFold_public/blob/v0.4.8-install.3/README.ko.md#1-준비와-설치)
+마지막 명령에서 `v0.4.8-install.4`가 표시되면 연구실 공유 기능이 포함된 수정판입니다. 영상은 원래 `v0.4.8`로 촬영했습니다. [Git 없이 ZIP으로 설치하기](https://github.com/kangk1204/NanoCoFold_public/blob/v0.4.8-install.4/README.ko.md#1-준비와-설치)
 
 **목적에 맞는 설치 명령 한 개를 선택하세요.**
 
@@ -94,7 +94,7 @@ git describe --tags --exact-match
 bash start.sh --port 18765
 ```
 
-**NanoCoFold:** 뒤에 표시된 주소를 Ubuntu 컴퓨터의 브라우저에서 엽니다. 사용 중에는 터미널을 열어 두세요. 이미 사용 중인 포트라면 `bash start.sh --port 0`으로 출력된 새 주소를 엽니다. 다른 컴퓨터에서 원격 서버에 접속하거나 기존 설치본을 업데이트할 때는 해당 절차를 따르세요. [원격 접속 안내](https://github.com/kangk1204/NanoCoFold_public/blob/v0.4.8-install.3/README.ko.md#2-브라우저-열기) · [기존 설치 업데이트](https://github.com/kangk1204/NanoCoFold_public/blob/main/docs/UPDATE.ko.md)
+**NanoCoFold:** 뒤에 표시된 주소를 Ubuntu 컴퓨터의 브라우저에서 엽니다. 사용 중에는 터미널을 열어 두세요. 이미 사용 중인 포트라면 `bash start.sh --port 0`으로 출력된 새 주소를 엽니다. 다른 컴퓨터에서 원격 서버에 접속하거나 기존 설치본을 업데이트할 때는 해당 절차를 따르세요. [원격 접속 안내](https://github.com/kangk1204/NanoCoFold_public/blob/v0.4.8-install.4/README.ko.md#2-브라우저-열기) · [기존 설치 업데이트](https://github.com/kangk1204/NanoCoFold_public/blob/main/docs/UPDATE.ko.md)
 
 ## 2. 네 분석 모드 소개 영상의 예제 따라 하기
 

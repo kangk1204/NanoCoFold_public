@@ -374,6 +374,8 @@
           브라우저를 닫아도 실행됩니다. 중단된 작업은 입력·설정과 완료 단계의
           출처를 확인한 뒤 직접 재개하세요.
         </p>
+        <p class="muted">GPU가 사용 중이면 작업은 대기합니다. 사용 가능해지면 자동으로 시작합니다.</p>
+        <button id="jobs-next-analysis" type="button">다음 분석 준비</button>
         <button id="refresh-jobs" class="secondary">새로고침</button>
         <div class="grid">
           <div id="job-list" class="card"></div>
@@ -507,6 +509,10 @@
             </div>
             <p class="muted" data-vhh-results>결합 부위 후필터는 기본으로 꺼져 있습니다. 켜면 접촉 평가가 있는 후보를 표시하며, 미지정·미평가·번호 대응 실패·기록 불일치 후보는 제외합니다. 이전 결과는 저장된 접촉률로 필터합니다. 품질 적격은 결합 부위 조건을 제외한 참고 판정이며, 원래 선별 목록은 실행 기록에서 확인하세요.</p>
             <label class="check"><input id="candidate-extra-columns" type="checkbox">상세 지표 열 펼치기</label>
+            <div data-vhh-results>
+              <button type="button" class="secondary" id="recorded-eligible">기록 적격 후보 보기</button>
+              <p class="muted">후보 행을 누르면 VHH 서열을 복사하거나 그 후보만 FASTA 파일로 저장할 수 있습니다.</p>
+            </div>
             <p id="candidate-count"></p><p id="candidate-sort-note" class="muted" role="status"></p>
           </div>
           <div class="candidate-workbench">
@@ -726,6 +732,19 @@
           계산은 Linux x86_64 NVIDIA GPU 호스트에서 실행합니다. 연구자 PC는
           브라우저와 SSH 포트포워딩으로 접속합니다.
         </p>
+        <details class="card" id="shared-server-help">
+          <summary>여러 자리에서 같은 서버 사용하기</summary>
+          <h3>서버 관리자</h3>
+          <p>기존 설치 폴더에서 연구원별 계정을 만들고 웹 서버를 한 번 실행하세요.</p>
+          <p>RESEARCHER를 결과 표에 표시할 연구원 이름으로 바꾸세요.</p>
+          <pre dir="ltr">python3 scripts/lab_account.py add RESEARCHER
+bash start.sh --no-browser --port 18765</pre>
+          <h3>사용자 PC</h3>
+          <p>터미널에서 USER@SERVER를 관리자가 알려준 SSH 계정과 주소로 바꾸세요. 터미널을 열어 두고 브라우저로 접속하세요.</p>
+          <pre dir="ltr">ssh -N -o ExitOnForwardFailure=yes -L 18765:127.0.0.1:18765 USER@SERVER</pre>
+          <p><code>http://127.0.0.1:18765</code></p>
+          <p>NanoCoFold 계정으로 로그인한 뒤 결과 DB에서 담당자 이름으로 검색하세요.</p>
+        </details>
         <div class="card environment-check-card">
           <h2>처음 한 번 · 실행 환경 확인</h2>
           <p>선택한 분석에 필요한 GPU·프로그램·모델 파일을 확인합니다. 완료 후 분석 준비하기로 이동하세요.</p>
