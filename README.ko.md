@@ -14,7 +14,9 @@
 
 **내려받기** · [소개 MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-intro-en.mp4) · [설치 MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-install-en.mp4) · [전체 실습 MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-walkthrough-en.mp4) · [자막 및 설치 안내](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8)
 
-**처음 설치하시나요?** [v0.4.8 소스 ZIP (설치 수정판 1)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.1.zip)을 내려받고 아래 공개 예제를 따라 하세요. 서열과 작은 시작 설정이 자동으로 채워집니다.
+[연구실 GPU 한 대를 여러 자리에서 사용하기 · 계정, GPU 대기, 담당자별 결과 검색](docs/shared-lab.ko.md)
+
+**처음 설치하시나요?** [v0.4.8 소스 ZIP (공유 연구실 수정판 2)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.2.zip)을 내려받고 아래 공개 예제를 따라 하세요. 서열과 작은 시작 설정이 자동으로 채워집니다.
 
 **이미 설치했다면** [업데이트 안내](docs/UPDATE.ko.md)에 따라 기존 작업 공간과 결과를 그대로 사용하세요.
 
@@ -60,8 +62,8 @@ GPU 메모리가 16 GB 미만이면 서버 관리자와 사용할 엔진·입력
 
 설치기가 Python 환경, 엔진, 모델을 자동으로 준비합니다. NVIDIA 드라이버는 서버 관리자가 미리 설치합니다.
 
-1. [v0.4.8 소스 ZIP (설치 수정판 1)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.1.zip)을 내려받아 전체를 압축 해제합니다. Git으로 clone했다면 그 저장소 폴더를 사용합니다.
-2. 릴리스 ZIP은 **`NanoCoFold_public-0.4.8-install.1` 폴더**, Git clone은 **`NanoCoFold_public` 폴더**를 엽니다.
+1. [v0.4.8 소스 ZIP (공유 연구실 수정판 2)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.2.zip)을 내려받아 전체를 압축 해제합니다. Git으로 clone했다면 그 저장소 폴더를 사용합니다.
+2. 릴리스 ZIP은 **`NanoCoFold_public-0.4.8-install.2` 폴더**, Git clone은 **`NanoCoFold_public` 폴더**를 엽니다.
 3. 이 폴더 안에서 터미널을 엽니다. `README.md`, `install.sh`, `start.sh`가 보이면 맞습니다.
 4. 첫 복합체 예제의 네 엔진을 준비하려면 아래 **세 명령을 순서대로, 같은 폴더에서** 실행합니다. 한 명령이 `[설치 완료]`로 끝난 뒤 다음 명령을 실행하세요.
 

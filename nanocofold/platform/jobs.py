@@ -228,6 +228,15 @@ class JobStore:
             connection.execute("CREATE INDEX IF NOT EXISTS jobs_identity_active ON jobs(json_extract(payload,'$.execution_identity.digest')) WHERE state IN ('queued','running','cancelling')")
             connection.execute("CREATE INDEX IF NOT EXISTS jobs_run_dir ON jobs(json_extract(payload,'$.run_dir'))")
             connection.execute("CREATE INDEX IF NOT EXISTS jobs_active_run_dir ON jobs(json_extract(payload,'$.run_dir')) WHERE state IN ('queued','running','cancelling')")
+            connection.execute("""CREATE TABLE IF NOT EXISTS lab_usage (
+                request_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, result_id TEXT NOT NULL,
+                researcher TEXT NOT NULL, submitted REAL NOT NULL, request_name TEXT)""")
+            if not any(col[1] == "request_name" for col in connection.execute("PRAGMA table_info(lab_usage)")):
+                connection.execute("ALTER TABLE lab_usage ADD COLUMN request_name TEXT")
+            connection.execute("CREATE INDEX IF NOT EXISTS lab_usage_owner ON lab_usage(researcher,result_id)")
+            connection.execute("CREATE INDEX IF NOT EXISTS lab_usage_time ON lab_usage(submitted DESC,request_id DESC)")
+            connection.execute("CREATE INDEX IF NOT EXISTS lab_usage_owner_time ON lab_usage(researcher,submitted DESC,request_id DESC)")
+            connection.execute("CREATE INDEX IF NOT EXISTS lab_usage_result ON lab_usage(result_id,researcher)")
             connection.execute("CREATE TABLE IF NOT EXISTS submission_links (id TEXT PRIMARY KEY,submission_hash TEXT NOT NULL,job_id TEXT NOT NULL)")
             connection.execute("""CREATE TABLE IF NOT EXISTS job_processes (
                 job_id TEXT NOT NULL, pid INTEGER NOT NULL, stamp TEXT NOT NULL,
@@ -328,6 +337,28 @@ class JobStore:
         from .errors import public_error_data
         return public_error_data(self._complex_read_cache.read(json.loads(payload), record_key=payload, terminal_states=TERMINAL))
 
+    def usage(self, researcher="", before=None, before_id="", limit=25):
+        if not 1 <= limit <= 100 or len(researcher) > 48 or (before is None) != (not before_id):
+            raise ValueError("사용 기록 검색 조건을 확인하세요. / Check the usage history filters.")
+        conditions, values = [], []
+        if researcher:
+            conditions.append("u.researcher=?")
+            values.append(researcher)
+        if before is not None:
+            conditions.append("(u.submitted,u.request_id)<(?,?)")
+            values.extend((before,before_id))
+        where = " WHERE " + " AND ".join(conditions) if conditions else ""
+        with self.connect() as db:
+            rows = db.execute("""SELECT u.request_id,u.researcher,u.submitted,u.job_id,j.state,
+                COALESCE(u.request_name,json_extract(j.payload,'$.name')) AS name,
+                (u.request_id != u.job_id OR u.job_id != u.result_id) AS reused,
+                json_extract(j.payload,'$.result_id') AS result_id
+                FROM lab_usage u JOIN jobs j ON j.id=u.job_id""" + where +
+                " ORDER BY u.submitted DESC,u.request_id DESC LIMIT ?", (*values,limit+1)).fetchall()
+        items = [dict(row) for row in rows[:limit]]
+        cursor = {"before":items[-1]["submitted"], "before_id":items[-1]["request_id"]} if len(rows)>limit else None
+        return {"items": items, "next_cursor": cursor}
+
     def get(self, identifier: str) -> dict:
         with self.connect() as connection:
             row = connection.execute("SELECT payload FROM jobs WHERE id=?", (identifier,)).fetchone()
@@ -422,6 +453,15 @@ class JobStore:
                                (state, job["updated"], json.dumps(job), int(bool(job.get("descendants"))), identifier))
         return job
 
+    @staticmethod
+    def _record_usage(connection, request, accepted):
+        if request.get("researcher") and request["kind"] == "analysis":
+            result_id = accepted.get("result_id") or accepted["id"]
+            connection.execute("""INSERT INTO lab_usage(request_id,job_id,result_id,researcher,submitted,request_name)
+                                  VALUES (?,?,?,?,?,?)""",
+                               (request["id"], accepted["id"], result_id, request["researcher"],
+                                request["created"], request.get("name")))
+
     def insert(self, job: dict):
         with self.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -437,6 +477,7 @@ class JobStore:
                         raise ValueError("원본 결과가 다른 조건으로 재개되었습니다. 결과를 다시 확인한 후 제출하세요.")
                     if job.get("submission_hash"):
                         connection.execute("INSERT INTO submission_links VALUES(?,?,?)", (job["id"], job["submission_hash"], source["id"]))
+                    self._record_usage(connection, job, source)
                     return source
             if job["kind"] == "analysis" and job["state"] in ACTIVE and job.get("reuse_results") and identity.get("reusable"):
                 same = connection.execute("SELECT payload FROM jobs WHERE state IN ('queued','running','cancelling') AND kind='analysis' AND json_extract(payload,'$.execution_identity.digest')=? LIMIT 1",
@@ -447,6 +488,7 @@ class JobStore:
                     source = json.loads(same["payload"])
                     if job.get("submission_hash"):
                         connection.execute("INSERT INTO submission_links VALUES(?,?,?)", (job["id"], job["submission_hash"], source["id"]))
+                    self._record_usage(connection, job, source)
                     return source
             if job["kind"] == "setup":
                 conflict = connection.execute("SELECT 1 FROM jobs WHERE kind='setup' AND state IN ('queued','running','cancelling')").fetchone()
@@ -459,6 +501,7 @@ class JobStore:
                                (job["id"], job["kind"], job["state"], job["created"], job["updated"], json.dumps(job)))
             if job.get("submission_hash"):
                 connection.execute("INSERT INTO submission_links VALUES(?,?,?)", (job["id"], job["submission_hash"], job["id"]))
+            self._record_usage(connection, job, job)
         return job
 
 
@@ -479,6 +522,7 @@ class JobManager:
         self.lockfile = None
         self.catalog_thread = None
         self.catalog_retry_after = {}
+        self.gpu_retry = {}
 
     def start(self):
         if self.thread and self.thread.is_alive():
@@ -603,6 +647,9 @@ class JobManager:
                "pid": None, "process_stamp": None, "pgid": None, "started": None, "finished": None,
                "error": None, "can_resume": False, "history": [], "resume": False,
                "profile": payload.get("profile"), "submission_id": payload.get("submission_id"), "submission_hash": submission_hash}
+        if payload.get("researcher"):
+            from .lab import account_name
+            job["researcher"] = account_name(payload["researcher"])
         if kind == "diagnostics" and payload.get("environment_only") is True:
             job["environment_only"] = True
             from .environment import environment_scope
@@ -858,6 +905,11 @@ class JobManager:
             write_platform_status(terminal)
             return False
 
+    def _gpu_wait(self, job, reading=None):
+        if job.get("phase") != "waiting_for_gpu" or job.get("gpu_reading") != reading:
+            self.store.update(job["id"], expected_states={"queued"}, expected_history_length=len(job.get("history", [])),
+                              phase="waiting_for_gpu", waiting_for="gpu", gpu_reading=reading)
+
     def _spawn_worker(self, job: dict) -> bool:
         import fcntl
         try:
@@ -873,9 +925,21 @@ class JobManager:
             try:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
-                if job.get("phase") != "waiting_for_gpu":
-                    self.store.update(job["id"], expected_states={"queued"}, expected_history_length=len(job.get("history", [])), phase="waiting_for_gpu", waiting_for="gpu")
+                self._gpu_wait(job)
                 return False
+            if job["kind"] == "analysis" and not job.get("mock"):
+                from .gpu_admission import availability
+                gpu = job["gpu"]
+                until, reading = self.gpu_retry.get(gpu, (0, None))
+                if time.monotonic() >= until:
+                    reading = availability(gpu)
+                    if reading["reason"]:
+                        self.gpu_retry[gpu] = (time.monotonic() + 10, reading)
+                    else:
+                        self.gpu_retry.pop(gpu, None)
+                if reading["reason"]:
+                    self._gpu_wait(job, reading)
+                    return False
             identity = os.fstat(lock.fileno())
             with self.store.connect() as connection:
                 connection.execute("BEGIN IMMEDIATE")
@@ -884,7 +948,7 @@ class JobManager:
                 if current["state"] != "queued" or len(current.get("history", [])) != len(job.get("history", [])):
                     return False
                 current.update(state="running", phase="starting", started=time.time(), finished=None, updated=time.time(),
-                               waiting_for=None, gpu_lock={"path": str(path), "device": identity.st_dev,
+                               waiting_for=None, gpu_reading=None, gpu_lock={"path": str(path), "device": identity.st_dev,
                                                          "inode": identity.st_ino, "scope": "user_host"})
                 connection.execute("UPDATE jobs SET state='running',updated=?,payload=? WHERE id=?", (current["updated"], json.dumps(current), job["id"]))
                 job = current
@@ -1071,6 +1135,7 @@ class JobManager:
             if job["state"] != "queued":
                 continue
             if job["kind"] in {"analysis", "diagnostics"} and job["gpu"] in occupied:
+                self._gpu_wait(job)
                 continue
             if job["kind"] in {"analysis", "diagnostics"} and "setup" in cpu_kinds:
                 continue

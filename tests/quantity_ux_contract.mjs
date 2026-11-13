@@ -123,5 +123,14 @@ test('a late accepted job leaves later navigation intact',async()=>{
  c.api=async()=>{c.state.navigationRequest=4;return{id:'saved'};};
  c.view=()=>assert.fail('overrode later navigation');
  c.selectJob=()=>assert.fail('overrode selected job');
+ let resets=0;c.state.nextAnalysis=()=>resets++;
+ await c.submitReviewedAnalysis();
+ assert.equal(resets,1);
+});
+test('a late acceptance preserves edits to the next analysis',async()=>{
+ const {c}=fixture();ready({c},design);
+ c.api=async()=>{c.state.inputRevision++;return{id:'previous'};};
+ c.state.nextAnalysis=()=>assert.fail('cleared a new draft');
+ c.view=()=>assert.fail('overrode the new form');
  await c.submitReviewedAnalysis();
 });

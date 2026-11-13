@@ -10,11 +10,11 @@ In **Jobs & logs**, wait until no jobs are queued or running. If you choose to c
 
 Choose the method you originally used. Save any local source changes first.
 
-**Git installation.** In the original source folder, run the commands below. The last command should print `v0.4.8-install.1`. This revision updates ESM downloads, analysis submission feedback and English warnings. The GPU lesson used the original `v0.4.8` tag and the `screen` installation profile.
+**Git installation.** In the original source folder, run the commands below. The last command should print `v0.4.8-install.2`. This revision adds step-one navigation for new jobs, GPU admission checks and [lab accounts with researcher search](shared-lab.en.md). The GPU lesson used the original `v0.4.8` tag and the `screen` installation profile.
 
 ```bash
-git fetch origin tag v0.4.8-install.1
-git switch --detach v0.4.8-install.1
+git fetch origin tag v0.4.8-install.2
+git switch --detach v0.4.8-install.2
 git describe --tags --exact-match
 ```
 
@@ -27,12 +27,12 @@ git rev-parse HEAD
 
 Keep the tag or commit with your run notes. If Git reports an error, resolve it before continuing.
 
-**ZIP installation.** Download the [v0.4.8 source ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.1.zip) and extract it into a **separate folder**. If your collaborator shared a specific revision, use **Code → Download ZIP** on that revision’s source page.
+**ZIP installation.** Download the [v0.4.8 source ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.2.zip) and extract it into a **separate folder**. If your collaborator shared a specific revision, use **Code → Download ZIP** on that revision’s source page.
 
 In the **original installation folder**, run the commands below. Replace the first path with the newly extracted folder containing `update.sh`. Keep the source link with your run notes.
 
 ```bash
-update_source="/path/to/extracted/NanoCoFold_public-0.4.8-install.1"
+update_source="/path/to/extracted/NanoCoFold_public-0.4.8-install.2"
 rsync -a --exclude='.git/' --exclude='.nanocofold/' "$update_source/" ./
 ```
 

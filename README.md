@@ -14,7 +14,9 @@ For an overview of the four analysis modes, watch the **four-mode overview**. Th
 
 **Downloads** · [Introduction MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-intro-en.mp4) · [Installation MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-install-en.mp4) · [Walkthrough MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-walkthrough-en.mp4) · [Captions and installation guides](https://github.com/kangk1204/NanoCoFold_public/releases/tag/v0.4.8)
 
-**First installation?** [Download the v0.4.8 source ZIP (installer revision 1)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.1.zip) and follow the public example below. It loads the sequences and a small starter preset.
+[Share a lab GPU · Accounts, queue and result search by researcher](docs/shared-lab.en.md)
+
+**First installation?** [Download the v0.4.8 source ZIP (shared lab revision 2)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.2.zip) and follow the public example below. It loads the sequences and a small starter preset.
 
 **Already installed?** Follow the [update guide](docs/UPDATE.en.md) to keep your workspace and saved results.
 
@@ -60,8 +62,8 @@ For GPUs with less than 16 GB of memory, ask your server administrator to select
 
 The installer prepares the Python environments, engines, and models automatically. Your server administrator installs the NVIDIA driver beforehand.
 
-1. [Download the v0.4.8 source ZIP (installer revision 1)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.1.zip) and extract the entire archive. If you cloned the repository, use your checkout.
-2. Open **`NanoCoFold_public-0.4.8-install.1`** for the release ZIP or **`NanoCoFold_public`** for a Git clone.
+1. [Download the v0.4.8 source ZIP (shared lab revision 2)](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.2.zip) and extract the entire archive. If you cloned the repository, use your checkout.
+2. Open **`NanoCoFold_public-0.4.8-install.2`** for the release ZIP or **`NanoCoFold_public`** for a Git clone.
 3. Open a terminal inside that folder. You should see `README.md`, `install.sh`, and `start.sh`.
 4. To prepare all four engines for the first complex example, run these **three commands in order, in the same folder**. Wait for each command to finish with **`[설치 완료]`** (installation complete) before starting the next.
 

@@ -74,7 +74,10 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
     manager = JobManager(workspace)
     from .batches import BatchManager
     batches = BatchManager(inputs, manager)
+    from .lab import LabAccounts
+    lab = LabAccounts(workspace)
     token = secrets.token_urlsafe(32)
+    login_gate = asyncio.Lock()
     with manager.store.connect() as db:
         db.execute("CREATE TABLE IF NOT EXISTS result_paths (id TEXT PRIMARY KEY,path TEXT NOT NULL UNIQUE)")
 
@@ -101,7 +104,7 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         def secure(response):
             response.headers["Cache-Control"] = "no-store"
             response.headers["X-Content-Type-Options"] = "nosniff"
-            response.headers["Referrer-Policy"] = "no-referrer"
+            response.headers.setdefault("Referrer-Policy", "no-referrer")
             response.headers["Content-Security-Policy"] = ("default-src 'self'; script-src 'self' 'unsafe-inline'; "
                 "style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; worker-src 'self' blob:; "
                 "frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
@@ -113,9 +116,23 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         origin = request.headers.get("origin")
         if parsed.hostname not in {"localhost", "127.0.0.1", "::1"} or (origin is not None and origin != "http://" + host):
             return secure(JSONResponse({"error": "loopback 주소 또는 SSH 포트포워딩으로 접속하세요."}, status_code=403))
+        request.state.researcher = None
+        request.state.api_token = token
+        if lab.enabled and not lab.db.is_file():
+            return secure(JSONResponse({"error":"연구실 계정 DB를 복원하세요. / Restore the lab account database."}, status_code=503))
+        if lab.enabled and request.url.path not in {"/lab/login", "/favicon.ico"}:
+            session_key = request.cookies.get(lab.cookie, "")
+            researcher = await asyncio.to_thread(lab.user, session_key)
+            if researcher is None:
+                if request.url.path == "/" and request.method == "GET":
+                    return secure(login_page())
+                return secure(JSONResponse({"error":"연구실 로그인이 필요합니다. / Please sign in to the lab."}, status_code=401))
+            request.state.researcher = researcher
+            import hmac
+            request.state.api_token = hmac.digest(token.encode(), session_key.encode(), "sha256").hex()
         if request.url.path.startswith("/api/"):
             supplied = request.headers.get("x-platform-token", request.headers.get("x-wizard-token", ""))
-            if not secrets.compare_digest(supplied.encode(), token.encode()):
+            if not secrets.compare_digest(supplied.encode(), request.state.api_token.encode()):
                 return secure(JSONResponse({"error": "세션이 만료되었습니다. 화면을 다시 여세요."}, status_code=403))
         if request.method in {"POST", "PUT", "PATCH"}:
             try:
@@ -127,7 +144,7 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         response = await call_next(request)
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
         response.headers["Content-Security-Policy"] = ("default-src 'self'; script-src 'self' 'unsafe-inline'; "
             "style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; worker-src 'self' blob:; "
             "frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
@@ -225,9 +242,15 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         from .cloud_agent import Agent
         return Agent.capabilities()
 
+    def draft_path(request):
+        if request.state.researcher:
+            key = hashlib.sha256(request.state.researcher.encode()).hexdigest()
+            return manager.store.root / ("draft-" + key + ".json")
+        return workspace / "platform_draft_v1.json"
+
     @app.get("/api/draft")
-    async def draft_read():
-        path = workspace / "platform_draft_v1.json"
+    async def draft_read(request: Request):
+        path = draft_path(request)
         if path.is_symlink():
             raise ValueError("초안 파일은 심볼릭 링크일 수 없습니다.")
         return json.loads(path.read_text()) if path.exists() else {"version": 1, "fields": {}}
@@ -238,7 +261,7 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         value = await body(request)
         if value.get("version") != 1 or not isinstance(value.get("fields"), dict):
             raise ValueError("초안 버전 또는 입력 형식 오류")
-        path = workspace / "platform_draft_v1.json"
+        path = draft_path(request)
         if path.is_symlink():
             raise ValueError("초안 파일은 심볼릭 링크일 수 없습니다.")
         await asyncio.to_thread(write_json, path, value)
@@ -250,7 +273,7 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
 
     @app.post("/api/batches/review")
     async def batch_review(request: Request):
-        return await asyncio.to_thread(batches.review, await body(request))
+        return await asyncio.to_thread(batches.review, await body(request), researcher=request.state.researcher)
 
     @app.get("/api/batches/{identifier}")
     def batch_get(identifier: str):
@@ -258,12 +281,12 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
 
     @app.post("/api/batches/{identifier}/submit")
     async def batch_submit(identifier: str, request: Request):
-        return await asyncio.to_thread(batches.submit, identifier, await body(request))
+        return await asyncio.to_thread(batches.submit, identifier, await body(request), researcher=request.state.researcher)
 
     @app.post("/api/batches/{identifier}/cancel")
     async def batch_cancel(identifier: str, request: Request):
         payload = await body(request) if await request.body() else {}
-        return await asyncio.to_thread(batches.cancel, identifier, expected_cancel=payload.get("expected_cancel"))
+        return await asyncio.to_thread(batches.cancel, identifier, expected_cancel=payload.get("expected_cancel"), researcher=request.state.researcher)
 
     def effective(payload):
         cfg = payload.get("config", {})
@@ -335,11 +358,58 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         path = result_directory(path)
         return ResultReader(path)
 
+    def login_page(failed=False):
+        template = Path(__file__).resolve().parents[1] / "templates/lab_login.html"
+        error = '<p role="alert">계정과 비밀번호를 확인하세요. / Check your account and password.</p>' if failed else ""
+        return HTMLResponse(template.read_text().replace("<!--LOGIN_ERROR-->", error), status_code=401 if failed else 200,
+                            headers={"Referrer-Policy": "same-origin"})
+
+    @app.get("/favicon.ico")
+    def favicon():
+        return Response(status_code=204)
+
+    @app.post("/lab/login")
+    async def login(request: Request):
+        from urllib.parse import parse_qs
+        from fastapi.responses import RedirectResponse
+        if not lab.enabled or request.headers.get("origin") != "http://" + request.headers["host"]:
+            raise HTTPException(403)
+        if request.headers.get("content-type","").split(";")[0] != "application/x-www-form-urlencoded":
+            raise HTTPException(415)
+        data = bytearray()
+        async for chunk in request.stream():
+            if len(data) + len(chunk) > 4096:
+                raise HTTPException(413)
+            data.extend(chunk)
+        try:
+            form = parse_qs(data.decode(), max_num_fields=2)
+        except (UnicodeError, ValueError):
+            raise HTTPException(400)
+        if login_gate.locked():
+            return JSONResponse({"error":"잠시 뒤 로그인하세요. / Try signing in again shortly."}, status_code=429)
+        async with login_gate:
+            key = await asyncio.to_thread(lab.login, form.get("name",[""])[0], form.get("password",[""])[0])
+            if not key:
+                await asyncio.sleep(.35)
+                return login_page(True)
+        response = RedirectResponse("/", status_code=303)
+        response.set_cookie(lab.cookie, key, max_age=12*3600, httponly=True, samesite="strict")
+        return response
+
+    @app.post("/api/lab/logout")
+    def logout(request: Request):
+        if not request.state.researcher:
+            raise HTTPException(400)
+        lab.logout(request.cookies[lab.cookie])
+        response = JSONResponse({"ok":True})
+        response.delete_cookie(lab.cookie, httponly=True, samesite="strict")
+        return response
+
     @app.get("/")
-    def index():
+    def index(request: Request):
         template = Path(__file__).resolve().parents[1] / "templates/platform.html"
         if template.exists():
-            document = template.read_text().replace("__TOKEN__", token).replace("__WORKSPACE__", str(workspace))
+            document = template.read_text().replace("__TOKEN__", request.state.api_token).replace("__WORKSPACE__", str(workspace))
         else:
             document = "<h1>NanoCoFold</h1><p>플랫폼 화면을 준비 중입니다.</p>"
         return HTMLResponse(document)
@@ -363,7 +433,7 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         return Response(content, media_type=mimetypes.guess_type(filename)[0])
 
     @app.get("/api/session")
-    def session():
+    def session(request: Request):
         from .. import __version__
         try:
             defaults = planning_defaults(workspace)
@@ -371,7 +441,7 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
             # A broken installation remains inspectable through Environment.
             # Do not invent numeric defaults before input review succeeds.
             defaults = {}
-        return {"workspace": str(workspace), "version": __version__, "modes": ["complex", "design", "screen", "mature"], "poll_interval_ms": 2000,
+        return {"workspace": str(workspace), "researcher": request.state.researcher, "version": __version__, "modes": ["complex", "design", "screen", "mature"], "poll_interval_ms": 2000,
                 "presets": {"researcher_exploration": exploration_config(), "standard": {}},
                 "planning_defaults": defaults}
 
@@ -442,7 +512,11 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
 
     @app.post("/api/jobs")
     async def job_create(request: Request):
-        return native(await asyncio.to_thread(manager.create, effective(await body(request))))
+        payload = effective(await body(request))
+        payload.pop("researcher", None)
+        if request.state.researcher:
+            payload["researcher"] = request.state.researcher
+        return native(await asyncio.to_thread(manager.create, payload))
 
     @app.get("/api/jobs/{identifier}")
     def job_get(identifier: str):
@@ -454,24 +528,34 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         result = manager.logs(identifier, offset)
         return {**result, "text": public_log(result["text"])}
 
+    def require_owner(request, record):
+        if request.state.researcher and record.get("researcher") != request.state.researcher:
+            raise HTTPException(403, "담당자만 변경할 수 있습니다. / Only the submitting researcher can change this record.")
+
     @app.post("/api/jobs/{identifier}/cancel")
     async def job_cancel(identifier: str, request: Request):
+        if request.state.researcher:
+            require_owner(request, await asyncio.to_thread(manager.store.get, identifier))
         payload = await body(request) if await request.body() else {}
         return await asyncio.to_thread(manager.cancel, identifier, expected_cancel=payload.get("expected_cancel"))
 
     @app.post("/api/jobs/{identifier}/resume")
     async def job_resume(identifier: str, request: Request):
+        if request.state.researcher:
+            require_owner(request, await asyncio.to_thread(manager.store.get, identifier))
         payload = await body(request)
         return await asyncio.to_thread(manager.resume, identifier, payload.get("additional_budget_seconds"))
 
     @app.post("/api/diagnostics")
     async def diagnostics(request: Request):
         payload = effective(await body(request))
+        payload["researcher"] = request.state.researcher
         return native(await asyncio.to_thread(manager.create, payload, kind="diagnostics"))
 
     @app.post("/api/environment/check")
     async def environment_check(request: Request):
         payload = effective(await body(request))
+        payload["researcher"] = request.state.researcher
         payload["environment_only"] = True
         return native(await asyncio.to_thread(manager.create, payload, kind="diagnostics"))
 
@@ -490,6 +574,8 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
 
     @app.post("/api/setup")
     async def setup(request: Request):
+        if request.state.researcher:
+            raise HTTPException(403, "공유 설치는 서버 터미널에서 관리하세요. / Manage shared installations from the server terminal.")
         return await asyncio.to_thread(manager.create, await body(request), kind="setup")
 
     @app.get("/api/results")
@@ -512,11 +598,17 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
                                         sort=sort, descending=descending)
         return native({"results": page["items"], "next_cursor": page["next_cursor"]})
 
+    @app.get("/api/lab/usage")
+    def lab_usage(request: Request, researcher: str="", before: float | None=None, before_id: str="", limit: int=25):
+        if not request.state.researcher:
+            raise HTTPException(403)
+        return manager.store.usage(researcher, before, before_id, limit)
+
     @app.get("/api/result-catalog")
-    def result_catalog(limit: int = 25, cursor: str | None = None, search: str = "", mode: str = "", retention: str = "",
+    def result_catalog(researcher: str = "", limit: int = 25, cursor: str | None = None, search: str = "", mode: str = "", retention: str = "",
                        sort: str = "created", descending: bool = True):
         return native(manager.catalog.list(limit=limit, cursor=cursor, search=search, mode=mode, retention=retention,
-                                           sort=sort, descending=descending))
+                                           sort=sort, descending=descending, researcher=researcher))
 
     @app.post("/api/results/open")
     async def results_open(request: Request):
@@ -552,6 +644,12 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         payload = await body(request)
         def apply_retention():
             root = reader(identifier).root
+            if request.state.researcher:
+                try:
+                    owner_job = manager.store.get(root.name)
+                except KeyError:
+                    raise HTTPException(403, "이전 결과는 서버 관리자가 정리할 수 있습니다. / Ask the server operator to compact older results.")
+                require_owner(request, owner_job)
             original_id = root.name  # Compact the canonical run, never an alias.
             identity = None
             with contextlib.suppress(KeyError):

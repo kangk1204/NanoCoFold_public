@@ -762,7 +762,7 @@ class ResultCatalog:
             raise KeyError("실행 identity가 없습니다.")
         return _valid_identity(json.loads(row["payload"]))
 
-    def list(self, limit=25, cursor=None, search="", mode="", retention="", sort="created", descending=True):
+    def list(self, limit=25, cursor=None, search="", mode="", retention="", sort="created", descending=True, researcher=""):
         if type(limit) is not int or not 1 <= limit <= MAX_PAGE_SIZE:
             raise ValueError("페이지 크기는 1–100이어야 합니다.")
         if any(not isinstance(value, str) for value in (search, mode, retention)) or len(search) > 200:
@@ -774,7 +774,11 @@ class ResultCatalog:
         if not isinstance(sort, str) or sort not in SORT_FIELDS or type(descending) is not bool:
             raise ValueError("결과 정렬 조건 형식이 잘못되었습니다.")
         filters = {"search": search, "mode": mode, "retention": retention, "sort": sort, "descending": descending}
+        if not isinstance(researcher, str) or len(researcher) > 48:
+            raise ValueError("담당자 검색은 48자 이내로 입력하세요.")
         clauses, parameters = [], []
+        if researcher:
+            filters["researcher"] = researcher
         position = None
         for key, value in (("mode", mode), ("retention", retention)):
             if value:
@@ -807,6 +811,15 @@ class ResultCatalog:
                                       f" ORDER BY {prefix}{sort} {direction},id {direction} LIMIT ?",
                                       (*parameters, *values, count)).fetchall()
         with self.connect() as connection:
+            usage = False
+            if (self.root / "jobs.sqlite3").is_file():
+                connection.execute("ATTACH DATABASE ? AS activity", (str(self.root / "jobs.sqlite3"),))
+                usage = bool(connection.execute("SELECT 1 FROM activity.sqlite_master WHERE type='table' AND name='lab_usage'").fetchone())
+            if researcher:
+                if not usage:
+                    return {"items": [], "next_cursor": None}
+                clauses.append("id IN (SELECT result_id FROM activity.lab_usage WHERE researcher=?)")
+                parameters.append(researcher)
             if sort in _NONNULL_SORT_FIELDS:
                 if position and position["value"] is None:
                     raise ValueError("페이지 커서 정렬 값이 잘못되었습니다.")
@@ -827,12 +840,18 @@ class ResultCatalog:
                         additions.append(f"id{comparison}?")
                         values.append(position["id"])
                     rows.extend(query(connection, additions, values, limit + 1 - len(rows)))
+            items = {row["id"]: json.loads(row["payload"]) for row in rows[:limit]}
+            if usage and items:
+                placeholders = ",".join("?" for _ in items)
+                for row in connection.execute("SELECT DISTINCT result_id,researcher FROM activity.lab_usage "
+                                              f"WHERE result_id IN ({placeholders}) ORDER BY result_id,researcher", tuple(items)):
+                    items[row[0]].setdefault("researchers", []).append(row[1])
         next_cursor = None
         if len(rows) > limit:
             position = rows[limit - 1]
             next_cursor = base64.urlsafe_b64encode(_json({"id": position["id"], "value": position["sort_value"],
                                                         "filters": filters}).encode()).decode()
-        return {"items": [json.loads(row["payload"]) for row in rows[:limit]], "next_cursor": next_cursor}
+        return {"items": list(items.values()), "next_cursor": next_cursor}
 
     def _source_active(self, root):
         """Bounded, read-only lookup; never initialize/import the job manager."""

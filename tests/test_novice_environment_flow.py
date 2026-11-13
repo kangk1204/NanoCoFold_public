@@ -63,6 +63,16 @@ def test_environment_once_then_review_and_explicit_analysis(supplied_server,lang
         assert posts.count("jobs")==1
         expect(page.locator("#job-detail")).to_contain_text("분석 중" if language=="ko" else "progress")
         assert not page.locator(".job-log-details").evaluate("e=>e.open")
+        page.locator('[data-view="input"]').click()
+        expect(page.locator(".novice-heading")).to_contain_text("1/4")
+        expect(page.locator("#job-name")).to_have_value("another-input")
+        expect(page.locator("#novice-consent")).not_to_be_checked()
+        page.locator(".novice-purpose-choice").first.click()
+        page.locator('[data-view="jobs"]').click()
+        page.locator('[data-view="input"]').click()
+        expect(page.locator(".novice-heading")).to_contain_text("2/4")
+        assert posts.count("jobs") == 1
+        page.locator('[data-view="jobs"]').click()
         # A real linked result is required before the UI offers Open results.
         jobs[0].update(state="complete",result_id="fixture-result")
         page.locator("#refresh-jobs").click()

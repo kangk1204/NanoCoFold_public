@@ -68,17 +68,17 @@ The target and WT are the deposited human EGFR domain III construct and nanobody
 
 ## 1. Install and start NanoCoFold
 
-Use an Ubuntu x86_64 computer where `nvidia-smi` shows the NVIDIA GPU. The published requirements for the four-engine example include glibc 2.34 or later, driver 580 or later, 16 GB of GPU memory, 32 GB of system memory, 150 GiB of free SSD space, internet access and `sudo`. The commands below assume one GPU. For a multi-GPU computer, follow the GPU selection instructions in the README. [Installation requirements](https://github.com/kangk1204/NanoCoFold_public/blob/v0.4.8-install.1/README.md#1-prepare-and-install)
+Use an Ubuntu x86_64 computer where `nvidia-smi` shows the NVIDIA GPU. The published requirements for the four-engine example include glibc 2.34 or later, driver 580 or later, 16 GB of GPU memory, 32 GB of system memory, 150 GiB of free SSD space, internet access and `sudo`. The commands below assume one GPU. For a multi-GPU computer, follow the GPU selection instructions in the README. [Installation requirements](https://github.com/kangk1204/NanoCoFold_public/blob/v0.4.8-install.2/README.md#1-prepare-and-install)
 
 For a first installation, open a terminal and run these commands.
 
 ```bash
-git clone --branch v0.4.8-install.1 https://github.com/kangk1204/NanoCoFold_public.git
+git clone --branch v0.4.8-install.2 https://github.com/kangk1204/NanoCoFold_public.git
 cd NanoCoFold_public
 git describe --tags --exact-match
 ```
 
-The last command prints `v0.4.8-install.1`. The film shows the original `v0.4.8` tag. If you already have an installation, follow the update instructions in its original folder. [Update an existing installation](https://github.com/kangk1204/NanoCoFold_public/blob/main/docs/UPDATE.en.md) · [Install from a ZIP without Git](https://github.com/kangk1204/NanoCoFold_public/blob/v0.4.8-install.1/README.md#1-prepare-and-install)
+The last command prints `v0.4.8-install.2`. The film shows the original `v0.4.8` tag. If you already have an installation, follow the update instructions in its original folder. [Update an existing installation](https://github.com/kangk1204/NanoCoFold_public/blob/main/docs/UPDATE.en.md) · [Install from a ZIP without Git](https://github.com/kangk1204/NanoCoFold_public/blob/v0.4.8-install.2/README.md#1-prepare-and-install)
 
 Choose **one** installation command.
 
@@ -94,7 +94,7 @@ Wait for **[설치 완료]** (installation complete). Start the web server from 
 bash start.sh --port 18765
 ```
 
-Open the address printed after **NanoCoFold:** in a browser on the Ubuntu computer. Keep the terminal open. If the port is already in use, run `bash start.sh --port 0` and open the new address it prints. To work from another computer, follow the two-terminal instructions. [Connect to a remote server](https://github.com/kangk1204/NanoCoFold_public/blob/v0.4.8-install.1/README.md#2-open-the-browser)
+Open the address printed after **NanoCoFold:** in a browser on the Ubuntu computer. Keep the terminal open. If the port is already in use, run `bash start.sh --port 0` and open the new address it prints. To work from another computer, follow the two-terminal instructions. [Connect to a remote server](https://github.com/kangk1204/NanoCoFold_public/blob/v0.4.8-install.2/README.md#2-open-the-browser)
 
 ## 2. Try the four-mode overview examples
 
@@ -118,7 +118,7 @@ Select a model to inspect its structure, interface scores and PAE together. PAE 
 
 1. Analyses completed in the web app are registered in **Results database**. To add an earlier run, place its original run folder inside your workspace. Go to **Explore results**, enter that folder's path and click **Open existing result**.
 2. In **Results database**, enter part of the analysis name or ID and click **Search**. Use the name you entered. The older overview searches for `public-complex`, a result in its filming workspace. Click the **analysis name in the first column** to open the report in a new tab. If an identical run reuses an earlier result, open it from **Jobs & logs → Open results**.
-3. In **Explore results**, select **Shareable report ZIP** and export it. Send the whole ZIP. The recipient extracts the entire archive, then opens **`report.html`** in a browser. They can explore the structures and scores offline without installing NanoCoFold. [Read and share results](https://github.com/kangk1204/NanoCoFold_public/blob/v0.4.8-install.1/README.md#5-read-and-share-results)
+3. In **Explore results**, select **Shareable report ZIP** and export it. Send the whole ZIP. The recipient extracts the entire archive, then opens **`report.html`** in a browser. They can explore the structures and scores offline without installing NanoCoFold. [Read and share results](https://github.com/kangk1204/NanoCoFold_public/blob/v0.4.8-install.2/README.md#5-read-and-share-results)
 
 ## What was recorded
 

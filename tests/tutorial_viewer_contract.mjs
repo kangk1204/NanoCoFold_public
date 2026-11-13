@@ -44,7 +44,7 @@ function node() {
 }
 function tutorialFixture() {
   const elements=new Map(),fields=['name','screen','mature','complex'].map(key=>Object.assign(node(),{dataset:{batchField:key}}));
-  const calls=[],context={$:id=>{if(!elements.has(id))elements.set(id,node());return elements.get(id);},
+  const calls=[],context={state:{},$:id=>{if(!elements.has(id))elements.set(id,node());return elements.get(id);},
     document:{querySelectorAll:()=>fields,hidden:false},setInterval:()=>1,clearInterval(){},
     notice:(...args)=>calls.push({notice:args}),view:name=>calls.push({view:name}),
     el:()=>node(),action(){},setTimeout,console};

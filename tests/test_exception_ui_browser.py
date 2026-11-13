@@ -43,6 +43,28 @@ def exception_app(tmp_path):
         assert app.state.jobs.store.list() == []
 
 
+@pytest.mark.skipif(os.environ.get('NANOCOFOLD_BROWSER_TEST') != '1', reason='Real Chromium lab sign-in')
+def test_shared_lab_browser_form_uses_same_origin(request, tmp_path, monkeypatch):
+    from nanocofold.platform.lab import LabAccounts
+    from playwright.sync_api import expect, sync_playwright
+
+    monkeypatch.setattr(Path, 'home', classmethod(lambda cls: tmp_path / 'local-home'))
+    LabAccounts(tmp_path).set_password('Lab-One', 'test-browser-password')
+    _, url = request.getfixturevalue('exception_app')
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = browser.new_page()
+        page.goto(url)
+        page.locator('input[name=name]').fill('Lab-One')
+        page.locator('input[name=password]').fill('test-browser-password')
+        page.get_by_role('button').click()
+        expect(page.locator('#lab-user')).to_have_text('Lab-One')
+        page.locator('#lab-logout').click()
+        expect(page.locator('input[name=password]')).to_be_visible()
+        assert (page.request.get(url + 'api/jobs')).status == 401
+        browser.close()
+
+
 def browser_fixture(page, jobs, posts):
     def route(request):
         path = request.request.url.split('/api/jobs', 1)[1]

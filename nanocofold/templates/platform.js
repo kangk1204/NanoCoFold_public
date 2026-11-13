@@ -226,7 +226,7 @@ function renderReportReasons(rows, mode) {
   else table($("exclusion-summary"), reasons.map(r => ({이유:r.label, 기록수:r.count, 기록코드:r.code})), ["이유", "기록수", "기록코드"]);
 }
 const phaseLabel = (phase) => ({
-  comparison_msa_search: "서열 정렬(MSA) 준비", starting: "시작 준비",
+  waiting_for_gpu: "GPU 대기", comparison_msa_search: "서열 정렬(MSA) 준비", starting: "시작 준비",
   input: "입력 준비", target: "표적 준비", prediction: "복합체 예측",
   design: "새 후보 생성", screen: "후보 비교", mature: "변이 후보 준비",
   tier2: "최종 복합체 평가", engine_comparison: "엔진별 비교",
@@ -411,6 +411,8 @@ async function refreshCatalog() {
   const params = new URLSearchParams({limit: "25", search: $("catalog-search").value,
     retention: $("catalog-retention").value, sort: state.catalogSort, descending: String(state.catalogDescending)});
   if (state.catalogCursor) params.set("cursor", state.catalogCursor);
+  const owner = $("catalog-owner")?.value.trim();
+  if (owner) params.set("researcher", owner);
   const page = await api("/api/result-catalog?" + params);
   if (request !== state.catalogRequest) return;
   state.catalogNext = page.next_cursor;
@@ -419,7 +421,14 @@ async function refreshCatalog() {
   const columns = [["name", "분석"], ["mode", "모드"], ["created", "실행일"], ["candidate_count", "서열"],
     ["model_count", "저장 구조 관측"], ["eligible_model_count", "기준 통과"], ["status", "계산 상태"],
     ["retention", "보관"], ["elapsed_seconds", "계산 시간"], ["storage_bytes", "서버 용량"]];
+  if (state.researcher || page.items.some(item => item.researchers?.length)) {
+    $("catalog-owner-label").hidden = false;
+    columns.splice(1, 0, ["researchers", "담당자"]);
+  }
   for (const [key, label] of columns) {
+    if (key === "researchers") {
+      const th = el("th", I18N.term(label)); th.scope="col"; headings.append(th); continue;
+    }
     const th = el("th"), button = el("button", I18N.concat([I18N.term(label), state.catalogSort === key ? state.catalogDescending ? " ↓" : " ↑" : ""]), "sort-header");
     th.scope = "col"; th.setAttribute("aria-sort", state.catalogSort === key ? state.catalogDescending ? "descending" : "ascending" : "none");
     button.onclick = () => {state.catalogDescending = state.catalogSort === key ? !state.catalogDescending : true; state.catalogSort = key; state.catalogCursor = null; refreshCatalog().catch(e => notice(e.message, true));};
@@ -430,7 +439,8 @@ async function refreshCatalog() {
     const tr = el("tr");
     for (const [key] of columns) {
       const td = el("td");
-      if (key === "name") {
+      if (key === "researchers") td.textContent = (item.researchers || []).join(", ") || "—";
+      else if (key === "name") {
         const link = el("a", (item.name || item.id) + (item.mock ? " · MOCK" : ""));
         link.href = "/?result=" + encodeURIComponent(item.id); link.target = "_blank"; link.rel = "noopener";
         td.append(link);
@@ -441,6 +451,26 @@ async function refreshCatalog() {
   }
   table.append(head, body); $("catalog-table").replaceChildren(table, el("p", I18N.term("저장 구조 관측은 1차 평가 구조도 포함합니다. 최종 평가 모델 수는 결과 보고서에서 따로 확인하세요."), "muted"));
   I18N.text(status, I18N.format("{0}개 표시 · 용량은 색인 시점의 측정값", [page.items.length]));
+}
+let usageRequest = 0, usageCursor = null, usageOwner = "";
+async function refreshLabUsage(nextPage = false) {
+  if (!state.researcher || !$("lab-usage").open) return;
+  const request = ++usageRequest, owner = $("catalog-owner").value.trim();
+  const params = new URLSearchParams({researcher:owner});
+  if (nextPage && usageCursor && usageOwner === owner) {
+    params.set("before", usageCursor.before); params.set("before_id", usageCursor.before_id);
+  }
+  const page = await api("/api/lab/usage?" + params);
+  if (request !== usageRequest) return;
+  usageCursor = page.next_cursor; usageOwner = owner;
+  $("lab-usage-next").hidden = !usageCursor;
+  const rows = page.items.map(item => ({
+    "담당자":item.researcher, "분석":item.name, "제출 시각":new Date(item.submitted * 1000).toLocaleString(),
+    "계산 상태": item.reused
+      ? I18N.concat([I18N.term(states[item.state] || item.state), " · ", I18N.term("재사용")])
+      : I18N.term(states[item.state] || item.state)
+  }));
+  table($("lab-usage-rows"), rows, ["담당자", "분석", "제출 시각", "계산 상태"]);
 }
 async function previewRetention() {
   if (!state.result || offline) return;
@@ -477,6 +507,11 @@ function merge(base, extra) {
         : val;
   return out;
 }
+function usesPublicMsa(cfg) {
+  return cfg.complex?.msa_source === "public_api" || cfg.screen?.colabfold?.msa_source === "public_api" ||
+    cfg.screen?.msa_mode === "msa" || cfg.structure?.msa?.backend === "public_api" ||
+    (cfg.structure?.provider === "chai1" && cfg.structure?.chai1?.msa_mode === "msa");
+}
 function inputSettings(forPlan = false) {
   let advanced;
   try {
@@ -503,9 +538,11 @@ function inputSettings(forPlan = false) {
     // CPU demonstrations create synthetic data and never acquire an MSA.
     cfg = merge(cfg, {structure:{msa:{backend:"empty"}},screen:{msa_mode:"single",allow_public_msa_server:false,colabfold:{msa_source:"cache"}}});
   }
-  const publicMsa = !simulated && (cfg.complex?.msa_source === "public_api" || cfg.screen?.colabfold?.msa_source === "public_api" || cfg.screen?.msa_mode === "msa" || cfg.structure?.msa?.backend === "public_api");
+  const publicMsa = !simulated && usesPublicMsa(cfg);
   if (!forPlan && publicMsa && !$("novice-consent").checked) throw Error("가져온 설정도 현재 입력에 대한 외부 MSA 전송 동의를 다시 확인해야 합니다.");
-  if (publicMsa) cfg.screen = merge(cfg.screen, {allow_public_msa_server: true});
+  if (publicMsa) cfg.screen = merge(cfg.screen || {}, {allow_public_msa_server: $("novice-consent").checked});
+  if (cfg.structure?.provider === "chai1" && cfg.structure?.chai1?.msa_mode === "msa")
+    cfg.structure = merge(cfg.structure, {allow_public_msa_server: !simulated && $("novice-consent").checked});
   const enteredSeed = $("seed").value;
   if ($("seed").validity?.badInput) throw Error("Seed는 0–4294967295 정수를 입력하세요.");
   const effectiveSeed = enteredSeed === "" ? cfg.run?.seed ?? state.planningDefaults?.run?.seed ?? 42 : Number(enteredSeed);
@@ -803,8 +840,13 @@ async function submitReviewedAnalysis() {
       if (!stillCurrent()) return;
       if (!job) throw error;
     }
-    if (!stillCurrent()) return;
-    view('jobs'); state.submissionNoticeJob=job.id;
+    if (!stillCurrent()) {
+      // A confirmed submission can finish after the researcher switches tabs.
+      // Retire that form without changing the page or touching newer edits.
+      if (state.input === input && revision === state.inputRevision) state.nextAnalysis?.();
+      return;
+    }
+    view('jobs'); state.nextAnalysis?.(); state.submissionNoticeJob=job.id;
     await selectJob(job.id);
     notice('작업을 등록했습니다. 브라우저를 닫아도 실행됩니다.');
   } finally { state.analysisSubmitting=false; renderInputReadiness(); }
@@ -1473,6 +1515,17 @@ async function refreshJobs() {
           I18N.format("{0} · {1} · {2} · {3}초", [(states[job.state] ? I18N.term(states[job.state]) : job.state), I18N.term(jobPhaseCaption(job)), I18N.term(jobProgressCaption(job)), Math.round(job.elapsed_seconds || 0)]),
         ),
       );
+      if (job.researcher) $("job-detail").append(el("p", I18N.concat([I18N.term("담당자"), " · ", job.researcher])));
+      if (job.state === "queued" && job.phase === "waiting_for_gpu") {
+        const reading = job.gpu_reading || {};
+        const label = {process:"다른 계산이 GPU를 사용하고 있습니다.", memory:"GPU 여유 메모리를 기다립니다.",
+          utilization:"GPU 사용률이 낮아지기를 기다립니다.", telemetry:"GPU 상태를 읽을 수 없어 다시 확인합니다."};
+        const note = el("p", I18N.term(label[reading.reason] || "앞선 작업이 GPU를 사용하고 있습니다."));
+        if (Number.isFinite(reading.free_mib))
+          note.append(el("span", I18N.format(" 여유 {0}/{1} MiB · 사용률 {2}%", [reading.free_mib, reading.total_mib, reading.utilization])));
+        note.append(el("span", I18N.term(" 자리가 나면 자동으로 시작합니다.")));
+        $("job-detail").append(note);
+      }
       if (job.reused_result_id) $("job-detail").append(el("p", I18N.format("저장 결과 연결 · 새 계산 0초 · 원본 {0}{1}. 원래 계산 시간 {2}", [job.reused_result_id, job.reuse_kind === "view_only" ? I18N.term(" · 핵심 보관본") : "", job.source_elapsed_seconds === null ? I18N.term("미기록") : I18N.concat([Math.round(job.source_elapsed_seconds || 0), I18N.term("초")])])));
       if (etaText(job)) $("job-detail").append(el("p", I18N.term(etaText(job)), "eta-note"));
       if (job.mock)
@@ -1490,6 +1543,7 @@ async function refreshJobs() {
         ["검증 후 재개", "resume"],
       ]) {
         if (
+          (state.researcher && job.researcher !== state.researcher) ||
           (operation === "cancel" &&
             !["queued", "running"].includes(job.state)) ||
           (operation === "resume" && !job.can_resume)
@@ -3197,7 +3251,7 @@ function renderBatch(batch) {
     check.type="checkbox";I18N.attribute(check, "aria-label", I18N.concat([row.id, I18N.term(" 실행 선택")]));check.checked=batchSelected.includes(row.id);check.disabled=batchBusy||!!batch.selected||!!row.error;
     check.onchange=()=>{batchSelected=check.checked?[...batchSelected,row.id]:batchSelected.filter(id=>id!==row.id);renderBatch(activeBatch);};choice.append(check);
     if(row.error||row.submission_error){line.style.background="#fff1ef";I18N.attribute(line, "aria-label", I18N.concat([row.id, I18N.term(" 오류")]));}
-    for(const action of row.job?.can_resume?["resume"]:row.job&&['queued','running'].includes(row.job.state)?["cancel"]:[]){
+    for(const action of state.researcher && row.job?.researcher !== state.researcher ? [] : row.job?.can_resume?["resume"]:row.job&&['queued','running'].includes(row.job.state)?["cancel"]:[]){
       const button=el("button",action==="resume" ? I18N.term("항목 재개") : I18N.term("항목 취소"));
       button.disabled=batchBusy;
       // Capture identifiers before opening the dialog; polling may replace activeBatch.
@@ -3219,10 +3273,10 @@ function renderBatch(batch) {
   }
   $("batch-rows").replaceChildren(target);
   const retryMissing = Boolean(batch.selected) && batch.rows.some(row => batch.selected.includes(row.id) && !row.job_id && !row.job && !row.error);
-  $("batch-submit").disabled=batchBusy||(Boolean(batch.selected)&&!retryMissing)||!batchSelected.length||batch.rows.some(r=>batchSelected.includes(r.id)&&r.error);
+  $("batch-submit").disabled=(!!state.researcher && batch.researcher!==state.researcher)||batchBusy||(Boolean(batch.selected)&&!retryMissing)||!batchSelected.length||batch.rows.some(r=>batchSelected.includes(r.id)&&r.error);
   I18N.text($("batch-submit"), batch.selected ? I18N.term(retryMissing ? "미제출 항목 다시 제출" : "이미 제출된 분석") : I18N.concat([I18N.concat([I18N.term("3. 선택한 "), batchSelected.length]), I18N.term("개 분석 실행")]));
   I18N.text($("batch-next-step"), batch.selected && retryMissing ? I18N.term("일부 항목을 제출하지 못했습니다. 항목별 오류를 확인한 뒤 미제출 항목 다시 제출을 누르세요. 이미 등록된 작업은 같은 작업으로 연결됩니다.") : batch.selected ? I18N.term("4단계 · 계산을 제출했습니다. 완료된 행의 결과 열기를 누르세요. 실행 중 상태는 자동으로 갱신됩니다.") : batch.rows.some(row => row.error) ? I18N.term("2단계 · 검토 오류가 있습니다. 아래 항목별 오류를 확인하고 입력을 수정한 뒤 다시 검토하세요.") : I18N.term("3단계 · 입력 검토 완료, 계산 미제출입니다. 실행할 항목을 확인하고 선택한 분석 실행을 누르세요."));
-  $("batch-cancel").disabled=batchBusy||!batch.rows.some(r=>r.job&&['queued','running'].includes(r.job.state));
+  $("batch-cancel").disabled=(!!state.researcher && (batch.researcher!==state.researcher || batch.rows.some(row=>row.job && ["queued","running","cancelling"].includes(row.job.state) && row.job.researcher!==state.researcher)))||batchBusy||!batch.rows.some(r=>r.job&&['queued','running'].includes(r.job.state));
 }
 async function refreshBatchHistory(){const data=await api("/api/batches");const node=$("batch-history");node.replaceChildren();for(const batch of data.batches){const button=el("button",I18N.concat([batch.name+" · "+batch.rows.length, I18N.term("개")]));button.onclick=async()=>renderBatch(await api("/api/batches/"+batch.id,undefined,{timeoutMs:15000}));node.append(button);}if(!data.batches.length)I18N.text(node, I18N.term("아직 검토한 배치가 없습니다."));}
 async function batchAction(message, fn) {
@@ -3365,7 +3419,10 @@ async function boot() {
   initBatch();
   for (const button of document.querySelectorAll("[data-view]"))
     button.onclick = () => view(button.dataset.view);
-  action("catalog-refresh", () => {state.catalogCursor = null; return refreshCatalog();});
+  for (const id of ["catalog-search", "catalog-owner"]) {
+    $(id)?.addEventListener("keydown", event => { if (event.key === "Enter") $("catalog-refresh").click(); });
+  }
+  action("catalog-refresh", () => {state.catalogCursor = null; return Promise.all([refreshCatalog(),refreshLabUsage()]);});
   action("catalog-first", () => {state.catalogCursor = null; return refreshCatalog();});
   action("catalog-next", () => {state.catalogCursor = state.catalogNext; return refreshCatalog();});
   action("retention-preview", previewRetention);
@@ -3623,6 +3680,17 @@ async function boot() {
   $("view-input").addEventListener("input", invalidateInput);
   $("seed").addEventListener("input", () => { $("seed").dataset.quantitySource = "direct"; });
   const session = await api("/api/session");
+  state.researcher = session.researcher;
+  if (session.researcher) {
+    $("lab-account").hidden = false;
+    I18N.text(document.querySelector(".platform-brand span"), I18N.term("단백질 복합체·나노바디 분석 · 연구실 공유 작업 공간"));
+    $("lab-user").textContent = session.researcher;
+    $("catalog-owner-label").hidden = false;
+    $("lab-usage").hidden = false;
+    $("lab-usage").ontoggle = () => refreshLabUsage().catch(e => notice(e.message, true));
+    action("lab-usage-next", () => refreshLabUsage(true));
+    action("lab-logout", async () => { await api("/api/lab/logout", {}); window.location.reload(); });
+  }
   state.presets = session.presets || {};
   state.planningDefaults = session.planning_defaults || {};
   I18N.text($("platform-version"), session.version ? "v" + session.version : "");
@@ -3800,11 +3868,18 @@ async function initNoviceFlow() {
     complex.hidden=!isComplex||$("input-kind").value!=="fasta";$("fasta-fields").hidden=isComplex||$("input-kind").value!=="fasta";
     controls.hidden=$("analysis-preset").value!=="small-four-v1";$("mock").disabled=isComplex;demoControls.hidden=isComplex;
     const simulated=$("mock").checked&&!isComplex;ml.hidden=simulated;msa.hidden=simulated;cl.hidden=simulated;demoMsaNote.hidden=!simulated;
-    try {const cfg = inputSettings(true); renderAnalysisScale(cfg, $("mode").value); I18N.text(plan, I18N.term(noviceModelPlan(cfg,$("mode").value,$("mode").value==="screen"?noviceFasta($("vhh-fasta").value).length:0)));}catch(e){clearScalePreview();I18N.text(plan, I18N.term(e.message));}
+    try {const cfg = inputSettings(true); cl.hidden = simulated || !usesPublicMsa(cfg); renderAnalysisScale(cfg, $("mode").value); I18N.text(plan, I18N.term(noviceModelPlan(cfg,$("mode").value,$("mode").value==="screen"?noviceFasta($("vhh-fasta").value).length:0)));}catch(e){clearScalePreview();I18N.text(plan, I18N.term(e.message));}
     I18N.text($("review-input"), I18N.term("입력 확인"));I18N.text($("start-job"), I18N.term("분석 실행"));
     refreshSequenceHelp();
   }
   function jump(n){step=n;I18N.text(reason, "");render();heading.focus();}
+  state.nextAnalysis = () => {
+    consent.checked = false;
+    invalidateInput();
+    step = 0;
+    I18N.text(reason, "");
+    render();
+  };
   state.showInputReview = () => jump(state.input ? 3 : 1);
   function validateInputs(){
     if($("mode").value==="complex") return noviceComplexProteins();

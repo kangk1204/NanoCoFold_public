@@ -29,6 +29,7 @@
         <strong>NanoCoFold</strong><span>단백질 복합체·나노바디 분석 · 개인 작업 공간</span>
       </div>
       <div class="language-switch"><label for="language-select">Language</label> <select id="language-select" aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div>
+      <div id="lab-account" hidden><span id="lab-user" data-i18n-ignore></span> <button id="lab-logout" type="button">로그아웃</button></div>
       <nav aria-label="주 메뉴">
         <button data-view="input" aria-current="page">입력·실행</button
         ><button data-view="batch">배치 분석</button
@@ -389,6 +390,7 @@
         <p>핵심 정보로 검색하고 제목을 눌러 정렬하세요. 결과는 새 탭에서 열립니다.</p>
         <div class="inline">
           <input id="catalog-search" placeholder="분석 이름 또는 결과 ID" aria-label="결과 검색" />
+          <label id="catalog-owner-label" hidden>담당자 <input id="catalog-owner" maxlength="48" placeholder="계정 이름" /></label>
           <select id="catalog-retention" aria-label="보관 상태">
             <option value="">모든 보관 상태</option><option value="full">원본 보관</option><option value="minimal">핵심 보관</option>
           </select>
@@ -398,6 +400,11 @@
         <div class="table-scroll" tabindex="0" role="region" aria-label="결과 표 스크롤" id="catalog-table"></div>
         <p class="muted">작은 화면에서는 표를 좌우로 이동해 나머지 항목을 볼 수 있습니다.</p>
         <div class="inline"><button id="catalog-first" class="secondary">처음</button><button id="catalog-next" class="secondary" disabled>다음 25개</button></div>
+        <details id="lab-usage" hidden><summary>연구실 사용 기록</summary>
+          <p>담당자 필터로 제출 기록을 조회합니다. 대기·취소·재사용 작업도 포함합니다.</p>
+          <div id="lab-usage-rows" class="table-scroll"></div>
+          <button type="button" class="secondary" id="lab-usage-next" hidden>다음 25개</button>
+        </details>
         <p class="muted">용량은 해당 서버 결과 폴더의 측정값입니다. 공용 캐시·모델 가중치·클라우드 사본 용량은 포함하지 않습니다.</p>
       </section>
       <section id="view-results" hidden>

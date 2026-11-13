@@ -167,7 +167,7 @@ class BatchManager:
                 files[field] = sha256(path)
         return files
 
-    def review(self, payload):
+    def review(self, payload, *, researcher=None):
         rows = expand_manifest(payload)  # Validate all sequences before writing any inputs.
         configs = [(normalized_config(self.inputs.workspace, row["input"].get("config"))
                     if payload["mode"] == "complex" else normalized_fasta_config(self.inputs.workspace, row["input"]))
@@ -177,6 +177,8 @@ class BatchManager:
         if requires_api and payload.get("api_consent") is not True:
             raise ValueError("표적·후보 서열의 외부 MSA 전송에 동의하면 배치 설정에 api_consent: true를 추가한 뒤 다시 검토하세요.")
         batch = {"id": uuid.uuid4().hex, "name": str(payload.get("name", "배치 분석"))[:120], "mode": payload["mode"], "created": time.time(), "manifest_sha256": digest(payload), "rows": [], "predictions_executed": False}
+        if researcher:
+            batch["researcher"] = researcher
         folder = self.jobs.store.root / "batches" / batch["id"]
         folder.mkdir(parents=True)
         source = folder / "manifest.json"
@@ -214,7 +216,7 @@ class BatchManager:
         self._save(batch)
         return batch
 
-    def submit(self, identifier, payload):
+    def submit(self, identifier, payload, *, researcher=None):
         path = self.jobs.store.root / f"batch-{identifier}.lock"
         # Validate ID before using it as a filename.
         self.get(identifier)
@@ -237,6 +239,8 @@ class BatchManager:
                 raise ValueError("제출한 배치의 시간 한도는 변경할 수 없습니다.")
             if batch.get("selected") is not None and batch["selected"] != selected:
                 raise ValueError("제출을 시작한 배치의 선택 항목은 변경할 수 없습니다.")
+            if (researcher or batch.get("researcher")) and batch.get("researcher") != researcher:
+                raise ValueError("이 배치는 처음 제출한 담당자가 다시 제출해야 합니다.")
             prepared = {}
             for row in batch["rows"]:
                 row.pop("job", None)
@@ -249,6 +253,8 @@ class BatchManager:
                     raise ValueError(f"{row['id']}: 검토 이후 입력 또는 설정이 바뀌었습니다.")
                 prepared[row["id"]] = value
             batch["selected"] = selected
+            if researcher:
+                batch["researcher"] = researcher
             batch["budget_seconds"] = budget
             self._save(batch)
             try:
@@ -258,7 +264,7 @@ class BatchManager:
                     # Each job and its submission link commit atomically. get()
                     # recovers those links if this batch checkpoint is lost.
                     try:
-                        job = self.jobs.create({"config": prepared[row["id"]]["config"], "mode": batch["mode"], "name": f"{batch['name']} · {row['id']}"[:120], "submission_id": f"batch-{identifier}-{number:03d}", "budget_seconds": budget})
+                        job = self.jobs.create({**({"researcher": researcher} if researcher else {}), "config": prepared[row["id"]]["config"], "mode": batch["mode"], "name": f"{batch['name']} · {row['id']}"[:120], "submission_id": f"batch-{identifier}-{number:03d}", "budget_seconds": budget})
                         row.update(job_id=job["id"], submission_error=None)
                     except (ValueError, OSError) as exc:
                         row["submission_error"] = public_error(exc)
@@ -268,13 +274,17 @@ class BatchManager:
                 self._save(batch)
             return self.get(identifier)
 
-    def cancel(self, identifier, *, expected_cancel=None):
+    def cancel(self, identifier, *, expected_cancel=None, researcher=None):
         self.get(identifier)
         # A cancellation waits for any in-flight registration to finish, so it
         # cannot miss the later rows of a concurrently submitted batch.
         with (self.jobs.store.root / f"batch-{identifier}.lock").open("a+") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
             batch = self.get(identifier)
+            if researcher and (batch.get("researcher") != researcher or any(
+                    row.get("job") and row["job"]["state"] not in TERMINAL and row["job"].get("researcher") != researcher
+                    for row in batch["rows"])):
+                raise ValueError("다른 담당자의 작업은 취소할 수 없습니다.")
             if expected_cancel is not None:
                 current_ids = {row["job_id"] for row in batch["rows"]
                                if row.get("job") and row["job"]["state"] not in TERMINAL}
