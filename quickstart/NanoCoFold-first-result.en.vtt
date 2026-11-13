@@ -1,0 +1,385 @@
+WEBVTT
+
+00:00:00.250 --> 00:00:01.978
+Want to see a result first?
+
+00:00:01.978 --> 00:00:06.778
+In the Korean or English readme, click the link for the
+example report zip.
+
+00:00:06.778 --> 00:00:11.130
+You can open it on your own computer, without installing
+NanoCoFold.
+
+00:00:11.950 --> 00:00:14.317
+Extract the whole zip into one folder.
+
+00:00:14.317 --> 00:00:17.119
+You can use Extract All in your file manager.
+
+00:00:17.119 --> 00:00:18.178
+Here I use unzip.
+
+00:00:18.178 --> 00:00:19.673
+Keep the files together.
+
+00:00:22.250 --> 00:00:23.940
+Open report dot H T M L.
+
+00:00:23.940 --> 00:00:27.109
+When the table appears, choose your language.
+
+00:00:27.109 --> 00:00:31.687
+This saved example has eleven evaluated models and zero
+selected.
+
+00:00:31.687 --> 00:00:33.941
+The calculation still completed.
+
+00:00:34.750 --> 00:00:36.815
+The summary switches to English.
+
+00:00:36.815 --> 00:00:41.009
+Select a candidate to rotate its structure and see the
+error map.
+
+00:00:41.009 --> 00:00:42.945
+Everything here opens offline.
+
+00:00:42.945 --> 00:00:45.139
+Next we will run a new experiment.
+
+00:00:57.950 --> 00:01:02.813
+To run your own prediction, use an Ubuntu computer with an
+NVIDIA driver.
+
+00:01:02.813 --> 00:01:07.077
+In the terminal, check that nvidia-smi lists your graphics
+card.
+
+00:01:07.077 --> 00:01:09.342
+This one is an R T X thirty sixty.
+
+00:01:10.150 --> 00:01:13.763
+Download the tagged public release, then enter its folder.
+
+00:01:13.763 --> 00:01:17.750
+For a new installation, use the current tag shown in the
+readme.
+
+00:01:17.750 --> 00:01:21.051
+For an existing installation, follow its update link.
+
+00:01:23.200 --> 00:01:24.541
+First check the host.
+
+00:01:24.541 --> 00:01:30.034
+For this particular Boltz two exercise, the screen profile
+provides the tools we need.
+
+00:01:30.034 --> 00:01:33.483
+System packages were already installed on this server.
+
+00:01:34.300 --> 00:01:37.423
+Leave the terminal open while the models download.
+
+00:01:37.423 --> 00:01:40.795
+This is a real installation; the video skips the wait.
+
+00:01:40.795 --> 00:01:43.793
+Continue when the installer says it is finished.
+
+00:01:44.600 --> 00:01:47.055
+Run start dot sh in the same folder.
+
+00:01:47.055 --> 00:01:51.828
+Open the address printed after NanoCoFold and leave the
+terminal open.
+
+00:01:51.828 --> 00:01:56.397
+For a shared server, use the connection instructions in the
+readme.
+
+00:01:57.200 --> 00:02:00.435
+Download the practice input zip from the readme.
+
+00:02:00.435 --> 00:02:01.177
+Extract it.
+
+00:02:01.177 --> 00:02:05.625
+Use these files as they are: one structure, two protein
+sequences,
+
+00:02:05.625 --> 00:02:08.187
+and a table of binding-site positions.
+
+00:02:09.000 --> 00:02:11.215
+Open the Fasta files as text.
+
+00:02:11.215 --> 00:02:13.278
+The first line is the name.
+
+00:02:13.278 --> 00:02:15.952
+The letters below are the sequence.
+
+00:02:15.952 --> 00:02:17.632
+E G F R is the target.
+
+00:02:17.632 --> 00:02:21.757
+Seven D twelve is the original nanobody, or wild type.
+
+00:02:22.600 --> 00:02:25.731
+Choose the option to improve an existing nanobody.
+
+00:02:25.731 --> 00:02:28.861
+Give the analysis a name you will recognize later.
+
+00:02:28.861 --> 00:02:32.243
+We will use this same name to find it in the database.
+
+00:02:40.400 --> 00:02:44.031
+Choose structure input and load four K R L dot cif.
+
+00:02:44.031 --> 00:02:46.950
+Choose the E G F R chain, B in this menu.
+
+00:02:46.950 --> 00:02:49.015
+Clear the partner chain here.
+
+00:02:49.015 --> 00:02:51.792
+We will supply the nanobody separately.
+
+00:03:01.150 --> 00:03:03.883
+Paste the supplied E G F R target Fasta.
+
+00:03:03.883 --> 00:03:07.093
+Choose the option to enter reference positions.
+
+00:03:07.093 --> 00:03:09.621
+Enter nineteen, forty, and forty-two.
+
+00:03:09.621 --> 00:03:12.969
+These are positions in the input target sequence.
+
+00:03:20.950 --> 00:03:26.153
+The numbering table links those positions to the original
+structure: three twenty-five,
+
+00:03:26.153 --> 00:03:28.486
+three forty-six, and three forty-eight.
+
+00:03:28.486 --> 00:03:31.297
+Enter only the binding sites you want to study.
+
+00:03:41.650 --> 00:03:45.497
+Confirm the coordinates and paste the original nanobody
+Fasta.
+
+00:03:45.497 --> 00:03:47.110
+Move to the settings step.
+
+00:03:47.110 --> 00:03:51.143
+We are changing the nanobody; the target sequence stays the
+same.
+
+00:03:57.100 --> 00:04:01.836
+Choose random substitutions in C D R three, a loop of the
+nanobody.
+
+00:04:01.836 --> 00:04:03.321
+Request ten variants.
+
+00:04:03.321 --> 00:04:07.916
+This is ten different sequences, not ten changes in one
+sequence.
+
+00:04:09.800 --> 00:04:13.561
+Set both the minimum and maximum substitutions to two.
+
+00:04:13.561 --> 00:04:16.695
+Include the unchanged wild type as a control.
+
+00:04:16.695 --> 00:04:20.595
+With one engine and one seed, the plan is eleven models.
+
+00:04:33.300 --> 00:04:35.506
+Review the settings before running.
+
+00:04:35.506 --> 00:04:38.909
+Check the ten variants, the wild type, and the engine.
+
+00:04:38.909 --> 00:04:44.265
+This exercise uses Boltz two without sending sequences to a
+public alignment service.
+
+00:04:45.100 --> 00:04:46.446
+Check the environment.
+
+00:04:46.446 --> 00:04:48.587
+This step checks your installation.
+
+00:04:48.587 --> 00:04:52.503
+When it says Environment ready, return to the reviewed
+settings.
+
+00:04:52.503 --> 00:04:54.828
+The real analysis has not started yet.
+
+00:05:05.450 --> 00:05:07.130
+Press Run analysis once.
+
+00:05:07.130 --> 00:05:10.001
+Find your analysis name in Jobs and logs.
+
+00:05:10.001 --> 00:05:13.992
+Queued means wait; running means the server is computing.
+
+00:05:13.992 --> 00:05:16.863
+Do not submit the same job a second time.
+
+00:05:32.450 --> 00:05:37.240
+If you already installed NanoCoFold, use the update guide
+for Git or zip.
+
+00:05:37.240 --> 00:05:38.946
+Finish running jobs first.
+
+00:05:38.946 --> 00:05:43.736
+In this recording we updated the same installation after
+the calculation,
+
+00:05:43.736 --> 00:05:47.149
+then reopened its saved result without rerunning it.
+
+00:05:47.950 --> 00:05:50.443
+The video skips computation time here.
+
+00:05:50.443 --> 00:05:53.921
+Once this same job says Complete, click Open results.
+
+00:05:53.921 --> 00:05:57.465
+You do not need to find a folder or import the result.
+
+00:05:58.300 --> 00:06:01.022
+Read the saved selection decision first.
+
+00:06:01.022 --> 00:06:04.289
+A completed run can have no eligible candidates.
+
+00:06:04.289 --> 00:06:07.011
+The exclusion section gives the reasons.
+
+00:06:07.011 --> 00:06:10.823
+A good interface score alone is not evidence of binding.
+
+00:06:11.650 --> 00:06:16.618
+In Compare candidates, select wild type first, then a
+mutant from the same engine.
+
+00:06:16.618 --> 00:06:21.101
+The candidate name above the viewer tells you which model
+you are reading.
+
+00:06:21.950 --> 00:06:24.377
+Here is the actual V H H sequence.
+
+00:06:24.377 --> 00:06:28.019
+Use Copy sequence, or Save this candidate as Fasta.
+
+00:06:28.019 --> 00:06:32.659
+That file contains exactly the sequence of the selected
+nanobody.
+
+00:06:33.500 --> 00:06:39.956
+For this one candidate, read i p S A E and i p T M as
+measures of confidence in the interface
+
+00:06:39.956 --> 00:06:42.525
+and in the arrangement of the chains.
+
+00:06:42.525 --> 00:06:45.788
+These are predictions, not measured affinities.
+
+00:06:46.600 --> 00:06:50.195
+Select the nanobody, then drag the structure to rotate it.
+
+00:06:50.195 --> 00:06:55.091
+Both the sequence and this three dimensional view belong to
+the same candidate.
+
+00:06:55.900 --> 00:07:00.306
+The error map shows how uncertain the relative residue
+positions are.
+
+00:07:00.306 --> 00:07:02.797
+Lower values mean less predicted error.
+
+00:07:02.797 --> 00:07:05.607
+Use the axes and the units on the color bar.
+
+00:07:06.450 --> 00:07:10.878
+To share this run, choose the interactive report zip and
+export it.
+
+00:07:10.878 --> 00:07:15.373
+The recipient can extract the whole zip and open report dot
+H T M L,
+
+00:07:15.373 --> 00:07:17.223
+just as we did at the start.
+
+00:07:18.050 --> 00:07:22.670
+Later, open Results database, then Candidate sequences and
+structures.
+
+00:07:22.670 --> 00:07:27.027
+Type the analysis name you used at the beginning and click
+Search.
+
+00:07:27.027 --> 00:07:29.997
+You can also search by candidate or sequence.
+
+00:07:30.800 --> 00:07:34.386
+Click the i p S A E column heading to sort the table.
+
+00:07:34.386 --> 00:07:36.821
+Sorting changes the order on screen.
+
+00:07:36.821 --> 00:07:40.272
+It does not change the original selection decision.
+
+00:07:41.100 --> 00:07:46.635
+Save the search results to Excel, or click a candidate name
+to reopen its sequence and
+
+00:07:46.635 --> 00:07:47.279
+structure.
+
+00:07:47.279 --> 00:07:52.364
+The database, the Fasta file, and the report all point back
+to the same result.
+
+00:07:53.200 --> 00:07:59.078
+If your lab shares one installation, the administrator sets
+up an account for each researcher.
+
+00:07:59.078 --> 00:08:03.330
+Here an administrator changes their own password and signs
+in again.
+
+00:08:03.330 --> 00:08:05.019
+The passwords stay private.
+
+00:08:05.850 --> 00:08:08.768
+By default researchers see their own results.
+
+00:08:08.768 --> 00:08:13.696
+The administrator can review all results and change the lab
+sharing setting.
+
+00:08:13.696 --> 00:08:19.079
+A researcher uses the account and connection details
+supplied by the lab; no second
+
+00:08:19.079 --> 00:08:20.570
+installation is needed.
