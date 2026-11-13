@@ -532,6 +532,16 @@
                 </div>
               </div>
               <p id="candidate-status" class="muted" role="status"></p>
+              <section id="vhh-sequence-panel" class="vhh-sequence-panel" aria-labelledby="vhh-sequence-heading" hidden>
+                <h3 id="vhh-sequence-heading">선택한 후보의 VHH 서열</h3>
+                <label for="vhh-sequence-value" id="vhh-sequence-record"></label>
+                <textarea id="vhh-sequence-value" class="sequence" rows="3" readonly spellcheck="false" dir="ltr"></textarea>
+                <div class="inline">
+                  <button type="button" class="secondary" id="copy-vhh-sequence">서열 복사</button>
+                  <button type="button" class="secondary" id="save-vhh-sequence">이 후보 FASTA 저장</button>
+                </div>
+                <p id="vhh-sequence-feedback" class="muted" role="status"></p>
+              </section>
               <p id="structure-source" class="muted" role="status"></p>
               <p id="structure-data-note" class="next-step" role="status"></p>
               <div class="inline viewer-chain-controls" role="group" aria-label="체인 선택과 구조 확대">

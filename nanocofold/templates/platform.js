@@ -1943,8 +1943,39 @@ function filters() {
       : {}),
   };
 }
+function showVhhSequence(row) {
+  const panel = $("vhh-sequence-panel");
+  if (!panel) return;
+  const value = $("vhh-sequence-value"), copy = $("copy-vhh-sequence"), save = $("save-vhh-sequence");
+  const status = $("vhh-sequence-feedback");
+  const sequence = typeof row?.sequence === "string" ? row.sequence.trim() : "";
+  value.value = sequence;
+  panel.hidden = !row || state.result?.mode === "complex";
+  copy.disabled = save.disabled = !sequence;
+  I18N.text(status, "");
+  if (panel.hidden) return;
+  const id = row.candidate_id;
+  I18N.text($("vhh-sequence-record"), sequence ? I18N.format("{0} · 아미노산 {1}개", [id, sequence.length]) : id);
+  if (!sequence) I18N.text(status, I18N.term("이 후보의 서열은 결과에 기록되지 않았습니다."));
+  copy.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(sequence);
+      if (state.candidate === row) I18N.text(status, I18N.term("VHH 서열을 복사했습니다."));
+    } catch {
+      if (state.candidate !== row) return;
+      value.focus(); value.select();
+      I18N.text(status, I18N.term("서열을 선택했습니다. Ctrl+C 또는 ⌘C로 복사하세요."));
+    }
+  };
+  save.onclick = () => {
+    const header = String(id).replace(/[\r\n]/g, " ");
+    const filename = header.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100);
+    saveBlob(new Blob([`>${header}\n${sequence}\n`], {type:"text/plain;charset=utf-8"}), "VHH-" + filename + ".fasta");
+  };
+}
 function clearCandidate() {
   state.candidate = null;
+  showVhhSequence(null);
   state.structure = null;
   setPaeErrorStatus(null);
   state.structureRequest++;
@@ -2299,6 +2330,7 @@ function renderScatter() {
 async function selectCandidate(id) {
   state.candidate = state.rows.find((r) => r.candidate_id === id);
   const row = state.candidate;
+  showVhhSequence(row);
   if (!row) return;
   I18N.text($("candidate-title"), (state.displayAliases?.[id] ? state.displayAliases?.[id] : id));
   syncCandidateNavigation();

@@ -200,6 +200,63 @@ def test_supplied_offline_structure_pae_columns_and_focus(tmp_path):
         browser.close()
 
 
+@pytest.mark.skipif(os.environ.get("NANOCOFOLD_BROWSER_TEST") != "1", reason="Real Chromium sequence recovery")
+@pytest.mark.parametrize("offline", [False, True])
+def test_vhh_sequence_for_exact_candidate(supplied_server, tmp_path, offline):
+    from nanocofold.platform.results import ResultReader
+    from playwright.sync_api import expect, sync_playwright
+
+    workspace, url = supplied_server
+    run = workspace / "runs" / ("saved-vhh-offline" if offline else "saved-vhh-live")
+    (run / "03_score").mkdir(parents=True)
+    (run / "run_config.yaml").write_text("run:\n  mode: design\n")
+    (run / "03_score/scored_candidates.csv").write_text(
+        "design_id,sequence,final_eligible,ipsae\n"
+        "candidate-one,QVWGYR,True,0.91\n"
+        "candidate-two,CAYWGG,False,0.80\n"
+        "missing,,False,0.70\n")
+    if offline:
+        report = tmp_path / "report.html"
+        report.write_bytes(ResultReader(run).export("html")[0])
+        url = report.as_uri()
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(args=["--enable-unsafe-swiftshader"])
+        page = browser.new_page()
+        if not offline:
+            page.context.grant_permissions(["clipboard-read", "clipboard-write"], origin=url.rstrip("/"))
+        page.goto(url)
+        if not offline:
+            page.locator('[data-view="results"]').click()
+            page.locator("#result-path").fill(str(run))
+            page.locator("#open-result").click()
+        picker = page.locator("#viewer-candidate-select")
+        expect(picker.locator('option[value="candidate-one"]')).to_have_count(1)
+        page.locator("#eligibility-basis").select_option("recorded")
+        page.locator("#eligibility").select_option("true")
+        picker.select_option("candidate-one")
+        expect(page.locator("#vhh-sequence-heading")).to_have_text("VHH sequence for the selected candidate")
+        expect(page.locator("#vhh-sequence-value")).to_have_value("QVWGYR")
+        if not offline:
+            page.locator("#copy-vhh-sequence").click()
+            expect(page.locator("#vhh-sequence-feedback")).to_have_text("VHH sequence copied.")
+            assert page.evaluate("navigator.clipboard.readText()") == "QVWGYR"
+        page.locator("#language-select").select_option("ko")
+        expect(page.locator("#vhh-sequence-heading")).to_have_text("선택한 후보의 VHH 서열")
+        with page.expect_download() as downloaded:
+            page.get_by_role("button", name="이 후보 FASTA 저장").click()
+        assert downloaded.value.suggested_filename == "VHH-candidate-one.fasta"
+        assert downloaded.value.path().read_bytes() == b">candidate-one\nQVWGYR\n"
+        page.locator("#eligibility").select_option("all")
+        picker.select_option("candidate-two")
+        expect(page.locator("#vhh-sequence-value")).to_have_value("CAYWGG")
+        picker.select_option("missing")
+        expect(page.locator("#vhh-sequence-value")).to_have_value("")
+        expect(page.locator("#copy-vhh-sequence")).to_be_disabled()
+        expect(page.locator("#save-vhh-sequence")).to_be_disabled()
+        expect(page.locator("#vhh-sequence-feedback")).to_contain_text("기록되지 않았습니다")
+        browser.close()
+
+
 @pytest.mark.skipif(os.environ.get("NANOCOFOLD_BROWSER_TEST") != "1", reason="Real Chromium release gate")
 def test_cpu_demo_review_needs_no_public_msa_consent(supplied_server):
     from playwright.sync_api import expect, sync_playwright

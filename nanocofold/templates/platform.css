@@ -541,3 +541,9 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
 .diagnostic-table th:nth-child(1){width:25%}
 .diagnostic-table th:nth-child(2){width:14%}
 .diagnostic-table th:nth-child(3){width:17%}
+
+.vhh-sequence-panel { min-width:0; margin:1rem 0; }
+.vhh-sequence-panel h3 { margin-bottom:.35rem; }
+#vhh-sequence-record { display:block; overflow-wrap:anywhere; }
+#vhh-sequence-value { display:block; box-sizing:border-box; width:100%; min-height:4.5em; margin:.3rem 0 .5rem; font-family:ui-monospace,monospace; }
+#vhh-sequence-feedback:empty { display:none; }

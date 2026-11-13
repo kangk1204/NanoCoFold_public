@@ -541,6 +541,12 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
 .diagnostic-table th:nth-child(1){width:25%}
 .diagnostic-table th:nth-child(2){width:14%}
 .diagnostic-table th:nth-child(3){width:17%}
+
+.vhh-sequence-panel { min-width:0; margin:1rem 0; }
+.vhh-sequence-panel h3 { margin-bottom:.35rem; }
+#vhh-sequence-record { display:block; overflow-wrap:anywhere; }
+#vhh-sequence-value { display:block; box-sizing:border-box; width:100%; min-height:4.5em; margin:.3rem 0 .5rem; font-family:ui-monospace,monospace; }
+#vhh-sequence-feedback:empty { display:none; }
 </style></head><body><header class="offline-header"><div class="offline-brand"><strong>NanoCoFold · 오프라인 결과 탐색</strong><span>전체 후보 · 관측 · 구조 · 출처 포함</span></div><div class="language-switch"><label for="language-select">Language</label> <select id="language-select" aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div></header><main><div id="notice" role="status" aria-live="polite" hidden></div><section id="view-results">
 
         <h1>분석 결과 보고서</h1><p class="muted">NanoCoFold · 저장된 분석 결과</p><nav class="report-nav" aria-label="보고서 내 탐색"><a href="#report-input">01 입력·설정</a><a href="#result-summary">02 후보·모델 수</a><a href="#report-comparison">03 후보 비교</a><a href="#report-exclusions">04 제외·미평가</a><a href="#candidate-title">05 구조·PAE</a><a href="#report-provenance">06 출처·산출물</a></nav>
@@ -666,6 +672,16 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
                 </div>
               </div>
               <p id="candidate-status" class="muted" role="status"></p>
+              <section id="vhh-sequence-panel" class="vhh-sequence-panel" aria-labelledby="vhh-sequence-heading" hidden>
+                <h3 id="vhh-sequence-heading">선택한 후보의 VHH 서열</h3>
+                <label for="vhh-sequence-value" id="vhh-sequence-record"></label>
+                <textarea id="vhh-sequence-value" class="sequence" rows="3" readonly spellcheck="false" dir="ltr"></textarea>
+                <div class="inline">
+                  <button type="button" class="secondary" id="copy-vhh-sequence">서열 복사</button>
+                  <button type="button" class="secondary" id="save-vhh-sequence">이 후보 FASTA 저장</button>
+                </div>
+                <p id="vhh-sequence-feedback" class="muted" role="status"></p>
+              </section>
               <p id="structure-source" class="muted" role="status"></p>
               <p id="structure-data-note" class="next-step" role="status"></p>
               <div class="inline viewer-chain-controls" role="group" aria-label="체인 선택과 구조 확대">
@@ -1152,6 +1168,17 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
 </script><script>/* UI catalog: Korean source keys, English translations. Research records are never rewritten. */
 "use strict";
 const NCF_LEGACY_TERMS = Object.freeze({
+  "담당자 이름에는 한글·영문·숫자·점·밑줄·붙임표를 사용하세요. / Use 1–48 letters, digits, dots, underscores or hyphens.": "담당자 이름에는 한글·영문·숫자·점·밑줄·붙임표를 사용하세요.",
+  "등록된 계정이 없습니다. / Unknown account.": "등록된 계정이 없습니다.",
+  "비밀번호는 10–256자입니다. / Use a password of 10–256 characters.": "비밀번호는 10–256자입니다.",
+  "사용 기록 검색 조건을 확인하세요. / Check the usage history filters.": "사용 기록 검색 조건을 확인하세요.",
+  "연구실 계정 DB를 복원하세요. / Restore the lab account database.": "연구실 계정 DB를 복원하세요.",
+  "연구실 로그인이 필요합니다. / Please sign in to the lab.": "연구실 로그인이 필요합니다.",
+  "이미 있는 계정입니다. / Account already exists.": "이미 있는 계정입니다.",
+  "잠시 뒤 로그인하세요. / Try signing in again shortly.": "잠시 뒤 로그인하세요.",
+  "담당자만 변경할 수 있습니다. / Only the submitting researcher can change this record.": "담당자만 변경할 수 있습니다.",
+  "공유 설치는 서버 터미널에서 관리하세요. / Manage shared installations from the server terminal.": "공유 설치는 서버 터미널에서 관리하세요.",
+  "이전 결과는 서버 관리자가 정리할 수 있습니다. / Ask the server operator to compact older results.": "이전 결과는 서버 관리자가 정리할 수 있습니다.",
   "지정 부위 접촉률": "지정 결합 부위 접촉률",
   "표적·파트너·서열·입력 준비 방식·hotspot과 경고를 확인했습니다.": "표적·파트너·서열·입력 준비 방식·결합 부위와 경고를 확인했습니다.",
   "서열 입력의 구조와 hotspot은 예측됩니다. 기본 MSA는 empty이며 외부 서버로 서열을 보내지 않습니다.": "서열 입력의 구조와 결합 부위는 예측됩니다. 기본 MSA는 empty이며 외부 서버로 서열을 보내지 않습니다.",
@@ -1770,6 +1797,43 @@ const NCF_TRANSLATIONS = Object.freeze({
   "원본 보관": "Original files retained",
   "핵심 보관": "Core files retained",
   "검색": "Search",
+  "단백질 복합체·나노바디 분석 · 연구실 공유 작업 공간": "Protein complex and nanobody analysis · Shared lab workspace",
+  "담당자 이름에는 한글·영문·숫자·점·밑줄·붙임표를 사용하세요. / Use 1–48 letters, digits, dots, underscores or hyphens.": "Use 1–48 letters, digits, dots, underscores or hyphens.",
+  "등록된 계정이 없습니다. / Unknown account.": "Unknown account.",
+  "비밀번호는 10–256자입니다. / Use a password of 10–256 characters.": "Use a password of 10–256 characters.",
+  "사용 기록 검색 조건을 확인하세요. / Check the usage history filters.": "Check the usage history filters.",
+  "연구실 계정 DB를 복원하세요. / Restore the lab account database.": "Restore the lab account database.",
+  "연구실 로그인이 필요합니다. / Please sign in to the lab.": "Please sign in to the lab.",
+  "이미 있는 계정입니다. / Account already exists.": "Account already exists.",
+  "잠시 뒤 로그인하세요. / Try signing in again shortly.": "Try signing in again shortly.",
+  "담당자만 변경할 수 있습니다. / Only the submitting researcher can change this record.": "Only the submitting researcher can change this record.",
+  "공유 설치는 서버 터미널에서 관리하세요. / Manage shared installations from the server terminal.": "Manage shared installations from the server terminal.",
+  "이전 결과는 서버 관리자가 정리할 수 있습니다. / Ask the server operator to compact older results.": "Ask the server operator to compact older results.",
+  "담당자 검색은 48자 이내로 입력하세요.": "Enter a researcher name of up to 48 characters.",
+  "재사용": "Reused",
+  "선택한 후보의 VHH 서열": "VHH sequence for the selected candidate",
+  "서열 복사": "Copy sequence",
+  "이 후보 FASTA 저장": "Save this candidate as FASTA",
+  "{0} · 아미노산 {1}개": "{0} · {1} amino acids",
+  "이 후보의 서열은 결과에 기록되지 않았습니다.": "No sequence was recorded for this candidate.",
+  "VHH 서열을 복사했습니다.": "VHH sequence copied.",
+  "서열을 선택했습니다. Ctrl+C 또는 ⌘C로 복사하세요.": "Sequence selected. Press Ctrl+C or ⌘C to copy.",
+  "담당자": "Researcher",
+  "연구실 사용 기록": "Lab usage history",
+  "제출 시각": "Submitted",
+  "다른 담당자의 작업은 취소할 수 없습니다.": "Only the submitting researcher can cancel these jobs.",
+  "담당자 필터로 제출 기록을 조회합니다. 대기·취소·재사용 작업도 포함합니다.": "Filter submissions by researcher, including queued, cancelled and reused jobs.",
+  "GPU 대기": "Waiting for GPU",
+  "다른 계산이 GPU를 사용하고 있습니다.": "Another computation is using the GPU.",
+  "GPU 여유 메모리를 기다립니다.": "Waiting for available GPU memory.",
+  "GPU 사용률이 낮아지기를 기다립니다.": "Waiting for GPU utilization to drop.",
+  "GPU 상태를 읽을 수 없어 다시 확인합니다.": "GPU status is unavailable. The queue will check again.",
+  "앞선 작업이 GPU를 사용하고 있습니다.": "An earlier job is using the GPU.",
+  " 여유 {0}/{1} MiB · 사용률 {2}%": " Free {0}/{1} MiB · utilization {2}%",
+  " 자리가 나면 자동으로 시작합니다.": " This job will start automatically when the GPU is available.",
+  "계정 이름": "Account name",
+  "로그아웃": "Sign out",
+  "이 배치는 처음 제출한 담당자가 다시 제출해야 합니다.": "The researcher who first submitted this batch must retry it.",
   "작은 화면에서는 표를 좌우로 이동해 나머지 항목을 볼 수 있습니다.": "On a small screen, scroll the table horizontally to see the remaining columns.",
   "처음": "First page",
   "다음 25개": "Next 25",
@@ -3785,7 +3849,7 @@ function renderReportReasons(rows, mode) {
   else table($("exclusion-summary"), reasons.map(r => ({이유:r.label, 기록수:r.count, 기록코드:r.code})), ["이유", "기록수", "기록코드"]);
 }
 const phaseLabel = (phase) => ({
-  comparison_msa_search: "서열 정렬(MSA) 준비", starting: "시작 준비",
+  waiting_for_gpu: "GPU 대기", comparison_msa_search: "서열 정렬(MSA) 준비", starting: "시작 준비",
   input: "입력 준비", target: "표적 준비", prediction: "복합체 예측",
   design: "새 후보 생성", screen: "후보 비교", mature: "변이 후보 준비",
   tier2: "최종 복합체 평가", engine_comparison: "엔진별 비교",
@@ -3970,6 +4034,8 @@ async function refreshCatalog() {
   const params = new URLSearchParams({limit: "25", search: $("catalog-search").value,
     retention: $("catalog-retention").value, sort: state.catalogSort, descending: String(state.catalogDescending)});
   if (state.catalogCursor) params.set("cursor", state.catalogCursor);
+  const owner = $("catalog-owner")?.value.trim();
+  if (owner) params.set("researcher", owner);
   const page = await api("/api/result-catalog?" + params);
   if (request !== state.catalogRequest) return;
   state.catalogNext = page.next_cursor;
@@ -3978,7 +4044,14 @@ async function refreshCatalog() {
   const columns = [["name", "분석"], ["mode", "모드"], ["created", "실행일"], ["candidate_count", "서열"],
     ["model_count", "저장 구조 관측"], ["eligible_model_count", "기준 통과"], ["status", "계산 상태"],
     ["retention", "보관"], ["elapsed_seconds", "계산 시간"], ["storage_bytes", "서버 용량"]];
+  if (state.researcher || page.items.some(item => item.researchers?.length)) {
+    $("catalog-owner-label").hidden = false;
+    columns.splice(1, 0, ["researchers", "담당자"]);
+  }
   for (const [key, label] of columns) {
+    if (key === "researchers") {
+      const th = el("th", I18N.term(label)); th.scope="col"; headings.append(th); continue;
+    }
     const th = el("th"), button = el("button", I18N.concat([I18N.term(label), state.catalogSort === key ? state.catalogDescending ? " ↓" : " ↑" : ""]), "sort-header");
     th.scope = "col"; th.setAttribute("aria-sort", state.catalogSort === key ? state.catalogDescending ? "descending" : "ascending" : "none");
     button.onclick = () => {state.catalogDescending = state.catalogSort === key ? !state.catalogDescending : true; state.catalogSort = key; state.catalogCursor = null; refreshCatalog().catch(e => notice(e.message, true));};
@@ -3989,7 +4062,8 @@ async function refreshCatalog() {
     const tr = el("tr");
     for (const [key] of columns) {
       const td = el("td");
-      if (key === "name") {
+      if (key === "researchers") td.textContent = (item.researchers || []).join(", ") || "—";
+      else if (key === "name") {
         const link = el("a", (item.name || item.id) + (item.mock ? " · MOCK" : ""));
         link.href = "/?result=" + encodeURIComponent(item.id); link.target = "_blank"; link.rel = "noopener";
         td.append(link);
@@ -4000,6 +4074,26 @@ async function refreshCatalog() {
   }
   table.append(head, body); $("catalog-table").replaceChildren(table, el("p", I18N.term("저장 구조 관측은 1차 평가 구조도 포함합니다. 최종 평가 모델 수는 결과 보고서에서 따로 확인하세요."), "muted"));
   I18N.text(status, I18N.format("{0}개 표시 · 용량은 색인 시점의 측정값", [page.items.length]));
+}
+let usageRequest = 0, usageCursor = null, usageOwner = "";
+async function refreshLabUsage(nextPage = false) {
+  if (!state.researcher || !$("lab-usage").open) return;
+  const request = ++usageRequest, owner = $("catalog-owner").value.trim();
+  const params = new URLSearchParams({researcher:owner});
+  if (nextPage && usageCursor && usageOwner === owner) {
+    params.set("before", usageCursor.before); params.set("before_id", usageCursor.before_id);
+  }
+  const page = await api("/api/lab/usage?" + params);
+  if (request !== usageRequest) return;
+  usageCursor = page.next_cursor; usageOwner = owner;
+  $("lab-usage-next").hidden = !usageCursor;
+  const rows = page.items.map(item => ({
+    "담당자":item.researcher, "분석":item.name, "제출 시각":new Date(item.submitted * 1000).toLocaleString(),
+    "계산 상태": item.reused
+      ? I18N.concat([I18N.term(states[item.state] || item.state), " · ", I18N.term("재사용")])
+      : I18N.term(states[item.state] || item.state)
+  }));
+  table($("lab-usage-rows"), rows, ["담당자", "분석", "제출 시각", "계산 상태"]);
 }
 async function previewRetention() {
   if (!state.result || offline) return;
@@ -4036,6 +4130,11 @@ function merge(base, extra) {
         : val;
   return out;
 }
+function usesPublicMsa(cfg) {
+  return cfg.complex?.msa_source === "public_api" || cfg.screen?.colabfold?.msa_source === "public_api" ||
+    cfg.screen?.msa_mode === "msa" || cfg.structure?.msa?.backend === "public_api" ||
+    (cfg.structure?.provider === "chai1" && cfg.structure?.chai1?.msa_mode === "msa");
+}
 function inputSettings(forPlan = false) {
   let advanced;
   try {
@@ -4062,9 +4161,11 @@ function inputSettings(forPlan = false) {
     // CPU demonstrations create synthetic data and never acquire an MSA.
     cfg = merge(cfg, {structure:{msa:{backend:"empty"}},screen:{msa_mode:"single",allow_public_msa_server:false,colabfold:{msa_source:"cache"}}});
   }
-  const publicMsa = !simulated && (cfg.complex?.msa_source === "public_api" || cfg.screen?.colabfold?.msa_source === "public_api" || cfg.screen?.msa_mode === "msa" || cfg.structure?.msa?.backend === "public_api");
+  const publicMsa = !simulated && usesPublicMsa(cfg);
   if (!forPlan && publicMsa && !$("novice-consent").checked) throw Error("가져온 설정도 현재 입력에 대한 외부 MSA 전송 동의를 다시 확인해야 합니다.");
-  if (publicMsa) cfg.screen = merge(cfg.screen, {allow_public_msa_server: true});
+  if (publicMsa) cfg.screen = merge(cfg.screen || {}, {allow_public_msa_server: $("novice-consent").checked});
+  if (cfg.structure?.provider === "chai1" && cfg.structure?.chai1?.msa_mode === "msa")
+    cfg.structure = merge(cfg.structure, {allow_public_msa_server: !simulated && $("novice-consent").checked});
   const enteredSeed = $("seed").value;
   if ($("seed").validity?.badInput) throw Error("Seed는 0–4294967295 정수를 입력하세요.");
   const effectiveSeed = enteredSeed === "" ? cfg.run?.seed ?? state.planningDefaults?.run?.seed ?? 42 : Number(enteredSeed);
@@ -4362,8 +4463,13 @@ async function submitReviewedAnalysis() {
       if (!stillCurrent()) return;
       if (!job) throw error;
     }
-    if (!stillCurrent()) return;
-    view('jobs'); state.submissionNoticeJob=job.id;
+    if (!stillCurrent()) {
+      // A confirmed submission can finish after the researcher switches tabs.
+      // Retire that form without changing the page or touching newer edits.
+      if (state.input === input && revision === state.inputRevision) state.nextAnalysis?.();
+      return;
+    }
+    view('jobs'); state.nextAnalysis?.(); state.submissionNoticeJob=job.id;
     await selectJob(job.id);
     notice('작업을 등록했습니다. 브라우저를 닫아도 실행됩니다.');
   } finally { state.analysisSubmitting=false; renderInputReadiness(); }
@@ -5032,6 +5138,17 @@ async function refreshJobs() {
           I18N.format("{0} · {1} · {2} · {3}초", [(states[job.state] ? I18N.term(states[job.state]) : job.state), I18N.term(jobPhaseCaption(job)), I18N.term(jobProgressCaption(job)), Math.round(job.elapsed_seconds || 0)]),
         ),
       );
+      if (job.researcher) $("job-detail").append(el("p", I18N.concat([I18N.term("담당자"), " · ", job.researcher])));
+      if (job.state === "queued" && job.phase === "waiting_for_gpu") {
+        const reading = job.gpu_reading || {};
+        const label = {process:"다른 계산이 GPU를 사용하고 있습니다.", memory:"GPU 여유 메모리를 기다립니다.",
+          utilization:"GPU 사용률이 낮아지기를 기다립니다.", telemetry:"GPU 상태를 읽을 수 없어 다시 확인합니다."};
+        const note = el("p", I18N.term(label[reading.reason] || "앞선 작업이 GPU를 사용하고 있습니다."));
+        if (Number.isFinite(reading.free_mib))
+          note.append(el("span", I18N.format(" 여유 {0}/{1} MiB · 사용률 {2}%", [reading.free_mib, reading.total_mib, reading.utilization])));
+        note.append(el("span", I18N.term(" 자리가 나면 자동으로 시작합니다.")));
+        $("job-detail").append(note);
+      }
       if (job.reused_result_id) $("job-detail").append(el("p", I18N.format("저장 결과 연결 · 새 계산 0초 · 원본 {0}{1}. 원래 계산 시간 {2}", [job.reused_result_id, job.reuse_kind === "view_only" ? I18N.term(" · 핵심 보관본") : "", job.source_elapsed_seconds === null ? I18N.term("미기록") : I18N.concat([Math.round(job.source_elapsed_seconds || 0), I18N.term("초")])])));
       if (etaText(job)) $("job-detail").append(el("p", I18N.term(etaText(job)), "eta-note"));
       if (job.mock)
@@ -5049,6 +5166,7 @@ async function refreshJobs() {
         ["검증 후 재개", "resume"],
       ]) {
         if (
+          (state.researcher && job.researcher !== state.researcher) ||
           (operation === "cancel" &&
             !["queued", "running"].includes(job.state)) ||
           (operation === "resume" && !job.can_resume)
@@ -5448,8 +5566,39 @@ function filters() {
       : {}),
   };
 }
+function showVhhSequence(row) {
+  const panel = $("vhh-sequence-panel");
+  if (!panel) return;
+  const value = $("vhh-sequence-value"), copy = $("copy-vhh-sequence"), save = $("save-vhh-sequence");
+  const status = $("vhh-sequence-feedback");
+  const sequence = typeof row?.sequence === "string" ? row.sequence.trim() : "";
+  value.value = sequence;
+  panel.hidden = !row || state.result?.mode === "complex";
+  copy.disabled = save.disabled = !sequence;
+  I18N.text(status, "");
+  if (panel.hidden) return;
+  const id = row.candidate_id;
+  I18N.text($("vhh-sequence-record"), sequence ? I18N.format("{0} · 아미노산 {1}개", [id, sequence.length]) : id);
+  if (!sequence) I18N.text(status, I18N.term("이 후보의 서열은 결과에 기록되지 않았습니다."));
+  copy.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(sequence);
+      if (state.candidate === row) I18N.text(status, I18N.term("VHH 서열을 복사했습니다."));
+    } catch {
+      if (state.candidate !== row) return;
+      value.focus(); value.select();
+      I18N.text(status, I18N.term("서열을 선택했습니다. Ctrl+C 또는 ⌘C로 복사하세요."));
+    }
+  };
+  save.onclick = () => {
+    const header = String(id).replace(/[\r\n]/g, " ");
+    const filename = header.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 100);
+    saveBlob(new Blob([`>${header}\n${sequence}\n`], {type:"text/plain;charset=utf-8"}), "VHH-" + filename + ".fasta");
+  };
+}
 function clearCandidate() {
   state.candidate = null;
+  showVhhSequence(null);
   state.structure = null;
   setPaeErrorStatus(null);
   state.structureRequest++;
@@ -5804,6 +5953,7 @@ function renderScatter() {
 async function selectCandidate(id) {
   state.candidate = state.rows.find((r) => r.candidate_id === id);
   const row = state.candidate;
+  showVhhSequence(row);
   if (!row) return;
   I18N.text($("candidate-title"), (state.displayAliases?.[id] ? state.displayAliases?.[id] : id));
   syncCandidateNavigation();
@@ -6756,7 +6906,7 @@ function renderBatch(batch) {
     check.type="checkbox";I18N.attribute(check, "aria-label", I18N.concat([row.id, I18N.term(" 실행 선택")]));check.checked=batchSelected.includes(row.id);check.disabled=batchBusy||!!batch.selected||!!row.error;
     check.onchange=()=>{batchSelected=check.checked?[...batchSelected,row.id]:batchSelected.filter(id=>id!==row.id);renderBatch(activeBatch);};choice.append(check);
     if(row.error||row.submission_error){line.style.background="#fff1ef";I18N.attribute(line, "aria-label", I18N.concat([row.id, I18N.term(" 오류")]));}
-    for(const action of row.job?.can_resume?["resume"]:row.job&&['queued','running'].includes(row.job.state)?["cancel"]:[]){
+    for(const action of state.researcher && row.job?.researcher !== state.researcher ? [] : row.job?.can_resume?["resume"]:row.job&&['queued','running'].includes(row.job.state)?["cancel"]:[]){
       const button=el("button",action==="resume" ? I18N.term("항목 재개") : I18N.term("항목 취소"));
       button.disabled=batchBusy;
       // Capture identifiers before opening the dialog; polling may replace activeBatch.
@@ -6778,10 +6928,10 @@ function renderBatch(batch) {
   }
   $("batch-rows").replaceChildren(target);
   const retryMissing = Boolean(batch.selected) && batch.rows.some(row => batch.selected.includes(row.id) && !row.job_id && !row.job && !row.error);
-  $("batch-submit").disabled=batchBusy||(Boolean(batch.selected)&&!retryMissing)||!batchSelected.length||batch.rows.some(r=>batchSelected.includes(r.id)&&r.error);
+  $("batch-submit").disabled=(!!state.researcher && batch.researcher!==state.researcher)||batchBusy||(Boolean(batch.selected)&&!retryMissing)||!batchSelected.length||batch.rows.some(r=>batchSelected.includes(r.id)&&r.error);
   I18N.text($("batch-submit"), batch.selected ? I18N.term(retryMissing ? "미제출 항목 다시 제출" : "이미 제출된 분석") : I18N.concat([I18N.concat([I18N.term("3. 선택한 "), batchSelected.length]), I18N.term("개 분석 실행")]));
   I18N.text($("batch-next-step"), batch.selected && retryMissing ? I18N.term("일부 항목을 제출하지 못했습니다. 항목별 오류를 확인한 뒤 미제출 항목 다시 제출을 누르세요. 이미 등록된 작업은 같은 작업으로 연결됩니다.") : batch.selected ? I18N.term("4단계 · 계산을 제출했습니다. 완료된 행의 결과 열기를 누르세요. 실행 중 상태는 자동으로 갱신됩니다.") : batch.rows.some(row => row.error) ? I18N.term("2단계 · 검토 오류가 있습니다. 아래 항목별 오류를 확인하고 입력을 수정한 뒤 다시 검토하세요.") : I18N.term("3단계 · 입력 검토 완료, 계산 미제출입니다. 실행할 항목을 확인하고 선택한 분석 실행을 누르세요."));
-  $("batch-cancel").disabled=batchBusy||!batch.rows.some(r=>r.job&&['queued','running'].includes(r.job.state));
+  $("batch-cancel").disabled=(!!state.researcher && (batch.researcher!==state.researcher || batch.rows.some(row=>row.job && ["queued","running","cancelling"].includes(row.job.state) && row.job.researcher!==state.researcher)))||batchBusy||!batch.rows.some(r=>r.job&&['queued','running'].includes(r.job.state));
 }
 async function refreshBatchHistory(){const data=await api("/api/batches");const node=$("batch-history");node.replaceChildren();for(const batch of data.batches){const button=el("button",I18N.concat([batch.name+" · "+batch.rows.length, I18N.term("개")]));button.onclick=async()=>renderBatch(await api("/api/batches/"+batch.id,undefined,{timeoutMs:15000}));node.append(button);}if(!data.batches.length)I18N.text(node, I18N.term("아직 검토한 배치가 없습니다."));}
 async function batchAction(message, fn) {
@@ -6924,7 +7074,10 @@ async function boot() {
   initBatch();
   for (const button of document.querySelectorAll("[data-view]"))
     button.onclick = () => view(button.dataset.view);
-  action("catalog-refresh", () => {state.catalogCursor = null; return refreshCatalog();});
+  for (const id of ["catalog-search", "catalog-owner"]) {
+    $(id)?.addEventListener("keydown", event => { if (event.key === "Enter") $("catalog-refresh").click(); });
+  }
+  action("catalog-refresh", () => {state.catalogCursor = null; return Promise.all([refreshCatalog(),refreshLabUsage()]);});
   action("catalog-first", () => {state.catalogCursor = null; return refreshCatalog();});
   action("catalog-next", () => {state.catalogCursor = state.catalogNext; return refreshCatalog();});
   action("retention-preview", previewRetention);
@@ -7182,6 +7335,17 @@ async function boot() {
   $("view-input").addEventListener("input", invalidateInput);
   $("seed").addEventListener("input", () => { $("seed").dataset.quantitySource = "direct"; });
   const session = await api("/api/session");
+  state.researcher = session.researcher;
+  if (session.researcher) {
+    $("lab-account").hidden = false;
+    I18N.text(document.querySelector(".platform-brand span"), I18N.term("단백질 복합체·나노바디 분석 · 연구실 공유 작업 공간"));
+    $("lab-user").textContent = session.researcher;
+    $("catalog-owner-label").hidden = false;
+    $("lab-usage").hidden = false;
+    $("lab-usage").ontoggle = () => refreshLabUsage().catch(e => notice(e.message, true));
+    action("lab-usage-next", () => refreshLabUsage(true));
+    action("lab-logout", async () => { await api("/api/lab/logout", {}); window.location.reload(); });
+  }
   state.presets = session.presets || {};
   state.planningDefaults = session.planning_defaults || {};
   I18N.text($("platform-version"), session.version ? "v" + session.version : "");
@@ -7359,11 +7523,18 @@ async function initNoviceFlow() {
     complex.hidden=!isComplex||$("input-kind").value!=="fasta";$("fasta-fields").hidden=isComplex||$("input-kind").value!=="fasta";
     controls.hidden=$("analysis-preset").value!=="small-four-v1";$("mock").disabled=isComplex;demoControls.hidden=isComplex;
     const simulated=$("mock").checked&&!isComplex;ml.hidden=simulated;msa.hidden=simulated;cl.hidden=simulated;demoMsaNote.hidden=!simulated;
-    try {const cfg = inputSettings(true); renderAnalysisScale(cfg, $("mode").value); I18N.text(plan, I18N.term(noviceModelPlan(cfg,$("mode").value,$("mode").value==="screen"?noviceFasta($("vhh-fasta").value).length:0)));}catch(e){clearScalePreview();I18N.text(plan, I18N.term(e.message));}
+    try {const cfg = inputSettings(true); cl.hidden = simulated || !usesPublicMsa(cfg); renderAnalysisScale(cfg, $("mode").value); I18N.text(plan, I18N.term(noviceModelPlan(cfg,$("mode").value,$("mode").value==="screen"?noviceFasta($("vhh-fasta").value).length:0)));}catch(e){clearScalePreview();I18N.text(plan, I18N.term(e.message));}
     I18N.text($("review-input"), I18N.term("입력 확인"));I18N.text($("start-job"), I18N.term("분석 실행"));
     refreshSequenceHelp();
   }
   function jump(n){step=n;I18N.text(reason, "");render();heading.focus();}
+  state.nextAnalysis = () => {
+    consent.checked = false;
+    invalidateInput();
+    step = 0;
+    I18N.text(reason, "");
+    render();
+  };
   state.showInputReview = () => jump(state.input ? 3 : 1);
   function validateInputs(){
     if($("mode").value==="complex") return noviceComplexProteins();
