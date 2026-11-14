@@ -37,7 +37,7 @@ def test_reference_metadata_allowance_does_not_silence_misspelled_options():
     (False, ["colabfold", "boltz2"], True),
 ])
 def test_multichain_iptm_warning_uses_only_supported_engine_settings(monkeypatch, cascade, engines, expected):
-    cfg = config.load_config(overrides=["run.mode=screen", "screen.engine=colabfold"])
+    cfg = config.load_config(overrides=["run.mode=screen", "screen.engine=colabfold", "screen.restraint.enabled=false"])
     cfg["screen"]["cascade"]["enabled"] = cascade
     if engines:
         cfg["screen"]["comparison"].update(enabled=True, engines=engines)

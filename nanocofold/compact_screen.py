@@ -71,13 +71,18 @@ def _error(value):
 
 
 def _retain(state, identifiers, metric, top_n, id_column, controls=None):
+    unassessed = {identifier for identifier in identifiers if identifier in state["completed"]
+                  and not _finite(state["metrics"][identifier].get(metric))
+                  and not _error(state["metrics"][identifier].get("error"))}
     valid = [identifier for identifier in identifiers if identifier in state["completed"]
              and _finite(state["metrics"][identifier].get(metric))
              and not _error(state["metrics"][identifier].get("error"))]
     ascending = metric in {"interface_pae", "n_clashes"}
     valid.sort(key=lambda identifier: (state["metrics"][identifier][metric] * (1 if ascending else -1), identifier))
     controls = set(controls or {"WT"})
-    retained = set([identifier for identifier in valid if identifier not in controls][:top_n])
+    retained = set([identifier for identifier in valid if identifier not in controls][:top_n]) | unassessed
+    state["retention_status"] = ("metric_unassessed_cohort_wide" if unassessed and not valid
+                                 else "metric_unassessed_candidates_preserved" if unassessed else "ranked")
     for identifier in controls:
         row = state["predictions"].get(identifier, {})
         if row.get("pred_dir"):
@@ -148,6 +153,7 @@ def _publish(stage, snapshot, pointer, manifest, state):
     stats = {"total": len(identifiers), "completed": len(state["completed"]),
              "attempted": len(state["metrics"]), "remaining": len(identifiers) - len(state["completed"]),
              "retained": len(state["retained"]),
+             "retention_status": state.get("retention_status", "legacy_not_recorded"),
              "pruned": sum(bool(row.get("structure_pruned")) for row in state["predictions"].values()),
              "batches": state["batches"], "wall_seconds": state["wall_seconds"],
              "fingerprint": manifest["fingerprint"], "score_commit": pointer["commit"]}
@@ -356,7 +362,7 @@ def predict_and_score(cfg, stage, target, candidates, predict, score,
                 _safe(stage, Path(measurement["cif_path"]))
             state["predictions"][identifier] = _paths(row, stage.parent)
             state["metrics"][identifier] = _paths(measurement, stage.parent)
-            if not _error(measurement.get("error")) and row.get("pred_dir") and _finite(measurement.get(metric)):
+            if not _error(measurement.get("error")) and row.get("pred_dir"):
                 if identifier not in state["completed"]:
                     state["completed"].append(identifier)
         retained = _retain(state, identifiers, metric, top_n, id_column, controls)

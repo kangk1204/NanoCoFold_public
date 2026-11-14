@@ -302,6 +302,7 @@ def _acquire_reviewed_local(cfg, run_dir, state, sequences):
 
 
 def _conditions(cfg, engine):
+    from .utils.tool_args import boltz_extra_args
     if engine == "opendde":
         from .opendde import settings as opendde_settings, SOURCE_COMMIT, VERSION
         return {"seed": cfg_seed(cfg, "run.seed"), "msa": "precomputed_unpaired", "restraint": False,
@@ -323,7 +324,8 @@ def _conditions(cfg, engine):
                 "msa_subsampled_sequences": cfg_get(cfg, "score.boltz2_num_subsampled_msa", 512),
                 "num_recycles": cfg_get(cfg, "score.boltz2_recycling_steps", 3),
                 "diffusion_samples": cfg_get(cfg, "score.boltz2_diffusion_samples", 1),
-                "extra_args": cfg_get(cfg, "score.boltz2_extra_args", [])}
+                "sampling_steps": cfg_get(cfg, "score.boltz2_sampling_steps"),
+                "extra_args": boltz_extra_args(cfg)}
     return {"seed": cfg_seed(cfg, "run.seed"), "msa": "precomputed_unpaired_aligned_parquet", "restraint": restrained,
             "restraint_type": cfg_get(cfg, "screen.restraint.connection_type", "pocket") if restrained else None,
             "restraint_max_distance_A": cfg_get(cfg, "screen.restraint.max_distance", 11.0) if restrained else None,
@@ -332,6 +334,16 @@ def _conditions(cfg, engine):
             "num_recycles": cfg_get(cfg, "screen.num_trunk_recycles", 1),
             "diffusion_timesteps": cfg_get(cfg, "screen.num_diffn_timesteps", 50),
             "diffusion_samples": cfg_get(cfg, "screen.num_diffn_samples", 1)}
+
+
+def source_input_hashes(cfg):
+    result = {}
+    for key in ("target.pdb", "target.fasta", "screen.vhh_fasta", "mature.wt_fasta"):
+        value = cfg_get(cfg, key)
+        if value:
+            path = resolve_path(cfg, value)
+            result[key] = provenance.file_digest(path) if path.is_file() else None
+    return result
 
 
 def run(cfg, run_dir, state, target, candidates, cdr_ranges=None, *, predict, finalize,
@@ -357,6 +369,7 @@ def run(cfg, run_dir, state, target, candidates, cdr_ranges=None, *, predict, fi
              "num_diffn_samples", "boltz2_pocket_max_distance", "env", "boltz2_env")},
         "boltz2_inference": {key: value for key, value in cfg_get(cfg, "score", {}).items() if key.startswith("boltz2")},
         "msa_hashes": {key: entry["sha256"] for key, entry in alignments.items()},
+        "source_inputs": source_input_hashes(cfg),
         "runtime": {engine: provenance.runtime_identity(cfg, engine) for engine in options["engines"]}
                    if not cfg_get(cfg, "run.mock", False) and not cfg_get(cfg, "run.dry_run", False) else {},
         "runner_sha256": provenance.file_digest(Path(__file__))}

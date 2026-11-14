@@ -207,6 +207,63 @@ def make_mock_target_only(target_seq: str, path: Path, seed: int = 7) -> Path:
     return write_pdb(structure, path)
 
 
+def make_mock_engine_output(out_dir, identifier, chains, hotspots, *, engine, seed=42, samples=1):
+    """Synthetic multi-chain fixtures in the selected engine's retained layout.
+
+    No upstream model is invoked. Each receipt explicitly records mock=True.
+    Existing two-chain generators remain available for historical test fixtures.
+    """
+    import json
+    from . import provenance
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    letters = list(chains)
+    n = sum(map(len, chains.values()))
+    for index in range(samples):
+        q = _quality(identifier, seed + index)
+        structure = build_complex_structure(chains[letters[0]], chains[letters[-1]], hotspots,
+                                            jitter=.15 * (1-q), seed=seed + index,
+                                            pull_closer=2.4*(1-q) if q < .35 else 0.)
+        model = next(structure.get_models())
+        binder = model['B']; model.detach_child('B'); binder.id = letters[-1]
+        for i, letter in enumerate(letters[1:-1]):
+            model.add(_build_chain(letter, chains[letter], np.array([0., 12. + 8.*i, 0.])))
+        model.add(binder)
+        confidence = .55 + .4*q
+        nt, nb = len(chains[letters[0]]), len(chains[letters[-1]])
+        old_plddt = np.clip(40.+55.*q+np.random.default_rng(seed+index+len(identifier)).normal(0,3,nt+nb),5,99).astype(np.float32)
+        plddt = np.full(n, 85., dtype=np.float32)
+        mapping = np.r_[np.arange(nt), np.arange(n-nb,n)]
+        plddt[mapping] = old_plddt
+        for atom in structure.get_atoms(): atom.set_bfactor(100*(.60+.40*q))
+        pae = np.full((n,n), 20.-4.*q, dtype=np.float32); np.fill_diagonal(pae, 1.5)
+        pae[np.ix_(mapping,mapping)] = _pae_matrix(nt,nb,q,hotspots,list(range(int(nb*.45),int(nb*.75))))
+        axis = np.full((len(letters), len(letters)), confidence, dtype=np.float32)
+        if engine == 'chai1':
+            path = write_cif(structure, out_dir/f'pred.model_idx_{index}.cif')
+            np.savez_compressed(out_dir/f'scores.model_idx_{index}.npz', pae=pae, plddt=plddt,
+                                ptm=np.float32(confidence), iptm=np.float32(confidence), per_chain_pair_iptm=axis,
+                                aggregate_score=np.float32(confidence))
+            receipt = {'schema_version':1, 'mock':True, 'model_index':index, 'source':'SampleRanking.asym_ids',
+                'chain_mapper':'chai_lab.data.io.cif_utils.get_chain_letter', 'pair_axes':['query_chain','key_chain'],
+                'asym_ids':list(range(1,len(letters)+1)), 'chain_ids':letters,
+                'chain_mapper_sha256':provenance.file_digest(Path(__file__)), 'chai_version':'synthetic-not-an-engine-run',
+                'structure_sha256':provenance.file_digest(path)}
+            (out_dir/f'chain_axis_idx_{index}.json').write_text(json.dumps(receipt))
+        else:
+            stem = f'{engine}_model_{index}' if engine in {'colabfold','opendde'} else f'{identifier}_model_{index}'
+            if engine == 'colabfold': write_pdb(structure, out_dir/(stem+'.pdb'))
+            else: write_cif(structure, out_dir/(stem+'.cif'))
+            native = {'mock':True, 'source':engine, 'ptm':confidence, 'iptm':confidence,
+                      'complex_plddt':float(plddt.mean()/100), 'plddt':float(plddt.mean())}
+            if engine == 'boltz2': native['pair_chains_iptm'] = {str(i):{str(j):float(axis[i,j]) for j in range(len(letters))} for i in range(len(letters))}
+            if engine == 'opendde': native.update(chain_axis=letters,chain_pair_iptm=axis.tolist())
+            if engine == 'colabfold': native.update(rank=index+1,raw_model=f'{identifier}_unrelaxed_rank_{index+1:03d}_model_1_seed_{seed+index}.pdb')
+            (out_dir/('confidence_'+stem+'.json')).write_text(json.dumps(native))
+            np.savez_compressed(out_dir/('pae_'+stem+'.npz'),pae=pae)
+    (out_dir/'synthetic_output.json').write_text(json.dumps({'mock':True,'engine_layout':engine,'models':samples,'chains':letters}))
+
+
 def make_mock_vhh(vhh_seq: str, path: Path, seed: int = 11) -> Path:
     structure = Structure.Structure("mock")
     structure.add(Model(0))

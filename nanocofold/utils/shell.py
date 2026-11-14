@@ -89,12 +89,12 @@ def managed_processes(store, job):
 @contextmanager
 def _command_process(argv, *, cwd, env, stdin, output, inherited, cancellation, start, timeout):
     owner = _CLOSED_THREADS.get(threading.current_thread(), _MANAGED_OWNER)
-    if owner is None:
+    if owner is None and sys.platform != "linux":
         with subprocess.Popen(argv, cwd=cwd, env=env, stdin=stdin, stdout=output,
                               stderr=subprocess.STDOUT, start_new_session=True, pass_fds=inherited) as process:
             yield process, None
         return
-    store, identifier, owner_pid, owner_stamp, active = owner
+    store, identifier, owner_pid, owner_stamp, active = owner or (None, None, None, None, True)
     if not active:
         raise ExecutionCancelled("종료된 작업에서 외부 명령을 시작할 수 없습니다.")
     from ..platform.jobs import process_stamp
@@ -128,7 +128,8 @@ def _command_process(argv, *, cwd, env, stdin, output, inherited, cancellation, 
             os.close(status_write)
             status_write = None
             stamp = process_stamp(process.pid)
-            store.register_process(identifier, owner_pid, owner_stamp, process.pid, stamp)
+            if store is not None:
+                store.register_process(identifier, owner_pid, owner_stamp, process.pid, stamp)
             if cancellation and cancellation():
                 raise ExecutionCancelled("분석 실행이 취소되었습니다.")
             if timeout is not None and time.monotonic() - start >= timeout:
@@ -150,7 +151,7 @@ def _command_process(argv, *, cwd, env, stdin, output, inherited, cancellation, 
             for descriptor in (lifeline_read, status_read, status_write):
                 if descriptor is not None:
                     os.close(descriptor)
-            if process is not None and stamp and process_stamp(process.pid) != stamp:
+            if store is not None and process is not None and stamp and process_stamp(process.pid) != stamp:
                 store.forget_process(identifier, process.pid, stamp)
 
 

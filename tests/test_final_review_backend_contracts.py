@@ -23,6 +23,7 @@ def projection_config():
     cfg['mature'].update(wt_sequence='ACDEFGHIKLMNPQRSTVWY'*2,prefilter={'mode':'none'})
     cfg['mature']['library'].update(strategy='random',size=3,min_mutations=1,max_mutations=8)
     cfg['screen']['engine']='colabfold'
+    cfg['screen']['restraint']['enabled']=False
     cfg['screen']['colabfold']['msa_mode']='precomputed'
     return cfg
 

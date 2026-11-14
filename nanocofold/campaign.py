@@ -629,11 +629,21 @@ def _run_locked(cfg: dict, root: Path, definition: dict, mapping: pd.DataFrame) 
     ledger_path = root / "06_specificity" / "budget.json"
     ledger = _read(ledger_path) or {"seconds": 0.0}
     if ledger.get("started_at"):
-        ledger["seconds"] += max(0, time.time() - ledger["started_at"])
+        # Charge only durable active-time checkpoints, never powered-off wall time.
+        ledger["seconds"] += max(0, float(ledger.get("active_seconds_checkpoint", 0)))
+        ledger["recovered_unclean_attempt"] = True
+    ledger["active_seconds_checkpoint"] = 0.0
     remaining = float(cfg_get(cfg, "specificity.budget_hours", 48)) * 3600 - ledger["seconds"]
     ledger["started_at"] = time.time()
     _save(ledger_path, ledger)
     start = time.monotonic()
+    import threading
+    stop_checkpoint = threading.Event()
+    def checkpoint_budget():
+        while not stop_checkpoint.wait(5):
+            ledger["active_seconds_checkpoint"] = max(0, time.monotonic() - start)
+            _save(ledger_path, ledger)
+    checkpoint_thread = threading.Thread(target=checkpoint_budget, name="nanocofold-budget-checkpoint", daemon=True)
     candidates = pd.DataFrame(columns=["design_id", "sequence", "cdr3", "dev_cdr_evaluated", "dev_severe"])
     records = []
     run_status = "complete"
@@ -642,6 +652,7 @@ def _run_locked(cfg: dict, root: Path, definition: dict, mapping: pd.DataFrame) 
     library = work / "candidates.csv"
     if library.exists() and _read_cache(work / "candidates_manifest.json").get("sha256") == _hash(library):
         candidates = _read_library(library)
+    checkpoint_thread.start()
     try:
         with shell.execution_budget(remaining):
             if remaining <= 0:
@@ -734,6 +745,9 @@ def _run_locked(cfg: dict, root: Path, definition: dict, mapping: pd.DataFrame) 
                 record.update(status="failed", error="불완전하거나 손상된 캐시")
             records.append(record)
     finally:
+        stop_checkpoint.set()
+        checkpoint_thread.join()
+        ledger["active_seconds_checkpoint"] = 0.0
         ledger["seconds"] += time.monotonic() - start
         ledger["started_at"] = None
         _save(ledger_path, ledger)

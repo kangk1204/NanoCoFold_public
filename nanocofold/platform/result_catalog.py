@@ -984,7 +984,7 @@ class ResultCatalog:
             os.close(descriptor)
 
     @contextlib.contextmanager
-    def reuse_lease(self, identity_digest):
+    def reuse_lease(self, identity_digest, *, researcher=None):
         """Yield a verified source while holding its writer lock through commit.
 
         The caller must commit the alias/link inside this context. Missing or
@@ -999,7 +999,18 @@ class ResultCatalog:
             rows = connection.execute("""SELECT id,updated,payload FROM results WHERE identity_digest=?
                 AND can_reuse=1 AND status='complete' ORDER BY updated DESC,id DESC LIMIT 100""",
                 (identity_digest,)).fetchall()
+        allowed = None
+        if researcher:
+            # Result reuse must not grant a second account access to another
+            # researcher's name, logs or outputs, even for identical sequences.
+            jobs = self.root / "jobs.sqlite3"
+            allowed = set()
+            if jobs.is_file() and not jobs.is_symlink():
+                with sqlite3.connect(f"file:{jobs}?mode=ro", uri=True) as activity:
+                    allowed = {row[0] for row in activity.execute("SELECT DISTINCT result_id FROM lab_usage WHERE researcher=?", (researcher,))}
         for row in rows:
+            if allowed is not None and row["id"] not in allowed:
+                continue
             result = json.loads(row["payload"])
             lease = contextlib.ExitStack()
             try:

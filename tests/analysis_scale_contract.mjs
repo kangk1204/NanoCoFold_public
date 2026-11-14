@@ -62,8 +62,8 @@ test('invalid selection bounds fail before submitting and complex mode ignores V
  get('selection-limit').value='5';get('selection-limit').valueAsNumber=5;
  assert.equal(c.inputSettings(false).rank.final_n,starter.modes.screen.native_override.rank.final_n,'Hidden design/mature controls must not change screening selections');
 });
-test('screen and complex keep their own candidate semantics and do not show VHH scale controls',()=>{
- const {c,get}=fixture();for(const mode of ['screen','complex']){get('mode').value=mode;c.renderAnalysisScale(c.inputSettings(true),mode);assert.equal(get('analysis-scale').hidden,true);}
+test('screen and complex show engine conditions while keeping their own candidate semantics',()=>{
+ const {c,get}=fixture();for(const mode of ['screen','complex']){get('mode').value=mode;c.renderAnalysisScale(c.inputSettings(true),mode);assert.equal(get('analysis-scale').hidden,false);}
  assert.match(c.noviceModelPlan({screen:{comparison:{enabled:true,engines:['boltz2','chai1']}}},'screen',1001),/1001개.*2002모델/);
 });
 

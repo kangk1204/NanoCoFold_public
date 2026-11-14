@@ -36,8 +36,13 @@ def test_supported_alias_case_and_unset_template_values_are_preserved(setting, v
     original_thresholds = copy.deepcopy(cfg["score"]["thresholds"])
     original_rank = copy.deepcopy(cfg["rank"])
     config.cfg_set(cfg, setting, value)
+    if setting == "structure.provider" and value == "mock":
+        cfg["run"]["mock"] = True
+    if setting == "screen.engine" and value in {"colabfold", "opendde"}:
+        cfg["screen"]["restraint"]["enabled"] = False
     config._validate(cfg)
-    assert config.cfg_get(cfg, setting) == value
+    expected = {"boltz": "boltz2"}.get(value.lower(), value.lower()) if setting == "structure.provider" and isinstance(value, str) else value
+    assert config.cfg_get(cfg, setting) == expected
     assert cfg["score"]["thresholds"] == original_thresholds and cfg["rank"] == original_rank
 
 

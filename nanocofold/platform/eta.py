@@ -220,10 +220,12 @@ class RuntimeEstimator:
                     if calibration.is_file():
                         control = json.loads(calibration.read_text())
                         cfg = yaml.safe_load(Path(job["config_path"]).read_text())
-                        count = min(cfg.get("screen", {}).get("cascade", {}).get("top_n", 99), len(ids) - int("WT" in ids))
+                        cascade = cfg.get("screen", {}).get("cascade", {})
+                        # The selection union can contain top, diversity, audit and WT rows.
+                        count = min(len(ids), max(int(cascade.get("final_count", 0)), int(cascade.get("top_n", 99)) + int(cascade.get("diversity_n", 0)) + int(cascade.get("audit_n", 0))) + int("WT" in ids))
                         if control.get("valid") and not control.get("mock") and _valid_duration(control.get("seconds_per_candidate")):
                             seconds += count * control["seconds_per_candidate"]
-                            result.update(includes_second_stage=True, note="ColabFold 완료 배치와 같은 설정의 WT Boltz-2 실측으로 두 단계 잔여 시간을 추정합니다. 결과 저장·전송과 GPU 대기는 제외합니다.")
+                            result.update(includes_second_stage=True, second_stage_count_basis="selection_union_upper_bound", note="ColabFold 완료 배치와 같은 설정의 WT Boltz-2 실측으로 두 단계 잔여 시간을 추정합니다. 결과 저장·전송과 GPU 대기는 제외합니다.")
                     return {**result, "status": "estimated", "seconds_per_candidate": round(rate, 2),
                             "remaining_seconds": round(seconds), "lower_seconds": round(seconds * .7), "upper_seconds": round(seconds * 1.4),
                             "estimated_finish": (time.time() if now is None else now) + seconds,

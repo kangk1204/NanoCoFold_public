@@ -1,0 +1,62 @@
+# 100 single-substitution VHH variants, evaluated by four engines, plus WT.
+# Input example: IL-6 / anti-IL-6 VHH. Replace both FASTA paths for your target.
+# Paths are relative to the NanoCoFold workspace (or use absolute paths).
+run:
+  mode: mature
+  name: mature100_four_engines
+  seed: 42
+  mock: false
+target:
+  fasta: examples/tutorial/target.fasta
+  sequence: ""
+  hotspots: auto
+mature:
+  wt_fasta: examples/tutorial/wt_vhh.fasta
+  wt_sequence: null
+  library:
+    strategy: dms
+    max_variants: null  # Remove the small starter's hidden 3-variant cap.
+  prefilter:
+    mode: esm2
+    top_n: 100
+    enforce_threshold: false  # Same as the small web starter; final gates remain unchanged.
+  antifold:
+    enabled: false
+screen:
+  engine: boltz2
+  comparison:
+    enabled: true
+    engines: [colabfold, boltz2, chai1, opendde]
+    continue_on_error: true
+  cascade:
+    enabled: false
+  boltz2_rescore_top: 0
+  restraint:
+    enabled: false
+  num_trunk_recycles: 3
+  num_diffn_timesteps: 200
+  num_diffn_samples: 1
+  # Exact MSAs must already be in this installation's registered cache.
+  # Public API alternative: follow the explicit consent command in the guide.
+  allow_public_msa_server: false
+  colabfold:
+    msa_mode: precomputed
+    msa_source: cache
+    num_models: 1
+    num_seeds: 1
+    num_recycles: 3
+  opendde:
+    enabled: true
+    cycles: 3
+    steps: 200
+    samples: 1
+score:
+  boltz2:
+    seed: 42
+  boltz2_recycling_steps: 3
+  boltz2_sampling_steps: 200
+  boltz2_diffusion_samples: 1
+rank:
+  include_wt_control: true
+# Final eligibility thresholds and rank weights come from the installation's
+# existing configuration; they are not relaxed in this example.

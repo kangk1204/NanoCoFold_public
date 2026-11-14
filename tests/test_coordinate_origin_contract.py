@@ -159,7 +159,7 @@ def test_observation_scope_is_copied_only_from_the_same_scored_coordinate(vhh_ru
     other = path.with_name("other.pdb")
     other.write_bytes(path.read_bytes())
     table.write_text(table.read_text().replace("model.pdb", "missing.pdb"))
-    assert all("iptm_scope" not in row and "iptm_source" not in row for row in ResultReader(root).observations()["rows"])
+    assert all(row.get("iptm_scope") is None and row.get("iptm_source") == "not_assessed" for row in ResultReader(root).observations()["rows"])
 
 
 def test_cloud_structure_json_keeps_verified_raw_utf8_bytes_and_hash(tmp_path, vhh_run):

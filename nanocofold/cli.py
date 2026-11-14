@@ -76,16 +76,16 @@ def build_parser(*, handoff_help_language: str = "en") -> argparse.ArgumentParse
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_init = sub.add_parser("init", help="Prepare a researcher workspace and CPU demo")
-    p_init.add_argument("--workspace", type=Path, default=Path.cwd())
+    p_init.add_argument("--workspace", type=Path, default=Path.cwd(), help="Workspace folder for inputs, jobs and saved results (default: current folder)")
     p_setup = sub.add_parser("setup", help="Install environments and verified models for an analysis mode")
     p_setup.add_argument("--workspace", type=Path, default=Path.cwd())
     p_setup.add_argument("--profile", choices=["core", "complex", "design", "screen", "mature", "all", "colabfold", "boltzgen", "opendde"], default="core")
     p_setup.add_argument("--yes", action="store_true", help="Run the selected installation profile")
     p_serve = sub.add_parser("serve", help="Start the browser app for setup, analysis and results")
-    p_serve.add_argument("--workspace", type=Path, default=Path.cwd())
-    p_serve.add_argument("--port", type=int, default=18765)
-    p_serve.add_argument("--host", default="127.0.0.1", choices=["127.0.0.1", "localhost", "::1"])
-    p_serve.add_argument("--no-browser", action="store_true")
+    p_serve.add_argument("--workspace", type=Path, default=Path.cwd(), help="Existing researcher workspace (default: current folder)")
+    p_serve.add_argument("--port", type=int, default=18765, help="Local web port (default: 18765)")
+    p_serve.add_argument("--host", default="127.0.0.1", choices=["127.0.0.1", "localhost", "::1"], help="Loopback address; use lab-serve for authenticated shared access")
+    p_serve.add_argument("--no-browser", action="store_true", help="Print the URL without opening a browser")
     p_catalog = sub.add_parser("catalog", help="Search or index saved results without computation")
     p_catalog.add_argument("--workspace", type=Path, default=Path.cwd())
     p_catalog.add_argument("--register", type=Path, help="Index one result inside the workspace")
@@ -321,6 +321,9 @@ def _main(argv: list[str] | None = None) -> int:
             return cmd_license(args)
         if args.command in {"run", "prepare", "complex", "design", "screen", "mature", "score", "report"}:
             return _execute_command(args)
+    except shell.ExecutionCancelled as exc:
+        print(f"[중단] {exc}", file=sys.stderr)
+        return 130
     except Exception as exc:  # noqa: BLE001
         print(f"[오류] {exc}", file=sys.stderr)
         if "DEBUG" in str(__import__("os").environ.get("NANOCOFOLD_DEBUG", "")):
@@ -375,6 +378,45 @@ def _preflight_input_files(cfg: dict, args, *, required=False) -> None:
             raise FileNotFoundError("screen 모드에는 --vhh-fasta (후보 나노바디 FASTA)가 필요합니다.")
         if mode == "mature":
             mature.resolve_wt_sequence(cfg)
+
+
+def _preflight_comparison_reuse(cfg, run_dir, command):
+    """Reject incompatible comparison attempts before touching saved run state."""
+    if command in {"report", "score"}:
+        return
+    saved = run_dir / "run_config.yaml"
+    identity_path = run_dir / "02_comparison/comparison_identity.json"
+    if not saved.is_file() or not identity_path.is_file():
+        return
+    previous = load_config(saved)
+    keys = ("run.seed", "run.mode", "run.mock", "target", "structure", "design", "mature", "screen", "truncate")
+    changed = [key for key in keys if cfg_get(previous, key) != cfg_get(cfg, key)]
+    old_boltz = {k:v for k,v in cfg_get(previous,"score",{}).items() if k.startswith("boltz2")}
+    new_boltz = {k:v for k,v in cfg_get(cfg,"score",{}).items() if k.startswith("boltz2")}
+    if old_boltz != new_boltz:
+        changed.append("score.boltz2")
+    identity = json.loads(identity_path.read_text())
+    from . import engine_comparison
+    if identity.get("runner_sha256") and identity["runner_sha256"] != provenance.file_digest(Path(engine_comparison.__file__)):
+        changed.append("comparison runner")
+    if "source_inputs" in identity and identity["source_inputs"] != engine_comparison.source_input_hashes(cfg):
+        changed.append("source input contents")
+    if identity.get("runtime"):
+        runtime = {engine: provenance.runtime_identity(cfg, engine) for engine in identity["engines"]}
+        if runtime != identity["runtime"]:
+            changed.append("runtime")
+    # File contents can change while their configuration path stays the same.
+    if cfg_get(cfg, "run.mode") == "screen" and cfg_get(cfg, "screen.vhh_fasta"):
+        candidates = screen.fasta_to_candidates(resolve_path(cfg, cfg_get(cfg, "screen.vhh_fasta")))
+        current = [{"id": str(row["design_id"]), "sequence": row["sequence"]} for row in candidates.to_dict("records")]
+        if current != identity.get("candidates"):
+            changed.append("screen.vhh_fasta contents")
+    if cfg_get(cfg, "target.fasta") and not cfg_get(cfg, "target.sequence"):
+        records = seq_utils.read_fasta(resolve_path(cfg, cfg_get(cfg, "target.fasta")))
+        if len(records) != 1 or next(iter(records.values())) != identity.get("target", {}).get("sequence"):
+            changed.append("target.fasta contents")
+    if changed:
+        raise ValueError("비교 입력·엔진·MSA 조건이 바뀌었습니다. 기존 실행을 보존하고 새 분석으로 제출하세요. 변경: " + ", ".join(changed))
 
 
 def _execute_command(args) -> int:
@@ -436,6 +478,7 @@ def _execute_command(args) -> int:
             and all(path.name == ".run.lock" and path.is_file() and not path.is_symlink()
                     for path in run_dir.iterdir())
         )
+        _preflight_comparison_reuse(cfg, run_dir, args.command)
         execution_context.enter_context(ConsoleProgress("NanoCoFold " + args.command, run_dir=run_dir))
         args.run_dir = str(run_dir)
         run_dir, state = _open_run(cfg, args)
@@ -470,6 +513,7 @@ def _execute_command(args) -> int:
             if not dry:
                 state.data["execution"] = {"state": "running", "started": started, "command": args.command,
                                            "completed_phases": []}
+                state.data.setdefault("attempts", []).append({"command": args.command, "started": started, "application_version": __version__, "config_sha256": __import__("hashlib").sha256(json.dumps(cfg,sort_keys=True,default=str).encode()).hexdigest()})
                 state.data["current_phase"] = "preflight"
                 state.save()
             if args.command in {"run", "complex", "design", "screen", "mature"} and not (_is_mock(cfg) or dry):
@@ -526,7 +570,7 @@ def _execute_command(args) -> int:
                 attempt = {"state": status, "started": started, "finished": time.time(),
                     "command": args.command, "error": f"{type(exc).__name__}: {exc}"}
                 source = state.data.get("report_source_execution", {})
-                if args.command == "report" and source.get("state") in {"cancelled", "interrupted", "budget_exhausted", "running"}:
+                if args.command == "report" and source.get("state") in {"cancelled", "interrupted", "budget_exhausted", "running", "failed", "partial_failure"}:
                     state.data["execution"] = dict(source)
                     state.data["report_attempt"] = {**attempt, "state": "rejected"}
                 else:
@@ -549,14 +593,43 @@ def _antibody_env_available(cfg: dict) -> bool:
 
 
 def _load(args) -> dict:
+    import warnings
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", UserWarning)
+        cfg = _load_unrecorded(args)
+    args.config_warnings = list(dict.fromkeys(str(w.message) for w in caught))
+    for message in args.config_warnings:
+        print("[경고] " + message)
+    return cfg
+
+
+def _load_unrecorded(args) -> dict:
     overrides = list(args.set)
+    if getattr(args, "mock", False):
+        overrides.append("run.mock=true")
+    if getattr(args, "dry_run", False):
+        overrides.append("run.dry_run=true")
     mode = getattr(args, "mode", None)
     if not mode and getattr(args, "command", None) in {"complex", "design", "screen", "mature"}:
         mode = args.command
     if mode:
         # Validate the selected CLI mode together with mode-specific options.
         overrides.append(f"run.mode={mode}")
-    cfg = load_config(args.config, overrides, historical=getattr(args, "command", None) == "report")
+    directory = getattr(args, "run_dir", None)
+    saved = resolve_path(None, directory) / "run_config.yaml" if directory else None
+    historical = getattr(args, "command", None) == "report"
+    if saved is not None and saved.is_file():
+        from .config import _deep_merge, _validate
+        cfg = load_config(saved, historical=historical)
+        if args.config:
+            partial = read_config_file(args.config) or {}
+            cfg = _deep_merge(cfg, partial)
+            if partial.get("target", {}).get("fasta") and not partial.get("target", {}).get("sequence"):
+                cfg["target"]["sequence"] = ""
+        apply_overrides(cfg, overrides)
+        _validate(cfg, historical=historical)
+    else:
+        cfg = load_config(args.config, overrides, historical=historical)
     if getattr(args, "mode", None):
         cfg["run"]["mode"] = args.mode
     if getattr(args, "mock", False):
@@ -567,6 +640,17 @@ def _load(args) -> dict:
 
 
 def _open_run(cfg: dict, args, new: bool = True) -> tuple[Path, RunState]:
+    import warnings
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", UserWarning)
+        run_dir, state = _open_run_unrecorded(cfg, args, new)
+    messages = list(dict.fromkeys([*getattr(args, "config_warnings", []), *(str(w.message) for w in caught)]))
+    if messages and getattr(args, "command", None) != "report":
+        state.add_warnings(messages)
+    return run_dir, state
+
+
+def _open_run_unrecorded(cfg: dict, args, new: bool = True) -> tuple[Path, RunState]:
     """run-dir 재개 시 저장된 run_config.yaml 을 기준으로 설정을 복원한다(F08)."""
     run_dir_arg = getattr(args, "run_dir", None)
     run_id = getattr(args, "run_id", None)
@@ -641,6 +725,7 @@ def _file_content_hash(value) -> str | None:
 
 def _target_fingerprint(cfg: dict, run_dir: Path | None = None, mock: bool = False) -> str:
     import hashlib
+    from . import provenance
 
     msa_files: dict[str, str] = {}
     if run_dir is not None:
@@ -663,6 +748,7 @@ def _target_fingerprint(cfg: dict, run_dir: Path | None = None, mock: bool = Fal
             configured_msa = cache_dir / f"{msa_utils.sequence_hash(sequence)}.a3m"
     payload = json.dumps({
         "mock": bool(mock),
+        "runtime": provenance.runtime_identity(cfg, str(cfg_get(cfg,"structure.provider","chai1"))) if not mock and not _is_dry_run(cfg) else None,
         "msa_files": msa_files,
         "configured_msa_path": str(configured_msa) if configured_msa else None,
         "configured_msa_exists": bool(
@@ -1735,6 +1821,13 @@ def cmd_design(args) -> int:
 
 
 def _run_design_backend(cfg, run_dir, target, mock, dry_run):
+    if dry_run and not Path(target.get("structure") or "").is_file():
+        # Target preview restores the protected run before returning. Keep a
+        # separate preview alive only while downstream commands are assembled.
+        import tempfile
+        with tempfile.TemporaryDirectory(prefix="nanocofold-design-preview-") as folder:
+            preview = target_prep._prepare_target_impl(cfg, Path(folder), mock=mock, dry_run=True)
+            return _run_design_backend(cfg, run_dir, preview, mock, dry_run)
     # Keep the established RF-only path and its return contract intact.
     if cfg_get(cfg, "design.engine", "rfantibody") == "rfantibody" and not cfg_get(cfg, "design.refinement.enabled", False):
         return design_rfantibody.run_design(cfg, run_dir, target, mock=mock, dry_run=dry_run)
@@ -1930,11 +2023,14 @@ def cmd_score(args) -> int:
     if _is_dry_run(cfg):
         _write_dry_run_notice(run_dir, state)
         return 0
+    prior = state.data.get("previous_execution", state.data.get("execution", {}))
+    if prior.get("state") in {"failed", "partial_failure", "cancelled", "interrupted", "budget_exhausted"}:
+        raise ValueError("마지막 예측 시도가 완료되지 않았습니다. 분석을 재개한 뒤 점수를 다시 계산하세요.")
     target = state.get_phase("target")
     if not target:
         raise RuntimeError("이 실행에 target 단계가 없습니다. 먼저 prepare/run 을 수행하세요.")
     from . import cascade
-    if (run_dir / "03_score" / "cascade_candidates.csv").exists():
+    if cfg_get(cfg, "screen.cascade.enabled", False) and (run_dir / "03_score" / "cascade_candidates.csv").exists():
         mature_state = state.get_phase("mature")
         cdr_ranges = {k: tuple(v) for k, v in mature_state.get("cdr_ranges", {}).items()} or None
         cascade.reanalyze(cfg, run_dir, state, target, cdr_ranges,
@@ -1959,8 +2055,8 @@ def cmd_score(args) -> int:
 
 
 def _load_candidates(cfg, run_dir: Path, state: RunState) -> pd.DataFrame | None:
-    predictions = _load_prediction_manifests(run_dir)
-    design_state = state.get_phase("design")
+    predictions = _load_prediction_manifests(run_dir, cfg)
+    design_state = state.get_phase("design") if cfg_get(cfg, "run.mode") == "design" else {}
     if design_state and (run_dir / "02_design" / "design_candidates.csv").exists():
         frame = pd.read_csv(run_dir / "02_design" / "design_candidates.csv", dtype={"design_id": str})
         if not predictions.empty:
@@ -1971,7 +2067,8 @@ def _load_candidates(cfg, run_dir: Path, state: RunState) -> pd.DataFrame | None
             if not merged.empty:
                 return _resolve_prediction_paths(_normalize_prediction_columns(merged), run_dir)
         return _resolve_prediction_paths(_normalize_prediction_columns(frame), run_dir)
-    for path in (run_dir / "02_screen" / "candidates.csv", run_dir / "02_mature" / "prefiltered_candidates.csv"):
+    candidate_paths = [run_dir / "02_mature" / "prefiltered_candidates.csv"] if cfg_get(cfg,"run.mode") == "mature" else [run_dir / "02_screen" / "candidates.csv"]
+    for path in candidate_paths:
         if path.exists():
             frame = pd.read_csv(path, dtype={"design_id": str, "variant_id": str})
             id_column = "design_id" if "design_id" in frame.columns else "variant_id"
@@ -2015,11 +2112,19 @@ def _resolve_prediction_paths(frame: pd.DataFrame, run_dir: Path) -> pd.DataFram
     return frame
 
 
-def _load_prediction_manifests(run_dir: Path) -> pd.DataFrame:
+def _load_prediction_manifests(run_dir: Path, cfg: dict | None = None) -> pd.DataFrame:
     """모든 predictions.csv 를 읽어 후보 ID별로 중복 제거한다 (boltz2 우선)."""
     frames: list[pd.DataFrame] = []
     from .utils.predictions import current_manifests
     for manifest in sorted(current_manifests(run_dir)):
+        if cfg is not None and not cfg_get(cfg, "screen.cascade.enabled", False) and not cfg_get(cfg, "screen.comparison.enabled", False):
+            mode = cfg_get(cfg, "run.mode")
+            stage = {"design": "02b_tier2", "mature": "02b_mature_complex"}.get(mode, "02_screen")
+            allowed = {run_dir / stage / "predictions.csv"}
+            if mode in {"design", "screen"} and cfg_get(cfg, "screen.boltz2_rescore_top", 0) > 0:
+                allowed.add(run_dir / "02c_boltz2/predictions.csv")
+            if manifest not in allowed:
+                continue
         try:
             frame = pd.read_csv(manifest, dtype={"design_id": str})
         except (OSError, ValueError, pd.errors.ParserError) as exc:
@@ -2105,7 +2210,7 @@ def cmd_report(args) -> int:
         execution = (state.data.get("previous_execution", {})
                      if current.get("command") == "report" and current.get("state") == "running"
                      else current)
-    if execution.get("state") in {"cancelled", "interrupted", "budget_exhausted", "running"}:
+    if execution.get("state") in {"cancelled", "interrupted", "budget_exhausted", "running", "failed", "partial_failure"}:
         raise ValueError("중단된 실행은 report로 완료 처리할 수 없습니다. 계산을 재개하거나 별도 읽기 전용 보고서를 내보내세요.")
     if cfg_get(cfg, "run.mode") == "complex" and (run_dir / "complex_results.json").is_file():
         prediction = state.get_phase("prediction")

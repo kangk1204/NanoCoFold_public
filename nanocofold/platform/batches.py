@@ -176,7 +176,7 @@ class BatchManager:
         # Consent covers this exact manifest, never an earlier single-analysis draft.
         requires_api = any(cfg.get("screen", {}).get("allow_public_msa_server") or cfg.get("complex", {}).get("allow_public_msa_server") for cfg in configs)
         if requires_api and payload.get("api_consent") is not True:
-            raise ValueError("표적·후보 서열의 외부 MSA 전송에 동의하면 배치 설정에 api_consent: true를 추가한 뒤 다시 검토하세요.")
+            raise ValueError("표적·후보 서열의 외부 MSA 전송에 동의하면 배치 매니페스트 최상위에 api_consent: true를 추가한 뒤 다시 검토하세요.")
         batch = {"id": uuid.uuid4().hex, "name": str(payload.get("name", "배치 분석"))[:120], "mode": payload["mode"], "created": time.time(), "manifest_sha256": digest(payload), "rows": [], "predictions_executed": False}
         if researcher:
             batch["researcher"] = researcher
@@ -289,10 +289,12 @@ class BatchManager:
         with (self.jobs.store.root / f"batch-{identifier}.lock").open("a+") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
             batch = self.get(identifier)
-            if researcher and (batch.get("researcher") != researcher or any(
-                    row.get("job") and row["job"]["state"] not in TERMINAL and row["job"].get("researcher") != researcher
-                    for row in batch["rows"])):
+            if researcher and batch.get("researcher") != researcher:
                 raise ValueError("다른 담당자의 작업은 취소할 수 없습니다.")
+            def outcome():
+                result = self.get(identifier)
+                result["cancel_skipped_job_ids"] = [row["job_id"] for row in batch["rows"] if row.get("job") and row["job"]["state"] not in TERMINAL and researcher and row["job"].get("researcher") != researcher]
+                return result
             if expected_cancel is not None:
                 current_ids = {row["job_id"] for row in batch["rows"]
                                if row.get("job") and row["job"]["state"] not in TERMINAL}
@@ -303,10 +305,11 @@ class BatchManager:
                                for item in expected_cancel["jobs"])
                         or {item["job_id"] for item in expected_cancel["jobs"]} != current_ids):
                     raise ValueError("작업 상태가 바뀌었습니다. 현재 상태를 확인한 뒤 취소를 다시 선택하세요.")
-                self.jobs.cancel_many(expected_cancel["jobs"],
+                owned_ids = {row["job_id"] for row in batch["rows"] if row.get("job") and (not researcher or row["job"].get("researcher") == researcher)}
+                self.jobs.cancel_many([item for item in expected_cancel["jobs"] if item["job_id"] in owned_ids],
                                       batch_job_ids=[row["job_id"] for row in batch["rows"] if row.get("job_id")])
-                return self.get(identifier)
+                return outcome()
             for row in batch["rows"]:
-                if row.get("job") and row["job"]["state"] not in TERMINAL:
+                if row.get("job") and row["job"]["state"] not in TERMINAL and (not researcher or row["job"].get("researcher") == researcher):
                     self.jobs.cancel(row["job_id"])
-            return self.get(identifier)
+            return outcome()

@@ -295,11 +295,13 @@ class Agent:
                 context.update(bound=True,settings_match=True,inputs_match=True)
             else:
                 mode=payload.get('mode','complex')
-                override=self.bounded_settings(mode,payload.get('settings',{}),payload.get('engine'))
+                # Installation-only checks never grant permission to upload sequences.
+                check_settings={**payload.get('settings',{}),'msa_source':'cache','allow_public_msa_server':False,'cf_public_preset':None}
+                override=self.bounded_settings(mode,check_settings,payload.get('engine'))
                 cfg=normalized_config(self.workspace,override)
                 context={'input_id':None,'settings_sha256':json_sha256(cfg),'input_sha256':None,
                          'bound':False,'settings_match':False,'inputs_match':False}
-            self.diagnostics=public_diagnostics(doctor(cfg))
+            self.diagnostics=public_diagnostics(doctor(cfg, environment_only='input_id' not in payload))
             context.update(checked_at=checked_at(),installation_identity=self.installation_identity(),ok=self.diagnostics.get('ok') is True)
             self.diagnostics.update(review_context=context,capabilities=self.capabilities(),agent_version=AGENT_VERSION)
             response={'state':'complete','response':self.diagnostics}
@@ -451,8 +453,8 @@ class Agent:
         maximum=10000 if cascade else 2000
         if type(count) is not int or not 1<=count<=maximum:raise ValueError(f'후보 수는 1–{maximum}입니다.')
         cfg={'run':{'mode':mode,'seed':seed},'screen':{'engine':engine,'boltz2_rescore_top':0,'restraint':{'enabled':False},'num_trunk_recycles':common['recycles'],'num_diffn_timesteps':common['diffusion_steps'],'num_diffn_samples':1},
-             'score':{'boltz2_recycling_steps':common['recycles'],'boltz2_extra_args':['--no_kernels','--num_workers','0','--sampling_steps',str(common['diffusion_steps'])]},
-             'structure':{'provider':engine,'msa':{'backend':'empty'},'boltz2':{'recycling_steps':common['recycles'],'diffusion_samples':1,'extra_args':['--no_kernels','--num_workers','0','--sampling_steps',str(common['diffusion_steps'])]},'chai1':{'num_trunk_recycles':common['recycles'],'num_diffn_timesteps':common['diffusion_steps']}},
+             'score':{'boltz2_recycling_steps':common['recycles'],'boltz2_sampling_steps':common['diffusion_steps'],'boltz2_extra_args':['--no_kernels','--num_workers','0']},
+             'structure':{'provider':engine,'msa':{'backend':'empty'},'boltz2':{'recycling_steps':common['recycles'],'diffusion_samples':1,'sampling_steps':common['diffusion_steps'],'extra_args':['--no_kernels','--num_workers','0']},'chai1':{'num_trunk_recycles':common['recycles'],'num_diffn_timesteps':common['diffusion_steps']}},
              'rank':{'require_hotspot':False,'final_n':count},'design':{'num_designs':count,'filters':{'enabled':False,'top_n_to_score':count}}}
         if mode=='design':
             # A restored draft may retain inputs from another mode. New VHH
@@ -533,7 +535,8 @@ class Agent:
             if msa_source=='public_api' and consent is not True:raise ValueError('public_api는 표적·생성 서열을 외부 서버로 전송합니다. allow_public_msa_server=true 동의가 필요합니다.')
             cfg['screen']['allow_public_msa_server']=consent
             cfg['screen']['comparison']={'enabled':True,'engines':list(predictors),'continue_on_error':True}
-            cfg['screen']['opendde']={'enabled':'opendde' in predictors}
+            cfg['screen']['opendde']={'enabled':'opendde' in predictors,
+                                      'cycles':common['recycles'], 'steps':common['diffusion_steps'], 'samples':1}
             cfg['screen']['cascade']={'enabled':False}
             cfg['screen']['colabfold']={'num_recycles':values['cf_recycles'],'batch_size':values['cf_batch_size'],
                 'num_models':values['cf_models'],'num_seeds':values['cf_seeds'],'msa_mode':'precomputed',

@@ -160,3 +160,31 @@ test('a cold shared-server check can finish after three minutes without a second
  await c.submitReviewedAnalysis();
  assert.equal(posts,1);assert.deepEqual(accepted,['cold-verified']);
 });
+
+test('increasing a mature starter limit removes its implicit DMS cap',()=>{
+ const {c,get}=fixture();get('mode').value='mature';get('candidate-limit').value='100';
+ const cfg=c.inputSettings(false);
+ assert.equal(cfg.mature.library.max_variants,null);
+ assert.equal(cfg.mature.prefilter.top_n,100);
+ cfg.rank.include_wt_control=true;
+ assert.equal(c.analysisQuantityPlan(cfg,'mature').modelUpper,404);
+ get('advanced').value=JSON.stringify({mature:{library:{max_variants:7}}});
+ assert.equal(c.inputSettings(false).mature.library.max_variants,7);
+});
+test('complex blank seed uses resolved settings and preserves explicit zero',()=>{
+ const {c,get}=fixture();get('mode').value='complex';get('seed').value='';
+ let cfg=c.inputSettings(false);assert.deepEqual([...c.noviceComplexSettings(cfg).seeds],[42]);
+ get('seed').value='0';cfg=c.inputSettings(false);assert.deepEqual([...c.noviceComplexSettings(cfg).seeds],[0]);
+});
+test('time limit is validated in minutes before consent or job submission',()=>{
+ const {c,get}=fixture();get('novice-msa').value='public_api';
+ for(const value of ['0','-5','20000','1.5']){get('budget').value=value;assert.throws(()=>c.inputSettings(false),e=>e.inputField===get('budget'));}
+ get('budget').value='10080';assert.equal(c.inputBudgetSeconds(),604800);
+ get('budget').value='';assert.equal(c.inputBudgetSeconds(),null);
+});
+test('sample counts are shown as structures separately from candidate-engine combinations',()=>{
+ const {c}=fixture();const cfg=structuredClone(starter.modes.design.native_override);
+ cfg.screen.num_diffn_samples=3;cfg.screen.colabfold.num_models=2;cfg.screen.colabfold.num_seeds=2;cfg.screen.opendde.samples=4;
+ const plan=c.analysisQuantityPlan(cfg,'design');assert.equal(plan.modelUpper,8);assert.equal(plan.nativeModelUpper,24);
+ assert.match(c.noviceModelPlan(cfg,'design'),/24/);assert.match(c.noviceModelPlan(cfg,'design'),/8/);
+});

@@ -210,6 +210,7 @@
                 외부 서버로 서열을 보내지 않습니다.
               </p>
             </div>
+            <p id="complex-mode-note" class="muted" hidden>복합체는 입력한 모든 체인을 분석합니다. 표적 구간·결합 부위 제외 설정과 CPU 데모는 적용하지 않습니다. 서열·체인 설정에서 분석 범위를 지정하세요.</p>
             <details id="region-fields">
               <summary>표적 분석 구간 · 결합 부위(hotspot) 제외 영역</summary>
               <p id="region-basis" class="muted">비워 두면 전체 표적을 분석합니다. 좌표 사용은 관측 서열, 새 구조 예측·FASTA는 검토한 전체 서열의 1-based 위치입니다.</p>
@@ -274,7 +275,7 @@
               백본 수와 평가 상한은 아래 현재 적용값으로 확인하세요.
               screen은 입력 라이브러리 전체를 평가합니다.
               품질 판정·충돌·개발가능성 경고를 유지하며 결과는 전체 후보를 표시합니다.
-              design 구조 생성은 선택한 결합 부위에 조건화됩니다. 후보 수가 늘면 계산 시간도 늘어납니다.</p>
+              RFantibody는 선택한 결합 부위를 사용합니다. BoltzGen은 design.hotspot_mode=specified일 때 적용합니다. 후보 수가 늘면 계산 시간도 늘어납니다.</p>
             <fieldset id="mature-library-settings" hidden>
               <legend>변이 생성 설정</legend>
               <label for="mutation-strategy">변이 생성 방식</label>
@@ -311,20 +312,21 @@
               <p id="mutation-current" role="status" aria-live="polite"></p>
             </fieldset>
             <label for="candidate-limit">후속 평가 후보 수 설정</label>
-            <input id="candidate-limit" type="number" min="1" step="1" placeholder="비우면 현재 설정 유지" aria-describedby="candidate-limit-help" />
+            <input id="candidate-limit" type="number" min="1" max="100000" step="1" placeholder="비우면 현재 설정 유지" aria-describedby="candidate-limit-help" />
             <label for="design-count">생성할 백본 수 · 생성기별</label>
-            <input id="design-count" type="number" min="1" step="1" placeholder="비우면 현재 설정 유지" aria-describedby="design-count-help" />
+            <input id="design-count" type="number" min="1" max="10000" step="1" placeholder="비우면 현재 설정 유지" aria-describedby="design-count-help" />
             <label for="screen-engine">복합체 예측 엔진</label
             ><select id="screen-engine">
               <option value="chai1">Chai-1</option>
-              <option value="boltz2">Boltz-2</option></select
+              <option value="boltz2">Boltz-2</option>
+              <option value="colabfold">ColabFold</option><option value="opendde">OpenDDE</option></select
             ><label for="seed">Seed</label
             ><input id="seed" type="number" value="42" min="0" step="1" aria-describedby="seed-current seed-help" />
             <p id="seed-current" aria-live="polite"></p>
             <p id="seed-help" class="muted">Seed는 난수 초기값입니다. 후보 수가 아닙니다. 엔진별로 가져온 개별 설정은 유지합니다.</p><label
               for="budget"
               >시간 한도 (분, 비우면 없음)</label
-            ><input id="budget" type="number" min="1" placeholder="예: 120" />
+            ><input id="budget" type="number" min="1" max="10080" step="1" placeholder="예: 120" />
             <label class="check"><input id="force-rerun" type="checkbox" />과거 결과를 재사용하지 않고 새로 계산</label>
             <p class="muted">완료된 결과는 입력·설정·도구·가중치·MSA 기록이 같은 경우 재사용합니다. 공용 API의 DB 버전은 실행 출처에서 확인하세요.</p>
             <details>
@@ -658,6 +660,7 @@
               <p id="reference-note" class="muted"></p>
               <details id="candidate-details-panel">
                 <summary>선택 후보의 수치·판정·서열 상세</summary>
+                <p class="muted">후보 대표 모델의 수치와 판정입니다. 관측 선택은 구조와 PAE만 바꿉니다.</p>
                 <p class="muted">지표 이름에 마우스를 올리거나 누르면 값의 의미와 읽는 방향을 볼 수 있습니다.</p>
                 <div id="candidate-detail"></div>
               </details>

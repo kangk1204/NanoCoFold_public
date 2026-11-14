@@ -18,7 +18,7 @@ from .config import cfg_get, cfg_seed, resolve_path
 from .target_prep import find_boltz_prediction_dir
 from .utils import msa as msa_utils, pdb_io
 from .utils import seq as seq_utils, shell
-from .utils.tool_args import BOLTZ_MANAGED, CHAI_MANAGED, validate_extra_args
+from .utils.tool_args import CHAI_MANAGED, validate_extra_args
 
 SCRIPTS_DIR = Path(__file__).resolve().parent / "scripts"
 CLIENT_SCRIPT = SCRIPTS_DIR / "chai_fold.py"
@@ -145,11 +145,25 @@ def predict_complexes(
     seq_utils.validate_candidate_ids(candidates[id_column].astype(str))
     work_dir.mkdir(parents=True, exist_ok=True)
     engine = engine or str(cfg_get(cfg, "screen.engine", "chai1"))
+    if engine not in {"chai1", "boltz2", "colabfold", "opendde"}:
+        raise ValueError(f"지원하지 않는 예측 엔진: {engine}")
     if engine == "colabfold":
         from .colabfold import predict
         return predict(cfg, work_dir, target_info, candidates, mock=mock, dry_run=dry_run,
                        id_column=id_column, sequence_column=sequence_column)
+    # Shared invalid inputs must fail before archiving results or trying candidates.
+    if engine == "opendde" and not mock:
+        if target_info.get("hotspot_seq_positions") and bool(cfg_get(cfg, "screen.restraint.enabled", True)):
+            raise ValueError("OpenDDE는 hotspot 예측 제약을 지원하지 않습니다. restraint를 끄고 사후 접촉 지표로 평가하세요.")
+        target_msa_input = target_info.get("target_msa") or "empty"
+        binder_msa_input = target_info.get("binder_msa") or "empty"
+        if not target_info.get("chain_msas") and (target_msa_input != "empty" or binder_msa_input != "empty"):
+            _, aux_pairs, _ = complex_chain_records(target_info, "")
+            if target_msa_input == "empty" or binder_msa_input == "empty" or aux_pairs:
+                raise ValueError("OpenDDE MSA는 모든 체인에 필요합니다. 일부 MSA를 무시하거나 자동 검색하지 않습니다.")
     if not dry_run:
+        provenance.archive_existing([work_dir / "predictions.csv", work_dir / "prediction_failures.json"], work_dir)
+        (work_dir / "prediction_failures.json").write_text("[]\n", encoding="utf-8")
         # A small stage-local plan lets progress readers use the actual selected
         # pool in every mode, including tier-2 and mature, without reranking it.
         plan = {"attempt_id": uuid.uuid4().hex, "engine": engine,
@@ -157,7 +171,6 @@ def predict_complexes(
         (work_dir / "prediction_plan.json").write_text(json.dumps(plan), encoding="utf-8")
         progress = {"attempt_id": plan["attempt_id"], "completed": []}
         (work_dir / "prediction_progress.json").write_text(json.dumps(progress), encoding="utf-8")
-    target_sequence = target_info["sequence"]
     hotspot_positions = target_info.get("hotspot_seq_positions")
     if hotspot_positions is None and target_info.get("hotspot_labels"):
         raise ValueError(
@@ -170,6 +183,7 @@ def predict_complexes(
     target_msa = target_info.get("target_msa") or "empty"
     seed = cfg_seed(cfg, "run.seed")
     records: list[dict] = []
+    failures = []
     run_root = work_dir.parent.resolve()
 
     for _, row in candidates.iterrows():
@@ -182,69 +196,85 @@ def predict_complexes(
         candidate_dir.mkdir(parents=True, exist_ok=True)
 
         if mock:
+            chain_records, aux_pairs, binder_letter = complex_chain_records(target_info, sequence)
+            samples = int(cfg_get(cfg, "score.boltz2_diffusion_samples", 1) if engine == "boltz2" else cfg_get(cfg, "screen.opendde.samples", 1) if engine == "opendde" else cfg_get(cfg, "screen.num_diffn_samples", 1))
             if not dry_run:
-                mock_mod.make_mock_chai_output(
-                    candidate_dir, candidate_id, target_sequence, sequence, hotspot_positions, seed=seed
-                )
+                provenance.archive_existing([p for p in candidate_dir.iterdir() if p.name != ".history"], candidate_dir)
+                mock_mod.make_mock_engine_output(candidate_dir, candidate_id, chain_records, hotspot_positions,
+                                                engine=engine, seed=seed, samples=samples)
             records.append({
                 id_column: candidate_id,
                 "pred_dir": str(candidate_dir.resolve()),
-                "engine": "mock",
+                "engine": engine, "mock": True, "seed": seed, "seed_source": "prediction",
+                "msa_used": "mock", "restraint": False, "model_count": samples,
                 "target_chain": "A",
-                "binder_chain": "B",
+                "binder_chain": binder_letter,
             })
             continue
 
-        chain_records, aux_pairs, binder_letter = complex_chain_records(target_info, sequence)
-        binder_msa = target_info.get("binder_msa") or "empty"
-        if bool(cfg_get(cfg, "screen.binder_msa", False)) and binder_msa == "empty" and not dry_run:
-            binder_msa, msa_warnings = msa_utils.ensure_a3m(
-                sequence, cfg_get(cfg, "structure.msa", {}) or {}, run_dir=candidate_dir
-            )
-            for warning in msa_warnings:
-                print(f"  [msa:{candidate_id}] {warning}")
-        if engine == "chai1":
-            msa_used = _predict_chai1(cfg, candidate_dir, target_info, chain_records, binder_letter, hotspot_positions, dry_run)
-            records.append({
-                id_column: candidate_id,
-                "pred_dir": str((candidate_dir / "chai_out").resolve()),
-                "engine": "chai1",
-                "msa_used": msa_used or "chai1_single",
-                "target_chain": "A",
-                "binder_chain": binder_letter,
-                "aux_chains": ";".join(f"{name}:{letter}" for name, letter in aux_pairs),
-            })
-        elif engine == "opendde":
-            from .opendde import predict as opendde_predict
-            if hotspot_positions:
-                raise ValueError("OpenDDE는 hotspot 예측 제약을 지원하지 않습니다. restraint를 끄고 사후 접촉 지표로 평가하세요.")
-            alignments = target_info.get("chain_msas")
-            if not alignments and (target_msa != "empty" or binder_msa != "empty"):
-                alignments = {"A": target_msa, binder_letter: binder_msa}
-                if any(value == "empty" for value in alignments.values()) or aux_pairs:
-                    raise ValueError("OpenDDE MSA는 모든 체인에 필요합니다. 일부 MSA를 무시하거나 자동 검색하지 않습니다.")
-            directory = opendde_predict(cfg, candidate_dir, chain_records,
-                                        chain_msas=alignments, dry_run=dry_run)
-            records.append({id_column: candidate_id, "pred_dir": str(directory.resolve()), "engine": engine,
-                            "msa_used": "precomputed_unpaired" if alignments else "empty",
-                            "target_chain": "A", "binder_chain": binder_letter,
-                            "aux_chains": ";".join(f"{name}:{letter}" for name, letter in aux_pairs)})
-        elif engine == "boltz2":
-            _predict_boltz2(cfg, candidate_dir, chain_records, target_msa, binder_letter, hotspot_positions, dry_run, binder_msa,
-                            chain_msas=target_info.get("chain_msas"))
-            nested = find_boltz_prediction_dir(candidate_dir / "boltz_out") or candidate_dir
-            records.append({
-                id_column: candidate_id,
-                "pred_dir": str((nested if Path(nested).exists() else candidate_dir).resolve()),
-                "engine": "boltz2",
-                "msa_used": _boltz_msa_mode(chain_records, target_msa, binder_letter, binder_msa,
-                                            target_info.get("chain_msas")),
-                "target_chain": "A",
-                "binder_chain": binder_letter,
-                "aux_chains": ";".join(f"{name}:{letter}" for name, letter in aux_pairs),
-            })
-        else:
-            raise ValueError(f"지원하지 않는 예측 엔진: {engine}")
+        try:
+            chain_records, aux_pairs, binder_letter = complex_chain_records(target_info, sequence)
+            binder_msa = target_info.get("binder_msa") or "empty"
+            if bool(cfg_get(cfg, "screen.binder_msa", False)) and binder_msa == "empty" and not dry_run:
+                binder_msa, msa_warnings = msa_utils.ensure_a3m(
+                    sequence, cfg_get(cfg, "structure.msa", {}) or {}, run_dir=candidate_dir
+                )
+                for warning in msa_warnings:
+                    print(f"  [msa:{candidate_id}] {warning}")
+            if engine == "chai1":
+                msa_used = _predict_chai1(cfg, candidate_dir, target_info, chain_records, binder_letter, hotspot_positions, dry_run)
+                records.append({
+                    id_column: candidate_id,
+                    "pred_dir": str((candidate_dir / "chai_out").resolve()),
+                    "engine": "chai1",
+                    "msa_used": msa_used or "chai1_single",
+                    "target_chain": "A",
+                    "binder_chain": binder_letter,
+                    "aux_chains": ";".join(f"{name}:{letter}" for name, letter in aux_pairs),
+                })
+            elif engine == "opendde":
+                from .opendde import predict as opendde_predict
+                if hotspot_positions:
+                    raise ValueError("OpenDDE는 hotspot 예측 제약을 지원하지 않습니다. restraint를 끄고 사후 접촉 지표로 평가하세요.")
+                alignments = target_info.get("chain_msas")
+                if not alignments and (target_msa != "empty" or binder_msa != "empty"):
+                    alignments = {"A": target_msa, binder_letter: binder_msa}
+                    if any(value == "empty" for value in alignments.values()) or aux_pairs:
+                        raise ValueError("OpenDDE MSA는 모든 체인에 필요합니다. 일부 MSA를 무시하거나 자동 검색하지 않습니다.")
+                directory = opendde_predict(cfg, candidate_dir, chain_records,
+                                            chain_msas=alignments, dry_run=dry_run)
+                records.append({id_column: candidate_id, "pred_dir": str(directory.resolve()), "engine": engine,
+                                "msa_used": "precomputed_unpaired" if alignments else "empty",
+                                "target_chain": "A", "binder_chain": binder_letter,
+                                "aux_chains": ";".join(f"{name}:{letter}" for name, letter in aux_pairs)})
+            elif engine == "boltz2":
+                _predict_boltz2(cfg, candidate_dir, chain_records, target_msa, binder_letter, hotspot_positions, dry_run, binder_msa,
+                                chain_msas=target_info.get("chain_msas"))
+                nested = find_boltz_prediction_dir(candidate_dir / "boltz_out") or candidate_dir
+                records.append({
+                    id_column: candidate_id,
+                    "pred_dir": str((nested if Path(nested).exists() else candidate_dir).resolve()),
+                    "engine": "boltz2",
+                    "msa_used": _boltz_msa_mode(chain_records, target_msa, binder_letter, binder_msa,
+                                                target_info.get("chain_msas")),
+                    "target_chain": "A",
+                    "binder_chain": binder_letter,
+                    "aux_chains": ";".join(f"{name}:{letter}" for name, letter in aux_pairs),
+                })
+            else:
+                raise ValueError(f"지원하지 않는 예측 엔진: {engine}")
+        except (shell.ExecutionCancelled, shell.ExecutionBudgetExceeded):
+            raise
+        except Exception as exc:
+            if dry_run:
+                raise
+            failures.append({"candidate_id": candidate_id, "error": f"{type(exc).__name__}: {exc}"})
+            (work_dir / "prediction_failures.json").write_text(json.dumps(failures, ensure_ascii=False), encoding="utf-8")
+            continue
+        if engine in {"chai1", "boltz2"}:
+            records[-1].update(seed=cfg_seed(cfg,"score.boltz2.seed") if engine == "boltz2" else seed,
+                           seed_source="prediction", num_recycles=cfg_get(cfg,"score.boltz2_recycling_steps") if engine == "boltz2" else cfg_get(cfg,"screen.num_trunk_recycles"),
+                           diffusion_samples=cfg_get(cfg,"score.boltz2_diffusion_samples") if engine == "boltz2" else cfg_get(cfg,"screen.num_diffn_samples"))
 
         if not dry_run and not mock:
             marker = candidate_dir / ("boltz_complete.json" if engine == "boltz2" else "prediction_complete.json")
@@ -257,8 +287,12 @@ def predict_complexes(
                 temporary.replace(work_dir / "prediction_progress.json")
 
     predictions = pd.DataFrame(records)
-    if not predictions.empty and not dry_run:
+    if not dry_run:
+        if predictions.empty:
+            predictions = pd.DataFrame(columns=[id_column, "pred_dir", "engine", "target_chain", "binder_chain"])
         write_csv(work_dir / "predictions.csv", _predictions_manifest_frame(predictions, run_root))
+    if failures:
+        raise RuntimeError(f"예측 {len(failures)}건 실패. 완료된 {len(records)}건은 보존했습니다. prediction_failures.json을 확인하고 재개하세요. 첫 오류: {failures[0]['error']}")
     return predictions
 
 
@@ -438,23 +472,23 @@ def _predict_chai1(
     msa_content_hash = None
     if msa_mode == "local" and target_msa_path and target_msa_path != "empty" and Path(str(target_msa_path)).exists():
         msa_content_hash = hashlib.sha256(Path(str(target_msa_path)).read_bytes()).hexdigest()[:16]
-    input_fingerprint = hashlib.sha256(
-        json.dumps({
+    input_identity = {
             "sequence": chain_records,
             "hotspot_positions": list(hotspot_positions),
             "seed": cfg_get(cfg, "run.seed"),
             "msa_mode": cfg_get(cfg, "screen.msa_mode", "single"),
             "target_msa": target_msa_path,
             "target_msa_content": msa_content_hash,
-            "precomputed_msa": provenance.output_manifest(msa_directory) if msa_mode == "precomputed" and not dry_run else None,
+            "precomputed_msa": provenance.output_manifest(msa_directory) if msa_mode in {"precomputed", "local"} and msa_directory and not dry_run else None,
+            "local_msa_max_sequences": cfg_get(cfg, "screen.colabfold.msa_max_sequences", 2048) if msa_mode == "local" else None,
             "recycles": cfg_get(cfg, "screen.num_trunk_recycles"),
             "timesteps": cfg_get(cfg, "screen.num_diffn_timesteps"),
             "samples": cfg_get(cfg, "screen.num_diffn_samples"),
             "restraint": cfg_get(cfg, "screen.restraint"),
             "extra_args": cfg_get(cfg, "screen.extra_args"),
             "runtime": provenance.runtime_identity(cfg, "chai1") if not dry_run else None,
-        }, sort_keys=True, default=str).encode()
-    ).hexdigest()[:16]
+        }
+    input_fingerprint = hashlib.sha256(json.dumps(input_identity, sort_keys=True, default=str).encode()).hexdigest()[:16]
     fingerprint_path = candidate_dir / "complex_input.json"
     completion_path = candidate_dir / "prediction_complete.json"
     expected_residue_count = sum(len(seq_utils.clean_sequence(sequence)) for sequence in chain_records.values())
@@ -507,7 +541,7 @@ def _predict_chai1(
         if not dry_run:
             if _valid_chai_artifacts(out_dir, expected_residue_count, chain_records, samples):
                 fingerprint_path.write_text(
-                    json.dumps({"fingerprint": input_fingerprint, "msa_mode": msa_mode, "msa_used": used}),
+                    json.dumps({"fingerprint": input_fingerprint, "inputs": input_identity, "msa_mode": msa_mode, "msa_used": used}),
                     encoding="utf-8",
                 )
                 completion_path.write_text(json.dumps({"status": "complete", "msa_used": used,
@@ -537,7 +571,7 @@ def _predict_chai1(
         used = "chai1_single_fallback"
         if _valid_chai_artifacts(out_dir, expected_residue_count, chain_records, samples):
             fingerprint_path.write_text(
-                json.dumps({"fingerprint": input_fingerprint, "msa_mode": "local_fallback", "msa_used": used}),
+                json.dumps({"fingerprint": input_fingerprint, "inputs": input_identity, "msa_mode": "local_fallback", "msa_used": used}),
                 encoding="utf-8",
             )
             completion_path.write_text(json.dumps({"status": "complete", "msa_used": used,
@@ -691,8 +725,8 @@ def _predict_boltz2(
     import hashlib
     import json as _json
 
-    extra = validate_extra_args(cfg_get(cfg, "score.boltz2_extra_args", []),
-                                setting="score.boltz2_extra_args", managed=BOLTZ_MANAGED)
+    from .utils.tool_args import boltz_extra_args
+    extra = boltz_extra_args(cfg)
     out_dir = candidate_dir / "boltz_out"
     cpu_fp32 = bool(cfg_get(cfg, "score.boltz2_cpu_fp32", False))
     if cpu_fp32:
@@ -707,8 +741,7 @@ def _predict_boltz2(
             return f"missing:{path_value}"
         return hashlib.sha256(p.read_bytes()).hexdigest()[:16]
 
-    input_fingerprint = hashlib.sha256(
-        _json.dumps({
+    input_identity = {
             "chains": chain_records,
             "binder_letter": binder_letter,
             "hotspot_positions": list(hotspot_positions),
@@ -722,11 +755,11 @@ def _predict_boltz2(
             "recycles": cfg_get(cfg, "score.boltz2_recycling_steps"),
             "diffusion_samples": cfg_get(cfg, "score.boltz2_diffusion_samples", 1),
             "pocket_max_distance": cfg_get(cfg, "screen.boltz2_pocket_max_distance"),
-            "extra_args": cfg_get(cfg, "score.boltz2_extra_args"),
+            "extra_args": extra,
             "runtime": provenance.runtime_identity(cfg, "boltz2") if not dry_run else None,
             **({"cpu_precision": 32} if cpu_fp32 else {}),
-        }, sort_keys=True, default=str).encode()
-    ).hexdigest()[:16]
+        }
+    input_fingerprint = hashlib.sha256(_json.dumps(input_identity, sort_keys=True, default=str).encode()).hexdigest()[:16]
     fingerprint_path = candidate_dir / "boltz_input.json"
     completion_path = candidate_dir / "boltz_complete.json"
     stored = _read_json_object(fingerprint_path) if fingerprint_path.exists() else {}
@@ -783,7 +816,7 @@ def _predict_boltz2(
         raise
     if not dry_run:
         if _valid_boltz_artifacts(out_dir, chain_records, int(cfg_get(cfg, "score.boltz2_diffusion_samples", 1))):
-            fingerprint_path.write_text(_json.dumps({"fingerprint": input_fingerprint}), encoding="utf-8")
+            fingerprint_path.write_text(_json.dumps({"fingerprint": input_fingerprint, "inputs": input_identity}), encoding="utf-8")
             completion_path.write_text(_json.dumps({"status": "complete",
                                                    "outputs": provenance.output_manifest(out_dir)}), encoding="utf-8")
         else:

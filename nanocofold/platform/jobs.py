@@ -474,7 +474,7 @@ class JobStore:
                 if current_source:
                     source = json.loads(current_source["payload"])
                     current_identity = source.get("execution_identity", {})
-                    if (source.get("kind") != "analysis" or not identity.get("digest")
+                    if (source.get("researcher", "") != job.get("researcher", "") or source.get("kind") != "analysis" or not identity.get("digest")
                             or current_identity.get("digest") != identity["digest"]
                             or current_identity.get("reusable") is not True):
                         raise ValueError("원본 결과가 다른 조건으로 재개되었습니다. 결과를 다시 확인한 후 제출하세요.")
@@ -483,8 +483,8 @@ class JobStore:
                     self._record_usage(connection, job, source)
                     return source
             if job["kind"] == "analysis" and job["state"] in ACTIVE and job.get("reuse_results") and identity.get("reusable"):
-                same = connection.execute("SELECT payload FROM jobs WHERE state IN ('queued','running','cancelling') AND kind='analysis' AND json_extract(payload,'$.execution_identity.digest')=? LIMIT 1",
-                                          (identity["digest"],)).fetchone()
+                same = connection.execute("SELECT payload FROM jobs WHERE state IN ('queued','running','cancelling') AND kind='analysis' AND json_extract(payload,'$.execution_identity.digest')=? AND COALESCE(json_extract(payload,'$.researcher'),'')=? LIMIT 1",
+                                          (identity["digest"], job.get("researcher",""))).fetchone()
                 if same:
                     # Serialize simultaneous exact requests inside SQLite;
                     # callers follow the original queued/running job ID.
@@ -665,7 +665,7 @@ class JobManager:
             job["execution_identity"] = {key: identity[key] for key in ("digest", "reusable", "reasons")}
             job["reuse_results"] = payload.get("reuse_results", True)
             if job["reuse_results"] and identity["reusable"]:
-                with self.catalog.reuse_lease(identity["digest"]) as source:
+                with self.catalog.reuse_lease(identity["digest"], researcher=job.get("researcher")) as source:
                     if source:
                         job.update(state="complete", phase="reused", finished=now, result_id=source["id"],
                                    run_dir=source["run_root"], reused_result_id=source["id"],
@@ -910,6 +910,16 @@ class JobManager:
             return False
 
     def _gpu_wait(self, job, reading=None):
+        now = time.time()
+        if reading and reading.get("reason") in {"telemetry", "policy"}:
+            first = job.get("gpu_measurement_failed_at") or now
+            if now - first >= 120:
+                self.store.update(job["id"], expected_states={"queued"}, expected_history_length=len(job.get("history", [])),
+                                  state="failed", phase="gpu_telemetry", error="GPU 상태를 120초 동안 확인하지 못했습니다. GPU 번호와 nvidia-smi를 확인하고 재개하세요.", finished=now, can_resume=job["kind"]=="analysis")
+                return
+            self.store.update(job["id"], expected_states={"queued"}, expected_history_length=len(job.get("history", [])), gpu_measurement_failed_at=first)
+        elif job.get("gpu_measurement_failed_at"):
+            self.store.update(job["id"], expected_states={"queued"}, expected_history_length=len(job.get("history", [])), gpu_measurement_failed_at=None)
         if job.get("phase") != "waiting_for_gpu" or job.get("gpu_reading") != reading:
             self.store.update(job["id"], expected_states={"queued"}, expected_history_length=len(job.get("history", [])),
                               phase="waiting_for_gpu", waiting_for="gpu", gpu_reading=reading)

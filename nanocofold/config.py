@@ -49,6 +49,8 @@ def read_config_file(path: str | Path):
         return read_config_yaml(path.read_text(encoding="utf-8-sig"))
     except UnicodeDecodeError as exc:
         raise ValueError(f"설정 파일을 UTF-8로 다시 저장한 뒤 입력하세요: {path}") from exc
+    except (yaml.YAMLError, ValueError) as exc:
+        raise ValueError(f"설정 파일을 확인하세요: {path}: {exc}") from exc
 
 def _resolve_project_root() -> Path:
     """사용자 작업 root(상대 입력/출력 기준). 패키지 내부 자산은 절대 반환하지 않는다(H11)."""
@@ -124,7 +126,13 @@ def apply_overrides(cfg: dict, overrides: list[str] | None) -> None:
         key, value = item.split("=", 1)
         if not key.strip():
             raise ValueError("--set 설정 키가 비어 있습니다.")
-        _set_dotted(cfg, key.strip(), _parse_scalar(value.strip()))
+        parsed = _parse_scalar(value.strip())
+        previous = cfg_get(cfg, key.strip())
+        if key.strip() == "rank.weights" and isinstance(previous, dict) and isinstance(parsed, dict):
+            omitted = sorted(set(previous) - set(parsed))
+            if omitted:
+                warnings.warn("--set rank.weights는 가중치 목록 전체를 교체합니다. 제외된 지표: " + ", ".join(omitted), UserWarning)
+        _set_dotted(cfg, key.strip(), parsed)
 
 
 def exploration_config() -> dict:
@@ -202,6 +210,7 @@ def _validate(cfg: dict, *, historical: bool = False) -> None:
     _validate_scalar_shapes(cfg, historical=historical)
     if not historical:
         developability_patterns(cfg)
+        _validate_option_semantics(cfg)
         screen_engine = cfg_get(cfg, "screen.engine")
         if not isinstance(screen_engine, str) or screen_engine not in {"chai1", "boltz2", "colabfold", "opendde"}:
             raise ValueError("screen.engine은 chai1, boltz2, colabfold, opendde 중 하나여야 합니다.")
@@ -224,6 +233,8 @@ def _validate(cfg: dict, *, historical: bool = False) -> None:
                 normalized = normalized.strip()
             if normalized not in allowed:
                 raise ValueError(message)
+            if dotted == "structure.provider":
+                _set_dotted(cfg, dotted, "boltz2" if normalized == "boltz" else normalized)
 
     _external_viewer_url(cfg)
     for dotted in ("run", "target", "structure", "design", "screen", "mature", "score", "rank",
@@ -272,6 +283,9 @@ def _validate(cfg: dict, *, historical: bool = False) -> None:
                                           ("screen.extra_args", CHAI_MANAGED, True)):
         validate_extra_args(cfg_get(cfg, dotted), setting=dotted, managed=managed, allow_abbrev=abbreviated)
     validate_colabfold_extra_args(cfg_get(cfg, "screen.colabfold.extra_args"))
+    from .utils.tool_args import boltz_extra_args
+    boltz_extra_args(cfg)
+    boltz_extra_args(cfg, target=True)
     if cfg_get(cfg, "structure.provider") == "chai1":
         from .target_prep import chai_target_settings
         chai_target_settings(cfg)
@@ -325,9 +339,8 @@ def _validate(cfg: dict, *, historical: bool = False) -> None:
             raise ValueError("design.refinement.final_count는 library_size 이하여야 합니다.")
         if not cfg_get(cfg, "screen.cascade.enabled", False):
             raise ValueError("design.refinement에는 ColabFold→Boltz-2 cascade가 필요합니다.")
-    if design_engine in {"boltzgen", "both"}:
-        from .design_boltzgen import settings
-        settings(cfg)
+    from .design_boltzgen import settings
+    settings(cfg)
     count = cfg_get(cfg, "design.num_designs", 2)
     if type(count) is not int or not 1 <= count <= 10000:
         raise ValueError("design.num_designs는 엔진당 생성 수로 1–10000 정수를 입력하세요.")
@@ -350,6 +363,13 @@ def _validate(cfg: dict, *, historical: bool = False) -> None:
             "실제 변이 생성 상한은 mature.library.max_variants로 설정하세요(WT는 별도 포함).",
             UserWarning, stacklevel=2,
         )
+    # Validate persisted options even while a different strategy is selected.
+    size = library.get("size", 10000)
+    minimum, maximum = library.get("min_mutations", 1), library.get("max_mutations", 5)
+    if type(size) is not int or not 2 <= size <= 100000:
+        raise ValueError("mature.library.size는 WT 포함 2–100000 사이의 정수여야 합니다.")
+    if any(type(v) is not int for v in (minimum, maximum)) or not 1 <= minimum <= maximum <= 50:
+        raise ValueError("mature.library 변이 개수는 1 ≤ min_mutations ≤ max_mutations ≤ 50이어야 합니다.")
     if strategy == "random":
         size = library.get("size", 10000)
         minimum, maximum = library.get("min_mutations", 1), library.get("max_mutations", 5)
@@ -415,13 +435,65 @@ def _validate(cfg: dict, *, historical: bool = False) -> None:
     if cascade.get("enabled", False):
         if mode not in {"screen", "mature"} and not (mode == "design" and refinement.get("enabled", False)):
             raise ValueError("ColabFold→Boltz-2 cascade에는 screen/mature 또는 활성화된 design.refinement가 필요합니다.")
-        if cfg_get(cfg, "screen.engine") != "colabfold":
-            raise ValueError("cascade 활성화에는 screen.engine=colabfold가 필요합니다.")
+        if cfg_get(cfg, "screen.engine") != "colabfold" or cfg_get(cfg, "screen.restraint.enabled", True):
+            raise ValueError("cascade 활성화에는 screen.engine=colabfold 및 screen.restraint.enabled=false가 필요합니다.")
         if int(cfg_get(cfg, "screen.boltz2_rescore_top", 0) or 0) > 0:
             raise ValueError("cascade와 기존 screen.boltz2_rescore_top을 동시에 사용할 수 없습니다.")
-    if cfg_get(cfg, "screen.engine") == "colabfold":
-        from .colabfold import settings as colabfold_settings
-        colabfold_settings(cfg)
+    from .colabfold import settings as colabfold_settings
+    colabfold_settings(cfg)
+
+
+def _validate_option_semantics(cfg):
+    """Reject unused spellings and incompatible options before creating a run."""
+    enums = {
+        "screen.msa_mode": ("single", "msa", "local", "precomputed"),
+        "structure.chai1.msa_mode": ("single", "msa"),
+        "structure.msa.backend": ("empty", "cache", "mmseqs", "colabfold_search"),
+        "mature.cdr.source": ("auto", "config"),
+        "mature.cdr.scheme": ("imgt",),
+        "mature.prefilter.mode": ("esm2", "none", "mock"),
+        "expression.order_format": ("dna", "aa"),
+        "screen.restraint.connection_type": ("pocket",),
+        "specificity.context": ("isolated", "complex"),
+        "specificity.epitope_mode": ("terminal", "exposed", "both"),
+    }
+    for path, allowed in enums.items():
+        value = cfg_get(cfg, path)
+        if value is None:
+            continue
+        value = value.strip().lower() if isinstance(value, str) else value
+        if value not in allowed:
+            raise ValueError(f"{path} 허용값: {', '.join(allowed)}")
+        _set_dotted(cfg, path, value)
+    if not cfg_get(cfg, "run.mock", False) and (str(cfg_get(cfg, "structure.provider", "")).lower() == "mock"
+            or cfg_get(cfg, "mature.prefilter.mode") == "mock"):
+        raise ValueError("합성 표적 또는 프리필터에는 run.mock=true가 필요합니다.")
+    for path in ("screen.restraint.max_distance", "screen.boltz2_pocket_max_distance", "specificity.budget_hours"):
+        value = cfg_get(cfg, path)
+        if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0):
+            raise ValueError(f"{path} 값은 0보다 큰 유한한 숫자여야 합니다.")
+    for path in ("screen.restraint.max_distance", "screen.boltz2_pocket_max_distance"):
+        if cfg_get(cfg, path, 0) > 100:
+            raise ValueError(f"{path}는 100 Å 이하여야 합니다.")
+    for path in ("specificity.stage1_n", "specificity.stage2_n", "specificity.final_n"):
+        value = cfg_get(cfg, path)
+        if value is not None and (type(value) is not int or not 1 <= value <= 100000):
+            raise ValueError(f"{path}는 1–100000 범위의 정수여야 합니다.")
+    size = cfg_get(cfg, "hotspots.auto.residues_per_set", [3, 6])
+    if (not isinstance(size, list) or len(size) != 2 or any(type(v) is not int for v in size)
+            or not 1 <= size[0] <= size[1]):
+        raise ValueError("hotspots.auto.residues_per_set는 1 ≤ 최소 ≤ 최대 정수 두 개여야 합니다.")
+    if cfg_get(cfg, "score.boltz2_cpu_fp32", False):
+        from .scripts.boltz_cpu_fp32 import validate_cpu_args
+        validate_cpu_args(["predict", *(cfg_get(cfg, "score.boltz2_extra_args", []) or [])])
+    if cfg_get(cfg, "mature.exclude.wt_residue", True) is False:
+        warnings.warn("mature.exclude.wt_residue=false는 지원하지 않습니다. 변이는 WT와 다른 서열이며 WT는 별도 대조군으로 보존합니다.", UserWarning)
+    engine = cfg_get(cfg, "screen.engine")
+    comparison = cfg_get(cfg, "screen.comparison.enabled", False)
+    if cfg_get(cfg, "run.mode") != "complex" and not comparison and engine in {"colabfold", "opendde"} and cfg_get(cfg, "screen.restraint.enabled", True):
+        raise ValueError(f"{engine}는 screen.restraint.enabled=false가 필요합니다. 결합 부위는 예측 후 접촉 평가에 사용합니다.")
+    if cfg_get(cfg, "screen.cascade.enabled", False) and cfg_get(cfg, "screen.colabfold.msa_source", "cache") == "local_mmseqs2":
+        raise ValueError("cascade MSA는 cache, public_api, public_mmseqs2를 지원합니다. 로컬 MSA를 준비한 뒤 cache를 사용하세요.")
 
 
 def _validate_scalar_shapes(cfg, *, historical=False):
@@ -472,10 +544,10 @@ def _validate_scalar_shapes(cfg, *, historical=False):
         "screen.num_diffn_samples": (1, 16),
         "structure.boltz2.recycling_steps": (1, 100),
         "score.boltz2_recycling_steps": (1, 100),
-        "structure.chai1.num_trunk_recycles": (1, 100),
-        "screen.num_trunk_recycles": (1, 100),
-        "structure.chai1.num_diffn_timesteps": (1, 10000),
-        "screen.num_diffn_timesteps": (1, 10000),
+        "structure.chai1.num_trunk_recycles": (1, 20),
+        "screen.num_trunk_recycles": (1, 20),
+        "structure.chai1.num_diffn_timesteps": (2, 1000),
+        "screen.num_diffn_timesteps": (2, 1000),
         "score.boltz2_num_subsampled_msa": (1, 100000),
         "design.chunk_size": (1, 10000),
         "design.mpnn.seqs_per_struct": (1, 1000),
@@ -587,6 +659,8 @@ def developability_patterns(cfg: dict) -> dict[str, str]:
         value = dev.get(name, default)
         if not isinstance(value, (list, tuple)) or any(not isinstance(item, str) or not item for item in value):
             raise ValueError(f"developability.{name}는 비어 있지 않은 모티프 문자열의 목록이어야 합니다.")
+        if not value:
+            warnings.warn(f"developability.{name}=[]: 이 모티프 검사가 꺼집니다. 의도한 설정인지 확인하세요.", UserWarning, stacklevel=2)
         patterns[name] = "|".join(value)
     patterns["glycosylation"] = dev.get("glycosylation", "N[^P][ST]")
     for name, pattern in patterns.items():

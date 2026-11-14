@@ -41,6 +41,18 @@ def deterministic_xlsx(workbook):
     import io
     import re
     import zipfile
+    import math
+    import numbers
+    # openpyxl emits numeric values with 16 significant digits. Keep the
+    # original float representation in XML; spreadsheet applications may still
+    # display/round values according to their own precision limits.
+    numeric_cells = {}
+    for index, sheet in enumerate(workbook.worksheets, 1):
+        numeric_cells[f"xl/worksheets/sheet{index}.xml"] = {
+            cell.coordinate: repr(float(cell.value)).encode()
+            for row in sheet for cell in row
+            if isinstance(cell.value, numbers.Real) and not isinstance(cell.value, (int, bool))
+            and math.isfinite(cell.value)}
     stream = io.BytesIO()
     modified = workbook.properties.modified
     try:
@@ -52,6 +64,12 @@ def deterministic_xlsx(workbook):
     with zipfile.ZipFile(stream) as source, zipfile.ZipFile(output, "w") as target:
         for original in sorted(source.infolist(), key=lambda entry: entry.filename):
             data = source.read(original.filename)
+            if original.filename in numeric_cells:
+                values = numeric_cells[original.filename]
+                def exact(match):
+                    value = values.get(match.group(2).decode())
+                    return match.group(1) + value + match.group(3) if value is not None else match.group(0)
+                data = re.sub(rb'(<c\b[^>]*\br="([^"]+)"[^>]*><v>)[^<]*(</v></c>)', exact, data)
             if original.filename == "docProps/core.xml":
                 data = re.sub(
                     rb"(<dcterms:(?:created|modified)\b[^>]*>)[^<]*(</dcterms:(?:created|modified)>)",

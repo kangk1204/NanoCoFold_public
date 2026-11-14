@@ -14,7 +14,7 @@ from .config import cfg_get, cfg_seed, require_input_file, resolve_path
 from .utils import msa as msa_utils
 from .utils import pdb_io, seq as seq_utils, shell
 from .utils.misc import to_native
-from .utils.tool_args import BOLTZ_MANAGED, CHAI_MANAGED, validate_extra_args
+from .utils.tool_args import CHAI_MANAGED, validate_extra_args
 from .utils.atomic import write_csv
 
 
@@ -90,8 +90,8 @@ def _raw_prediction_identity(cfg: dict, *, mock: bool, msa: dict) -> dict:
     runtime, arguments = {}, {"requested_seed": cfg_seed(cfg, "run.seed")}
     if provider in {"boltz2", "boltz"}:
         env = resolve_path(cfg, cfg_get(cfg, "structure.boltz2.env"))
-        extra = validate_extra_args(cfg_get(cfg, "structure.boltz2.extra_args", []),
-                                    setting="structure.boltz2.extra_args", managed=BOLTZ_MANAGED)
+        from .utils.tool_args import boltz_extra_args
+        extra = boltz_extra_args(cfg, target=True)
         arguments.update(seed=cfg_seed(cfg, "structure.boltz2.seed"),
             recycling_steps=int(cfg_get(cfg, "structure.boltz2.recycling_steps", 3)),
             diffusion_samples=int(cfg_get(cfg, "structure.boltz2.diffusion_samples", 1)), extra_args=extra)
@@ -791,7 +791,8 @@ def _fold_boltz2(
 ) -> Path:
     from .screen import write_boltz_yaml
 
-    extra = validate_extra_args(extra, setting="structure.boltz2.extra_args", managed=BOLTZ_MANAGED)
+    from .utils.tool_args import boltz_extra_args
+    extra = boltz_extra_args(cfg, target=True, extra_args=extra)
     yaml_path = phase_dir / "target_boltz.yaml"
     out_dir = phase_dir / "boltz_out"
     chains = [{"id": "A", "sequence": sequence, "msa": msa_path}]

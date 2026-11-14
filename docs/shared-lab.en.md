@@ -44,3 +44,11 @@ After you click **Run analysis**, leave the tab open until the job appears. The 
 - The default reservation is 6 GiB per analysis. The device keeps the larger of 10% or 1 GiB in reserve. On smaller GPUs, the job reservation is reduced to the remaining capacity. An active NanoCoFold job counts against available memory even before it loads its model. This is an admission estimate. Actual peak memory depends on the engine and sequence length. For analyses that typically use 10 GiB, for example, start the server with `NANOCOFOLD_GPU_JOB_MIB=10240 bash start.sh --no-browser --port 18765`.
 
 In Results database, search for a candidate ID or a VHH sequence fragment (three or more consecutive amino acids). Add a researcher filter if needed. Open a matching candidate to see its sequence and predicted structure. Identical sequences are stored once in the search database.
+
+## Shared execution policy
+
+Administrators can view all results and set sharing permissions. Only the submitter can cancel or resume an analysis. New analyses reuse results only from the same researcher. Previously shared records remain available.
+
+After five failed sign-in attempts for one account within a minute, wait before trying again. If GPU status cannot be read for 120 seconds, the job fails with instructions to check the GPU ID and driver, then resume. Jobs waiting for available memory continue checking automatically.
+
+The GPU reservation is an operator-defined scheduling policy, not a prediction of peak memory. Installation and GPU checks run exclusively. A shared ticket on a separate local MSA search service has its own lifetime. Before stopping such a search, the server operator must check whether another request uses it.

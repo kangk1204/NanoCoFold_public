@@ -303,6 +303,15 @@ class InputManager:
         with warnings.catch_warnings(record=True) as config_warnings:
             warnings.simplefilter("always", UserWarning)
             cfg = normalized_config(self.workspace, cfg)
+        if cfg["run"]["mode"] == "complex":
+            from ..complex_comparison import effective_config, condition_receipt
+            options = cfg["complex"]
+            engines = options.get("comparison_engines") or [options["engine"]]
+            review["engine_conditions"] = [
+                {"engine": engine, "seed": seed, **condition_receipt(
+                    effective_config(cfg, options, engine, seed), options, engine)}
+                for engine in engines for seed in options["seeds"]
+            ]
         if config_warnings:
             review["warnings"] = list(dict.fromkeys([*review.get("warnings", []),
                                                     *(str(item.message) for item in config_warnings)]))
@@ -439,9 +448,13 @@ class InputManager:
             raise ValueError("interest_positions는 실제 분석 구간의 중복 없는 원본 잔기 번호 정수 목록이어야 합니다.")
         folder = self.root / secrets.token_hex(16)
         folder.mkdir()
-        cfg = {"run": {"mode": "complex", "mock": mock}, "target": {"sequence": entries[0]["sequence"], "fasta": None, "pdb": None},
+        override = payload.get("config", {})
+        if not isinstance(override, dict):
+            raise ValueError("설정은 객체여야 합니다.")
+        cfg = _deep_merge(override, {"run": {"mode": "complex", "mock": mock, "seed": settings["seeds"][0]}, "target": {"sequence": entries[0]["sequence"], "fasta": None, "pdb": None},
                "complex": {**settings, "proteins": payload["proteins"], "reference_path": None,
-                           "anchor_chain": anchor, "interest_positions": interest}}
+                           "anchor_chain": anchor, "interest_positions": interest},
+               "screen": {"comparison": {"enabled": False}}})
         from ..complex_comparison import configure
         configure(cfg, settings)
         upload = payload.get("reference")

@@ -34,9 +34,21 @@ def effective_config(cfg, settings, engine, seed):
     applied.setdefault("run", {})["seed"] = seed
     score = applied.setdefault("score", {})
     score.setdefault("boltz2", {})["seed"] = seed
+    # Keep user environment/CPU flags. complex.diffusion_steps owns only the
+    # sampling option, including its legacy extra_args spelling.
+    existing = list(score.get("boltz2_extra_args") or [])
+    extra, skip = [], False
+    for arg in existing:
+        if skip:
+            skip = False
+            continue
+        if arg.split("=", 1)[0].replace("_", "-") == "--sampling-steps":
+            skip = "=" not in arg
+            continue
+        extra.append(arg)
     score.update(boltz2_diffusion_samples=settings["models_per_seed"],
                  boltz2_recycling_steps=settings["recycles"],
-                 boltz2_extra_args=["--no_kernels", "--num_workers", "0", "--sampling_steps", str(settings["diffusion_steps"])])
+                 boltz2_sampling_steps=settings["diffusion_steps"], boltz2_extra_args=extra)
     screen_cfg = applied.setdefault("screen", {})
     screen_cfg.update(num_trunk_recycles=settings["recycles"],
                       num_diffn_timesteps=settings["diffusion_steps"], num_diffn_samples=1,

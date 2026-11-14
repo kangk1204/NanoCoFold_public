@@ -70,6 +70,9 @@ CANDIDATE_COLUMNS = [
     ("iptm_source", "ipTM 출처"),
     ("iptm_unavailable_reason", "쌍 ipTM 미평가 사유"),
     ("complex_iptm", "전체 복합체 ipTM"),
+    ("prediction_sample_index", "대표 모델 번호"),
+    ("prediction_retained_sample_count", "보존 모델 수"),
+    ("prediction_sample_selection", "대표 모델 선택 방식"),
     ("ptm", "pTM"),
     ("pdockq", "pDockQ"),
     ("pdockq2", "pDockQ2 (최소)"),
@@ -703,6 +706,9 @@ def _threshold_check_rows(rows: list[dict], recorded_cfg: dict) -> list[dict]:
                                "threshold_source": "run_config.yaml" if threshold is not None else "not_recorded"})
         for check in checks:
             if isinstance(check, dict):
+                check = dict(check)
+                if check.get("metric") == "hotspot_contact_frac" and _recorded_bool(row.get("hotspot_mapping_failed")) is True:
+                    check.update(diagnostic_value=check.get("value"), value=None, reason="결합 부위 번호 대응 실패")
                 result.append({"model": _display_identity(row), **check})
     return to_native(result)
 

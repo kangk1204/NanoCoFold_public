@@ -180,12 +180,16 @@ def execute(workspace: Path, identifier: str) -> int:
                 if summary["failed_candidates"] or summary["issues"]:
                     state = "partial_failure"
                 extra["summary"] = summary
+        elif code == 130:
+            current = store.get(identifier)
+            state = "budget_exhausted" if current.get("budget_exceeded") else "cancelled" if current.get("cancel_requested") or current["state"] == "cancelling" else "interrupted"
+            error = "실행 시간 한도에 도달했습니다." if state == "budget_exhausted" else "사용자가 작업을 취소했습니다." if state == "cancelled" else "분석 프로세스가 중단됐습니다. 로그를 확인한 뒤 재개하세요."
         else:
             error = f"분석 명령이 종료 코드 {code}로 실패했습니다. 실행 로그를 확인하세요."
     except KeyboardInterrupt:
         current = store.get(identifier)
-        state = "budget_exhausted" if current.get("budget_exceeded") else "cancelled"
-        error = "실행 시간 한도에 도달했습니다." if state == "budget_exhausted" else "사용자가 작업을 취소했습니다."
+        state = "budget_exhausted" if current.get("budget_exceeded") else "cancelled" if current.get("cancel_requested") or current["state"] == "cancelling" else "interrupted"
+        error = "실행 시간 한도에 도달했습니다." if state == "budget_exhausted" else "사용자가 작업을 취소했습니다." if state == "cancelled" else "분석 프로세스가 중단됐습니다. 로그를 확인한 뒤 재개하세요."
         code = 130
     except BaseException as exc:
         if store.get(identifier)["state"] == "cancelling":
@@ -206,6 +210,13 @@ def execute(workspace: Path, identifier: str) -> int:
         observed = refresh_complex_job({**job, "state": state})
         extra["progress"] = observed["progress"]
         extra["eta"] = observed["eta"]
+    if state == "interrupted":
+        # The queue publishes interruption after observing the worker exit.
+        # Keep this attempt running until then so a simultaneous cancellation
+        # or registration failure can still win its terminal transaction.
+        store.update(identifier, expected_states={"running"}, expected_attempt=(job.get("pid"), job.get("process_stamp")),
+                     error=error, exit_code=130, elapsed_seconds=elapsed, worker_interrupted=True)
+        return 130
     if state in {"cancelled", "budget_exhausted"}:
         # The worker still holds its RSS and inherited GPU/core reservations.
         # Persist the outcome, then exit without hashing/registering artifacts.

@@ -30,6 +30,16 @@ class PredictionFiles:
     sample_selection: str = "explicit_structure_file"
 
 
+def model_order(path):
+    match = re.search(r"(?:model_idx_|_model_)(\d+)$", path.stem)
+    return (int(match.group(1)) if match else 0, path.name)
+
+
+def sample_selection_label(source):
+    return {"colabfold": "first_retained_ranked_model", "chai1": "first_diffusion_sample",
+            "opendde": "first_diffusion_sample"}.get(source, "first_retained_engine_model")
+
+
 @dataclass
 class ScoringContext:
     """Read-only per-model inputs; never shared between prediction files."""
@@ -76,9 +86,9 @@ def find_prediction_files(path: str | Path, name: str | None = None, *, model_in
     if not path.is_dir():
         raise FileNotFoundError(path)
 
-    cif_candidates = sorted(path.glob("pred.model_idx_*.cif")) or sorted(path.glob("*_model_*.cif")) or sorted(path.glob("*.cif"))
+    cif_candidates = sorted(path.glob("pred.model_idx_*.cif"), key=model_order) or sorted(path.glob("*_model_*.cif"), key=model_order) or sorted(path.glob("*.cif"), key=model_order)
     if not cif_candidates:
-        cif_candidates = sorted(path.glob("*.pdb"))
+        cif_candidates = sorted(path.glob("*.pdb"), key=model_order)
     if not cif_candidates:
         raise FileNotFoundError(f"cif/pdb 파일을 찾을 수 없습니다: {path}")
     retained_sample_count = len(cif_candidates)
@@ -88,7 +98,8 @@ def find_prediction_files(path: str | Path, name: str | None = None, *, model_in
             raise FileNotFoundError(f"model {model_index} 출력이 없습니다: {path}")
     cif = cif_candidates[0]
     sample_index = int(cif.stem.rsplit("_", 1)[-1]) if cif.stem.rsplit("_", 1)[-1].isdigit() else None
-    sample_selection = "explicit_model_index" if model_index is not None else "first_retained_model"
+    source = "chai1" if cif.name.startswith("pred.model_idx_") else "opendde" if cif.name.startswith("opendde_model_") else "colabfold" if cif.name.startswith("colabfold_model_") else "boltz2"
+    sample_selection = "explicit_model_index" if model_index is not None else sample_selection_label(source)
 
     if cif.name.startswith("pred.model_idx_"):
         idx = cif.stem.split("_")[-1]

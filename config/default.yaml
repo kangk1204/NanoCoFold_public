@@ -31,6 +31,7 @@ structure:
     seed: null             # null이면 run.seed 사용
     extra_args: ["--no_kernels"]   # cu128/sm_120에서 cuequivariance 미지원 시 필수
     recycling_steps: 3
+    sampling_steps: null   # target folding; null keeps the engine/legacy extra_args setting
     diffusion_samples: 1
   chai1:
     env: envs/chai1
@@ -40,7 +41,7 @@ structure:
     num_trunk_recycles: 3
     num_diffn_timesteps: 200
     num_diffn_samples: 1   # 모든 sample을 보존하고 표적 준비는 첫 sample 사용
-    msa_mode: single       # single(무MSA, 고속) | msa(공용 서버, allow_public_msa_server 필요)
+    msa_mode: single       # target folding: single | msa (requires explicit public-server consent)
   allow_public_msa_server: false  # ColabFold 공용 MSA 서버 사용 명시 허용(기본 차단)
   msa:
     backend: cache         # cache | mmseqs | colabfold_search | empty
@@ -154,7 +155,7 @@ screen:
   env: envs/chai1
   boltz2_env: envs/boltz2
   vhh_fasta: null           # screen 모드 후보 나노바디 FASTA (CLI --vhh-fasta 보다 우선순위 낮음)
-  msa_mode: single          # single(무MSA, 고속) | msa
+  msa_mode: single          # Chai candidate prediction: single | msa | local | precomputed
   restraint:
     enabled: true          # specificity 캠페인은 양쪽 모두 false로 비교
     connection_type: pocket
@@ -242,6 +243,7 @@ score:
     use_official: true     # 공식 스크립트가 있으면 결과를 우선 사용
     dist_cutoff: 10.0      # 공식 출력 파일명·거리 보조 컬럼용; ipSAE의 PAE mask에는 무영향
   boltz2_recycling_steps: 3
+  boltz2_sampling_steps: null  # candidate complex prediction; legacy extra_args remains readable
   boltz2_diffusion_samples: 1 # 모든 요청 샘플을 보존; 평가 경로는 샘플별 기록
   boltz2:
     seed: null             # null이면 run.seed 사용
@@ -354,3 +356,25 @@ experiment:
   antigen_qc_confirmed: false
   controls_confirmed: false
   terminal_review_confirmed: false
+
+# Configuration precedence: default.yaml < environment.yaml < user YAML < --set
+# < dedicated CLI options < subcommand mode. YAML mappings merge; --set mappings
+# and all lists replace the selected value. Keep --no_kernels when required by
+# the installed Boltz/CUDA combination; it is not an immutable scientific setting.
+# structure.* predicts the target only (01_target). screen.* configures Chai-1
+# candidate complexes; score.boltz2_* configures Boltz-2 candidate complexes.
+# screen.env_vars applies to Chai-1/Boltz-2; ColabFold has its own env_vars.
+# RFantibody-only: design.mpnn, design.rf2, design.loops, design.chunk_size.
+# These values are retained but are not applied when the corresponding engine
+# is inactive. run.seed is the fallback for unset engine-specific seeds.
+# General complex mode uses complex.* instead of VHH screen/score settings:
+# complex:
+#   engine: boltz2
+#   seeds: [42]              # integers 0..2147483647 (CLI run.seed supports uint32)
+#   recycles: 3
+#   diffusion_steps: 200
+#   models_per_seed: 1
+#   msa: empty               # single-engine path; comparisons use msa_source
+#   restraints: false
+# Native starter overrides are input-review templates, not standalone CLI
+# configurations. Input preparation resolves sequences, consent and mode settings.

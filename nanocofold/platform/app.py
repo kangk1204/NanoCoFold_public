@@ -11,6 +11,7 @@ import re
 import secrets
 import socket
 import sqlite3
+import time
 import threading
 import webbrowser
 from pathlib import Path
@@ -97,6 +98,8 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         finally:
             pending_password_checks -= 1
 
+    login_attempts = {}
+    logins_inflight = {}
     account_inputs = {}
     account_lock = threading.Lock()
 
@@ -317,7 +320,7 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         content = b"".join(chunks)
         try:
             payload = json.loads(content or b"{}")
-        except ValueError:
+        except (ValueError, RecursionError):
             raise ValueError("JSON 입력을 읽지 못했습니다.")
         if not isinstance(payload, dict):
             raise ValueError("JSON 객체가 필요합니다.")
@@ -540,13 +543,31 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
             form = parse_qs(data.decode(), max_num_fields=2)
         except (UnicodeError, ValueError):
             raise HTTPException(400)
-        async with password_check_slot() as available:
-            if not available:
-                return login_page(busy=True)
-            key = await asyncio.to_thread(lab.login, form.get("name",[""])[0], form.get("password",[""])[0])
-            if not key:
-                await asyncio.sleep(.35)
-                return login_page(True)
+        name = form.get("name", [""])[0].strip()
+        now = time.monotonic()
+        for account in list(login_attempts):
+            login_attempts[account] = [stamp for stamp in login_attempts[account] if now - stamp < 60]
+            if not login_attempts[account]:
+                login_attempts.pop(account)
+        if len(login_attempts.get(name, [])) >= 5 or logins_inflight.get(name, 0) >= 2:
+            return login_page(busy=True)
+        if len(login_attempts) >= 2048 and name not in login_attempts:
+            return login_page(busy=True)
+        login_attempts.setdefault(name, []).append(now)
+        logins_inflight[name] = logins_inflight.get(name, 0) + 1
+        try:
+            async with password_check_slot() as available:
+                if not available:
+                    return login_page(busy=True)
+                key = await asyncio.to_thread(lab.login, name, form.get("password", [""])[0])
+                if not key:
+                    await asyncio.sleep(.35)
+                    return login_page(True)
+            login_attempts.pop(name, None)
+        finally:
+            logins_inflight[name] -= 1
+            if not logins_inflight[name]:
+                logins_inflight.pop(name)
         response = RedirectResponse("/", status_code=303)
         response.set_cookie(lab.cookie, key, max_age=12*3600, httponly=True, samesite="strict")
         return response
@@ -688,18 +709,28 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
     def input_get(identifier: str, request: Request):
         return native(input_manager(request).get(identifier))
 
+    def present_job(record, *, compact=False):
+        from ..utils.presentation import portable_metadata
+        value = dict(record)
+        if compact:
+            keys = {"id", "kind", "name", "researcher", "state", "phase", "mode", "mock", "created", "updated", "started", "finished", "elapsed_seconds", "result_id", "can_resume", "progress", "eta"}
+            value = {key: item for key, item in value.items() if key in keys}
+            if record.get("diagnostics"):
+                value["diagnostics"] = {"ok": record["diagnostics"].get("ok")}
+        return native(portable_metadata(value, root=workspace))
+
     @app.get("/api/jobs")
     def job_list(request: Request, limit: int = 100, before: float | None = None, before_id: str | None = None, active: bool = False):
         active_states = {"queued", "running", "cancelling"}
         history = manager.store.list(researcher=request.state.owner,limit=limit, before=before, before_id=before_id,
                                      states=active_states if active else None)
         cursor = lambda rows: {"before": rows[-1]["created"], "before_id": rows[-1]["id"]} if len(rows) == limit else None
-        result = {"jobs": history, "next_cursor": cursor(history)}
+        result = {"jobs": [present_job(job, compact=True) for job in history], "next_cursor": cursor(history)}
         # Keep old active work visible without making a two-second poll return
         # an unbounded queue. Each stream has its own bounded cursor.
         if before is None and not active:
             running = manager.store.list(states=active_states, limit=limit,researcher=request.state.owner)
-            result.update(active_jobs=running, active_next_cursor=cursor(running))
+            result.update(active_jobs=[present_job(job, compact=True) for job in running], active_next_cursor=cursor(running))
         return result
 
     @app.post("/api/jobs")
@@ -715,7 +746,7 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         record = manager.store.get(identifier)
         if request.state.owner and record.get("researcher") != request.state.owner:
             result_access(request,identifier)
-        return native(record)
+        return present_job(record)
 
     @app.get("/api/jobs/{identifier}/logs")
     def job_logs(identifier: str, request: Request, offset: int = 0):
@@ -846,7 +877,8 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
     def result_summary(identifier: str, request: Request):
         summary = reader(identifier, request).summary()
         summary["id"] = identifier
-        return native(summary)
+        from ..utils.presentation import portable_metadata
+        return native(portable_metadata(summary, root=reader(identifier, request).root))
 
     @app.get("/api/results/{identifier}/retention")
     def retention_plan(identifier: str, request: Request):
@@ -880,8 +912,10 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
     def candidates(identifier: str, request: Request, search: str = "", sort: str = "composite_score", descending: bool = True,
                    eligible: bool | None = None, eligibility_basis: str = "recorded", hotspot_min: float | None = None,
                    offset: int = 0, limit: int = 100):
-        if not 0 <= offset or not 1 <= limit <= 10000:
-            raise ValueError("페이지 크기는 1–10,000개여야 합니다.")
+        if offset < 0:
+            raise ValueError("offset은 0 이상이어야 합니다.")
+        if not 1 <= limit <= 10000:
+            raise ValueError("limit은 1–10,000개여야 합니다.")
         return native(reader(identifier, request).candidates(search=search, sort=sort, descending=descending, eligible=eligible,
                       eligibility_basis=eligibility_basis, hotspot_min=hotspot_min, offset=offset, limit=limit))
 

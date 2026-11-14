@@ -599,6 +599,10 @@ class ResultReader:
                            "passed": passed,
                            "threshold_source": source_name if recorded or self.assessment else "not_recorded"})
         cdr = self.config.get("mature", {}).get("cdr", {})
+        if row.get("hotspot_mapping_failed") is True:
+            for check in checks:
+                if check.get("metric") == "hotspot_contact_frac":
+                    check.update(diagnostic_value=check.get("value"), value=None, reason="결합 부위 번호 대응 실패")
         if not isinstance(cdr, dict):
             cdr = {}
         mature_state = self.state.get("phases", {}).get("mature", {})
@@ -763,11 +767,11 @@ class ResultReader:
                 "expected_total": comparison.get("expected_rows"),
                 "engine_provenance": recorded_engines,
                 "ranking_policy": self._json("03_score/ranking_policy.json") if self._path("03_score/ranking_policy.json").is_file() else None,
-                "conditions": {"seed": run.get("seed"), "engine": self.config.get("screen", {}).get("engine"),
+                "conditions": {"seed": run.get("seed"), "engine": None if self.config.get("screen", {}).get("comparison", {}).get("enabled") else self.config.get("screen", {}).get("engine"),
                                "cascade": cascade,
                                "comparison": self.config.get("screen", {}).get("comparison", {}),
                                "comparison_progress": comparison,
-                               "msa": self.config.get("structure", {}).get("msa", {}),
+                               "msa": self.config.get("structure", {}).get("msa", {}), "msa_record_source": "config",
                                "restraint": self.config.get("screen", {}).get("restraint", {}),
                                "target": self.config.get("target", {})}, "readonly": True}
 
@@ -808,8 +812,9 @@ class ResultReader:
                 # Stage manifests describe actual engine conditions. In
                 # particular CF's single-sequence/no-restraint settings must
                 # not be replaced by the final engine's configuration.
+                row.setdefault("msa_record_source", "manifest" if "msa" in row or "msa_used" in row else "config")
                 row.setdefault("msa", row.get("msa_used", self.config.get("structure", {}).get("msa", {}).get("backend")))
-                row.setdefault("restraint", self.config.get("screen", {}).get("restraint", {}).get("enabled"))
+                row.setdefault("restraint", False if row.get("engine") in {"opendde", "colabfold"} else self.config.get("screen", {}).get("restraint", {}).get("enabled"))
                 row["source_table"] = str(path.relative_to(self.root))
                 candidate = candidates.get(row["candidate_id"], {})
                 if candidate.get("input_structure_stage"):
@@ -831,7 +836,7 @@ class ResultReader:
                 try:
                     directory = self.artifact_path(row.get("pred_dir"))
                     if directory.is_dir():
-                        structures = sorted(directory.glob("pred.model_idx_*.cif")) or sorted(directory.glob("*_model_*.cif")) or sorted(directory.glob("*.cif")) or sorted(directory.glob("*.pdb"))
+                        structures = sorted(directory.glob("pred.model_idx_*.cif"), key=score_complex.model_order) or sorted(directory.glob("*_model_*.cif"), key=score_complex.model_order) or sorted(directory.glob("*.cif"), key=score_complex.model_order) or sorted(directory.glob("*.pdb"), key=score_complex.model_order)
                     elif directory.is_file():
                         structures = [directory]
                 except (ValueError, OSError) as exc:
@@ -840,7 +845,12 @@ class ResultReader:
                     observation = dict(row)
                     if sample:
                         observation["observation_id"] += ":model:" + structure_path.name
-                    observation["model_index"] = sample
+                    # File names carry engine sample IDs; lexicographic position
+                    # is not an ID (model_10 sorts before model_2).
+                    match = re.search(r"(?:model_idx_|_model_)(\d+)$", structure_path.stem) if structure_path else None
+                    observation["model_index"] = int(match.group(1)) if match else sample
+                    observation.update({key: None for key in METRICS + ADDITIONAL_METRICS})
+                    observation.update(iptm_scope=None, iptm_source="not_assessed")
                     if structure_path:
                         observation["cif_path"] = str(structure_path.relative_to(self.root))
                         try:
@@ -848,7 +858,13 @@ class ResultReader:
                             confidence = score_complex.load_confidence(prediction)
                             if not isinstance(confidence, dict):
                                 raise ValueError("신뢰도 데이터는 JSON 객체여야 합니다.")
-                            observation.update(native(confidence))
+                            # Native global confidence is not a scored chain-pair
+                            # metric. Preserve its original definition and scale.
+                            observation["native_confidence"] = native(confidence)
+                            observation["complex_iptm"] = native(confidence.get("iptm"))
+                            observation["prediction_sample_selection"] = score_complex.sample_selection_label(prediction.source)
+                            observation["prediction_sample_index"] = observation["model_index"]
+                            observation["prediction_retained_sample_count"] = len(structures)
                             observation.update(self._model_identity(confidence, row.get("seed")))
                         except (ValueError, OSError, KeyError) as exc:
                             self.issues.append(f"{observation['observation_id']}: 신뢰도 파일 손상 ({exc})")
@@ -860,8 +876,7 @@ class ResultReader:
                         try:
                             if self.artifact_path(first_path) == structure_path.resolve():
                                 for metric in METRICS + ADDITIONAL_METRICS:
-                                    if metric in GEOMETRY_METADATA or candidate.get("colabfold_" + metric) is not None:
-                                        observation[metric] = candidate.get("colabfold_" + metric)
+                                    observation[metric] = candidate.get("colabfold_" + metric)
                                 observation["scored"] = True
                                 observation["score_stage"] = "colabfold"
                                 for key in ("iptm_scope", "iptm_source"):
@@ -876,8 +891,7 @@ class ResultReader:
                         try:
                             if self.artifact_path(final["cif_path"]) == structure_path.resolve():
                                 for metric in METRICS + ADDITIONAL_METRICS + ("composite_score",):
-                                    if metric in GEOMETRY_METADATA or final.get(metric) is not None:
-                                        observation[metric] = final.get(metric)
+                                    observation[metric] = final.get(metric)
                                 observation["scored"] = True
                                 observation["score_stage"] = "boltz2" if observation["stage"] == "final" else observation["structure_stage"]
                                 for key in ("iptm_scope", "iptm_source"):
@@ -951,8 +965,10 @@ class ResultReader:
         engine = row.get("engine")
         seed = cfg_seed(self.config, "score.boltz2.seed") if engine in {"boltz", "boltz2"} else self.config.get("run", {}).get("seed")
         return {"seed": row.get("seed", row.get(prefix + "seed", seed)),
-                "msa": row.get("msa", row.get(prefix + "msa", self.config.get("structure", {}).get("msa", {}).get("backend"))),
-                "restraint": row.get("restraint", row.get(prefix + "restraint", self.config.get("screen", {}).get("restraint", {}).get("enabled")))}
+                "seed_source": row.get("seed_source", "manifest" if "seed" in row or prefix + "seed" in row else "config"),
+                "msa_record_source": row.get("msa_record_source", "manifest" if "msa" in row or "msa_used" in row or prefix + "msa" in row else "config"),
+                "msa": row.get("msa_used", row.get("msa", row.get(prefix + "msa", self.config.get("structure", {}).get("msa", {}).get("backend")))),
+                "restraint": row.get("restraint", row.get(prefix + "restraint", False if engine in {"colabfold", "opendde"} else self.config.get("screen", {}).get("restraint", {}).get("enabled")))}
 
     @staticmethod
     def _model_identity(confidence, base_seed):

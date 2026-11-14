@@ -63,7 +63,9 @@ def resolve_cdr_ranges(
 ) -> tuple[dict[str, tuple[int, int]], list[str]]:
     """ANARCI(IMGT) 또는 config 지정값으로 CDR 범위(1-based inclusive)를 확정한다."""
     warnings: list[str] = []
-    source = str(cfg_get(cfg, "mature.cdr.source", "auto"))
+    source = str(cfg_get(cfg, "mature.cdr.source", "auto")).strip().lower()
+    if source not in {"auto", "config"}:
+        raise ValueError("mature.cdr.source 허용값: auto, config")
     configured = cfg_get(cfg, "mature.cdr.regions", {}) or {}
     def config_ranges():
         if not configured and mock:

@@ -234,7 +234,7 @@ def test_multisample_default_selection_is_explicitly_recorded(tmp_path, cfg):
     first = score_complex.score_complex(tmp_path, "A", "B", [1], cfg)
     assert first["prediction_sample_index"] == 0
     assert first["prediction_retained_sample_count"] == 2
-    assert first["prediction_sample_selection"] == "first_retained_model"
+    assert first["prediction_sample_selection"] == "first_diffusion_sample"
     assert "샘플 0만" in first["prediction_sample_note"]
     chosen = score_complex.find_prediction_files(tmp_path, model_index=1)
     second = score_complex.score_complex(chosen.cif, "A", "B", [1], cfg, pred=chosen)

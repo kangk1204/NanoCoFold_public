@@ -348,6 +348,10 @@ def select_candidates(candidates: pd.DataFrame, metrics: pd.DataFrame, cfg: dict
     frame["_valid"] = frame[metric].map(_finite)
     if "error" in frame:
         frame["_valid"] &= ~frame["error"].map(_error)
+    successful = frame if "error" not in frame else frame[~frame["error"].map(_error)]
+    if not successful.empty and not frame["_valid"].any():
+        raise ValueError(f"Cascade 선별 지표 '{metric}'가 모든 성공 후보에서 미평가입니다. 1차 결과는 보존됩니다. "
+                         "기록된 지표를 screen.cascade.ranking_metric에 지정한 뒤 재개하세요.")
     ascending = RANKING_DIRECTIONS[metric] == "ascending"
     valid = frame[frame["_valid"]].sort_values([metric, id_column], ascending=[ascending, True], kind="stable")
     ranks = {str(identifier): index + 1 for index, identifier in enumerate(valid[id_column])}

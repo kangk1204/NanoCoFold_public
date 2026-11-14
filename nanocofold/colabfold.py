@@ -196,10 +196,12 @@ def predict(cfg, work_dir, target, candidates, *, mock=False, dry_run=False,
         write_csv(work_dir / "predictions.csv", _predictions_manifest_frame(frame, work_dir.parent.resolve()))
     publish()
     if mock:
-        from .mock import make_mock_chai_output
+        from .mock import make_mock_engine_output
         for identifier, chains, fingerprint, query_msa in pending:
             output = work_dir / identifier / "colabfold_out"
-            make_mock_chai_output(output, identifier, chains["A"], chains[records[identifier]["binder_chain"]], [], seed=seed)
+            make_mock_engine_output(output, identifier, chains, [], engine="colabfold", seed=seed,
+                                    samples=options['num_models'] * options['num_seeds'])
+            records[identifier].update(engine="colabfold", mock=True, seed_source="prediction")
             progress["completed"].append(identifier)
         publish()
         return pd.DataFrame([records[x] for x in identifiers])

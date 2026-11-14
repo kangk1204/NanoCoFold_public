@@ -4,14 +4,15 @@
 function recordedCandidateSeed(row, observations = []) {
   const valid = value => (typeof value === 'number' || (typeof value === 'string' && /^\d+$/.test(value)))
     && Number.isSafeInteger(Number(value)) && Number(value) >= 0 && Number(value) <= 4294967295;
-  if (row.seed != null && row.seed !== '') return valid(row.seed) ? Number(row.seed) : null;
+  if (row.model_record === false) return null;
+  if (row.seed_source !== 'config' && row.seed != null && row.seed !== '') return valid(row.seed) ? Number(row.seed) : null;
   if (row.model_record === false || !row.candidate_id) return null;
   const engine = value => value === 'boltz' ? 'boltz2' : value;
   const selectedEngine = engine(row.predictor_engine || row.engine);
   if (!selectedEngine || selectedEngine === 'unknown' || selectedEngine === 'not_predicted') return null;
-  const matching = observations.filter(record => record.candidate_id === row.candidate_id
+  const matching = observations instanceof Map ? observations.get(JSON.stringify([row.candidate_id, selectedEngine])) || [] : observations.filter(record => record.candidate_id === row.candidate_id
     && engine(record.predictor_engine || record.engine) === selectedEngine);
-  if (!matching.length || matching.some(record => !valid(record.seed))) return null;
+  if (!matching.length || matching.some(record => record.seed_source === 'config' || !valid(record.seed))) return null;
   const seeds = [...new Set(matching.map(record => Number(record.seed)))].sort((a, b) => a - b);
   return seeds.length === 1 ? seeds[0] : seeds.join(', ');
 }
@@ -601,12 +602,23 @@ function usesPublicMsa(cfg) {
     cfg.screen?.msa_mode === "msa" || cfg.structure?.msa?.backend === "public_api" ||
     (cfg.structure?.provider === "chai1" && cfg.structure?.chai1?.msa_mode === "msa");
 }
+function fieldError(message, id) {
+  const error = Error(message); error.inputField = $(id); return error;
+}
+function inputBudgetSeconds() {
+  const input = $('budget'), text = input.value;
+  if (!text && !input.validity?.badInput) return null;
+  const minutes = Number(text);
+  if (input.validity?.badInput || !Number.isSafeInteger(minutes) || minutes < 1 || minutes > 10080)
+    throw fieldError('시간 한도는 1–10080분의 정수로 입력하거나 비워 두세요.', 'budget');
+  return minutes * 60;
+}
 function inputSettings(forPlan = false) {
   let advanced;
   try {
     advanced = JSON.parse($("advanced").value || "{}");
   } catch {
-    throw Error("고급 설정 JSON 형식을 확인하세요.");
+    throw fieldError("고급 설정 JSON 형식을 확인하세요.", "advanced");
   }
   if (!advanced || typeof advanced !== "object" || Array.isArray(advanced))
     throw Error("고급 설정은 객체여야 합니다.");
@@ -619,9 +631,8 @@ function inputSettings(forPlan = false) {
     cfg.screen.colabfold.msa_source = $("novice-msa").value;
     cfg.screen.allow_public_msa_server = $("novice-consent").checked;
     cfg.screen.comparison.engines = [...document.querySelectorAll('[data-novice-engine]:checked')].map(i => i.value);
-    if (!cfg.screen.comparison.engines.length) throw Error("평가 엔진을 하나 이상 선택하세요.");
-    if (!forPlan && !simulated && cfg.screen.colabfold.msa_source === "public_api" && !cfg.screen.allow_public_msa_server)
-      throw Error("현재 입력의 단백질 서열 전송 동의가 필요합니다.");
+    if (!cfg.screen.comparison.engines.length) throw fieldError("평가 엔진을 하나 이상 선택하세요.", "analysis-preset");
+
   }
   if (simulated) {
     // CPU demonstrations create synthetic data and never acquire an MSA.
@@ -632,7 +643,7 @@ function inputSettings(forPlan = false) {
   }
   const effectiveMsa = merge(state.planningDefaults || {}, cfg);
   const publicMsa = !simulated && usesPublicMsa(effectiveMsa);
-  if (!forPlan && publicMsa && !$("novice-consent").checked) throw Error("가져온 설정도 현재 입력에 대한 외부 MSA 전송 동의를 다시 확인해야 합니다.");
+
   if (publicMsa) cfg.screen = merge(cfg.screen || {}, {allow_public_msa_server: $("novice-consent").checked});
   if (effectiveMsa.structure?.provider === "chai1" && effectiveMsa.structure?.chai1?.msa_mode === "msa")
     cfg.structure = merge(cfg.structure, {allow_public_msa_server: !simulated && $("novice-consent").checked});
@@ -643,18 +654,20 @@ function inputSettings(forPlan = false) {
     throw Error("Seed는 0–4294967295 정수를 입력하세요.");
   for (const id of ["candidate-limit", "design-count"]) {
     if (id === "design-count" && $("mode").value !== "design") continue;
-    if (id === "candidate-limit" && $("mode").value === "screen") continue;
+    if (id === "candidate-limit" && !["design", "mature"].includes($("mode").value)) continue;
     if ($(id).validity?.badInput) throw Error("후보 상한과 백본 수는 1 이상의 정수여야 합니다.");
     if (!$(id).value) continue;
     const value = $(id).valueAsNumber;
-    if (!Number.isSafeInteger(value) || value < 1)
-      throw Error("후보 상한과 백본 수는 1 이상의 정수여야 합니다.");
-    cfg = merge(cfg, id === "design-count" ? { design: { num_designs: value } } : {
-      design: { filters: { top_n_to_score: value } },
-      screen: { tier2_n: value },
-      mature: { prefilter: { top_n: value } },
-    });
+    const maximum = id === "design-count" ? 10000 : 100000;
+    if (!Number.isSafeInteger(value) || value < 1 || value > maximum)
+      throw fieldError(I18N.value(I18N.format("{0}: 1–{1} 정수를 입력하세요.", [id === "design-count" ? I18N.term("생성할 백본 수 · 생성기별") : I18N.term("후보 상한"), maximum])), id);
+    cfg = merge(cfg, id === "design-count" ? { design: { num_designs: value } }
+      : $("mode").value === "mature" ? {mature: {prefilter: {top_n: value}}}
+      : {design: {filters: {top_n_to_score: value}}, ...(cfg.screen?.comparison?.enabled ? {} : {screen: {tier2_n: value}})});
   }
+  if ($("mode").value === "mature" && $("candidate-limit").value
+      && !Object.hasOwn(advanced.mature?.library || {}, "max_variants"))
+    cfg = merge(cfg, {mature: {library: {max_variants: null}}});
   const selection = $("selection-limit");
   if (selection?.value && ["design", "mature"].includes($("mode").value)) {
     if (!Number.isSafeInteger(selection.valueAsNumber) || selection.valueAsNumber < 1)
@@ -662,6 +675,9 @@ function inputSettings(forPlan = false) {
     cfg = merge(cfg, {rank: {final_n: selection.valueAsNumber}});
   }
   cfg = matureInputSettings(cfg);
+  inputBudgetSeconds();
+  if (!forPlan && publicMsa && !$("novice-consent").checked)
+    throw fieldError("가져온 설정도 현재 입력에 대한 외부 MSA 전송 동의를 다시 확인해야 합니다.", "novice-consent");
   return merge(cfg, {
     run: {
       mode: $("mode").value,
@@ -671,7 +687,7 @@ function inputSettings(forPlan = false) {
       analysis_preset: $("analysis-preset").value,
     },
     screen: cfg.screen?.comparison?.enabled ? {} : {
-      engine: $("screen-engine").value,
+      engine: advanced.screen?.engine || $("screen-engine").value,
       // The server resolves the selected engine using its registered installation.
     },
   });
@@ -739,12 +755,12 @@ function noviceComplexSettings(cfg) {
   const current = cfg.complex || {}, small = $("analysis-preset").value === "small-four-v1";
   const engines = small ? cfg.screen?.comparison?.engines : current.comparison_engines;
   if (!engines) return {...current, engine: current.engine || $("screen-engine").value,
-    seeds: current.seeds || [Number($("seed").value)]};
+    seeds: current.seeds || [cfg.run?.seed ?? 42]};
   const source = small ? cfg.screen?.colabfold?.msa_source : current.msa_source ?? cfg.screen?.colabfold?.msa_source;
   if (!source) throw Error("복합체 비교에 사용할 MSA 준비 방식을 선택하세요.");
   const preserved = {...current};
   delete preserved.engine;
-  return {...preserved, comparison_engines: engines, seeds: current.seeds || [Number($("seed").value)], msa: "precomputed",
+  return {...preserved, comparison_engines: engines, seeds: current.seeds || [cfg.run?.seed ?? 42], msa: "precomputed",
     msa_source: source, allow_public_msa_server: source === "public_api" && $("novice-consent").checked,
     models_per_seed: current.models_per_seed ?? 1, recycles: current.recycles ?? 3,
     diffusion_steps: current.diffusion_steps ?? 200};
@@ -822,6 +838,8 @@ function noviceModelPlan(cfg, mode, libraryCount) {
   const plan = analysisQuantityPlan(cfg, mode, libraryCount);
   if (plan.staged) return '다단계 선별 경로입니다. 전체 입력·생성 수와 단계별 확정 평가 수를 실행 기록에서 구분합니다.';
   if (plan.modelUpper === null) return '계획 미확정 · 입력과 적용 설정을 확인하세요.';
+  if (plan.nativeModelUpper !== null && plan.nativeModelUpper !== plan.modelUpper)
+    return I18N.value(I18N.format('최대 {0}개 후보–엔진 조합 · 최대 {1}개 구조 예측 · 엔진별 샘플 수를 포함합니다.', [plan.modelUpper, plan.nativeModelUpper]));
   if (mode === 'complex') return `계획 모델 ${plan.modelUpper}개 · 실제 성공·실패·미평가는 결과에서 구분합니다.`;
   if (mode === 'screen') return `입력 VHH 전체 ${libraryCount}개 × 엔진 ${plan.engineCount}개 = 계획 ${plan.modelUpper}모델 · 후보를 자동 생략하지 않습니다.`;
   if (mode === 'mature') {
@@ -864,7 +882,9 @@ function clearScalePreview() {
 function applyAnalysisSettings(cfg) {
   resetMutationControls();
   $('advanced').value = JSON.stringify(cfg, null, 2);
-  $('analysis-preset').value = 'standard';
+  const savedPreset = cfg.run?.analysis_preset;
+  $('analysis-preset').value = [...($('analysis-preset').options || [])].some(o=>o.value === savedPreset) ? savedPreset : 'standard';
+  for (const n of document.querySelectorAll('[data-novice-engine]')) n.checked = (cfg.screen?.comparison?.engines || cfg.complex?.comparison_engines || []).includes(n.value);
   for (const id of ['candidate-limit','design-count','selection-limit']) if ($(id)) $(id).value = '';
   $('mode').value = cfg.run.mode;
   $('seed').value = String(cfg.run.seed ?? 42);
@@ -878,7 +898,7 @@ function applyAnalysisSettings(cfg) {
     engine.value = selected;
   }
   if ($('novice-consent')) $('novice-consent').checked = false;
-  invalidateInput(); fields();
+  invalidateInput(); fields(); state.refreshNovice?.();
 }
 async function findAcceptedAnalysis(submissionId, stillCurrent) {
   // A lost response is ambiguous. Only attach a job carrying this exact receipt.
@@ -913,13 +933,13 @@ async function submitReviewedAnalysis() {
       if (!await window.confirm(message)) return;
     }
     if (revision !== state.inputRevision || input !== state.input) throw Error('입력이나 설정이 변경되었습니다. 다시 검토하세요.');
-    const budget = $('budget').value;
+    const budgetSeconds = inputBudgetSeconds();
     const submissionId = state.submissionId || (state.submissionId = crypto.randomUUID().replaceAll('-', ''));
     const navigation = state.navigationRequest;
     const stillCurrent = () => state.input === input && revision === state.inputRevision && navigation === state.navigationRequest;
     const payload = {submission_id:submissionId, reuse_results:!$('force-rerun').checked,
       input_id:input.id, mode, name:$('job-name').value, mock:input.config.run.mock,
-      ...(budget ? {budget_seconds:Number(budget)*60}: {})};
+      ...(budgetSeconds !== null ? {budget_seconds:budgetSeconds}: {})};
     notice('서버에서 분석 입력과 설치 파일을 확인 중입니다. 몇 분 걸릴 수 있습니다. 다시 누르지 않아도 접수되면 작업 화면이 열립니다.');
     let job;
     try {
@@ -963,6 +983,7 @@ function renderAnalysisScale(cfg, mode) {
   }
   const quantities = analysisQuantityPlan(cfg, mode, null);
   if ($("quantity-breakdown")) {
+    $("quantity-breakdown").hidden = !['design', 'mature'].includes(mode);
     const lines = quantities.generators.map(g => el("p", I18N.format("{0}: 요청 백본 {1}개 · 백본당 제안 서열 {2}개 · 제안 예산 최대 {3}개", [g.engine, known(g.backbones), known(g.sequencesPerBackbone), known(g.proposed)])));
     lines.push(el("p", I18N.term("고유 후보 서열 수: 생성·중복 확인 후 확정")));
     $("quantity-breakdown").replaceChildren(...lines);
@@ -997,14 +1018,18 @@ function renderAnalysisScale(cfg, mode) {
   $("screen-engine").hidden = Array.isArray(comparison);
   document.querySelector('label[for="screen-engine"]').hidden = Array.isArray(comparison);
   const small = $("analysis-preset").value === "small-four-v1";
+  $("analysis-scale-note").hidden = mode === "complex";
+  for (const id of ["selection-limit-current", "selection-limit-help"]) $(id).hidden = mode === "complex";
   I18N.text($("analysis-scale-note"), I18N.term(small
     ? "작은 시작 설정은 설치 확인용 소규모 분석입니다. 아래 수를 바꾸면 규모를 늘릴 수 있습니다. 후보 서열 수·예측 모델 수·최종 선별 수는 서로 다릅니다."
     : "현재 설정의 생성·평가 규모를 확인하세요. 백본 수와 서열 수는 다를 수 있으며, 후보가 늘면 계산 시간과 저장 공간도 늘어납니다."));
   for (const [id, visible] of [["design-count-help", mode === "design"], ["design-count-current", mode === "design"], ["candidate-limit-help", ["design", "mature"].includes(mode) && !unfiltered]]) $(id).hidden = !visible;
-  $("analysis-scale").hidden = mode === "complex" || mode === "screen";
+  $("analysis-scale").hidden = false;
 }
 function fields() {
   const mode = $("mode").value;
+  if ($("mature-library-settings")) $("mature-library-settings").hidden = mode !== "mature";
+  $("region-fields").hidden = mode === "complex";
   for (const [id, visible] of [["candidate-limit", ["design", "mature"].includes(mode)], ["design-count", mode === "design"], ["selection-limit", mode !== "complex"]]) {
     if (!$(id)) continue;
     $(id).hidden = !visible;
@@ -1245,7 +1270,7 @@ async function prepareInput() {
     const comparison = $("analysis-preset").value === "small-four-v1" || Array.isArray(cfg.complex?.comparison_engines);
     if (comparison && state.capabilities.complex_comparison !== true)
       throw Error("현재 서버는 일반 복합체 네 엔진 비교를 지원하지 않습니다. 새 기능 패키지로 업데이트하세요.");
-    result = await api("/api/inputs/complex", {proteins, mock: false, name: $("job-name").value,
+    result = await api("/api/inputs/complex", {proteins, config: cfg, mock: false, name: $("job-name").value,
       settings: noviceComplexSettings(cfg)});
   } else if ($("input-kind").value === "fasta") {
     result = await api("/api/inputs", {
@@ -1285,7 +1310,8 @@ async function prepareInput() {
   state.readiness = Boolean(result.config.run.mock);
   state.diagnostic = null;
   $("start-job").disabled = !state.readiness;
-  I18N.text($("resolved-config"), JSON.stringify(result.config, null, 2));
+  I18N.text($("resolved-config"), JSON.stringify(result.review?.engine_conditions?.length
+    ? {base_config: result.config, engine_conditions: result.review.engine_conditions} : result.config, null, 2));
   if ($("novice-reviewed-summary")) {
     const cfg=result.config, mode=cfg.run.mode, complex=mode==="complex", summary=$("novice-reviewed-summary");
     const engines=complex?cfg.complex.comparison_engines||[cfg.complex.engine]:cfg.screen.comparison?.enabled?cfg.screen.comparison.engines:[cfg.screen.engine];
@@ -1294,10 +1320,19 @@ async function prepareInput() {
       : cfg.screen.engine === "chai1" ? cfg.screen.msa_mode : cfg.structure?.msa?.backend;
     const entries=complex?result.review.proteins:[{id:"A",sequence:cfg.target.sequence}];
     summary.replaceChildren(el("h3",I18N.term("이번에 실행할 입력과 조건")),
-      el("p",`${mode} · ${entries.map(p=>`${p.id}: ${p.sequence.length} aa`).join(" · ")} · Seed ${cfg.run.seed}`),
+      el("p",`${mode} · ${entries.map(p=>`${p.id}: ${p.sequence.length} aa`).join(" · ")} · Seed ${complex ? cfg.complex.seeds.join(", ") : cfg.run.seed}`),
       el("p",I18N.format("평가 엔진: {0} · 엔진 점수를 합산하지 않습니다.", [engines.join(" · ")])),
       el("p",I18N.format("MSA: {0} · 공용 전송 동의: {1}", [msaSource, cfg.screen.allow_public_msa_server===true ? I18N.term("현재 입력에 동의") : I18N.term("외부 전송 없음")])),
       el("p",I18N.term(noviceModelPlan(cfg,mode,mode==="screen"?noviceFasta($("vhh-fasta").value).length:0))));
+  }
+  if (result.review?.engine_conditions?.length) {
+    const table=el("table"), head=el("tr");
+    for (const label of ["예측 엔진", "Seed", "엔진별 적용 설정"]) head.append(el("th", I18N.term(label)));
+    table.append(head);
+    for (const item of result.review.engine_conditions) {
+      const row=el("tr"); row.append(el("td", item.engine), el("td", String(item.seed)), el("td", JSON.stringify(item.effective))); table.append(row);
+    }
+    $("novice-reviewed-summary").append(table);
   }
   warnings($("review-summary"), result.review?.warnings);
   $("review-output").hidden = false;
@@ -1782,7 +1817,31 @@ async function refreshResults() {
   }
 }
 // HANDOFF_PRESENTATION_START
-function resultHandoffView(summary) {
+function predictionMsaSetting(summary) {
+  const cfg = summary?.config || {}, conditions = summary?.conditions || {};
+  if (summary?.mode === "complex") return cfg.complex?.msa ?? conditions.msa ?? null;
+  if (cfg.screen?.comparison?.enabled || cfg.screen?.cascade?.enabled || conditions.comparison?.enabled)
+    return cfg.screen?.colabfold?.msa_source ?? conditions.colabfold?.msa_source ?? null;
+  const engine = cfg.screen?.engine ?? conditions.engine;
+  if (engine === "colabfold") return cfg.screen?.colabfold?.msa_source ?? null;
+  if (engine === "chai1") return cfg.screen?.msa_mode ?? null;
+  return cfg.structure?.msa?.backend ?? null;
+}
+function recordedModelMsa(summary, row = {}) {
+  if (row.model_record === false) return null;
+  const actual = row.msa_used ?? (row.msa_record_source === "config" ? null : row.msa);
+  const conditions = summary?.conditions || {};
+  const value = actual ?? conditions.msa_used ?? (conditions.msa_record_source === "prediction" ? conditions.msa : null);
+  return typeof value === "string" ? value : value?.backend ?? null;
+}
+function hasRecordedEmptyMsa(summary, observations = []) {
+  const records = observations.filter(row => row.model_record !== false);
+  const empty = value => ["empty", "single", "chai1_single", "chai1_single_fallback"].includes(value);
+  if (records.length) return records.every(row => empty(recordedModelMsa(summary, row)));
+  // Target preparation settings do not describe complex prediction inputs.
+  return empty(recordedModelMsa(summary));
+}
+function resultHandoffView(summary, observations = []) {
   const count = value => Number.isSafeInteger(value) && value >= 0 ? value : null;
   const d = summary?.handoff_diagnostics;
   const saved = summary?.state?.phases?.final?.handoff_gate ?? d?.recorded_summary;
@@ -1799,13 +1858,13 @@ function resultHandoffView(summary) {
     errors: consistent ? d.errors : [], warnings: consistent ? d.warnings : [],
     source: typeof d?.source === "string" ? d.source : "05_final/handoff_gate.json",
     source_sha256: typeof d?.source_sha256 === "string" ? d.source_sha256 : null,
-    empty_msa: summary?.mode === "complex" ? (summary?.conditions?.msa ?? summary?.config?.complex?.msa) === "empty" : summary?.config?.structure?.msa?.backend === "empty",
+    empty_msa: hasRecordedEmptyMsa(summary, observations),
     visible: summary?.mode !== "complex" || !!recorded || (d && d.detail_status !== "missing")};
 }
 // HANDOFF_PRESENTATION_END
 
 function renderHandoffStatus(summary) {
-  const gate = resultHandoffView(summary);
+  const gate = resultHandoffView(summary, state.observations);
   if (!gate.visible) return;
   const panel = el("section", undefined, "report-guide");
   panel.setAttribute("data-handoff-status", gate.status);
@@ -1869,6 +1928,8 @@ function resultMsaCaption(summary, observations = []) {
   const source = summary.conditions?.msa_source ?? (complex ? summary.config?.complex?.msa_source : undefined);
   if (mode != null) return caption(mode, source);
   if (complex) return missing;
+  if (summary.config?.screen?.comparison?.enabled || summary.config?.screen?.cascade?.enabled || summary.conditions?.comparison?.enabled)
+    return comparisonSource ? caption("precomputed", comparisonSource) : missing;
   const engine = summary.conditions?.engine ?? summary.config?.screen?.engine;
   if (engine === "colabfold") {
     const config = summary.config?.screen?.colabfold;
@@ -3577,6 +3638,7 @@ function initBatch(){
       if(latest.id!==batchId||batchCancellationGeneration(latest)!==generation){cancellationChanged();return;}
       const updated=await api("/api/batches/"+batchId+"/cancel",{expected_cancel:expectedCancel},{timeoutMs:30000});
       if(activeBatch?.id===batchId)renderBatch(updated);
+      if(updated.cancel_skipped_job_ids?.length)notice(I18N.format("다른 연구원이 제출한 작업 {0}개는 유지했습니다.",[updated.cancel_skipped_job_ids.length]));
     });
   };
 }
@@ -4165,7 +4227,10 @@ async function initNoviceFlow() {
     [...rail.children].forEach((n,i)=>n.setAttribute("aria-current",i===step?"step":"false"));
     const isComplex=$("mode").value==="complex";
     complex.hidden=!isComplex||$("input-kind").value!=="fasta";$("fasta-fields").hidden=isComplex||$("input-kind").value!=="fasta";
-    controls.hidden=$("analysis-preset").value!=="small-four-v1";$("mock").disabled=isComplex;demoControls.hidden=isComplex;
+    controls.hidden=$("analysis-preset").value!=="small-four-v1";$("mock").disabled=isComplex;demoControls.hidden=false;
+    if ($("complex-mode-note")) $("complex-mode-note").hidden=!isComplex;
+    $("region-fields").hidden=isComplex;
+    if ($("mature-library-settings")) $("mature-library-settings").hidden=$("mode").value!=="mature";
     const simulated=$("mock").checked&&!isComplex;
     ml.hidden=msa.hidden=simulated || controls.hidden;
     cl.hidden=msaNote.hidden=true;demoMsaNote.hidden=!simulated;
@@ -4178,11 +4243,13 @@ async function initNoviceFlow() {
         : !controls.hidden && msa.value === "local_mmseqs2" ? "서버에 등록된 데이터베이스를 검색합니다. 외부 전송 동의는 필요하지 않습니다."
         : "현재 설정에는 공용 MSA 서열 전송 동의가 필요하지 않습니다.";
       I18N.text(msaNote, I18N.term(note));
-      renderAnalysisScale(cfg, $("mode").value); I18N.text(plan, I18N.term(noviceModelPlan(cfg,$("mode").value,$("mode").value==="screen"?noviceFasta($("vhh-fasta").value).length:0)));}catch(e){clearScalePreview();I18N.text(plan, I18N.term(e.message));}
+      renderAnalysisScale(cfg, $("mode").value); I18N.text(plan, I18N.term(noviceModelPlan(cfg,$("mode").value,$("mode").value==="screen"?noviceFasta($("vhh-fasta").value).length:0)));}catch(e){clearScalePreview();I18N.text(plan, I18N.term(e.message));I18N.text(reason, I18N.term(e.message));}
     I18N.text($("review-input"), I18N.term("입력 확인"));I18N.text($("start-job"), I18N.term("분석 실행"));
     refreshSequenceHelp();
   }
-  function jump(n){step=n;I18N.text(reason, "");render();heading.focus();}
+  state.refreshNovice = render;
+  function clearOptionErrors(){host.querySelectorAll('[aria-invalid="true"]').forEach(n=>n.removeAttribute("aria-invalid"));}
+  function jump(n){step=n;clearOptionErrors();I18N.text(reason, "");render();heading.focus();}
   state.nextAnalysis = () => {
     consent.checked = false;
     invalidateInput();
@@ -4198,12 +4265,12 @@ async function initNoviceFlow() {
     if($("mode").value==="screen")noviceInputFasta("vhh-fasta");
     if($("mode").value==="mature"&&noviceInputFasta("wt-fasta").length!==1)throw Error("WT VHH 1개를 입력하세요.");
   }
-  next.onclick=()=>{try {if(step===1)validateInputs();else inputSettings();jump(step+1);}catch(e){I18N.text(reason, I18N.term(e.message));const field=e.inputField||(step===2?consent:$("mode").value==="complex"?fasta:$("input-kind").value==="fasta"?$("target-fasta"):$("structure-file"));field.focus();field.setAttribute("aria-invalid","true");}};
+  next.onclick=()=>{try {if(step===1)validateInputs();else inputSettings();jump(step+1);}catch(e){I18N.text(reason, I18N.term(e.message));reason.setAttribute("role","alert");const field=e.inputField||(step===2?$("advanced"):$("mode").value==="complex"?fasta:$("input-kind").value==="fasta"?$("target-fasta"):$("structure-file"));field?.focus();field?.setAttribute("aria-invalid","true");}};
   start.onclick=()=>{fields();jump(1);};prev.onclick=()=>jump(step-1);
   function copiesReview(){try{const old=[...copies.querySelectorAll("input")].map(i=>i.value),rows=noviceFasta(fasta.value);copies.replaceChildren(...rows.map((r,i)=>{const l=el("label",I18N.format("{0} · {1} · {2} aa · 사본 수", [String.fromCharCode(65+i), r.name, r.sequence.length])),n=el("input");n.id="complex-copies-"+i;n.type="number";n.min="1";n.max="25";n.value=old[i]||"1";l.append(n);return l;}));}catch{copies.replaceChildren();}}
   fasta.addEventListener("input",copiesReview);
-  host.addEventListener("input",e=>{if(e.target!==consent)consent.checked=false;I18N.text(reason, "");render();if(restoring)return;clearTimeout(draftTimer);draftTimer=setTimeout(()=>{const fields={};for(const n of host.querySelectorAll("input[id],select[id],textarea[id]")){if(n.type!=="file"&&n.id!=="novice-consent")fields[n.id]=n.type==="checkbox"?n.checked:n.value;}fields.comparison_engines=[...controls.querySelectorAll('[data-novice-engine]:checked')].map(i=>i.value);saveQueue=saveQueue.catch(()=>{}).then(()=>api("/api/draft",{version:1,fields})).catch(e=>{I18N.text(reason, I18N.concat([I18N.term("초안 저장 실패: "), e.message]));});},500);});
-  action("load-tutorial",async()=>{const revision=state.inputRevision;const example=await api("/api/tutorials/"+$("tutorial-mode").value),entry=example.payload.entries[0];if(revision!==state.inputRevision)throw Error("불러오는 동안 입력이 변경되었습니다. 현재 입력을 유지합니다.");$("mode").value=example.mode;$("input-kind").value="fasta";$("analysis-preset").value="small-four-v1";$("advanced").value="{}";resetMutationControls();$("mock").checked=false;$("candidate-limit").value="";$("design-count").value="";if($("selection-limit"))$("selection-limit").value="";$("seed").value="42";$("job-name").value=example.payload.name;$("target-fasta").value=entry.content||"";$("vhh-fasta").value=entry.vhh_fasta||"";$("wt-fasta").value=entry.wt_fasta||"";fasta.value=(entry.proteins||[]).map(p=>`>${p.name}\n${p.sequence}`).join("\n");consent.checked=false;invalidateInput();copiesReview();fields();jump(1);I18N.text($("tutorial-status"), I18N.term("공개 입력을 불러왔습니다. 아직 계산은 시작하지 않았습니다."));});
+  host.addEventListener("input",e=>{clearOptionErrors();if(e.target!==consent)consent.checked=false;I18N.text(reason, "");render();if(restoring)return;clearTimeout(draftTimer);draftTimer=setTimeout(()=>{const fields={};for(const n of host.querySelectorAll("input[id],select[id],textarea[id]")){if(n.type!=="file"&&n.id!=="novice-consent")fields[n.id]=n.type==="checkbox"?n.checked:n.value;}fields.comparison_engines=[...controls.querySelectorAll('[data-novice-engine]:checked')].map(i=>i.value);saveQueue=saveQueue.catch(()=>{}).then(()=>api("/api/draft",{version:1,fields})).catch(e=>{I18N.text(reason, I18N.concat([I18N.term("초안 저장 실패: "), e.message]));});},500);});
+  action("load-tutorial",async()=>{const revision=state.inputRevision;const example=await api("/api/tutorials/"+$("tutorial-mode").value),entry=example.payload.entries[0];if(revision!==state.inputRevision)throw Error("불러오는 동안 입력이 변경되었습니다. 현재 입력을 유지합니다.");$("mode").value=example.mode;$("input-kind").value="fasta";$("analysis-preset").value="small-four-v1";$("advanced").value="{}";for(const n of controls.querySelectorAll("[data-novice-engine]")) n.checked=state.starter.engines.includes(n.value);resetMutationControls();$("mock").checked=false;$("candidate-limit").value="";$("design-count").value="";if($("selection-limit"))$("selection-limit").value="";$("seed").value="42";$("job-name").value=example.payload.name;$("target-fasta").value=entry.content||"";$("vhh-fasta").value=entry.vhh_fasta||"";$("wt-fasta").value=entry.wt_fasta||"";fasta.value=(entry.proteins||[]).map(p=>`>${p.name}\n${p.sequence}`).join("\n");consent.checked=false;invalidateInput();copiesReview();fields();jump(1);I18N.text($("tutorial-status"), I18N.term("공개 입력을 불러왔습니다. 아직 계산은 시작하지 않았습니다."));});
   render();const draftRevision=state.inputRevision;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=true);start.disabled=true;$("load-tutorial").disabled=true;try{const draft=await api("/api/draft");if(draftRevision!==state.inputRevision)throw Error("입력이 변경되어 저장된 초안을 덮어쓰지 않았습니다.");restoring=true;for(const [id,value]of Object.entries(draft.fields||{})){const n=$(id);if(n&&host.contains(n)&&n.type!=="file"){if(n.type==="checkbox")n.checked=value===true;else n.value=String(value);}}if(Object.hasOwn(draft.fields||{},'seed')&&$('seed').dataset)$('seed').dataset.quantitySource='restored';if(draft.fields?.comparison_engines)for(const n of controls.querySelectorAll('[data-novice-engine]'))n.checked=draft.fields.comparison_engines.includes(n.value);consent.checked=false;fields();copiesReview();if(Object.keys(draft.fields||{}).length)I18N.text(task, I18N.term("초안 입력을 복원했습니다. 구조 파일을 다시 선택하고 전송 동의와 입력을 확인하세요. 설치 환경 확인 기록은 재사용합니다."));}catch(e){I18N.text(reason, I18N.concat([I18N.term("초안 복원 실패: "), e.message]));}finally{restoring=false;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=false);start.disabled=false;$("load-tutorial").disabled=false;render();}
 }
 I18N.init();

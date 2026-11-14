@@ -15,6 +15,22 @@ CHAI_MANAGED = frozenset({
 })
 
 
+def boltz_extra_args(cfg, *, target=False, extra_args=None):
+    """Named sampling steps with explicit compatibility for saved extra_args."""
+    from ..config import cfg_get
+    path = "structure.boltz2.extra_args" if target else "score.boltz2_extra_args"
+    key = "structure.boltz2.sampling_steps" if target else "score.boltz2_sampling_steps"
+    steps = cfg_get(cfg, key)
+    managed = BOLTZ_MANAGED | ({"--sampling-steps"} if steps is not None else set())
+    extra = validate_extra_args(cfg_get(cfg, path, []) if extra_args is None else extra_args,
+                                setting=path, managed=managed)
+    if steps is not None:
+        if type(steps) is not int or not 1 <= steps <= 10000:
+            raise ValueError(f"{key}: 1–10000 integer required")
+        extra.extend(["--sampling_steps", str(steps)])
+    return extra
+
+
 def validate_colabfold_extra_args(values) -> None:
     """The ColabFold adapter supports named settings, not passthrough argv."""
     if values is not None and (not isinstance(values, (list, tuple)) or values):

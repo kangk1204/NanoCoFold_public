@@ -1,6 +1,6 @@
 # Update an existing installation
 
-Update in the original installation folder to keep your workspace, prediction engines and saved results. The current installer is **v0.4.8-install.13**. Its compute package reports **0.4.8rc12**.
+Update in the original installation folder to keep your workspace, prediction engines and saved results. Use the current `main` revision for the latest input, resume and Excel corrections. The compute package reports **0.4.8rc12**; record the commit as well.
 
 ## 1. Finish active jobs
 
@@ -10,12 +10,12 @@ In **Jobs & logs**, wait until no jobs are queued or running. If you choose to c
 
 Choose the method you originally used. Save any local source changes first.
 
-**Git installation.** Run the commands below in the original source folder. The last command should print `v0.4.8-install.13`. For a shared installation, [set up the administrator and result access](shared-lab.en.md) after updating.
+**Git installation.** Run the commands below in the original source folder. The last command prints the installed source commit. For a shared installation, [set up the administrator and result access](shared-lab.en.md) after updating.
 
 ```bash
-git fetch origin tag v0.4.8-install.13
-git switch --detach v0.4.8-install.13
-git describe --tags --exact-match
+git fetch origin main
+git switch --detach origin/main
+git rev-parse HEAD
 ```
 
 If your installation follows the `main` branch and you want to keep it there, use these commands instead.
@@ -27,12 +27,12 @@ git rev-parse HEAD
 
 Keep the tag or commit with your run notes. If Git reports an error, resolve it before continuing.
 
-**ZIP installation.** Download the [v0.4.8-install.13 source ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/tags/v0.4.8-install.13.zip) and extract it into a **separate folder**. If your collaborator shared a specific revision, use **Code → Download ZIP** on that revision’s source page.
+**ZIP installation.** Download the [current source ZIP](https://github.com/kangk1204/NanoCoFold_public/archive/refs/heads/main.zip) and extract it into a **separate folder**. If your collaborator shared a specific revision, use **Code → Download ZIP** on that revision’s source page.
 
 In the **original installation folder**, run the commands below. Replace the first path with the newly extracted folder containing `update.sh`. Keep the source link with your run notes.
 
 ```bash
-update_source="/path/to/extracted/NanoCoFold_public-0.4.8-install.13"
+update_source="/path/to/extracted/NanoCoFold_public-main"
 rsync -a --exclude='.git/' --exclude='.nanocofold/' "$update_source/" ./
 ```
 
@@ -52,3 +52,5 @@ Open the address printed after **NanoCoFold:** and reload the browser. To check 
 Reopen a saved run via **Explore results → Select run**. To use the updated interface for an old report, export a new copy. If the updater cannot find the installation, return to the folder you used the first time. For a new computer, use the [installation instructions](../README.md#1-prepare-and-install).
 
 After updating, open a saved analysis in **Explore results** and select a **?** in the candidate details. Previously downloaded HTML and ZIPs stay unchanged. To share the new explanations, export a fresh report ZIP; no new prediction is needed.
+
+**Check the update:** open Results database and save the complete Excel table again. “MSA used (recorded)” and “Requested MSA setting” are separate columns. Blank recorded cells mean that the original result did not record that value. Existing predictions and selection criteria are unchanged; no new GPU run is required.
