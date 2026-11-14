@@ -273,6 +273,8 @@ For **Design new nanobodies**, the small starter preset requests one backbone fr
 | Seed | Random starting value, separate from candidate counts |
 | Final selection limit | Maximum selected records, applied per engine in a multi-engine comparison |
 
+In four-engine nanobody design, the **RFantibody follow-up candidate limit** applies only to RFantibody candidates. BoltzGen uses its own backbone and sequence settings. For example, 1,000 backbones per generator, one sequence per backbone and an RFantibody follow-up limit of 500 give up to 1,500 candidates × 4 engines = 6,000 models. Eight models is a starter setting, not the platform limit. Check **Planned models** before running.
+
 Unique sequences and successful, failed or unevaluated models are counted in the results. Blank overrides keep the preset or imported values shown on screen. Large jobs ask for a size confirmation after **Run analysis**; cancelling submits no job and keeps your input.
 
 Hotspot exclusions omit tags or fusion regions from automatic site suggestions. They retain the structure and contact assessment and do not prohibit binding there. For structure input, specify intended residues in the hotspot position field. Sequence-only input selects hotspots automatically from the predicted structure. Leave exclusions blank when unnecessary. Region start/end changes the actual target segment used for analysis.
@@ -363,7 +365,7 @@ The **Full original ZIP · For local archiving** includes server paths and execu
 
 **Find a VHH sequence and see its structure**
 
-Open **Explore results → Lead candidates in this run**. Select **View sequence and predicted structure** to open the recorded first-ranked eligible candidate for that engine. Copy its amino acids or save it as FASTA. If no candidate passed, open section 04 to see why. Section 03 lets you inspect any candidate. The shareable ZIP lists all sequences in `sequences.fasta`. The original run lists the final selection in `05_final/selected_candidates.csv`.
+Open **Explore results → 03 Compare candidates → candidate ID** to see a candidate's VHH sequence and predicted structure. Choose **Copy sequence** or **Save this candidate as FASTA**. Recorded candidate sequences remain available even when final selection is zero. When candidates were selected, **Lead candidates in this run → View sequence and predicted structure** opens the recorded first-ranked candidate for that engine. Section 04 explains exclusions and review holds. The shareable ZIP lists all sequences in `sequences.fasta`. The original run lists the final selection in `05_final/selected_candidates.csv`.
 
 Choose English or 한국어 before saving the **shareable report ZIP**. Extract the entire ZIP and open `report.html`; it opens in the chosen language. You can also change the language inside the report.
 

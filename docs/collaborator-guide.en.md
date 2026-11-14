@@ -86,14 +86,14 @@ Once connected, open [http://127.0.0.1:18765](http://127.0.0.1:18765) in your co
 2. When the check completes, click **Prepare analysis**.
 3. Click **Load public example for this purpose**. This fills in Barnase (110 aa) and Barstar (89 aa), with one copy each.
 4. Click **Review input & continue**. Check the small starter preset, four engines, and four planned models.
-5. Consent to sending the example sequences to the public MSA service. Click **Review settings & continue → Review input → Run analysis** once.
+5. On first use of the public MSA service, consent to sending the example sequences. Consent remains saved for later analyses, batches and page reloads under the same account. Click **Review settings & continue → Review input → Run analysis** once. You can revoke consent in **Environment & setup**.
 6. In **Jobs & logs**, select the analysis you submitted and wait for completion. Then click **Open results**.
 
 While analysis runs, **Jobs & logs** shows **Running**, the current stage, model count, and elapsed time. Open **Detailed execution log** for more detail. Keep the server running; you can close the browser and return to the same job later.
 
 When analysis completes, check the completed, failed, and unevaluated model counts. Select a candidate/model row to view its scores, 3D structure, and PAE. Reopen saved analyses through **Explore results → Select run**.
 
-To find a nanobody sequence, go to **Results database → Candidate sequences and structures** and search by target or candidate ID. Select a candidate ID to open its sequence and 3D structure. Choose **Save this candidate as FASTA** for the sequence or **Export all matches to Excel** for the table.
+In the current result, open **03 Compare candidates → candidate ID → Save this candidate as FASTA**. Recorded candidate sequences remain available even when final selection is zero. For previous analyses, search by target or candidate ID in **Results database → Candidate sequences and structures**. Select a candidate ID to open its sequence and 3D structure. Choose **Export all matches to Excel** for the table.
 
 `diagnostics · Complete` is the environment-check record. Continue with **Prepare analysis**. If the results button is out of view, scroll down in the job details.
 
@@ -115,6 +115,7 @@ GitHub's **Download ZIP** contains the source for installation. The sample ZIPs 
 | Individual screen, mature, or design sample ZIP | `report.html` |
 | Complex sample ZIP | Open `START_HERE.html` to read the mock-run refusal record |
 | Shareable report ZIP downloaded after analysis | `report.html` |
+| Complete results ZIP from the hosted site | Open `exploration/report_offline.html` to explore results. The `original/` folder retains the original files. |
 
 If you received the separately supplied sample archives described above, those archives are CPU/mock examples. No precomputed result ZIP is included in the GitHub source download. Other reports may contain real GPU results; check each report’s recorded execution mode and provenance. Use **Language** at the top of the report to switch between English and Korean. Keep the extracted folder structure intact, including the files alongside the report. Saved reports also open in web browsers on Windows and macOS.
 

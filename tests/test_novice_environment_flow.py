@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -18,7 +19,7 @@ def test_environment_once_then_review_and_explicit_analysis(supplied_server,lang
     checked=False;jobs=[];posts=[];errors=[]
     def route_api(route):
         nonlocal checked
-        request=route.request;path=request.url.split("/api/",1)[1]
+        request=route.request;path=urlsplit(request.url).path.removeprefix("/api/")
         if request.method=="POST":posts.append(path)
         if path=="environment/status":
             route.fulfill(json={"ready":checked,"reason":"passed" if checked else "not_checked"});return
@@ -43,12 +44,20 @@ def test_environment_once_then_review_and_explicit_analysis(supplied_server,lang
         page.add_init_script(f"localStorage.setItem('nanocofold.language','{language}')")
         page.route("**/api/**",route_api);page.on("pageerror",lambda error:errors.append(str(error)))
         page.goto(url);expect(page.locator("body")).to_have_attribute("data-startup","ready")
-        page.locator("#open-environment").click();page.locator("#diagnose-environment").click()
+        page.locator("#open-environment").click()
+        # The server is shared by both languages; reset only this test's saved preference.
+        saved_consent = page.locator("#saved-msa-consent")
+        saved_consent.uncheck()
+        expect(saved_consent).to_be_enabled()
+        page.locator("#diagnose-environment").click()
         expect(page.locator("#environment-status")).to_contain_text("완료" if language=="ko" else "ready",timeout=10000)
         expect(page.locator("#view-environment")).to_be_visible()
         assert posts.count("environment/check")==1
         page.locator("#environment-continue").click()
         page.locator("#load-tutorial").click()
+        tutorial = json.loads((ROOT / "examples/tutorial/complex_batch.json").read_text())
+        expect(page.locator("#job-name")).to_have_value(tutorial["name"])
+        expect(page.locator("#load-tutorial")).to_be_enabled()
         page.locator("#novice-next").click()
         msa, consent = page.locator("#novice-msa"), page.locator("#novice-consent")
         expect(consent).to_be_visible()
@@ -64,7 +73,9 @@ def test_environment_once_then_review_and_explicit_analysis(supplied_server,lang
         # Re-review a different run name: reuse the same check; no automatic job.
         page.locator("#novice-previous").click();page.locator("#novice-previous").click()
         page.locator("#job-name").fill("another-input")
-        page.locator("#novice-next").click();page.locator("#novice-consent").check();page.locator("#novice-next").click()
+        page.locator("#novice-next").click()
+        expect(consent).to_be_checked()
+        page.locator("#novice-next").click()
         page.locator("#review-input").click();expect(page.locator("#start-job")).to_be_enabled()
         assert posts.count("environment/check")==1 and "jobs" not in posts
         page.locator("#start-job").click();expect(page.locator("#view-jobs")).to_be_visible()
@@ -77,7 +88,7 @@ def test_environment_once_then_review_and_explicit_analysis(supplied_server,lang
         page.locator("#jobs-next-analysis").click()
         expect(page.locator(".novice-heading")).to_contain_text("1/4")
         expect(page.locator("#job-name")).to_have_value("another-input")
-        expect(page.locator("#novice-consent")).not_to_be_checked()
+        expect(consent).to_be_checked()
         page.locator(".novice-purpose-choice").first.click()
         page.locator('[data-view="jobs"]').click()
         page.locator('[data-view="input"]').click()
@@ -96,6 +107,17 @@ def test_environment_once_then_review_and_explicit_analysis(supplied_server,lang
         page.locator('.job-history .job-row').click()
         expect(page.locator("#job-detail")).to_contain_text("환경 확인" if language=="ko" else "environment check")
         expect(page.locator("#job-actions")).not_to_contain_text("결과 열기" if language=="ko" else "Open results")
+        page.reload()
+        expect(page.locator("body")).to_have_attribute("data-startup","ready")
+        page.locator('[data-view="environment"]').click()
+        expect(saved_consent).to_be_checked()
+        # Revocation is also persisted and clears the single and batch controls.
+        saved_consent.uncheck()
+        expect(saved_consent).to_be_enabled()
+        page.reload()
+        expect(page.locator("body")).to_have_attribute("data-startup","ready")
+        expect(saved_consent).not_to_be_checked()
+        expect(page.locator("#batch-api-consent")).not_to_be_checked()
         assert errors==[]
         browser.close()
 
