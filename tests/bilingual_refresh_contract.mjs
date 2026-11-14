@@ -25,3 +25,16 @@ test('generic table localizes only explicitly owned value columns and composed c
  assert.doesNotMatch(f.nodes.find(n=>n.tag==='caption').textContent,/[가-힣]/);
  f.I18N.setLanguage('ko',{persist:false});assert.equal(cells[0].textContent,'표적–VHH ipTM');assert.equal(cells[1].textContent,'미통과');assert.equal(cells[2].textContent,'완료');assert.equal(JSON.stringify(rows),before);
 });
+
+test('selected chain status translates when switching languages after focusing the structure',async()=>{
+ const f=fixture(),focused=[];
+ f.context.document={querySelector:()=>null};f.context.resultLayers=()=>({});
+ f.context.state.result={mode:'screen'};
+ f.context.state.structure={binder_chain:'B',chains:[{id:'B',role:'binder',residues:[{label:'B:1'},{label:'B:2'}]}]};
+ f.context.state.viewer={async layers(){},async focus(labels){focused.push(...labels);}};
+ vm.runInContext(ui.slice(ui.indexOf('function resultChain('),ui.indexOf('async function focusStructure(')),f.context);
+ f.I18N.setLanguage('ko',{persist:false});await f.context.focusResultChain('binder');
+ assert.deepEqual(focused,['B:1','B:2']);assert.match(f.get('structure-note').textContent,/나노바디/);
+ f.I18N.setLanguage('en',{persist:false});assert.doesNotMatch(f.get('structure-note').textContent,/[가-힣]/);assert.match(f.get('structure-note').textContent,/Chain B/);
+ f.I18N.setLanguage('ko',{persist:false});assert.match(f.get('structure-note').textContent,/나노바디/);
+});

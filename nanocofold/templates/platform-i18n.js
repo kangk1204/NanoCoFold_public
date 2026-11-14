@@ -64,6 +64,21 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "MSA 전송 동의는 true/false로 지정하세요.": "Set MSA transfer approval to true or false.",
+  "API MSA 서열 전송에 동의하고 설정을 저장합니다.": "I agree to send sequences for public MSA searches and save this preference.",
+  "API MSA 서열 전송에 동의하고 이 계정에 저장합니다.": "I agree to send sequences for public MSA searches and save this preference for my account.",
+  "공용 MSA를 사용하려면 서열 전송에 처음 한 번 동의하세요.": "To use public MSA searches, approve sequence transfer once.",
+  "MSA 전송 설정": "MSA transfer preference",
+  "MSA 전송 동의를 저장하고 있습니다. 잠시 기다려 주세요.": "Saving your MSA transfer preference. Please wait.",
+  "MSA 전송 동의를 저장하지 못했습니다. 다시 시도하세요.": "Could not save your MSA transfer preference. Please try again.",
+  "공용 MSA는 표적·후보 서열을 api.colabfold.com으로 전송합니다. 처음 한 번 동의하면 다음 분석과 배치에도 적용됩니다. 환경·설치에서 해제할 수 있습니다.": "Public MSA searches send target and candidate sequences to api.colabfold.com. Approve once for future analyses and batches. You can revoke approval in Environment & setup.",
+  "동의는 로그인한 계정에 저장됩니다. 로그인 없는 개인 설치에서는 이 설치에 저장됩니다. 캐시·로컬 MSA는 외부 전송 없이 사용합니다.": "Approval is saved for your signed-in account, or for this installation when using it without login. Cached and local MSA searches do not send sequences externally.",
+  "해제한 뒤 새 입력을 검토하면 전송이 차단됩니다. 이미 제출한 분석은 작업·로그에서 취소하세요.": "After revoking approval, new input reviews block public MSA transfers. Cancel already submitted analyses in Jobs & logs.",
+  "캐시·로컬 MSA는 외부 전송 없이 사용합니다. 동의 해제는 이후 입력 검토에 적용하며, 이미 제출한 분석은 별도로 취소하세요.": "Cached and local MSA searches do not send sequences externally. Revocation applies to subsequent input reviews. Cancel already submitted analyses separately.",
+  "초안 입력을 복원했습니다. 구조 파일을 다시 선택하고 입력을 확인하세요. 저장된 MSA 동의와 환경 확인 기록은 유지됩니다.": "Draft restored. Reselect structure files and review the input. Saved MSA approval and environment checks are retained.",
+  "이 탭의 입력을 복구했습니다. 파일을 다시 선택하고 구조를 확인하세요. 저장된 MSA 동의는 유지됩니다.": "Recovered this tab’s input. Reselect files and check the structure. Your saved MSA approval is retained.",
+  "한 번 동의하면 이 계정의 이후 분석과 배치에도 적용합니다. API MSA를 선택한 경우에만 표적·VHH 서열을 api.colabfold.com에 보내며, 환경 상태에서 동의를 해제할 수 있습니다.": "Public MSA searches send target and candidate sequences to api.colabfold.com. Approval is saved for your account and reused for single analyses and batches. Revoke it in Environment & setup.",
+
   "예측 {0}건 실패. 완료된 {1}건은 보존했습니다. prediction_failures.json을 확인하고 재개하세요. 첫 오류: {2}": "{0} predictions failed. The {1} completed predictions were kept. Check prediction_failures.json, then resume. First error: {2}",
   "표적·후보 서열의 외부 MSA 전송에 동의하면 배치 매니페스트 최상위에 api_consent: true를 추가한 뒤 다시 검토하세요.": "If you consent to sending target and candidate sequences for external MSA search, add api_consent: true at the top level of the batch manifest and review again.",
   "{0}는 100 Å 이하여야 합니다.": "{0} must be at most 100 \u00c5.",

@@ -46,6 +46,9 @@ function developabilityReviewOnly(row) {
 const decisionCaption = (value, row) => typeof value === "boolean" ? value ? "적격" : developabilityReviewOnly(row) ? "검토 보류" : "부적격" : "미평가";
 const offline = Boolean(window.NANOCOFOLD_OFFLINE);
 const state = {
+  publicMsaConsent: false,
+  msaConsentSaving: false,
+  msaConsentRequest: 0,
   input: null,
   readiness: null,
   diagnostic: null,
@@ -614,6 +617,7 @@ function inputBudgetSeconds() {
   return minutes * 60;
 }
 function inputSettings(forPlan = false) {
+  if (!forPlan && state.msaConsentSaving) throw Error("MSA 전송 동의를 저장하고 있습니다. 잠시 기다려 주세요.");
   let advanced;
   try {
     advanced = JSON.parse($("advanced").value || "{}");
@@ -677,7 +681,7 @@ function inputSettings(forPlan = false) {
   cfg = matureInputSettings(cfg);
   inputBudgetSeconds();
   if (!forPlan && publicMsa && !$("novice-consent").checked)
-    throw fieldError("가져온 설정도 현재 입력에 대한 외부 MSA 전송 동의를 다시 확인해야 합니다.", "novice-consent");
+    throw fieldError("공용 MSA를 사용하려면 서열 전송에 처음 한 번 동의하세요.", "novice-consent");
   return merge(cfg, {
     run: {
       mode: $("mode").value,
@@ -897,7 +901,7 @@ function applyAnalysisSettings(cfg) {
     }
     engine.value = selected;
   }
-  if ($('novice-consent')) $('novice-consent').checked = false;
+
   invalidateInput(); fields(); state.refreshNovice?.();
 }
 async function findAcceptedAnalysis(submissionId, stillCurrent) {
@@ -1066,7 +1070,7 @@ function syncAlternativeInputs() {
 function chooseStructureInput(source) {
   structureInputSource = source;
   clearInputStructure();
-  const consent = $("novice-consent"); if (consent) consent.checked = false;
+
   syncAlternativeInputs();
 }
 async function importCanonicalFasta(fileId, textId) {
@@ -3053,7 +3057,9 @@ async function focusResultChain(role) {
   if (state.structure !== data || state.viewer !== viewer) return;
   await viewer.focus(chain.residues.map(residue => residue.label));
   if (state.structure !== data || state.viewer !== viewer) return;
-  I18N.text($("structure-note"), I18N.format("{0} · 체인 {1} · {2}개 잔기", [$("select-result-" + role).textContent, chain.id, chain.residues.length]));
+  const complex = state.result?.mode === "complex";
+  const label = role === "target" ? (complex ? "기준 체인 선택" : "표적 선택") : (complex ? "파트너 선택" : "나노바디 선택");
+  I18N.text($("structure-note"), I18N.format("{0} · 체인 {1} · {2}개 잔기", [I18N.term(label), chain.id, chain.residues.length]));
 }
 async function focusStructure(labels, text, reveal = false) {
   const viewer = state.viewer, data = state.structure;
@@ -3504,11 +3510,40 @@ function syncBatchFields() {
   $("batch-mode").closest("label").hidden = json;
   I18N.text($("batch-format-help"), json ? I18N.term("JSON 안의 목적·이름·서열·조건을 사용합니다. 공통 입력 칸은 필요하지 않습니다.") : I18N.term("목적에 필요한 공통 입력만 아래에 표시됩니다. 표적마다 다른 조건은 JSON으로 지정하세요."));
 }
-function resetBatchReview(revokeConsent = true) {
+function syncMsaConsent() {
+  for (const id of ["novice-consent", "batch-api-consent", "saved-msa-consent"]) {
+    const input = $(id);
+    if (input) { input.checked = state.publicMsaConsent === true; input.disabled = state.msaConsentSaving; }
+  }
+  state.refreshNovice?.();
+}
+async function refreshMsaConsent() {
+  if (offline || state.msaConsentSaving) return;
+  const token = ++state.msaConsentRequest;
+  try {
+    const value = await api("/api/msa-consent");
+    if (token !== state.msaConsentRequest) return;
+    state.publicMsaConsent = value.allowed === true;
+    syncMsaConsent();
+  } catch (error) { notice(error.message, true); }
+}
+async function saveMsaConsent(allowed) {
+  if (state.msaConsentSaving) return;
+  state.msaConsentSaving = true;
+  const token = ++state.msaConsentRequest;
+  syncMsaConsent();
+  try {
+    const value = await api("/api/msa-consent", {allowed});
+    if (token === state.msaConsentRequest) state.publicMsaConsent = value.allowed === true;
+    invalidateInput();
+    resetBatchReview(false);
+  } catch (error) { notice(I18N.value(I18N.term("MSA 전송 동의를 저장하지 못했습니다. 다시 시도하세요.")), true); }
+  finally { state.msaConsentSaving = false; syncMsaConsent(); }
+}
+function resetBatchReview(clearExample = true) {
   batchInputRevision++;
   activeBatch = null; batchSelected = [];
-  if (revokeConsent) {
-    $("batch-api-consent").checked = false;
+  if (clearExample) {
     $("batch-tutorial-summary").hidden = true;
   }
   $("batch-submit").disabled = true;
@@ -3610,7 +3645,7 @@ function initBatch(){
   setInterval(async()=>{if(batchBusy||document.hidden||$("view-batch").hidden||!activeBatch)return;const id=activeBatch.id;try{const next=await api("/api/batches/"+id);if(activeBatch?.id===id&&!batchBusy)renderBatch(next);}catch(e){I18N.text($("batch-activity"), I18N.concat([I18N.term("마지막 상태를 표시합니다. "), e.message]));}},4000);
   const reset=()=>resetBatchReview();
   syncBatchFields();
-  $("batch-api-consent").addEventListener("input", () => resetBatchReview(false));
+  $("batch-api-consent").addEventListener("change", event => saveMsaConsent(event.target.checked));
   // The purpose wizard owns the public-example action.
   for(const id of ["batch-mode","batch-format","batch-content","batch-name","batch-library","batch-wt","batch-partners","batch-use-config"])$(id).addEventListener("input",reset);
   $("batch-file").onchange=async()=>{
@@ -3989,6 +4024,10 @@ async function boot() {
   $("seed").addEventListener("input", () => { $("seed").dataset.quantitySource = "direct"; });
   const session = await api("/api/session");
   state.researcher = session.researcher;
+  state.publicMsaConsent = session.public_msa_consent === true;
+  syncMsaConsent();
+  $("saved-msa-consent").addEventListener("change", event => saveMsaConsent(event.target.checked));
+  window.addEventListener("focus", refreshMsaConsent);
   state.canBrowseLab = Boolean(session.lab_admin || session.lab_shared);
   if (session.researcher) {
     $("lab-account").hidden = false;
@@ -4164,7 +4203,7 @@ async function initNoviceFlow() {
   const msaNote=el("p",null,"muted"); msaNote.id="msa-transfer-note";
   msa.setAttribute("aria-describedby",msaNote.id); settingsCard.insertBefore(ml,advanced); settingsCard.insertBefore(msa,advanced);
   settingsCard.insertBefore(msaNote,advanced);
-  const consent=el("input");consent.id="novice-consent";consent.type="checkbox";const cl=el("label",null,"check");cl.append(consent,el("span", I18N.term("이 입력의 단백질 서열을 api.colabfold.com으로 전송하는 데 동의합니다.")));settingsCard.insertBefore(cl,advanced);
+  const consent=el("input");consent.id="novice-consent";consent.type="checkbox";const cl=el("label",null,"check");cl.append(consent,el("span", I18N.term("API MSA 서열 전송에 동의하고 설정을 저장합니다.")));settingsCard.insertBefore(cl,advanced);consent.checked=state.publicMsaConsent===true;consent.addEventListener("change",event=>saveMsaConsent(event.target.checked));
   const demoMsaNote=el("p",I18N.term("CPU 합성 데모는 MSA를 준비하거나 외부 서버로 서열을 전송하지 않습니다."),"muted");settingsCard.insertBefore(demoMsaNote,advanced);
   const plan=el("p","","next-step");plan.id="novice-model-plan";settingsCard.insertBefore(controls,advanced);settingsCard.insertBefore(plan,advanced);
   plan.setAttribute("role", "status"); plan.setAttribute("aria-live", "polite");
@@ -4186,7 +4225,7 @@ async function initNoviceFlow() {
   const conditions = el("details"), conditionData = el("pre"); conditionData.id = "quantity-conditions";
   conditions.append(el("summary", I18N.term("평가 엔진별 Seed·샘플 설정")), conditionData);
   scale.append(selectionLabel, selection, selectionCurrent, selectionHelp, conditions); settingsCard.insertBefore(scale, advanced);
-  settingsCard.insertBefore(cl,advanced);
+  settingsCard.insertBefore(cl,advanced);consent.checked=state.publicMsaConsent===true;consent.addEventListener("change",event=>saveMsaConsent(event.target.checked));
   const complex=el("div");complex.id="novice-complex-fields";complex.hidden=true;
   const label=el("label",I18N.term("복합체 단백질 FASTA · 위에서 아래 순서로 체인 배정"));label.htmlFor="complex-fasta";const fasta=el("textarea");fasta.id="complex-fasta";fasta.rows=8;fasta.spellcheck=false;
   const copies=el("div");copies.id="novice-complex-copies";complex.append(label,fasta,copies);inputCard.insertBefore(complex,$("fasta-fields"));
@@ -4238,7 +4277,7 @@ async function initNoviceFlow() {
       const needsConsent = usesPublicMsa(cfg);
       cl.hidden = simulated || !needsConsent;
       msaNote.hidden = simulated;
-      const note = needsConsent ? "이 설정에서는 공용 MSA 검색을 위해 입력 서열을 전송합니다. 동의하려면 아래 확인란을 선택하세요."
+      const note = needsConsent ? "공용 MSA는 표적·후보 서열을 api.colabfold.com으로 전송합니다. 처음 한 번 동의하면 다음 분석과 배치에도 적용됩니다. 환경·설치에서 해제할 수 있습니다."
         : !controls.hidden && msa.value === "cache" ? "검증된 캐시를 사용합니다. 해당 서열의 저장된 MSA가 필요하며 외부 전송 동의는 필요하지 않습니다."
         : !controls.hidden && msa.value === "local_mmseqs2" ? "서버에 등록된 데이터베이스를 검색합니다. 외부 전송 동의는 필요하지 않습니다."
         : "현재 설정에는 공용 MSA 서열 전송 동의가 필요하지 않습니다.";
@@ -4251,7 +4290,6 @@ async function initNoviceFlow() {
   function clearOptionErrors(){host.querySelectorAll('[aria-invalid="true"]').forEach(n=>n.removeAttribute("aria-invalid"));}
   function jump(n){step=n;clearOptionErrors();I18N.text(reason, "");render();heading.focus();}
   state.nextAnalysis = () => {
-    consent.checked = false;
     invalidateInput();
     step = 0;
     I18N.text(reason, "");
@@ -4269,9 +4307,9 @@ async function initNoviceFlow() {
   start.onclick=()=>{fields();jump(1);};prev.onclick=()=>jump(step-1);
   function copiesReview(){try{const old=[...copies.querySelectorAll("input")].map(i=>i.value),rows=noviceFasta(fasta.value);copies.replaceChildren(...rows.map((r,i)=>{const l=el("label",I18N.format("{0} · {1} · {2} aa · 사본 수", [String.fromCharCode(65+i), r.name, r.sequence.length])),n=el("input");n.id="complex-copies-"+i;n.type="number";n.min="1";n.max="25";n.value=old[i]||"1";l.append(n);return l;}));}catch{copies.replaceChildren();}}
   fasta.addEventListener("input",copiesReview);
-  host.addEventListener("input",e=>{clearOptionErrors();if(e.target!==consent)consent.checked=false;I18N.text(reason, "");render();if(restoring)return;clearTimeout(draftTimer);draftTimer=setTimeout(()=>{const fields={};for(const n of host.querySelectorAll("input[id],select[id],textarea[id]")){if(n.type!=="file"&&n.id!=="novice-consent")fields[n.id]=n.type==="checkbox"?n.checked:n.value;}fields.comparison_engines=[...controls.querySelectorAll('[data-novice-engine]:checked')].map(i=>i.value);saveQueue=saveQueue.catch(()=>{}).then(()=>api("/api/draft",{version:1,fields})).catch(e=>{I18N.text(reason, I18N.concat([I18N.term("초안 저장 실패: "), e.message]));});},500);});
-  action("load-tutorial",async()=>{const revision=state.inputRevision;const example=await api("/api/tutorials/"+$("tutorial-mode").value),entry=example.payload.entries[0];if(revision!==state.inputRevision)throw Error("불러오는 동안 입력이 변경되었습니다. 현재 입력을 유지합니다.");$("mode").value=example.mode;$("input-kind").value="fasta";$("analysis-preset").value="small-four-v1";$("advanced").value="{}";for(const n of controls.querySelectorAll("[data-novice-engine]")) n.checked=state.starter.engines.includes(n.value);resetMutationControls();$("mock").checked=false;$("candidate-limit").value="";$("design-count").value="";if($("selection-limit"))$("selection-limit").value="";$("seed").value="42";$("job-name").value=example.payload.name;$("target-fasta").value=entry.content||"";$("vhh-fasta").value=entry.vhh_fasta||"";$("wt-fasta").value=entry.wt_fasta||"";fasta.value=(entry.proteins||[]).map(p=>`>${p.name}\n${p.sequence}`).join("\n");consent.checked=false;invalidateInput();copiesReview();fields();jump(1);I18N.text($("tutorial-status"), I18N.term("공개 입력을 불러왔습니다. 아직 계산은 시작하지 않았습니다."));});
-  render();const draftRevision=state.inputRevision;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=true);start.disabled=true;$("load-tutorial").disabled=true;try{const draft=await api("/api/draft");if(draftRevision!==state.inputRevision)throw Error("입력이 변경되어 저장된 초안을 덮어쓰지 않았습니다.");restoring=true;for(const [id,value]of Object.entries(draft.fields||{})){const n=$(id);if(n&&host.contains(n)&&n.type!=="file"){if(n.type==="checkbox")n.checked=value===true;else n.value=String(value);}}if(Object.hasOwn(draft.fields||{},'seed')&&$('seed').dataset)$('seed').dataset.quantitySource='restored';if(draft.fields?.comparison_engines)for(const n of controls.querySelectorAll('[data-novice-engine]'))n.checked=draft.fields.comparison_engines.includes(n.value);consent.checked=false;fields();copiesReview();if(Object.keys(draft.fields||{}).length)I18N.text(task, I18N.term("초안 입력을 복원했습니다. 구조 파일을 다시 선택하고 전송 동의와 입력을 확인하세요. 설치 환경 확인 기록은 재사용합니다."));}catch(e){I18N.text(reason, I18N.concat([I18N.term("초안 복원 실패: "), e.message]));}finally{restoring=false;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=false);start.disabled=false;$("load-tutorial").disabled=false;render();}
+  host.addEventListener("input",e=>{clearOptionErrors();I18N.text(reason, "");render();if(restoring)return;clearTimeout(draftTimer);draftTimer=setTimeout(()=>{const fields={};for(const n of host.querySelectorAll("input[id],select[id],textarea[id]")){if(n.type!=="file"&&n.id!=="novice-consent")fields[n.id]=n.type==="checkbox"?n.checked:n.value;}fields.comparison_engines=[...controls.querySelectorAll('[data-novice-engine]:checked')].map(i=>i.value);saveQueue=saveQueue.catch(()=>{}).then(()=>api("/api/draft",{version:1,fields})).catch(e=>{I18N.text(reason, I18N.concat([I18N.term("초안 저장 실패: "), e.message]));});},500);});
+  action("load-tutorial",async()=>{const revision=state.inputRevision;const example=await api("/api/tutorials/"+$("tutorial-mode").value),entry=example.payload.entries[0];if(revision!==state.inputRevision)throw Error("불러오는 동안 입력이 변경되었습니다. 현재 입력을 유지합니다.");$("mode").value=example.mode;$("input-kind").value="fasta";$("analysis-preset").value="small-four-v1";$("advanced").value="{}";for(const n of controls.querySelectorAll("[data-novice-engine]")) n.checked=state.starter.engines.includes(n.value);resetMutationControls();$("mock").checked=false;$("candidate-limit").value="";$("design-count").value="";if($("selection-limit"))$("selection-limit").value="";$("seed").value="42";$("job-name").value=example.payload.name;$("target-fasta").value=entry.content||"";$("vhh-fasta").value=entry.vhh_fasta||"";$("wt-fasta").value=entry.wt_fasta||"";fasta.value=(entry.proteins||[]).map(p=>`>${p.name}\n${p.sequence}`).join("\n");consent.checked=state.publicMsaConsent===true;invalidateInput();copiesReview();fields();jump(1);I18N.text($("tutorial-status"), I18N.term("공개 입력을 불러왔습니다. 아직 계산은 시작하지 않았습니다."));});
+  render();const draftRevision=state.inputRevision;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=true);start.disabled=true;$("load-tutorial").disabled=true;try{const draft=await api("/api/draft");if(draftRevision!==state.inputRevision)throw Error("입력이 변경되어 저장된 초안을 덮어쓰지 않았습니다.");restoring=true;for(const [id,value]of Object.entries(draft.fields||{})){const n=$(id);if(n&&host.contains(n)&&n.type!=="file"&&n.id!=="novice-consent"){if(n.type==="checkbox")n.checked=value===true;else n.value=String(value);}}if(Object.hasOwn(draft.fields||{},'seed')&&$('seed').dataset)$('seed').dataset.quantitySource='restored';if(draft.fields?.comparison_engines)for(const n of controls.querySelectorAll('[data-novice-engine]'))n.checked=draft.fields.comparison_engines.includes(n.value);consent.checked=state.publicMsaConsent===true;fields();copiesReview();if(Object.keys(draft.fields||{}).length)I18N.text(task, I18N.term("초안 입력을 복원했습니다. 구조 파일을 다시 선택하고 입력을 확인하세요. 저장된 MSA 동의와 환경 확인 기록은 유지됩니다."));}catch(e){I18N.text(reason, I18N.concat([I18N.term("초안 복원 실패: "), e.message]));}finally{restoring=false;purposeChoices.querySelectorAll("button").forEach(button=>button.disabled=false);start.disabled=false;$("load-tutorial").disabled=false;render();}
 }
 I18N.init();
 document.addEventListener("nanocofold:language", () => {

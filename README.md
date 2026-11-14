@@ -211,7 +211,9 @@ Use the **Predict protein complexes** public example and follow the table in ord
 
 If prompted for an environment check, follow **Go to environment check → Environment ready → Prepare analysis**. The saved check is reused while the installation, GPU, and selected engines remain the same.
 
-The example uses seed **42** and **one model per engine**, for **four planned models**. Check completed, failed, and unevaluated counts in the results. Review the input and MSA consent again after changing sequences.
+The example uses seed **42** and **one model per engine**, for **four planned models**. Check completed, failed, and unevaluated counts in the results. MSA transfer approval is saved once for future analyses and batches. Review the input again after changing sequences; revoke approval in Environment & setup.
+
+When using a personal installation without login, approval is saved for that installation. Cached and local MSA searches do not send sequences externally.
 
 <details>
 <summary>Step-by-step settings and English screenshots</summary>
@@ -224,7 +226,7 @@ Use the settings and English screenshots below. All screenshots show **0.4.8rc9*
 | Purpose | Predict protein complexes | [1](docs/images/quickstart-rc9/en/01-purpose.jpg) |
 | Input | Barnase 110 aa + Barstar 89 aa, one copy of each | [2](docs/images/quickstart-rc9/en/02-input.jpg) |
 | Settings | Small starter preset, four engines, seed 42, one model per engine → four planned models | [3](docs/images/quickstart-rc9/en/03-settings.jpg) |
-| Review & run | Current-sequence consent → Review input → reuse environment check → Run analysis once | [4 · a check is needed](docs/images/quickstart-rc9/en/04-review.jpg) |
+| Review & run | Saved MSA approval → Review input → reuse environment check → Run analysis once | [4 · a check is needed](docs/images/quickstart-rc9/en/04-review.jpg) |
 | Results | Completed, failed and unevaluated counts → select a model → structure and PAE | [5](docs/images/quickstart-rc9/en/05-results.jpg) · [structure](docs/images/quickstart-rc9/en/06-structure-pae.jpg) · [PAE](docs/images/quickstart-rc9/en/07-pae.jpg) |
 
 <details>
@@ -286,7 +288,7 @@ Hotspot exclusions omit tags or fusion regions from automatic site suggestions. 
 
 Use **amino-acid FASTA**: a `>name` line followed by the sequence. For nanobodies, provide the **full VHH sequence**. Give entries distinct names that do not start with `=`, `+`, `-`, or `@`. Compare prepared substitution or insertion variants in `screen`.
 
-Enter a structure by **file upload** or **PDB ID**, and use **Change input method** to switch. Paste VHH / WT FASTA or import a file. **Load another file** replaces it; **Restore previous FASTA** restores it. After loading a draft, reselect structure files and review the input and transmission consent.
+Enter a structure by **file upload** or **PDB ID**, and use **Change input method** to switch. Paste VHH / WT FASTA or import a file. **Load another file** replaces it; **Restore previous FASTA** restores it. After loading a draft, reselect structure files and review the input. Saved MSA transfer approval is retained.
 
 For structure files, check chains, residue numbering, and missing residues. Public MSA sends sequences to an external server. Choose an MSA method that follows your institution's policy for research sequences.
 

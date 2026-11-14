@@ -24,7 +24,7 @@ For local searches, an administrator must first register a local MSA database. T
 
 ## Use the browser
 
-Choose nanobody maturation and import the configuration using the advanced YAML import. Review the 100-variant limit, WT inclusion, four engines, one sample per engine and seed 42. Confirm sequence-transfer consent for the current input if you choose public MSA search.
+Choose nanobody maturation and import the configuration using the advanced YAML import. Review the 100-variant limit, WT inclusion, four engines, one sample per engine and seed 42. For public MSA searches, approve sequence transfer once. The same account reuses approval for later analyses and batches; revoke it in Environment & setup.
 
 ## Review results
 

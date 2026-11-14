@@ -128,6 +128,7 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
 
     with manager.store.connect() as db:
         db.execute("CREATE TABLE IF NOT EXISTS result_paths (id TEXT PRIMARY KEY,path TEXT NOT NULL UNIQUE)")
+        db.execute("CREATE TABLE IF NOT EXISTS msa_consent (owner TEXT PRIMARY KEY, allowed INTEGER NOT NULL, updated REAL NOT NULL)")
 
     @contextlib.asynccontextmanager
     async def lifespan(_app):
@@ -334,6 +335,20 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
                 raise ValueError(f"{key} 입력은 JSON 객체여야 합니다.")
         if "mock" in payload and type(payload["mock"]) is not bool:
             raise ValueError("mock는 true/false여야 합니다.")
+        if request.url.path.startswith("/api/inputs/") or request.url.path == "/api/inputs":
+            allowed = saved_msa_consent(request)
+            if allowed is not None:
+                if isinstance(payload.get("settings"), dict):
+                    payload["settings"]["allow_public_msa_server"] = allowed
+                if isinstance(payload.get("config"), dict):
+                    for section in ("screen", "structure", "complex"):
+                        values = payload["config"].get(section)
+                        if isinstance(values, dict):
+                            values["allow_public_msa_server"] = allowed
+        if request.url.path == "/api/batches/review":
+            allowed = saved_msa_consent(request)
+            if allowed is not None:
+                payload["api_consent"] = allowed
         if request.url.path.startswith(("/api/jobs","/api/inputs","/api/batches","/api/diagnostics","/api/environment","/api/configs")):
             lab_payload_paths(request,payload)
         return payload
@@ -356,6 +371,26 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
             key = hashlib.sha256(request.state.researcher.encode()).hexdigest()
             return manager.store.root / ("draft-" + key + ".json")
         return workspace / "platform_draft_v1.json"
+
+    def saved_msa_consent(request):
+        owner = "user:" + request.state.researcher if request.state.researcher else "local"
+        with manager.store.connect() as db:
+            row = db.execute("SELECT allowed FROM msa_consent WHERE owner=?", (owner,)).fetchone()
+        return bool(row[0]) if row else None
+
+    @app.get("/api/msa-consent")
+    def msa_consent_read(request: Request):
+        return {"allowed": saved_msa_consent(request) is True, "scope": "account" if request.state.researcher else "installation"}
+
+    @app.post("/api/msa-consent")
+    async def msa_consent_save(request: Request):
+        value = await body(request)
+        if set(value) != {"allowed"} or type(value["allowed"]) is not bool:
+            raise ValueError("MSA 전송 동의는 true/false로 지정하세요.")
+        owner = "user:" + request.state.researcher if request.state.researcher else "local"
+        with manager.store.connect() as db:
+            db.execute("INSERT INTO msa_consent VALUES(?,?,?) ON CONFLICT(owner) DO UPDATE SET allowed=excluded.allowed,updated=excluded.updated", (owner, int(value["allowed"]), time.time()))
+        return msa_consent_read(request)
 
     @app.get("/api/draft")
     async def draft_read(request: Request):
@@ -654,6 +689,7 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
             # Do not invent numeric defaults before input review succeeds.
             defaults = {}
         return {"workspace": str(workspace), "researcher": request.state.researcher, "lab_admin":request.state.admin, "lab_shared":request.state.shared, "version": __version__, "modes": ["complex", "design", "screen", "mature"], "poll_interval_ms": 2000,
+                "public_msa_consent": saved_msa_consent(request) is True,
                 "presets": {"researcher_exploration": exploration_config(), "standard": {}},
                 "planning_defaults": defaults}
 

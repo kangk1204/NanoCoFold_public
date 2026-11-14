@@ -54,3 +54,5 @@ Reopen a saved run via **Explore results → Select run**. To use the updated in
 After updating, open a saved analysis in **Explore results** and select a **?** in the candidate details. Previously downloaded HTML and ZIPs stay unchanged. To share the new explanations, export a fresh report ZIP; no new prediction is needed.
 
 **Check the update:** open Results database and save the complete Excel table again. “MSA used (recorded)” and “Requested MSA setting” are separate columns. Blank recorded cells mean that the original result did not record that value. Existing predictions and selection criteria are unchanged; no new GPU run is required.
+
+Approve public MSA sequence transfer once. Approval persists across single analyses, batches and reloads. It is saved per account, or per installation without login. Revoke it in Environment & setup. Cached and local MSA searches do not send sequences externally.

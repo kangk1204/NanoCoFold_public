@@ -15,12 +15,12 @@ Start NanoCoFold as described in the README, then open the URL printed after `Na
 | Environment · once | Check environment once → select analysis → Check environment → Prepare analysis | Confirms installation readiness |
 | Purpose / example | After Prepare analysis, load the public example directly. If purpose choices are shown, first choose Predict protein complexes. | Public barnase–barstar input is filled in |
 | Input | Check full sequences, chain order and copies → Review input & continue | Required input is valid |
-| Settings | Check engines, planned models and MSA → Review settings & continue | Public MSA needs consent for these sequences |
+| Settings | Check engines, planned models and MSA → Review settings & continue | Approve public MSA transfer once; the preference is saved |
 | Review | Review input → read the applied input and settings | Reuse a matching environment receipt |
 | Analysis | Run analysis once → Jobs & logs | Prediction is submitted; inspect the analysis job |
 | Results | Open results → select a candidate | Read status, structure, PAE and metrics together |
 
-Input review checks your sequences and settings. **Run analysis** submits the calculation. The saved environment check (`diagnostics`) is reused for the same installation, GPU and engines. After changing inputs, review them and confirm MSA transmission consent again.
+Input review checks your sequences and settings. **Run analysis** submits the calculation. The saved environment check (`diagnostics`) is reused for the same installation, GPU and engines. After changing inputs, review them again. MSA transfer approval is saved once for future analyses and batches; revoke it in Environment & setup.
 
 ## Follow the screenshots
 
@@ -40,7 +40,7 @@ Input review checks your sequences and settings. **Run analysis** submits the ca
 
 ![Four engines, planned model count and MSA consent](images/quickstart-rc9/en/03-settings.jpg)
 
-**4. Review before running.** Click **Review input**, read the applied inputs and settings, then click **Run analysis** once. A saved environment check is reused without leaving this page. If it is missing for these engines, click **Go to environment check**, complete the separate check, and click **Prepare analysis** to return to this input. The screenshot illustrates this missing-check state; no prediction was submitted. Input changes require another input review and fresh transmission consent.
+**4. Review before running.** Click **Review input**, read the applied inputs and settings, then click **Run analysis** once. A saved environment check is reused without leaving this page. If it is missing for these engines, click **Go to environment check**, complete the separate check, and click **Prepare analysis** to return to this input. The screenshot illustrates this missing-check state; no prediction was submitted. Input changes require another input review. Your saved MSA transfer approval is retained.
 
 ![Review inputs and follow the explicit next action](images/quickstart-rc9/en/04-review.jpg)
 
@@ -96,7 +96,7 @@ These web starter settings can differ from the preserved CLI conditions in `exam
 
 ## Your own inputs and saved results
 
-Choose either a structure file or a PDB ID; use **Change input method** to switch. Paste VHH/WT FASTA or import a file once. The populated FASTA is the actual input. Use **Load another file** or **Restore previous FASTA** to replace or undo an import. After restoring a draft, reselect structure files and reconfirm consent and input review. A matching installation check is reused. If you edit FASTA while a file is loading, the current input is retained and a notice is shown.
+Choose either a structure file or a PDB ID; use **Change input method** to switch. Paste VHH/WT FASTA or import a file once. The populated FASTA is the actual input. Use **Load another file** or **Restore previous FASTA** to replace or undo an import. After restoring a draft, reselect structure files and review the input. Saved MSA transfer approval is retained. A matching installation check is reused. If you edit FASTA while a file is loading, the current input is retained and a notice is shown.
 
 In results, select a candidate to inspect its structure. Use **Expand detailed metric columns** when needed. **Save selected display coordinates** saves the displayed coordinates; **Download original engine coordinates** is available only when the original is preserved and matches its recorded hash. Preparation and preselection have separate records from prediction failures. Unevaluated values remain missing. Check low-confidence predictions separately from failed calculations. The full original ZIP includes server paths/logs and is intended for personal archiving; share the report ZIP with collaborators.
 

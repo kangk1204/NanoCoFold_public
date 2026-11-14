@@ -59,15 +59,15 @@ function tutorialFixture() {
   return {context,elements,fields,calls};
 }
 for(const mode of ['complex','screen','mature','design']) {
-  test('public '+mode+' loads exact settings, revokes consent and never submits',async()=>{
+  test('public '+mode+' loads exact settings, retains saved consent and never submits',async()=>{
     const f=tutorialFixture(),c=f.context;
-    c.$('batch-api-consent').checked=true;c.$('batch-use-config').checked=true;
+    c.state.publicMsaConsent=true;c.$('batch-api-consent').checked=true;c.$('batch-use-config').checked=true;
     for(const id of ['batch-library','batch-wt','batch-partners'])c.$(id).value='old input';
     await c.loadTutorial(mode);
     const expected=JSON.parse(readFileSync(new URL('../examples/tutorial/'+mode+'_batch.json',import.meta.url),'utf8'));
     assert.deepEqual(JSON.parse(c.$('batch-content').value),expected);
     assert.equal(c.$('batch-mode').value,mode);assert.equal(c.$('batch-format').value,'json');
-    assert.equal(c.$('batch-api-consent').checked,false);assert.equal(c.$('batch-use-config').checked,false);
+    assert.equal(c.$('batch-api-consent').checked,true);assert.equal(c.$('batch-use-config').checked,false);
     assert.equal(c.$('batch-submit').disabled,true);assert.equal(c.$('batch-content-details').open,false);
     assert.ok(f.fields.every(field=>field.hidden));assert.equal(c.$('batch-tutorial-summary').hidden,false);
     assert.ok(c.$(mode==='complex'?'batch-review':'batch-api-consent').focused);
@@ -102,13 +102,13 @@ test('submitted batches cannot be submitted again through the displayed button',
   assert.equal(c.$('batch-submit').disabled,false);assert.match(c.$('batch-next-step').textContent,/미제출/);
   c.renderBatch({id:'review',name:'example',selected:['one'],rows:[{id:'one',job:{state:'running'}}]});
   assert.equal(c.$('batch-submit').disabled,true);assert.match(c.$('batch-next-step').textContent,/계산을 제출/);
-  c.$('batch-api-consent').checked=true;c.resetBatchReview(false);
+  c.state.publicMsaConsent=true;c.$('batch-api-consent').checked=true;c.resetBatchReview(false);
   assert.equal(c.$('batch-api-consent').checked,true);assert.equal(c.$('batch-submit').disabled,true);
 });
 test('explicit consent retains the loaded example summary while invalidating review',async()=>{
   const f=tutorialFixture(),c=f.context;await c.loadTutorial('screen');
   const summary=c.$('batch-tutorial-summary').textContent;
-  c.$('batch-api-consent').checked=true;c.resetBatchReview(false);
+  c.state.publicMsaConsent=true;c.$('batch-api-consent').checked=true;c.resetBatchReview(false);
   assert.equal(c.$('batch-tutorial-summary').hidden,false);
   assert.equal(c.$('batch-tutorial-summary').textContent,summary);
   assert.equal(c.$('batch-submit').disabled,true);
