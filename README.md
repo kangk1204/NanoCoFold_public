@@ -365,6 +365,8 @@ Choose English or 한국어 before saving the **shareable report ZIP**. Extract 
 
 **Find candidates across your analyses.** Open **Results database → Candidate sequences and structures**, choose the target and prediction engine, select **Recorded decision → Eligible**, and click **Search**. Click **Final selection rank** for first picks within each run and engine. Click a candidate ID for its sequence, 3D structure and metrics, or an analysis name for the full report. **Export all matches to Excel** saves every matching page in the displayed sort order.
 
+**Export the whole database to Excel:** In the local web app, open **Results database → Candidate sequences and structures**, clear the search and target fields, choose **All** for engine and decision, then click **Search → Export all matches to Excel**. Select **Include practice runs** if needed. On the hosted site, use **Results summary → Save all analyses to Excel**. The workbook includes candidate sequences, key metrics, recorded decisions and result links.
+
 The server registers new results and indexes earlier registrations in the background. Researchers initially see their own submissions. The `admin` account can review all runs, including runs without a recorded owner, and can grant or revoke lab-wide viewing. After signing in, select **Change password** next to your account name to change your own password. [Set up lab access](docs/shared-lab.en.md)
 
 Use section links and browser **Back / Forward** to move through the report while analysis continues. Keep the same candidate selected when comparing languages.

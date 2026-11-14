@@ -44,3 +44,25 @@ for (const interruption of ['disposed','newer selection']) test('pending sequenc
   if (interruption==='disposed') owner.disposed=true; else owner.sequenceFocusRequest++;
   release(); assert.equal(await pending,null); assert.deepEqual(calls,[]);
 });
+
+for (const surface of ['platform.js','platform_offline.html']) test(surface + ': observation loading retires old coordinates before sequence input',async()=>{
+ const source=readFileSync(new URL('../nanocofold/templates/'+surface,import.meta.url),'utf8'),nodes=new Map();
+ const get=id=>{if(!nodes.has(id))nodes.set(id,{value:'',selectionStart:0,selectionEnd:1,textContent:'',replaceChildren(){}});return nodes.get(id);};
+ const row={candidate_id:'candidate',sequence:'AC'},old={candidate_id:'candidate',observation_id:'old'},next={candidate_id:'candidate',observation_id:'new'},focused=[];
+ let resolve;const pending=new Promise(done=>{resolve=done;});
+ const c={state:{candidate:row,result:{id:'saved',mode:'screen'},structure:old,structureRequest:0,
+  viewer:{data:old,focusSequence:async()=>{focused.push('old');return ['B:10'];}}},$:get,
+  I18N:{text:(node,value)=>node.textContent=value,term:x=>x,value:x=>x,format:(s,args)=>s.replace(/\{(\d+)\}/g,(_,i)=>args[Number(i)])},
+  document:{querySelector:()=>null},offline:surface.endsWith('.html'),api:()=>pending,offlineStructure:()=>pending,setPaeErrorStatus(){},
+  disposeResultViewer(){c.state.viewer=null;},renderStructure:async()=>{c.state.viewer={data:c.state.structure,focusSequence:async()=>{focused.push('new');return ['B:90'];}};},
+  window:{NANOCOFOLD_OFFLINE:{structures:[next]}},encodeURIComponent,Blob,navigator:{},saveBlob(){}};
+ vm.createContext(c);
+ vm.runInContext(source.slice(source.indexOf('function showVhhSequence('),source.indexOf('function clearCandidate(')),c);
+ vm.runInContext(source.slice(source.indexOf('async function loadStructure('),source.indexOf('function labelSelection(')),c);
+ c.showVhhSequence(row);get('observation-select').value='new';const switching=c.loadStructure();
+ get('vhh-sequence-value').onpointerup({button:0});for(let n=0;n<5;n++)await Promise.resolve();
+ assert.deepEqual(focused,[]);assert.match(get('vhh-structure-feedback').textContent,/기다리세요/);
+ resolve(next);await switching;assert.equal(c.state.structure.observation_id,'new');assert.equal(get('vhh-structure-feedback').textContent,'');
+ get('vhh-sequence-value').onpointerup({button:0});for(let n=0;n<5;n++)await Promise.resolve();
+ assert.deepEqual(focused,['new']);assert.match(get('vhh-structure-feedback').textContent,/B:90/);
+});

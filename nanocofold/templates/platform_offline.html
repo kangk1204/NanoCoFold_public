@@ -6787,6 +6787,11 @@ async function loadStructure() {
   const id = state.candidate.candidate_id,
     observation = $("observation-select").value,
     request = ++state.structureRequest;
+  // The selected observation now owns this view. Retiring the previous viewer
+  // also prevents sequence clicks from selecting its coordinates during I/O.
+  state.structure = null;
+  disposeResultViewer();
+  I18N.text($("structure-note"), I18N.term("MolStar 구조가 준비될 때까지 기다리세요."));
   try {
     const loaded = offline
       ? await offlineStructure((window.NANOCOFOLD_OFFLINE.structures || []).find(
@@ -6805,6 +6810,8 @@ async function loadStructure() {
     state.structure = offline && loaded ? {...loaded, pae: loaded.pae ? {...loaded.pae} : loaded.pae} : loaded;
     if (!state.structure) throw Error("이 후보의 구조는 보고서에 없습니다.");
     await renderStructure();
+    if (request === state.structureRequest && $("vhh-structure-feedback").textContent === I18N.value(I18N.term("MolStar 구조가 준비될 때까지 기다리세요.")))
+      I18N.text($("vhh-structure-feedback"), "");
   } catch (e) {
     if (request !== state.structureRequest) return;
     state.structure = null;
