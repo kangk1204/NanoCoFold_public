@@ -1,6 +1,43 @@
 /* Mol* 5.12.0, local assets and saved coordinates only. */
 "use strict";
 window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
+  static sequenceResidues(sequence, data) {
+    const empty = Array.from(sequence || "", () => null);
+    if (!sequence || !/^[ACDEFGHIKLMNPQRSTVWY]+$/.test(sequence)) return empty;
+    const chain = (Array.isArray(data?.chains) ? data.chains : []).find(c => c?.id === data.binder_chain && c.role === "binder");
+    if (!Array.isArray(chain?.residues) || !chain.residues.length) return empty;
+    const codes = {ALA:"A",ARG:"R",ASN:"N",ASP:"D",CYS:"C",GLN:"Q",GLU:"E",GLY:"G",HIS:"H",ILE:"I",LEU:"L",LYS:"K",MET:"M",PHE:"F",PRO:"P",SER:"S",THR:"T",TRP:"W",TYR:"Y",VAL:"V"};
+    const residues = chain.residues, letters = residues.map(r => codes[r?.name]);
+    if (letters.some(x => !x) || residues.some(r => typeof r?.label !== "string" || !r.label.startsWith(chain.id + ":")) || new Set(residues.map(r => r.label)).size !== residues.length) return empty;
+    // Match sequence order, not author residue numbers (which can contain gaps
+    // and insertion codes). Only uniquely placed observed residues are linked.
+    const first = [], last = []; let position = -1;
+    for (const letter of letters) {
+      position = sequence.indexOf(letter, position + 1);
+      if (position < 0) return empty;
+      first.push(position);
+    }
+    position = sequence.length;
+    for (let i = letters.length - 1; i >= 0; i--) {
+      position = sequence.lastIndexOf(letters[i], position - 1);
+      if (position < 0) return empty;
+      last[i] = position;
+    }
+    first.forEach((index, i) => { if (index === last[i]) empty[index] = residues[i].label; });
+    return empty;
+  }
+  async focusSequence(sequence, start, end) {
+    const request = this.sequenceFocusRequest = (this.sequenceFocusRequest || 0) + 1;
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end > sequence.length)
+      throw Error(this.text("아미노산을 클릭하거나 구간을 선택하세요.", "Click an amino acid or select a range."));
+    const labels = NanoCoFoldResultViewer.sequenceResidues(sequence, this.data).slice(start, end);
+    if (labels.some(label => !label))
+      throw Error(this.text("선택 구간의 구조 좌표를 정확히 연결할 수 없습니다. 다른 잔기를 선택하세요.", "The selected range cannot be mapped to saved coordinates. Select another residue."));
+    await this.layers({...this.activeLayers, binder: true});
+    if (this.disposed || request !== this.sequenceFocusRequest) return null;
+    await this.focus(labels, {minRadius: 10, extraRadius: 5});
+    return this.disposed || request !== this.sequenceFocusRequest ? null : labels;
+  }
   static async create(host, data, onPick, onProgress = () => {}) {
     onProgress("viewer");
     const viewer = await molstar.Viewer.create(host, {
@@ -243,12 +280,12 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     if (StructureElement.Loci.isEmpty(loci)) throw Error(this.text("선택한 잔기·원자가 구조에 없습니다", "The selected residue or atom is absent from the structure"));
     return loci;
   }
-  focus(labels) {
+  focus(labels, options = {}) {
     return this.enqueue(() => {
       const plugin = this.viewer.plugin, loci = this.loci(labels);
       plugin.managers.interactivity.lociSelects.deselectAll();
       plugin.managers.interactivity.lociSelects.select({loci});
-      plugin.managers.camera.focusLoci(loci, window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? {durationMs:0} : undefined);
+      plugin.managers.camera.focusLoci(loci, {...options, ...(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? {durationMs:0} : {})});
       this.selectedLabels = [...labels];
       this.cameraFocusLabels = [...labels];
     });

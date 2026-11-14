@@ -99,6 +99,14 @@ p {
   width: auto;
   max-width: 100%;
 }
+.candidate-filters { display:grid; grid-template-columns:minmax(180px,1.3fr) minmax(170px,1.2fr) minmax(100px,.7fr) minmax(170px,1.2fr) minmax(120px,.9fr) auto; gap:12px 16px; align-items:end; margin:18px 0; }
+.candidate-filters .filter-field { min-width:0; }
+.candidate-filters .filter-field label { margin:0 0 6px; }
+.candidate-filters :is(input[type="search"],select) { width:100%; min-width:0; min-height:44px; margin:0; }
+.candidate-filters .filter-direction { min-height:44px; margin:0; white-space:nowrap; }
+@media(max-width:1100px) { .candidate-filters { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media(max-width:600px) { .candidate-filters { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; } }
+@media(max-width:420px) { .candidate-filters { grid-template-columns:minmax(0,1fr); } }
 label {
   display: block;
   font-weight: 600;
@@ -554,6 +562,9 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
 #vhh-sequence-record { display:block; overflow-wrap:anywhere; }
 #vhh-sequence-value { display:block; box-sizing:border-box; width:100%; min-height:4.5em; margin:.3rem 0 .5rem; font-family:ui-monospace,monospace; }
 #vhh-sequence-feedback:empty { display:none; }
+#vhh-structure-feedback:empty { display:none; }
+#vhh-sequence-value::selection { color:#123c43; background:#c3e8e1; }
+#vhh-sequence-help { margin:.4rem 0; font-size:.9rem; }
 </style></head><body><header class="offline-header"><div class="offline-brand"><strong>NanoCoFold · 오프라인 결과 탐색</strong><span>전체 후보 · 관측 · 구조 · 출처 포함</span></div><div class="language-switch"><label for="language-select">Language</label> <select id="language-select" disabled aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div></header><main><div id="notice" role="status" aria-live="polite" hidden></div><section id="view-results">
 
         <h1>분석 결과 보고서</h1><p class="muted">NanoCoFold · 저장된 분석 결과</p><nav class="report-nav" aria-label="보고서 내 탐색"><a href="#report-input">01 입력·설정</a><a href="#result-summary">02 후보·모델 수</a><a href="#report-comparison">03 후보 비교</a><a href="#report-exclusions">04 제외·미평가</a><a href="#candidate-title">05 구조·PAE</a><a href="#report-provenance">06 출처·산출물</a></nav>
@@ -604,23 +615,23 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
           <div class="card">
             <h2 id="report-comparison">03 후보 비교</h2>
             <p class="muted" data-vhh-results>결합 부위 접촉 수와 판정을 함께 확인하세요. 지표는 같은 엔진·실행 조건 안에서 비교하며, 정렬은 현재 표의 탐색 순서입니다.</p>
-            <div class="inline">
-              <label for="candidate-search">후보 검색</label
+            <div class="candidate-filters">
+              <div class="filter-field"><label for="candidate-search">후보 검색</label
               ><input
                 id="candidate-search"
                 type="search"
                 placeholder="ID, 서열, 제외 사유"
-              ><label for="eligibility-basis">적격 판정</label
+              ></div><div class="filter-field"><label for="eligibility-basis">적격 판정</label
               ><select id="eligibility-basis">
                 <option value="quality">품질 적격 · 결합 부위 제외</option>
                 <option value="recorded">실행 당시 기록 적격</option></select
-              ><label for="eligibility">적격 여부</label
+              ></div><div class="filter-field"><label for="eligibility">적격 여부</label
               ><select id="eligibility">
                 <option value="all">전체</option>
                 <option value="true">적격</option>
                 <option value="false">부적격</option>
                 <option value="missing">미평가</option></select
-              ><label for="sort-metric">정렬</label
+              ></div><div class="filter-field"><label for="sort-metric">정렬</label
               ><select id="sort-metric">
                 <option value="ipsae">ipSAE ↑</option>
                 <option>composite_score</option>
@@ -642,8 +653,8 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
                 <option>n_clashes</option>
                 <option>dev_flags</option><option>n_hbonds</option><option>n_salt_bridges</option><option>esm_score</option>
                 <option>candidate_id</option></select
-              ><label for="engine-filter">예측 엔진</label><select id="engine-filter"><option value="all">전체 엔진</option></select>
-              <label class="check"
+              ></div><div class="filter-field"><label for="engine-filter">예측 엔진</label><select id="engine-filter"><option value="all">전체 엔진</option></select></div>
+              <label class="check filter-direction"
                 ><input
                   id="descending"
                   type="checkbox"
@@ -690,7 +701,9 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
               <section id="vhh-sequence-panel" class="vhh-sequence-panel" aria-labelledby="vhh-sequence-heading" hidden>
                 <h3 id="vhh-sequence-heading">선택한 후보의 VHH 서열</h3>
                 <label for="vhh-sequence-value" id="vhh-sequence-record"></label>
-                <textarea id="vhh-sequence-value" class="sequence" rows="3" readonly spellcheck="false" dir="ltr"></textarea>
+                <p id="vhh-sequence-help" class="muted">아미노산을 클릭하거나 구간을 드래그하면 아래 3D 구조에서 강조하고 확대합니다. 키보드 방향키와 Shift로도 선택할 수 있습니다.</p>
+                <textarea id="vhh-sequence-value" class="sequence" rows="3" readonly spellcheck="false" dir="ltr" aria-describedby="vhh-sequence-help vhh-structure-feedback"></textarea>
+                <p id="vhh-structure-feedback" class="muted" role="status" aria-live="polite"></p>
                 <div class="inline">
                   <button type="button" class="secondary" id="copy-vhh-sequence">서열 복사</button>
                   <button type="button" class="secondary" id="save-vhh-sequence">이 후보 FASTA 저장</button>
@@ -725,7 +738,8 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
               </div>
               <p id="structure-note" role="status"></p>
               <label for="observation-select">구조·PAE 관측 선택</label
-              ><select id="observation-select"></select>
+              ><select id="observation-select" aria-describedby="observation-selection-help"></select>
+              <p id="observation-selection-help" class="muted">후보 대표 구조는 결과표에 연결된 모델입니다. 아래 엔진·seed 항목은 개별 예측의 구조와 PAE입니다. 예측이 1개이면 같은 구조일 수 있으며, 대표 구조 표시와 최종 적격 판정은 별개입니다.</p>
               <div class="inline toggles">
                 <label class="check"
                   ><input
@@ -878,6 +892,43 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
       </section></main><script id="result-data" type="application/json">__RESULT_DATA__</script><script>window.NANOCOFOLD_OFFLINE=JSON.parse(document.getElementById("result-data").textContent);document.getElementById("result-data").textContent="";</script><script>__PLOTLY_JS__</script><script>__3DMOL_JS__</script><script>__MOLSTAR_JS__</script><script>/* Mol* 5.12.0, local assets and saved coordinates only. */
 "use strict";
 window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
+  static sequenceResidues(sequence, data) {
+    const empty = Array.from(sequence || "", () => null);
+    if (!sequence || !/^[ACDEFGHIKLMNPQRSTVWY]+$/.test(sequence)) return empty;
+    const chain = (Array.isArray(data?.chains) ? data.chains : []).find(c => c?.id === data.binder_chain && c.role === "binder");
+    if (!Array.isArray(chain?.residues) || !chain.residues.length) return empty;
+    const codes = {ALA:"A",ARG:"R",ASN:"N",ASP:"D",CYS:"C",GLN:"Q",GLU:"E",GLY:"G",HIS:"H",ILE:"I",LEU:"L",LYS:"K",MET:"M",PHE:"F",PRO:"P",SER:"S",THR:"T",TRP:"W",TYR:"Y",VAL:"V"};
+    const residues = chain.residues, letters = residues.map(r => codes[r?.name]);
+    if (letters.some(x => !x) || residues.some(r => typeof r?.label !== "string" || !r.label.startsWith(chain.id + ":")) || new Set(residues.map(r => r.label)).size !== residues.length) return empty;
+    // Match sequence order, not author residue numbers (which can contain gaps
+    // and insertion codes). Only uniquely placed observed residues are linked.
+    const first = [], last = []; let position = -1;
+    for (const letter of letters) {
+      position = sequence.indexOf(letter, position + 1);
+      if (position < 0) return empty;
+      first.push(position);
+    }
+    position = sequence.length;
+    for (let i = letters.length - 1; i >= 0; i--) {
+      position = sequence.lastIndexOf(letters[i], position - 1);
+      if (position < 0) return empty;
+      last[i] = position;
+    }
+    first.forEach((index, i) => { if (index === last[i]) empty[index] = residues[i].label; });
+    return empty;
+  }
+  async focusSequence(sequence, start, end) {
+    const request = this.sequenceFocusRequest = (this.sequenceFocusRequest || 0) + 1;
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end > sequence.length)
+      throw Error(this.text("아미노산을 클릭하거나 구간을 선택하세요.", "Click an amino acid or select a range."));
+    const labels = NanoCoFoldResultViewer.sequenceResidues(sequence, this.data).slice(start, end);
+    if (labels.some(label => !label))
+      throw Error(this.text("선택 구간의 구조 좌표를 정확히 연결할 수 없습니다. 다른 잔기를 선택하세요.", "The selected range cannot be mapped to saved coordinates. Select another residue."));
+    await this.layers({...this.activeLayers, binder: true});
+    if (this.disposed || request !== this.sequenceFocusRequest) return null;
+    await this.focus(labels, {minRadius: 10, extraRadius: 5});
+    return this.disposed || request !== this.sequenceFocusRequest ? null : labels;
+  }
   static async create(host, data, onPick, onProgress = () => {}) {
     onProgress("viewer");
     const viewer = await molstar.Viewer.create(host, {
@@ -1120,12 +1171,12 @@ window.NanoCoFoldResultViewer = class NanoCoFoldResultViewer {
     if (StructureElement.Loci.isEmpty(loci)) throw Error(this.text("선택한 잔기·원자가 구조에 없습니다", "The selected residue or atom is absent from the structure"));
     return loci;
   }
-  focus(labels) {
+  focus(labels, options = {}) {
     return this.enqueue(() => {
       const plugin = this.viewer.plugin, loci = this.loci(labels);
       plugin.managers.interactivity.lociSelects.deselectAll();
       plugin.managers.interactivity.lociSelects.select({loci});
-      plugin.managers.camera.focusLoci(loci, window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? {durationMs:0} : undefined);
+      plugin.managers.camera.focusLoci(loci, {...options, ...(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? {durationMs:0} : {})});
       this.selectedLabels = [...labels];
       this.cameraFocusLabels = [...labels];
     });
@@ -1247,6 +1298,12 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "후보 대표 구조": "Representative candidate structure",
+  "아미노산을 클릭하거나 구간을 드래그하면 아래 3D 구조에서 강조하고 확대합니다. 키보드 방향키와 Shift로도 선택할 수 있습니다.": "Click an amino acid or drag across a range to highlight and zoom in on the 3D structure below. You can also use the arrow keys and Shift.",
+  "서열 위치 {0}–{1} · 구조 잔기 {2}": "Sequence positions {0}–{1} · structure residues {2}",
+  "선택 구간의 구조 좌표를 정확히 연결할 수 없습니다. 다른 잔기를 선택하세요.": "The selected range cannot be mapped to saved coordinates. Select another residue.",
+  "아미노산을 클릭하거나 구간을 선택하세요.": "Click an amino acid or select a range.",
+  "후보 대표 구조는 결과표에 연결된 모델입니다. 아래 엔진·seed 항목은 개별 예측의 구조와 PAE입니다. 예측이 1개이면 같은 구조일 수 있으며, 대표 구조 표시와 최종 적격 판정은 별개입니다.": "The representative structure is the model linked to the candidate table. Engine and seed entries show individual predictions and their PAE. With one prediction, these may be the same structure. A representative structure does not indicate final eligibility.",
   "language에는 ko 또는 en을 입력하세요. / Use ko or en for language.": "Use ko or en for language.",
   "지표 이름에 마우스를 올리거나 누르면 값의 의미와 읽는 방향을 볼 수 있습니다.": "Hover over or tap a metric name to see what it measures and how to read it.",
   "보존된 입력 표적·파트너 좌표를 표적 Cα로 강체 정렬합니다. 실험 B-factor를 pLDDT로 해석하지 않습니다.": "Saved target and partner coordinates are aligned on target Cα atoms. Experimental B-factors are not treated as pLDDT.",
@@ -5996,6 +6053,29 @@ function showVhhSequence(row) {
   panel.hidden = !row || state.result?.mode === "complex";
   copy.disabled = save.disabled = !sequence;
   I18N.text(status, "");
+  I18N.text($("vhh-structure-feedback"), "");
+  let selectionRequest = 0;
+  const selectSequence = async () => {
+    const request = ++selectionRequest, viewer = state.viewer, data = state.structure;
+    const feedback = $("vhh-structure-feedback");
+    if (!sequence || state.candidate !== row) return;
+    if (!viewer || viewer.data !== data || data?.candidate_id !== row.candidate_id) {
+      I18N.text(feedback, I18N.term("MolStar 구조가 준비될 때까지 기다리세요.")); return;
+    }
+    const start = Math.min(value.selectionStart, sequence.length - 1);
+    const end = Math.max(start + 1, value.selectionEnd);
+    try {
+      const labels = await viewer.focusSequence(sequence, start, end);
+      if (!labels || request !== selectionRequest || state.candidate !== row || state.viewer !== viewer || state.structure !== data) return;
+      const toggle = document.querySelector('[data-layer="binder"]'); if (toggle) toggle.checked = true;
+      I18N.text(feedback, I18N.format("서열 위치 {0}–{1} · 구조 잔기 {2}", [start + 1, end, labels.join(", ")]));
+    } catch (error) {
+      if (request === selectionRequest && state.candidate === row && state.viewer === viewer && state.structure === data)
+        I18N.text(feedback, I18N.term(error.message));
+    }
+  };
+  value.onpointerup = event => { if (event.button === 0) selectSequence(); };
+  value.onkeyup = event => { if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) selectSequence(); };
   if (panel.hidden) return;
   const id = row.candidate_id;
   I18N.text($("vhh-sequence-record"), sequence ? I18N.format("{0} · 아미노산 {1}개", [id, sequence.length]) : id);
@@ -6514,7 +6594,7 @@ async function selectCandidate(id) {
   }
   const observations = state.observations.filter((o) => o.candidate_id === id);
   options($("observation-select"), [
-    { value: "", label: "선별된 / 대표 구조" },
+    { value: "", label: "후보 대표 구조" },
     ...observations.map((o) => ({
       value: o.observation_id,
       label: `${o.engine || "engine"} · seed ${fmt(o.seed)} · ${o.observation_id}`,
@@ -6702,6 +6782,7 @@ function localizeEmptyPaeAnnotation() {
 }
 async function loadStructure() {
   if (!state.candidate) return;
+  I18N.text($("vhh-structure-feedback"), "");
   setPaeErrorStatus(null);
   const id = state.candidate.candidate_id,
     observation = $("observation-select").value,

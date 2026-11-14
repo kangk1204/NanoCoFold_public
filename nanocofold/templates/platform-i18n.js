@@ -64,6 +64,12 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "후보 대표 구조": "Representative candidate structure",
+  "아미노산을 클릭하거나 구간을 드래그하면 아래 3D 구조에서 강조하고 확대합니다. 키보드 방향키와 Shift로도 선택할 수 있습니다.": "Click an amino acid or drag across a range to highlight and zoom in on the 3D structure below. You can also use the arrow keys and Shift.",
+  "서열 위치 {0}–{1} · 구조 잔기 {2}": "Sequence positions {0}–{1} · structure residues {2}",
+  "선택 구간의 구조 좌표를 정확히 연결할 수 없습니다. 다른 잔기를 선택하세요.": "The selected range cannot be mapped to saved coordinates. Select another residue.",
+  "아미노산을 클릭하거나 구간을 선택하세요.": "Click an amino acid or select a range.",
+  "후보 대표 구조는 결과표에 연결된 모델입니다. 아래 엔진·seed 항목은 개별 예측의 구조와 PAE입니다. 예측이 1개이면 같은 구조일 수 있으며, 대표 구조 표시와 최종 적격 판정은 별개입니다.": "The representative structure is the model linked to the candidate table. Engine and seed entries show individual predictions and their PAE. With one prediction, these may be the same structure. A representative structure does not indicate final eligibility.",
   "language에는 ko 또는 en을 입력하세요. / Use ko or en for language.": "Use ko or en for language.",
   "지표 이름에 마우스를 올리거나 누르면 값의 의미와 읽는 방향을 볼 수 있습니다.": "Hover over or tap a metric name to see what it measures and how to read it.",
   "보존된 입력 표적·파트너 좌표를 표적 Cα로 강체 정렬합니다. 실험 B-factor를 pLDDT로 해석하지 않습니다.": "Saved target and partner coordinates are aligned on target Cα atoms. Experimental B-factors are not treated as pLDDT.",

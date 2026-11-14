@@ -491,23 +491,23 @@
           <div class="card">
             <h2 id="report-comparison">03 후보 비교</h2>
             <p class="muted" data-vhh-results>결합 부위 접촉 수와 판정을 함께 확인하세요. 지표는 같은 엔진·실행 조건 안에서 비교하며, 정렬은 현재 표의 탐색 순서입니다.</p>
-            <div class="inline">
-              <label for="candidate-search">후보 검색</label
+            <div class="candidate-filters">
+              <div class="filter-field"><label for="candidate-search">후보 검색</label
               ><input
                 id="candidate-search"
                 type="search"
                 placeholder="ID, 서열, 제외 사유"
-              ><label for="eligibility-basis">적격 판정</label
+              ></div><div class="filter-field"><label for="eligibility-basis">적격 판정</label
               ><select id="eligibility-basis">
                 <option value="quality">품질 적격 · 결합 부위 제외</option>
                 <option value="recorded">실행 당시 기록 적격</option></select
-              ><label for="eligibility">적격 여부</label
+              ></div><div class="filter-field"><label for="eligibility">적격 여부</label
               ><select id="eligibility">
                 <option value="all">전체</option>
                 <option value="true">적격</option>
                 <option value="false">부적격</option>
                 <option value="missing">미평가</option></select
-              ><label for="sort-metric">정렬</label
+              ></div><div class="filter-field"><label for="sort-metric">정렬</label
               ><select id="sort-metric">
                 <option value="ipsae">ipSAE ↑</option>
                 <option>composite_score</option>
@@ -529,8 +529,8 @@
                 <option>n_clashes</option>
                 <option>dev_flags</option><option>n_hbonds</option><option>n_salt_bridges</option><option>esm_score</option>
                 <option>candidate_id</option></select
-              ><label for="engine-filter">예측 엔진</label><select id="engine-filter"><option value="all">전체 엔진</option></select>
-              <label class="check"
+              ></div><div class="filter-field"><label for="engine-filter">예측 엔진</label><select id="engine-filter"><option value="all">전체 엔진</option></select></div>
+              <label class="check filter-direction"
                 ><input
                   id="descending"
                   type="checkbox"
@@ -577,7 +577,9 @@
               <section id="vhh-sequence-panel" class="vhh-sequence-panel" aria-labelledby="vhh-sequence-heading" hidden>
                 <h3 id="vhh-sequence-heading">선택한 후보의 VHH 서열</h3>
                 <label for="vhh-sequence-value" id="vhh-sequence-record"></label>
-                <textarea id="vhh-sequence-value" class="sequence" rows="3" readonly spellcheck="false" dir="ltr"></textarea>
+                <p id="vhh-sequence-help" class="muted">아미노산을 클릭하거나 구간을 드래그하면 아래 3D 구조에서 강조하고 확대합니다. 키보드 방향키와 Shift로도 선택할 수 있습니다.</p>
+                <textarea id="vhh-sequence-value" class="sequence" rows="3" readonly spellcheck="false" dir="ltr" aria-describedby="vhh-sequence-help vhh-structure-feedback"></textarea>
+                <p id="vhh-structure-feedback" class="muted" role="status" aria-live="polite"></p>
                 <div class="inline">
                   <button type="button" class="secondary" id="copy-vhh-sequence">서열 복사</button>
                   <button type="button" class="secondary" id="save-vhh-sequence">이 후보 FASTA 저장</button>
@@ -612,7 +614,8 @@
               </div>
               <p id="structure-note" role="status"></p>
               <label for="observation-select">구조·PAE 관측 선택</label
-              ><select id="observation-select"></select>
+              ><select id="observation-select" aria-describedby="observation-selection-help"></select>
+              <p id="observation-selection-help" class="muted">후보 대표 구조는 결과표에 연결된 모델입니다. 아래 엔진·seed 항목은 개별 예측의 구조와 PAE입니다. 예측이 1개이면 같은 구조일 수 있으며, 대표 구조 표시와 최종 적격 판정은 별개입니다.</p>
               <div class="inline toggles">
                 <label class="check"
                   ><input

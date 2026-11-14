@@ -2119,6 +2119,29 @@ function showVhhSequence(row) {
   panel.hidden = !row || state.result?.mode === "complex";
   copy.disabled = save.disabled = !sequence;
   I18N.text(status, "");
+  I18N.text($("vhh-structure-feedback"), "");
+  let selectionRequest = 0;
+  const selectSequence = async () => {
+    const request = ++selectionRequest, viewer = state.viewer, data = state.structure;
+    const feedback = $("vhh-structure-feedback");
+    if (!sequence || state.candidate !== row) return;
+    if (!viewer || viewer.data !== data || data?.candidate_id !== row.candidate_id) {
+      I18N.text(feedback, I18N.term("MolStar 구조가 준비될 때까지 기다리세요.")); return;
+    }
+    const start = Math.min(value.selectionStart, sequence.length - 1);
+    const end = Math.max(start + 1, value.selectionEnd);
+    try {
+      const labels = await viewer.focusSequence(sequence, start, end);
+      if (!labels || request !== selectionRequest || state.candidate !== row || state.viewer !== viewer || state.structure !== data) return;
+      const toggle = document.querySelector('[data-layer="binder"]'); if (toggle) toggle.checked = true;
+      I18N.text(feedback, I18N.format("서열 위치 {0}–{1} · 구조 잔기 {2}", [start + 1, end, labels.join(", ")]));
+    } catch (error) {
+      if (request === selectionRequest && state.candidate === row && state.viewer === viewer && state.structure === data)
+        I18N.text(feedback, I18N.term(error.message));
+    }
+  };
+  value.onpointerup = event => { if (event.button === 0) selectSequence(); };
+  value.onkeyup = event => { if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) selectSequence(); };
   if (panel.hidden) return;
   const id = row.candidate_id;
   I18N.text($("vhh-sequence-record"), sequence ? I18N.format("{0} · 아미노산 {1}개", [id, sequence.length]) : id);
@@ -2637,7 +2660,7 @@ async function selectCandidate(id) {
   }
   const observations = state.observations.filter((o) => o.candidate_id === id);
   options($("observation-select"), [
-    { value: "", label: "선별된 / 대표 구조" },
+    { value: "", label: "후보 대표 구조" },
     ...observations.map((o) => ({
       value: o.observation_id,
       label: `${o.engine || "engine"} · seed ${fmt(o.seed)} · ${o.observation_id}`,
@@ -2825,6 +2848,7 @@ function localizeEmptyPaeAnnotation() {
 }
 async function loadStructure() {
   if (!state.candidate) return;
+  I18N.text($("vhh-structure-feedback"), "");
   setPaeErrorStatus(null);
   const id = state.candidate.candidate_id,
     observation = $("observation-select").value,
