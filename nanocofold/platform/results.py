@@ -806,7 +806,7 @@ class ResultReader:
                 row["observation_id"] = str(path.relative_to(self.root)) + ":" + str(index)
                 recorded_seed = self.config.get("run", {}).get("seed")
                 if row.get("engine") in {"boltz", "boltz2"} and (recorded_seed is not None or self.config.get("score", {}).get("boltz2", {}).get("seed") is not None):
-                    recorded_seed = cfg_seed(self.config, "score.boltz2.seed")
+                    recorded_seed = cfg_seed(self.config, "score.boltz2.seed", historical=True)
                 row.setdefault("seed_source", "manifest" if "seed" in row else "config")
                 row["seed"] = row.get("seed", recorded_seed)
                 # Stage manifests describe actual engine conditions. In
@@ -963,7 +963,7 @@ class ResultReader:
         from ..config import cfg_seed
         prefix = "colabfold_" if self._observation_stage(row)["stage"] == "first" else "boltz_"
         engine = row.get("engine")
-        seed = cfg_seed(self.config, "score.boltz2.seed") if engine in {"boltz", "boltz2"} else self.config.get("run", {}).get("seed")
+        seed = cfg_seed(self.config, "score.boltz2.seed", historical=True) if engine in {"boltz", "boltz2"} else self.config.get("run", {}).get("seed")
         return {"seed": row.get("seed", row.get(prefix + "seed", seed)),
                 "seed_source": row.get("seed_source", "manifest" if "seed" in row or prefix + "seed" in row else "config"),
                 "msa_record_source": row.get("msa_record_source", "manifest" if "msa" in row or "msa_used" in row or prefix + "msa" in row else "config"),

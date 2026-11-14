@@ -23,6 +23,24 @@ def _file_identity(path):
         return None
 
 
+def _cascade_candidate_budget(settings, ids, candidates_path):
+    """Bound the planned second-stage union without changing any selection."""
+    final_count = settings.get("final_count")
+    if final_count is not None:
+        # The exact budget already includes WT and parent controls.
+        return min(len(ids), int(final_count))
+    controls = {"WT"} & ids
+    if candidates_path.is_file():
+        with candidates_path.open(encoding="utf-8-sig", newline="") as stream:
+            for row in csv.DictReader(stream):
+                identifier = row.get("design_id") or row.get("variant_id")
+                if identifier in ids and str(row.get("is_parent_control", "")).lower() == "true":
+                    controls.add(identifier)
+    count = sum(int(settings.get(key, default)) for key, default in
+                (("top_n", 20), ("diversity_n", 0), ("audit_n", 2)))
+    return min(len(ids), count + len(controls))
+
+
 class MetadataReadCache:
     """Bound parsed metadata to file identity; never use it as queue control state."""
     def __init__(self, limit=16384):
@@ -222,8 +240,8 @@ class RuntimeEstimator:
                         cfg = yaml.safe_load(Path(job["config_path"]).read_text())
                         cascade = cfg.get("screen", {}).get("cascade", {})
                         # The selection union can contain top, diversity, audit and WT rows.
-                        count = min(len(ids), max(int(cascade.get("final_count", 0)), int(cascade.get("top_n", 99)) + int(cascade.get("diversity_n", 0)) + int(cascade.get("audit_n", 0))) + int("WT" in ids))
-                        if control.get("valid") and not control.get("mock") and _valid_duration(control.get("seconds_per_candidate")):
+                        count = _cascade_candidate_budget(cascade, ids, source.parent / "candidates.csv")
+                        if cascade.get("enabled") and control.get("valid") and not control.get("mock") and _valid_duration(control.get("seconds_per_candidate")):
                             seconds += count * control["seconds_per_candidate"]
                             result.update(includes_second_stage=True, second_stage_count_basis="selection_union_upper_bound", note="ColabFold 완료 배치와 같은 설정의 WT Boltz-2 실측으로 두 단계 잔여 시간을 추정합니다. 결과 저장·전송과 GPU 대기는 제외합니다.")
                     return {**result, "status": "estimated", "seconds_per_candidate": round(rate, 2),

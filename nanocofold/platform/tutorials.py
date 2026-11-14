@@ -36,6 +36,8 @@ def load_public_example(mode: str, *, root: Path | None = None) -> dict:
     if payload["mode"] != mode or payload.get("api_consent") is not False:
         raise ValueError("예제 모드 또는 API 동의 기본값이 예상과 다릅니다.")
     return {"mode": mode, "title": MODES[mode][0], "description": MODES[mode][1],
-            "payload": payload, "requires_api_consent": mode != "complex",
+            "payload": payload, "requires_api_consent": any(
+                entry.get("config", {}).get("screen", {}).get("colabfold", {}).get("msa_source") == "public_api"
+                for entry in payload["entries"]),
             "maximum_representative_models": plan["maximum_representative_models"],
             "predictions_executed": False}

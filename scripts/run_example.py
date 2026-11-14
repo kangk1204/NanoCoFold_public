@@ -90,9 +90,13 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         payload = checked_payload(args.mode)
-        if args.mode != 'complex' and not args.allow_public_msa:
-            parser.error('이 예제는 공개 MSA API를 사용합니다. 안내를 확인한 뒤 --allow-public-msa를 붙이세요. 입력 검토에서도 이 배치 동의가 필요합니다.')
         payload['api_consent'] = bool(args.allow_public_msa)
+        # Shipped manifests use a local cache and can be reviewed offline. This
+        # explicit switch chooses the API for this new example request only.
+        if args.allow_public_msa and args.mode != 'complex':
+            for entry in payload['entries']:
+                entry['config']['screen']['colabfold']['msa_source'] = 'public_api'
+                entry['config']['screen']['allow_public_msa_server'] = True
         workspace = args.workspace.expanduser().resolve()
         if not (workspace / 'config' / 'environment.yaml').is_file():
             if not args.review_only:

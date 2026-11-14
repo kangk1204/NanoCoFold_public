@@ -47,7 +47,6 @@ def test_real_batch_review_accepts_exact_public_manifest_without_starting_jobs(t
         payload = runner.checked_payload(mode)
         assert payload['api_consent'] is False
         assert len(expand_manifest(payload)) == 1
-        payload['api_consent'] = mode != 'complex'
         batch = BatchManager(inputs, jobs).review(payload)
         assert len(batch['rows']) == 1
         assert not any(row.get('error') for row in batch['rows']), batch['rows']
@@ -71,12 +70,19 @@ def test_hash_change_refused_before_review(tmp_path, monkeypatch):
         runner.checked_payload('screen')
 
 
-def test_runtime_api_consent_is_explicit_and_does_not_change_example_file(tmp_path):
+def test_runtime_api_consent_is_explicit_and_does_not_change_example_file(completed_core_workspace, monkeypatch):
+    workspace, _, _ = completed_core_workspace
     before = (EXAMPLES/'screen_batch.json').read_bytes()
-    with pytest.raises(SystemExit) as exc:
-        runner.main(['screen', '--workspace', str(tmp_path)])
-    assert exc.value.code == 2
-    assert not (tmp_path/'.nanocofold').exists()
+    captured = []
+    def review(workspace, args, **kwargs):
+        payload = json.loads(Path(args[args.index('--manifest') + 1]).read_text())
+        captured.append(payload)
+        return 0, {'id': 'review-only', 'review_sha256': 'digest', 'name': 'example', 'mode': 'screen', 'rows': []}
+    monkeypatch.setattr(runner, 'cli', review)
+    assert runner.main(['screen', '--workspace', str(workspace), '--review-only', '--allow-public-msa']) == 0
+    assert captured[0]['api_consent'] is True
+    assert captured[0]['entries'][0]['config']['screen']['colabfold']['msa_source'] == 'public_api'
+    assert captured[0]['entries'][0]['config']['screen']['allow_public_msa_server'] is True
     assert (EXAMPLES/'screen_batch.json').read_bytes() == before
 
 

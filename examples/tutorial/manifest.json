@@ -27,9 +27,9 @@
   "files_sha256": {
     "complex.fasta": "1b96a683bcc7971859e63fce4f5e76c3b80bc04b09999f1c04c41cb2db015c01",
     "complex_batch.json": "cd83f6afe36f4fda498e8a7e134fad5fd621a25483a0411f3992a0bdb3de044f",
-    "design_batch.json": "929a68c837434f47a631fd09ac5dc1439fe37071291910a40a7d7e25b2b64b73",
-    "mature_batch.json": "ef671fa8e0f415cf568ec73a2b9799ce41173dfbb27183e10aea617bec3f4f46",
-    "screen_batch.json": "6684e71275b67b90b9759469bc78a3a2f1cc0bd3c0657977e5fcd83a9e5965c5",
+    "design_batch.json": "1a66b497737fa631c1fe81bb25d305bd58fef4b9c71ca8fe72d7a1122c550f44",
+    "mature_batch.json": "a5b6365859cc31f7e1c3b4c99b5df9e7d365ba2e6218922a362cfc403f54fba7",
+    "screen_batch.json": "2cf4c94cd20ec2c06b7d7867457e58710d128fb9a987e4c265854dd214fd325d",
     "sources.json": "2d4a1d2ee3a96a5dafd7cb01108c7b6d5b09290f2cfc36c37057b2e0ab0772ec",
     "target.fasta": "a1e2fcd2b0ac018ff3ec67e2ca811540fc2d41c31fe39105b046e823f1fa3128",
     "vhh_library.fasta": "325fe7a555e5ad9246be7f6fcab8fa1c1aeaa73c4da6ee5936d1669ee2c04995",

@@ -7,7 +7,7 @@ run:
   mode: design             # complex | design | screen | mature
   analysis_preset: null    # optional input preset label; does not alter conditions
   outdir: runs
-  seed: 42
+  seed: 42                # 모든 새 실행: 0–2147483647 (CLI·웹·복합체 공통)
   dry_run: false           # true면 명령만 생성하고 실행하지 않음
   mock: false              # true면 GPU/모델 없이 합성 데이터로 전체 흐름 검증
   resume: true             # 이미 생성된 산출물은 재사용
@@ -160,11 +160,11 @@ screen:
     enabled: true          # specificity 캠페인은 양쪽 모두 false로 비교
     connection_type: pocket
     max_distance: 11.0
-  num_trunk_recycles: 1     # 스크리닝 고속화 (정밀 평가는 Boltz-2 담당)
+  num_trunk_recycles: 1     # Chai-1 전용
   num_diffn_timesteps: 50
   num_diffn_samples: 1
-  extra_args: []
-  env_vars: {}               # 예: {PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True}
+  extra_args: []             # Chai-1 전용
+  env_vars: {}               # Chai-1/Boltz-2 전용; 예: {OMP_NUM_THREADS: "4"}
   binder_msa: false          # true면 나노바디 체인도 MSA 생성 (Boltz-2 정확도 향상, 시간 증가)
   allow_public_msa_server: false  # ColabFold 공용 서버 사용 명시 허용(기본 차단, 라이선스)
   tier2_n: 50               # 구조 스코어링 코어로 넘길 후보 수
@@ -204,7 +204,7 @@ mature:
   exclude:
     cys_substitution: true
     wt_cys: true           # 야생형 Cys 위치 보호 (구조 이황화 결합)
-    wt_residue: true
+    wt_residue: true        # 호환성 키. 변이는 항상 WT와 다른 잔기를 사용하며 false는 지원하지 않음. WT는 별도 대조군.
   prefilter:
     mode: esm2             # esm2 | none | mock
     enforce_threshold: true # false면 ESM/AntiFold를 계산하되 점수 컷으로 제외하지 않음
@@ -370,7 +370,7 @@ experiment:
 # General complex mode uses complex.* instead of VHH screen/score settings:
 # complex:
 #   engine: boltz2
-#   seeds: [42]              # integers 0..2147483647 (CLI run.seed supports uint32)
+#   seeds: [42]              # integers 0..2147483647 in CLI, web and complex mode
 #   recycles: 3
 #   diffusion_steps: 200
 #   models_per_seed: 1

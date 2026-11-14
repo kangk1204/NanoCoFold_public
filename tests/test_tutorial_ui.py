@@ -25,7 +25,7 @@ def test_tutorial_endpoint_reads_exact_input_with_no_submission(tmp_path, mode):
         assert example["payload"] == expected
         assert example["payload"]["api_consent"] is False
         assert example["predictions_executed"] is False
-        assert example["requires_api_consent"] is (mode != "complex")
+        assert example["requires_api_consent"] is False
         assert app.state.jobs.store.list() == []
         assert app.state.inputs.list() == []
 

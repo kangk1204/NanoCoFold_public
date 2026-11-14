@@ -132,6 +132,10 @@ def apply_overrides(cfg: dict, overrides: list[str] | None) -> None:
             omitted = sorted(set(previous) - set(parsed))
             if omitted:
                 warnings.warn("--set rank.weights는 가중치 목록 전체를 교체합니다. 제외된 지표: " + ", ".join(omitted), UserWarning)
+        if key.strip() == "score.thresholds" and isinstance(previous, dict) and isinstance(parsed, dict):
+            omitted = sorted(set(previous) - set(parsed))
+            if omitted:
+                warnings.warn("--set score.thresholds는 임계값 목록 전체를 교체합니다. 생략한 항목은 기본 임계값을 사용합니다: " + ", ".join(omitted), UserWarning)
         _set_dotted(cfg, key.strip(), parsed)
 
 
@@ -241,8 +245,9 @@ def _validate(cfg: dict, *, historical: bool = False) -> None:
                    "score.thresholds", "score.ipsae", "rank.weights", "rank.cdr3"):
         if not isinstance(cfg_get(cfg, dotted, {}), dict):
             raise ValueError(f"{dotted} 설정은 객체여야 합니다.")
-    for dotted in ("run.seed", "structure.boltz2.seed", "score.boltz2.seed", "mature.library.seed"):
-        cfg_seed(cfg, dotted)
+    for dotted in ("run.seed", "structure.boltz2.seed", "structure.chai1.seed", "score.boltz2.seed",
+                   "mature.library.seed", "screen.cascade.audit_seed"):
+        cfg_seed(cfg, dotted, historical=historical)
     for dotted in ("run.mock", "run.dry_run", "run.resume", "rank.fallback_to_ineligible",
                    "rank.include_wt_control", "score.ipsae.use_official"):
         if type(cfg_get(cfg, dotted, False)) is not bool:
@@ -377,9 +382,6 @@ def _validate(cfg: dict, *, historical: bool = False) -> None:
             raise ValueError("mature.library.size는 WT 포함 2–100000 사이의 정수여야 합니다.")
         if any(isinstance(v, bool) or not isinstance(v, int) for v in (minimum, maximum)) or not 1 <= minimum <= maximum <= 50:
             raise ValueError("mature.library 변이 개수는 1 ≤ min_mutations ≤ max_mutations ≤ 50이어야 합니다.")
-        library_seed = library.get("seed")
-        if library_seed is not None and (isinstance(library_seed, bool) or not isinstance(library_seed, int) or not 0 <= library_seed < 2**32):
-            raise ValueError("mature.library.seed는 null 또는 0–4294967295 사이의 정수여야 합니다.")
         if cfg_get(cfg, "mature.prefilter.mode", "esm2") != "none":
             raise ValueError("random 다중 변이 라이브러리는 mature.prefilter.mode=none이 필요합니다.")
     from .mature import validate_msa_mutation_limit
@@ -429,9 +431,6 @@ def _validate(cfg: dict, *, historical: bool = False) -> None:
     if (isinstance(cdr_identity, bool) or not isinstance(cdr_identity, (int, float))
             or not math.isfinite(cdr_identity) or not 0 < cdr_identity <= 1):
         raise ValueError("rank.cdr3.cluster_identity는 0 초과 1 이하의 유한한 숫자여야 합니다.")
-    seed = cascade.get("audit_seed")
-    if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed < 2**32):
-        raise ValueError("screen.cascade.audit_seed 는 null 또는 0–4294967295 사이의 정수여야 합니다.")
     if cascade.get("enabled", False):
         if mode not in {"screen", "mature"} and not (mode == "design" and refinement.get("enabled", False)):
             raise ValueError("ColabFold→Boltz-2 cascade에는 screen/mature 또는 활성화된 design.refinement가 필요합니다.")
@@ -441,6 +440,61 @@ def _validate(cfg: dict, *, historical: bool = False) -> None:
             raise ValueError("cascade와 기존 screen.boltz2_rescore_top을 동시에 사용할 수 없습니다.")
     from .colabfold import settings as colabfold_settings
     colabfold_settings(cfg)
+    if not historical:
+        _warn_inactive_engine_options(cfg)
+
+
+def _warn_inactive_engine_options(cfg: dict) -> None:
+    """Explain changed engine-only options without warning about installed defaults.
+
+    The shared ColabFold MSA settings also serve other engines. Installed tool
+    paths are likewise not an attempt to enable an engine, so neither is listed.
+    Complex prediction has its own effective-config receipt and option mapping.
+    """
+    mode = cfg_get(cfg, "run.mode", "design")
+    if mode == "complex":
+        return
+    defaults = _default_config()
+    if cfg_get(cfg, "screen.comparison.enabled", False):
+        active = set(cfg_get(cfg, "screen.comparison.engines", []))
+    else:
+        active = {cfg_get(cfg, "screen.engine", "chai1")}
+        if cfg_get(cfg, "screen.cascade.enabled", False) or cfg_get(cfg, "screen.boltz2_rescore_top", 0):
+            active.add("boltz2")
+    if cfg_get(cfg, "specificity.enabled", False):
+        active.add(cfg_get(cfg, "specificity.engine", "boltz2"))
+
+    groups = [
+        ({"chai1"}, ["screen.extra_args", "screen.num_trunk_recycles", "screen.num_diffn_timesteps",
+                     "screen.num_diffn_samples", "screen.chai1.msa_directory"]),
+        ({"boltz2"}, ["score.boltz2_recycling_steps", "score.boltz2_sampling_steps",
+                      "score.boltz2_diffusion_samples", "score.boltz2.seed", "score.boltz2_num_subsampled_msa",
+                      "score.boltz2_extra_args", "score.boltz2_cpu_fp32", "screen.boltz2_pocket_max_distance"]),
+        ({"chai1", "boltz2"}, ["screen.env_vars"]),
+        ({"colabfold"}, ["screen.colabfold." + key for key in
+                         ("num_recycles", "num_models", "num_seeds", "extra_args", "env_vars", "fast_kernels")]),
+        ({"opendde"}, ["screen.opendde." + key for key in
+                       ("cycles", "steps", "samples", "dtype", "attention_chunk_size")]),
+    ]
+    for engines, keys in groups:
+        if not active.intersection(engines):
+            _warn_changed_options(cfg, defaults, keys, engines)
+    if mode == "design":
+        design_engine = cfg_get(cfg, "design.engine", "rfantibody")
+        if design_engine == "boltzgen":
+            _warn_changed_options(cfg, defaults, ["design.mpnn", "design.rf2", "design.loops",
+                                  "design.extra_args", "design.deterministic"], {"rfantibody"})
+        elif design_engine == "rfantibody":
+            _warn_changed_options(cfg, defaults, ["design.boltzgen." + key for key in
+                                  ("diffusion_batch_size", "inverse_fold_num_sequences", "sampling_steps",
+                                   "folding_sampling_steps", "recycling_steps", "use_kernels")], {"boltzgen"})
+
+
+def _warn_changed_options(cfg: dict, defaults: dict, keys: list[str], engines: set[str]) -> None:
+    changed = [key for key in keys if cfg_get(cfg, key) != cfg_get(defaults, key)]
+    if changed:
+        warnings.warn("선택한 엔진에서 사용하지 않는 설정: " + ", ".join(changed)
+                      + ". 적용 엔진: " + ", ".join(sorted(engines)) + ".", UserWarning, stacklevel=3)
 
 
 def _validate_option_semantics(cfg):
@@ -673,15 +727,16 @@ def developability_patterns(cfg: dict) -> dict[str, str]:
     return patterns
 
 
-def cfg_seed(cfg: dict, dotted: str, default: int = 42) -> int:
-    """seed 값을 안전하게 해석한다(I01): null/누락이면 run.seed, 0은 유효값으로 보존."""
+def cfg_seed(cfg: dict, dotted: str, default: int = 42, *, historical: bool = False) -> int:
+    """Use the shared engine range for new runs; retain old uint32 metadata on read."""
     value = cfg_get(cfg, dotted)
     if value is None:
         value = cfg_get(cfg, "run.seed", default)
     if value is None:
-        return int(default)
-    if type(value) is not int or not 0 <= value < 2**32:
-        raise ValueError(f"{dotted}는 null 또는 0–4294967295 사이의 정수여야 합니다.")
+        value = default
+    maximum = 2**32 - 1 if historical else 2**31 - 1
+    if type(value) is not int or not 0 <= value <= maximum:
+        raise ValueError(f"{dotted}는 null 또는 0–{maximum} 사이의 정수여야 합니다.")
     return value
 
 

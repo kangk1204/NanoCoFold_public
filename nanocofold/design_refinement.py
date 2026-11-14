@@ -89,8 +89,8 @@ def settings(cfg):
     if result["library_size"] < controls or not controls < result["final_count"] <= result["library_size"]:
         raise ValueError("design.refinement.final_count는 전체 부모 수보다 크고 library_size 이하여야 합니다.")
     result["seed"] = cfg_get(cfg, "run.seed", 42)
-    if type(result["seed"]) is not int or not 0 <= result["seed"] < 2**32:
-        raise ValueError("design.refinement에는 0–4294967295 정수 run.seed가 필요합니다.")
+    if type(result["seed"]) is not int or not 0 <= result["seed"] < 2**31:
+        raise ValueError("design.refinement에는 0–2147483647 정수 run.seed가 필요합니다.")
     result["exclude_cys"] = bool(cfg_get(cfg, "mature.exclude.cys_substitution", True))
     result["protect_wt_cys"] = bool(cfg_get(cfg, "mature.exclude.wt_cys", True))
     result["mock"] = bool(cfg_get(cfg, "run.mock", False))

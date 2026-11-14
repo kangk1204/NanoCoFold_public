@@ -29,13 +29,13 @@
             "continue_on_error": true
           },
           "colabfold": {
-            "msa_source": "public_api",
+            "msa_source": "cache",
             "msa_cache_dir": "msa/monomer_cache",
             "num_recycles": 1,
             "num_models": 1,
             "num_seeds": 1
           },
-          "allow_public_msa_server": true,
+          "allow_public_msa_server": false,
           "restraint": {
             "enabled": false
           },

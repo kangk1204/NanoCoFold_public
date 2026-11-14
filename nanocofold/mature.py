@@ -412,8 +412,8 @@ def generate_random_library(
     """
     if isinstance(size, bool) or not isinstance(size, int) or not 2 <= size <= 100000:
         raise ValueError("random 라이브러리 size는 WT 포함 2–100000 사이의 정수여야 합니다.")
-    if isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed < 2**32:
-        raise ValueError("random seed는 0–4294967295 사이의 정수여야 합니다.")
+    if isinstance(seed, bool) or not isinstance(seed, int) or not 0 <= seed < 2**31:
+        raise ValueError("random seed는 0–2147483647 사이의 정수여야 합니다.")
     regions, positions, alternatives, capacity = _random_substitution_space(
         wt_sequence, cdr_ranges, min_mutations, max_mutations, exclude_cys, protect_wt_cys,
         mutation_region, mutation_ranges)

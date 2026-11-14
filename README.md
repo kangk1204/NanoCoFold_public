@@ -215,6 +215,8 @@ The example uses seed **42** and **one model per engine**, for **four planned mo
 
 When using a personal installation without login, approval is saved for that installation. Cached and local MSA searches do not send sequences externally.
 
+For command-line batch examples, see [reviewing the four examples and choosing an MSA source](docs/batch-examples.en.md).
+
 <details>
 <summary>Step-by-step settings and English screenshots</summary>
 
@@ -406,7 +408,7 @@ Select candidates by reviewing engine-specific scores, ipTM, interface pLDDT, in
 | **Time budget exhausted** | Enter additional minutes when prompted, then **Verify and resume**. |
 | Resume is unavailable | Read the displayed reason and log, then contact the administrator. |
 
-While cancelling, NanoCoFold stops the worker and its tools and releases their resources. Saved results remain available; unfinished models may be recalculated when resumed. In a batch, confirm cancellation of one item or all unfinished jobs.
+While cancelling, NanoCoFold stops the worker and its tools and releases their resources. Saved results remain available; unfinished models may be recalculated when resumed. In a batch, confirm cancellation of one item or all unfinished jobs. A previously submitted search on a shared local MSA service may continue to populate its shared cache; cancelling an analysis does not stop other users' searches.
 
 Continue interrupted jobs with **Verify and resume**. Saved results remain available. Review partial results together with job status and completed model counts.
 

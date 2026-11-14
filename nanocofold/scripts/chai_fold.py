@@ -24,8 +24,8 @@ def configure_determinism(seed: int) -> dict:
     Unsupported deterministic operations fail explicitly; silently falling
     back to nondeterministic kernels would invalidate same-input comparisons.
     """
-    if type(seed) is not int or not 0 <= seed < 2**32:
-        raise ValueError("Chai seed must be an integer from 0 through 4294967295")
+    if type(seed) is not int or not 0 <= seed < 2**31:
+        raise ValueError("Chai seed must be an integer from 0 through 2147483647")
     existing = os.environ.get("CUBLAS_WORKSPACE_CONFIG")
     if existing not in (None, ":4096:8", ":16:8"):
         raise ValueError("Chai deterministic execution requires CUBLAS_WORKSPACE_CONFIG=:4096:8 or :16:8")

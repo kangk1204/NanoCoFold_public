@@ -72,7 +72,7 @@ def test_mapping_created_by_unquoted_colon_retains_relevant_advice(setting):
     assert "':'" in str(error.value) and "--set" in str(error.value)
 
 
-@pytest.mark.parametrize("value", [-1, 2**32, True, .5, "12"])
+@pytest.mark.parametrize("value", [-1, 2**31, 2**32, True, .5, "12"])
 def test_seed_diagnostic_names_setting_once(value):
     with pytest.raises(ValueError) as error:
         config.cfg_seed({"run":{"seed":value}}, "run.seed")
@@ -80,8 +80,8 @@ def test_seed_diagnostic_names_setting_once(value):
     assert str(error.value).count("seed") == 1
 
 
-@pytest.mark.parametrize("value", [0, 2**32-1, None])
-def test_valid_seed_boundaries_and_null_fallback_are_unchanged(value):
+@pytest.mark.parametrize("value", [0, 2**31-1, None])
+def test_shared_seed_boundaries_and_null_fallback(value):
     assert config.cfg_seed({"run":{"seed":value}}, "run.seed") == (42 if value is None else value)
 
 
