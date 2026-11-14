@@ -90,7 +90,11 @@ def test_supported_analysis_options_do_not_emit_typo_warnings():
     with __import__("warnings").catch_warnings(record=True) as captured:
         cfg = load_config(overrides=["score.boltz2_diffusion_samples=2", "mature.antifold.model_path=models/a.pt",
                                      "screen.cascade.calibrate_wt=true", "screen.cascade.prune_unselected=false"])
-    assert not captured
+    # Valid keys produce no typo warnings. A changed Boltz-only option is now
+    # explicitly reported as unused while the default Chai engine is selected.
+    assert [str(item.message) for item in captured] == [
+        "선택한 엔진에서 사용하지 않는 설정: score.boltz2_diffusion_samples. 적용 엔진: boltz2."
+    ]
     assert cfg["score"]["boltz2_diffusion_samples"] == 2
 
 

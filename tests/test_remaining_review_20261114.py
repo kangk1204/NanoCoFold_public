@@ -17,6 +17,22 @@ SEEDS = ("run.seed", "structure.boltz2.seed", "structure.chai1.seed", "score.bol
          "mature.library.seed", "screen.cascade.audit_seed")
 
 
+def test_internal_parent_seed_preserves_the_existing_refinement_library():
+    from nanocofold.mature import generate_random_library
+    # Recorded from the pre-change implementation. A hashed parent seed can
+    # exceed int31 even when the user selected run.seed=42.
+    frame = generate_random_library("ACDEFGHIKLMNPQRSTVWY", {"CDR3": (5, 8)},
+                                    size=11, min_mutations=2, max_mutations=2, seed=2536431552)
+    assert frame.sequence.tolist() == [
+        "ACDEFGHIKLMNPQRSTVWY", "ACDEFMHTKLMNPQRSTVWY", "ACDEFSFIKLMNPQRSTVWY",
+        "ACDEVGFIKLMNPQRSTVWY", "ACDEDWHIKLMNPQRSTVWY", "ACDEAGHNKLMNPQRSTVWY",
+        "ACDEFGVFKLMNPQRSTVWY", "ACDEFDHDKLMNPQRSTVWY", "ACDESGFIKLMNPQRSTVWY",
+        "ACDEFGTAKLMNPQRSTVWY", "ACDEFGSEKLMNPQRSTVWY",
+    ]
+    assert frame.mutation_count.tolist() == [0] + [2]*10
+    assert frame.library_seed.eq(2536431552).all()
+
+
 @pytest.mark.parametrize("key", SEEDS)
 def test_new_execution_seeds_share_web_and_complex_range(key):
     cfg = load_config(overrides=[f"{key}={2**31-1}"])
