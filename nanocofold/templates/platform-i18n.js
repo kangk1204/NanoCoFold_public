@@ -539,6 +539,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "환경 확인 기록을 불러오지 못했습니다. 잠시 후 다시 조회합니다. 기존 결과는 계속 열 수 있습니다.": "Could not load the environment check. Retrying shortly. Existing results remain available.",
   "환경 확인 세부 기록이 아직 없습니다. 작업·로그에서 진행 상태나 종료 사유를 확인하세요.": "No detailed environment report is available yet. Open Jobs & logs for progress or the reason the check ended.",
   "결과 해석 안내": "How to interpret these results",
+  "결과 DB 조회에 실패했습니다. 새로고침하거나 다시 검색하세요.": "Could not load the results database. Refresh or search again.",
   "입력 확인 완료 · 분석 실행을 선택하세요.": "Input reviewed · Click Run analysis.",
   "선택한 엔진의 환경 확인이 필요합니다.": "The selected engines need an environment check.",
   "처음 사용하시나요?": "First time here?",

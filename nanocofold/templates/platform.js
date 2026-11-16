@@ -413,13 +413,23 @@ async function refreshCatalog() {
   if (offline) return;
   const request = ++state.catalogRequest;
   const status = $("catalog-status");
+  // Rows and cursors belong to the last successful query, not the new filters.
+  state.catalogNext = null;
+  $("catalog-next").disabled = true;
+  $("catalog-table").replaceChildren();
   I18N.text(status, I18N.term("결과 DB를 조회하고 있습니다…"));
   const params = new URLSearchParams({limit: "25", search: $("catalog-search").value,
     retention: $("catalog-retention").value, sort: state.catalogSort, descending: String(state.catalogDescending)});
   if (state.catalogCursor) params.set("cursor", state.catalogCursor);
   const owner = $("catalog-owner")?.value.trim();
   if (owner) params.set("researcher", owner);
-  const page = await api("/api/result-catalog?" + params);
+  let page;
+  try { page = await api("/api/result-catalog?" + params); }
+  catch (error) {
+    if (request !== state.catalogRequest) return;
+    I18N.text(status, I18N.term("결과 DB 조회에 실패했습니다. 새로고침하거나 다시 검색하세요."));
+    throw error;
+  }
   if (request !== state.catalogRequest) return;
   state.catalogNext = page.next_cursor;
   $("catalog-next").disabled = !page.next_cursor;
@@ -485,9 +495,16 @@ async function refreshVhhTable() {
   const revision=++vhhGrid.revision, params=vhhParams();
   const status=$("db-vhh-status"), output=$("db-vhh-table");
   vhhGrid.applied=null; $("db-vhh-export").disabled=true;
+  $("db-vhh-prev").disabled=$("db-vhh-next").disabled=true;
   I18N.text(status,I18N.term("결과 DB를 조회하고 있습니다…"));
   output.replaceChildren();
-  const data=await api("/api/candidate-catalog?"+params+"&offset="+vhhGrid.offset);
+  let data;
+  try { data=await api("/api/candidate-catalog?"+params+"&offset="+vhhGrid.offset); }
+  catch (error) {
+    if(revision!==vhhGrid.revision) return;
+    I18N.text(status,I18N.term("결과 DB 조회에 실패했습니다. 새로고침하거나 다시 검색하세요."));
+    throw error;
+  }
   if(revision!==vhhGrid.revision) return;
   if(vhhGrid.offset && !data.items.length) {vhhGrid.offset=0;return refreshVhhTable();}
   const table=el("table"), header=el("tr"), body=el("tbody");
