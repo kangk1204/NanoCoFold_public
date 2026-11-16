@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import errno
+import fcntl
 import hashlib
 import json
 import mimetypes
@@ -339,16 +340,25 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
             allowed = saved_msa_consent(request)
             if allowed is not None:
                 if isinstance(payload.get("settings"), dict):
-                    payload["settings"]["allow_public_msa_server"] = allowed
+                    if allowed is False:
+                        payload["settings"]["allow_public_msa_server"] = False
+                    else:
+                        payload["settings"].setdefault("allow_public_msa_server", True)
                 if isinstance(payload.get("config"), dict):
                     for section in ("screen", "structure", "complex"):
                         values = payload["config"].get(section)
                         if isinstance(values, dict):
-                            values["allow_public_msa_server"] = allowed
+                            if allowed is False:
+                                values["allow_public_msa_server"] = False
+                            else:
+                                values.setdefault("allow_public_msa_server", True)
         if request.url.path == "/api/batches/review":
             allowed = saved_msa_consent(request)
             if allowed is not None:
-                payload["api_consent"] = allowed
+                if allowed is False:
+                    payload["api_consent"] = False
+                else:
+                    payload.setdefault("api_consent", True)
         if request.url.path.startswith(("/api/jobs","/api/inputs","/api/batches","/api/diagnostics","/api/environment","/api/configs")):
             lab_payload_paths(request,payload)
         return payload
@@ -378,6 +388,27 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
             row = db.execute("SELECT allowed FROM msa_consent WHERE owner=?", (owner,)).fetchone()
         return bool(row[0]) if row else None
 
+    @contextlib.contextmanager
+    def msa_consent_lock(request):
+        owner = "user:" + request.state.researcher if request.state.researcher else "local"
+        path = manager.store.root / ("msa-consent-" + hashlib.sha256(owner.encode()).hexdigest() + ".lock")
+        fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, "a+") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    def require_current_msa_consent(request, config):
+        # A stored revocation also applies to reviews from another tab. Never
+        # rewrite their scientific config or an explicit per-input refusal.
+        if (saved_msa_consent(request) is False
+                and not config.get("run", {}).get("mock", False)
+                and any(config.get(section, {}).get("allow_public_msa_server") is True
+                        for section in ("screen", "structure", "complex"))):
+            raise ValueError("공용 MSA 전송 동의가 해제되어 있습니다. 환경·설치에서 다시 동의하거나 MSA 준비 방식을 캐시·로컬 검색으로 바꿔 입력을 다시 검토하세요.")
+
     @app.get("/api/msa-consent")
     def msa_consent_read(request: Request):
         return {"allowed": saved_msa_consent(request) is True, "scope": "account" if request.state.researcher else "installation"}
@@ -388,9 +419,12 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         if set(value) != {"allowed"} or type(value["allowed"]) is not bool:
             raise ValueError("MSA 전송 동의는 true/false로 지정하세요.")
         owner = "user:" + request.state.researcher if request.state.researcher else "local"
-        with manager.store.connect() as db:
-            db.execute("INSERT INTO msa_consent VALUES(?,?,?) ON CONFLICT(owner) DO UPDATE SET allowed=excluded.allowed,updated=excluded.updated", (owner, int(value["allowed"]), time.time()))
-        return msa_consent_read(request)
+        def save_checked():
+            with msa_consent_lock(request):
+                with manager.store.connect() as db:
+                    db.execute("INSERT INTO msa_consent VALUES(?,?,?) ON CONFLICT(owner) DO UPDATE SET allowed=excluded.allowed,updated=excluded.updated", (owner, int(value["allowed"]), time.time()))
+                return msa_consent_read(request)
+        return await asyncio.to_thread(save_checked)
 
     @app.get("/api/draft")
     async def draft_read(request: Request):
@@ -413,30 +447,35 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
 
     @app.get("/api/batches")
     def batch_list(request: Request):
-        return {"batches": batches.list(request.state.owner)}
+        return present_metadata({"batches": batches.list(request.state.owner)})
 
     @app.post("/api/batches/review")
     async def batch_review(request: Request):
         batch_manager = BatchManager(input_manager(request),manager) if request.state.researcher else batches
-        return await asyncio.to_thread(batch_manager.review, await body(request), researcher=request.state.researcher)
+        return present_metadata(await asyncio.to_thread(batch_manager.review, await body(request), researcher=request.state.researcher))
 
     @app.get("/api/batches/{identifier}")
     def batch_get(identifier: str, request: Request):
         batch = batches.get(identifier)
         if request.state.owner and batch.get("researcher") != request.state.owner:
             raise HTTPException(404)
-        return batch
+        return present_metadata(batch)
 
     @app.post("/api/batches/{identifier}/submit")
     async def batch_submit(identifier: str, request: Request):
         batch_manager = BatchManager(input_manager(request),manager) if request.state.researcher else batches
-        return await asyncio.to_thread(batch_manager.submit, identifier, await body(request),
-                                       researcher=request.state.researcher, legacy_inputs=inputs)
+        payload = await body(request)
+        def submit_checked():
+            with msa_consent_lock(request):
+                return batch_manager.submit(identifier, payload, researcher=request.state.researcher,
+                    legacy_inputs=inputs, authorize=lambda config: require_current_msa_consent(request, config))
+        result = await asyncio.to_thread(submit_checked)
+        return present_metadata(result)
 
     @app.post("/api/batches/{identifier}/cancel")
     async def batch_cancel(identifier: str, request: Request):
         payload = await body(request) if await request.body() else {}
-        return await asyncio.to_thread(batches.cancel, identifier, expected_cancel=payload.get("expected_cancel"), researcher=request.state.researcher)
+        return present_metadata(await asyncio.to_thread(batches.cancel, identifier, expected_cancel=payload.get("expected_cancel"), researcher=request.state.researcher))
 
     def effective(request, payload):
         cfg = payload.get("config", {})
@@ -745,15 +784,18 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
     def input_get(identifier: str, request: Request):
         return native(input_manager(request).get(identifier))
 
-    def present_job(record, *, compact=False):
+    def present_metadata(value):
         from ..utils.presentation import portable_metadata
+        return native(portable_metadata(value, root=workspace))
+
+    def present_job(record, *, compact=False):
         value = dict(record)
         if compact:
             keys = {"id", "kind", "name", "researcher", "state", "phase", "mode", "mock", "created", "updated", "started", "finished", "elapsed_seconds", "result_id", "can_resume", "progress", "eta"}
             value = {key: item for key, item in value.items() if key in keys}
             if record.get("diagnostics"):
                 value["diagnostics"] = {"ok": record["diagnostics"].get("ok")}
-        return native(portable_metadata(value, root=workspace))
+        return present_metadata(value)
 
     @app.get("/api/jobs")
     def job_list(request: Request, limit: int = 100, before: float | None = None, before_id: str | None = None, active: bool = False):
@@ -775,7 +817,14 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         payload.pop("researcher", None)
         if request.state.researcher:
             payload["researcher"] = request.state.researcher
-        return native(await asyncio.to_thread(manager.create, payload))
+        def create_checked():
+            with msa_consent_lock(request):
+                config = normalized_config(workspace, payload["config"])
+                if "mock" in payload:
+                    config["run"]["mock"] = payload["mock"]
+                require_current_msa_consent(request, config)
+                return manager.create(payload)
+        return present_job(await asyncio.to_thread(create_checked))
 
     @app.get("/api/jobs/{identifier}")
     def job_get(identifier: str, request: Request):
@@ -801,27 +850,33 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         if request.state.researcher:
             require_owner(request, await asyncio.to_thread(manager.store.get, identifier))
         payload = await body(request) if await request.body() else {}
-        return await asyncio.to_thread(manager.cancel, identifier, expected_cancel=payload.get("expected_cancel"))
+        return present_job(await asyncio.to_thread(manager.cancel, identifier, expected_cancel=payload.get("expected_cancel")))
 
     @app.post("/api/jobs/{identifier}/resume")
     async def job_resume(identifier: str, request: Request):
         if request.state.researcher:
             require_owner(request, await asyncio.to_thread(manager.store.get, identifier))
         payload = await body(request)
-        return await asyncio.to_thread(manager.resume, identifier, payload.get("additional_budget_seconds"))
+        def resume_checked():
+            with msa_consent_lock(request):
+                record = manager.store.get(identifier)
+                config = read_config_yaml(Path(record["config_path"]).read_text())
+                require_current_msa_consent(request, config)
+                return manager.resume(identifier, payload.get("additional_budget_seconds"))
+        return present_job(await asyncio.to_thread(resume_checked))
 
     @app.post("/api/diagnostics")
     async def diagnostics(request: Request):
         payload = effective(request, await body(request))
         payload["researcher"] = request.state.researcher
-        return native(await asyncio.to_thread(manager.create, payload, kind="diagnostics"))
+        return present_job(await asyncio.to_thread(manager.create, payload, kind="diagnostics"))
 
     @app.post("/api/environment/check")
     async def environment_check(request: Request):
         payload = effective(request, await body(request))
         payload["researcher"] = request.state.researcher
         payload["environment_only"] = True
-        return native(await asyncio.to_thread(manager.create, payload, kind="diagnostics"))
+        return present_job(await asyncio.to_thread(manager.create, payload, kind="diagnostics"))
 
     @app.post("/api/environment/status")
     async def environment_status(request: Request):
@@ -834,13 +889,13 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
 
     @app.get("/api/diagnostics")
     def diagnostic_list(request: Request):
-        return {"jobs": [job for job in manager.store.list(limit=100,researcher=request.state.owner) if job["kind"] == "diagnostics"]}
+        return {"jobs": [present_job(job) for job in manager.store.list(limit=100,researcher=request.state.owner) if job["kind"] == "diagnostics"]}
 
     @app.post("/api/setup")
     async def setup(request: Request):
         if request.state.researcher:
             raise HTTPException(403, "공유 설치는 서버 터미널에서 관리하세요. / Manage shared installations from the server terminal.")
-        return await asyncio.to_thread(manager.create, await body(request), kind="setup")
+        return present_job(await asyncio.to_thread(manager.create, await body(request), kind="setup"))
 
     @app.get("/api/results")
     def results_list(request: Request, limit: int = 25, cursor: str | None = None, search: str = "", mode: str = "", retention: str = "",
@@ -860,7 +915,7 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
                             manager.catalog.register(entry.name, entry.path, state="complete")
             page = manager.catalog.list(researcher=read_owner(request),limit=limit, search=search, mode=mode, retention=retention,
                                         sort=sort, descending=descending)
-        return native({"results": page["items"], "next_cursor": page["next_cursor"]})
+        return present_metadata({"results": page["items"], "next_cursor": page["next_cursor"]})
 
     @app.get("/api/lab/usage")
     def lab_usage(request: Request, researcher: str="", before: float | None=None, before_id: str="", limit: int=25):
@@ -871,7 +926,7 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
     @app.get("/api/result-catalog")
     def result_catalog(request: Request, researcher: str = "", limit: int = 25, cursor: str | None = None, search: str = "", mode: str = "", retention: str = "",
                        sort: str = "created", descending: bool = True):
-        return native(manager.catalog.list(limit=limit, cursor=cursor, search=search, mode=mode, retention=retention,
+        return present_metadata(manager.catalog.list(limit=limit, cursor=cursor, search=search, mode=mode, retention=retention,
                                            sort=sort, descending=descending, researcher=read_owner(request,researcher)))
 
     @app.get("/api/candidate-catalog")

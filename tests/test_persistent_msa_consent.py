@@ -8,7 +8,7 @@ from nanocofold.platform.app import create_app
 from nanocofold.platform.lab import LabAccounts
 
 
-def test_local_preference_survives_restart_and_overrides_stale_input(tmp_path, monkeypatch):
+def test_local_preference_survives_restart_and_respects_explicit_refusal(tmp_path, monkeypatch):
     from nanocofold.platform.inputs import InputManager
     monkeypatch.setattr(InputManager, 'review', lambda self, payload: payload)
     monkeypatch.setattr(InputManager, 'complex', lambda self, payload: payload)
@@ -23,7 +23,9 @@ def test_local_preference_survives_restart_and_overrides_stale_input(tmp_path, m
             assert (await client.get('/api/session')).json()['public_msa_consent'] is True
             payload={'settings':{'msa_source':'cache','allow_public_msa_server':False},'config':{'screen':{'colabfold':{'msa_source':'local_mmseqs2'}}}}
             result=(await client.post('/api/inputs/review',json=payload)).json()
-            assert result['settings']['allow_public_msa_server'] is True
+            assert result['settings']['allow_public_msa_server'] is False
+            inherited=(await client.post('/api/inputs/review',json={'settings':{}})).json()
+            assert inherited['settings']['allow_public_msa_server'] is True
             assert result['settings']['msa_source']=='cache'
             assert result['config']['screen']['colabfold']['msa_source']=='local_mmseqs2'
             if not first:
@@ -51,7 +53,8 @@ def test_account_consent_is_shared_by_tabs_but_not_researchers(tmp_path,monkeypa
             await a.post('/api/msa-consent',json={'allowed':True})
             assert (await a.get('/api/msa-consent')).json()=={'allowed':True,'scope':'account'}
             assert (await b.get('/api/msa-consent')).json()=={'allowed':False,'scope':'account'}
-            assert (await a.post('/api/batches/review',json={'api_consent':False})).json()['api_consent'] is True
+            assert (await a.post('/api/batches/review',json={'api_consent':False})).json()['api_consent'] is False
+            assert (await a.post('/api/batches/review',json={})).json()['api_consent'] is True
             await a.post('/api/msa-consent',json={'allowed':False})
             assert (await a.post('/api/batches/review',json={'api_consent':True})).json()['api_consent'] is False
     try: asyncio.run(check())

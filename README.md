@@ -273,7 +273,7 @@ For **Design new nanobodies**, the small starter preset requests one backbone fr
 | Seed | Random starting value, separate from candidate counts |
 | Final selection limit | Maximum selected records, applied per engine in a multi-engine comparison |
 
-In four-engine nanobody design, the **RFantibody follow-up candidate limit** applies only to RFantibody candidates. BoltzGen uses its own backbone and sequence settings. For example, 1,000 backbones per generator, one sequence per backbone and an RFantibody follow-up limit of 500 give up to 1,500 candidates × 4 engines = 6,000 models. Eight models is a starter setting, not the platform limit. Check **Planned models** before running.
+In four-engine nanobody design, the **RFantibody follow-up candidate limit** applies only to RFantibody candidates. BoltzGen has a separate sequences-per-backbone setting. For example, 1,000 backbones per generator, one sequence per backbone and an RFantibody follow-up limit of 500 give up to 1,500 candidates × 4 engines = 6,000 models. Eight models is a starter setting, not the platform limit. Check **Planned models** before running. The 1,000-backbone example applies to local installations. The hosted site accepts 1–50 backbones per generator.
 
 Unique sequences and successful, failed or unevaluated models are counted in the results. Blank overrides keep the preset or imported values shown on screen. Large jobs ask for a size confirmation after **Run analysis**; cancelling submits no job and keeps your input.
 
@@ -409,6 +409,10 @@ Select candidates by reviewing engine-specific scores, ipTM, interface pLDDT, in
 | A failed, interrupted or cancelled job offers **Verify and resume** | Resolve the logged cause, then use that action on the **same job**. Saved inputs/configuration and process ownership are checked before restarting. |
 | **Time budget exhausted** | Enter additional minutes when prompted, then **Verify and resume**. |
 | Resume is unavailable | Read the displayed reason and log, then contact the administrator. |
+
+**Successful computation and eligible candidates are different counts.** Four prediction engines evaluate the same candidate sequences; structures, metrics and selection ranks can differ. New sequences are made during variant generation or new design. The same WT, mutation settings and generation Seed produce the same random candidates. Change the generation Seed, for example from 42 to 43, to explore other candidates. Exhaustive single-substitution DMS can contain the same variants regardless of Seed.
+
+If a job immediately shows **Previous result reused**, no new computation ran. Identical inputs, settings and Seed opened the saved result. Select **Run settings → Recompute without reusing previous results** to calculate again. Change the **Variant generation Seed** as well for different random variant candidates. Renaming the analysis still reuses its result.
 
 While cancelling, NanoCoFold stops the worker and its tools and releases their resources. Saved results remain available; unfinished models may be recalculated when resumed. In a batch, confirm cancellation of one item or all unfinished jobs. A previously submitted search on a shared local MSA service may continue to populate its shared cache; cancelling an analysis does not stop other users' searches.
 

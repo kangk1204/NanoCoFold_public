@@ -190,6 +190,8 @@ def predict_complexes(
         if records and not dry_run:
             # Preserve validated preceding queries even when the next tool fails.
             write_csv(work_dir / "predictions.csv", _predictions_manifest_frame(pd.DataFrame(records), run_root))
+            from .utils.predictions import record_manifest
+            record_manifest(work_dir / "predictions.csv")
         candidate_id = seq_utils.validate_candidate_id(str(row[id_column]))
         sequence = str(row[sequence_column])
         candidate_dir = work_dir / candidate_id
@@ -291,6 +293,8 @@ def predict_complexes(
         if predictions.empty:
             predictions = pd.DataFrame(columns=[id_column, "pred_dir", "engine", "target_chain", "binder_chain"])
         write_csv(work_dir / "predictions.csv", _predictions_manifest_frame(predictions, run_root))
+        from .utils.predictions import record_manifest
+        record_manifest(work_dir / "predictions.csv")
     if failures:
         raise RuntimeError(f"예측 {len(failures)}건 실패. 완료된 {len(records)}건은 보존했습니다. prediction_failures.json을 확인하고 재개하세요. 첫 오류: {failures[0]['error']}")
     return predictions

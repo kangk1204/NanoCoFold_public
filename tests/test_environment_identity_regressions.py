@@ -88,7 +88,7 @@ def test_complex_environment_mode_and_default_engines_normalize_before_validatio
         check = client.post("/api/environment/check", json=payload, headers=headers)
         assert check.status_code == 200, check.text
         assert check.json()["environment_scope"] == status.json()["scope"]
-        snapshot = load_config(check.json()["config_path"])
+        snapshot = load_config(tmp_path / check.json()["config_path"])
         assert snapshot["complex"]["comparison_engines"] == expected
         assert snapshot["screen"]["comparison"]["enabled"] is False
     assert payload == original

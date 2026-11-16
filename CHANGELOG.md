@@ -3,6 +3,16 @@
 영어를 README와 웹 플랫폼의 기본 언어로 사용합니다. README 상단에서 한국어판으로 이동할 수 있고, 플랫폼 및 새 오프라인 보고서는 English/한국어를 즉시 전환하고 선택을 저장합니다. 입력·후보 ID·서열·수치·원본 로그·설정은 번역하거나 변경하지 않습니다. 언어 전환 시 사본 수 입력·체인 체크박스·선택한 모델과 PAE를 유지합니다. (2026-10-15)
 
 
+## 0.4.8rc13 — 2026-11-16
+
+MSA approval keeps the selected checkbox state while saving. Revocation blocks previously reviewed submissions and resumes, and imported refusals remain explicit. Score-only runs use recorded prediction stages and hashes rather than old folders selected by a new option. API responses use workspace-relative paths. The bilingual collaborator guide distinguishes result-data ZIPs from the separate offline HTML. Browser release checks and offline-template regeneration are part of the release procedure.
+
+Random mutation settings now show a generation Seed. The run screen explains result reuse and keeps the recompute choice visible. Completed model counts are distinct from eligible candidate counts. All prediction engines evaluate the same candidate sequences; their structures, scores and selected candidate lists can differ.
+
+MSA 동의 저장 중 체크 상태를 유지합니다. 동의 해제 후에는 기존 검토본도 제출·재개할 수 없으며, 가져온 설정의 명시적 거부는 보존합니다. 점수 재계산은 실제 예측 단계와 해시 기록을 사용해 이전 단계의 결과가 섞이지 않도록 했습니다. API 응답은 작업 공간의 상대 경로를 사용합니다. 한영 안내문의 결과 ZIP·오프라인 HTML 경로를 정정하고 브라우저 검사와 템플릿 일치 검사를 릴리스 절차에 포함했습니다. 기존 결과와 선별 기준은 변경하지 않습니다.
+
+무작위 변이 설정에 변이 생성 Seed를 표시합니다. 실행 화면에서 결과 재사용과 새 계산을 선택할 수 있으며, 모델 계산 완료 수와 적격 후보 수를 구분해 안내합니다. 각 예측 엔진은 같은 후보 서열을 평가하며, 구조·점수·선별 목록은 달라질 수 있습니다.
+
 ## v0.4.8-install.13 — 2026-11-14
 
 Results opened from the database now remain selected even when older than the 25 most recent runs. Opening a different analysis clears the previous candidate filters. The input review shows the comparison workflow’s selected MSA source. Exported reports retain the chosen language on another computer.

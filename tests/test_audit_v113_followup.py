@@ -64,7 +64,7 @@ def test_rescore_reads_only_current_mode_and_enabled_rescore(tmp_path,mode,activ
     assert row['seed']==7 and row['pred_dir']==str(tmp_path/active/'v')
     if mode in {'design','screen'}:
         cfg['screen']['boltz2_rescore_top']=1
-        assert cli._load_prediction_manifests(tmp_path,cfg).iloc[0]['engine']=='boltz2'
+        assert cli._load_prediction_manifests(tmp_path,cfg).iloc[0]['engine']=='chai1'
     assert all(hashlib.sha256(p.read_bytes()).hexdigest()==h for p,h in original.items())
 
 

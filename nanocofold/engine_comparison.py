@@ -18,6 +18,7 @@ from . import provenance
 from .config import cfg_get, cfg_seed, dump_resolved, resolve_path
 from .utils import seq, shell
 from .utils.atomic import write_csv
+from .utils.predictions import record_manifest
 
 LEGACY_ENGINES = ("colabfold", "boltz2", "chai1")
 ENGINES = (*LEGACY_ENGINES, "opendde")
@@ -442,6 +443,8 @@ def run(cfg, run_dir, state, target, candidates, cdr_ranges=None, *, predict, fi
                     frame = pd.DataFrame(all_rows)
                     write_csv(root / "comparison_candidates.csv", frame)
                     write_csv(root / "predictions.csv", _predictions_manifest_frame(frame, Path(run_dir)))
+                    record_manifest(root / "comparison_candidates.csv")
+                    record_manifest(root / "predictions.csv")
                     snapshot["status"] = "failed"
                     snapshot["rows"].append({"id": identifier, "source_sequence_id": source_id, "engine": engine,
                                              "status": "failed", "error": row["prediction_error"]})
@@ -463,6 +466,8 @@ def run(cfg, run_dir, state, target, candidates, cdr_ranges=None, *, predict, fi
             write_csv(root / "comparison_candidates.csv", frame)
             # This manifest is intentionally complete across engines, including failures.
             write_csv(root / "predictions.csv", _predictions_manifest_frame(frame, Path(run_dir)))
+            record_manifest(root / "comparison_candidates.csv")
+            record_manifest(root / "predictions.csv")
             _save(root / "comparison_status.json", snapshot)
     snapshot["status"] = "partial_failure" if any(row["prediction_status"] == "failed" for row in all_rows) else "complete"
     _save(root / "comparison_status.json", snapshot)

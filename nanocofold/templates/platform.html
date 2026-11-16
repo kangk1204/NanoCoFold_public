@@ -304,6 +304,10 @@
                 <input id="mutation-min" type="number" min="1" max="50" step="1" placeholder="비우면 현재 설정 유지" />
                 <label for="mutation-max">후보당 최대 치환 잔기 수</label>
                 <input id="mutation-max" type="number" min="1" max="50" step="1" placeholder="비우면 현재 설정 유지" />
+                <label for="mutation-seed">변이 생성 Seed</label>
+                <input id="mutation-seed" type="number" min="0" max="2147483647" step="1" placeholder="비우면 현재 설정 유지" aria-describedby="mutation-seed-current mutation-seed-help" />
+                <p id="mutation-seed-current" role="status" aria-live="polite"></p>
+                <p id="mutation-seed-help" class="muted">같은 WT·변이 설정·생성 Seed는 같은 변이 후보를 만듭니다. 다른 후보를 탐색하려면 이 값을 바꾸세요. 비우면 현재 설정을 유지합니다.</p>
                 <p class="muted">CDR 안에서만 치환하며 프레임워크와 Cys 보호 설정을 유지합니다. 실제 분석은 생성한 변이를 모두 평가하고 ESM·AntiFold 사전 선별은 생략합니다.</p>
               <p class="muted">변이 수는 중복 없는 서열 수입니다. 치환 가능한 위치와 치환 개수에 따라 가능한 수가 달라집니다. 요청이 가능한 수를 넘으면 설정을 조정해야 합니다.</p>
               </div>
@@ -323,7 +327,7 @@
             ><label for="seed">Seed</label
             ><input id="seed" type="number" value="42" min="0" step="1" aria-describedby="seed-current seed-help" />
             <p id="seed-current" aria-live="polite"></p>
-            <p id="seed-help" class="muted">Seed는 난수 초기값입니다. 후보 수가 아닙니다. 엔진별로 가져온 개별 설정은 유지합니다.</p><label
+            <p id="seed-help" class="muted">Seed는 난수 초기값입니다. 후보 수가 아닙니다. 별도 변이 생성 Seed가 없으면 이 값을 사용합니다. 엔진별로 가져온 개별 설정은 유지합니다.</p><label
               for="budget"
               >시간 한도 (분, 비우면 없음)</label
             ><input id="budget" type="number" min="1" max="10080" step="1" placeholder="예: 120" />

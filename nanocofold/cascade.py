@@ -699,6 +699,8 @@ def run(cfg, run_dir, state, target, candidates, cdr_ranges, *, predict, score, 
     score_dir = run_dir / "03_score"
     score_dir.mkdir(parents=True, exist_ok=True)
     write_csv(score_dir / "cascade_candidates.csv", candidates, root=run_dir)
+    from .utils.predictions import record_manifest
+    record_manifest(score_dir / "cascade_candidates.csv")
     controls = control_ids(candidates, id_column)
     if cfg_get(cfg, "screen.cascade.calibrate_wt", False) and controls:
         state.begin_phase("runtime_calibration")

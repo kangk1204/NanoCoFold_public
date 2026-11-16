@@ -115,7 +115,7 @@ GitHub's **Download ZIP** contains the source for installation. The sample ZIPs 
 | Individual screen, mature, or design sample ZIP | `report.html` |
 | Complex sample ZIP | Open `START_HERE.html` to read the mock-run refusal record |
 | Shareable report ZIP downloaded after analysis | `report.html` |
-| Complete results ZIP from the hosted site | Open `exploration/report_offline.html` to explore results. The `original/` folder retains the original files. |
+| Complete results ZIP from the hosted site | `exploration/` contains exported data; `original/` retains originals. Download **Offline HTML** separately to explore results. |
 
 If you received the separately supplied sample archives described above, those archives are CPU/mock examples. No precomputed result ZIP is included in the GitHub source download. Other reports may contain real GPU results; check each report’s recorded execution mode and provenance. Use **Language** at the top of the report to switch between English and Korean. Keep the extracted folder structure intact, including the files alongside the report. Saved reports also open in web browsers on Windows and macOS.
 

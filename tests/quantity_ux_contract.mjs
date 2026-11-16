@@ -15,6 +15,16 @@ function fixture(){
   vm.runInContext(source.slice(source.indexOf('function invalidateInput('),source.indexOf('function chainLabel(')),c);
  return{c,get,writes,actions};
 }
+test('variant Seed is explicit, accepts zero and preserves imported values until edited',()=>{
+ const {c,get}=fixture();get('mode').value='mature';get('mutation-strategy').value='random';
+ get('mutation-count').value='100';get('mutation-min').value='2';get('mutation-max').value='2';
+ const original={run:{seed:43},mature:{library:{strategy:'random',size:101,seed:42}}};
+ assert.equal(c.matureInputSettings(original).mature.library.seed,42);
+ get('mutation-seed').value='43';assert.equal(c.matureInputSettings(original).mature.library.seed,43);
+ get('mutation-seed').value='0';assert.equal(c.matureInputSettings(original).mature.library.seed,0);
+ for(const bad of ['-1','1.5','2147483648']){get('mutation-seed').value=bad;assert.throws(()=>c.matureInputSettings(original),/Seed/);}
+ assert.equal(original.mature.library.seed,42);
+});
 test('native mutation range controls map CDR3 and custom masks without changing CDR annotations',()=>{
  const {c,get}=fixture();get('mode').value='mature';get('mutation-strategy').value='random';
  get('mutation-count').value='100';get('mutation-min').value='2';get('mutation-max').value='2';

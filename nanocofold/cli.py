@@ -4,6 +4,7 @@ import argparse
 import copy
 import contextlib
 import contextvars
+import hashlib
 import json
 import math
 import subprocess
@@ -500,6 +501,13 @@ def _execute_command(args) -> int:
                 print(f"[전달용 보고서] {delivery} · {delivery.stat().st_size / 1024**2:.2f} MiB", flush=True)
             return code
         started = time.time()
+        if not dry and args.command in {"run", "screen", "mature", "design", "complex"}:
+            from .utils.predictions import prediction_attempt
+            execution_context.enter_context(prediction_attempt(run_dir, {
+                "mode": cfg_get(cfg, "run.mode"),
+                "cascade": bool(cfg_get(cfg, "screen.cascade.enabled", False)),
+                "comparison": bool(cfg_get(cfg, "screen.comparison.enabled", False)),
+            }))
         previous_execution = dict(state.data.get("execution", {}))
         if previous_execution and not dry:
             state.data["previous_execution"] = previous_execution
@@ -513,7 +521,7 @@ def _execute_command(args) -> int:
             if not dry:
                 state.data["execution"] = {"state": "running", "started": started, "command": args.command,
                                            "completed_phases": []}
-                state.data.setdefault("attempts", []).append({"command": args.command, "started": started, "application_version": __version__, "config_sha256": __import__("hashlib").sha256(json.dumps(cfg,sort_keys=True,default=str).encode()).hexdigest()})
+                state.data.setdefault("attempts", []).append({"command": args.command, "started": started, "application_version": __version__, "config_sha256": __import__("hashlib").sha256(json.dumps(cfg,sort_keys=True,default=str).encode()).hexdigest(), "stages_used": []})
                 state.data["current_phase"] = "preflight"
                 state.save()
             if args.command in {"run", "complex", "design", "screen", "mature"} and not (_is_mock(cfg) or dry):
@@ -528,6 +536,7 @@ def _execute_command(args) -> int:
             code = functions[args.command](args)
             if not dry:
                 state = RunState(run_dir)
+                _persist_prediction_stages(state, cfg)
                 will_deliver = ("final" in state.data.get("phases", {}) and
                     args.command in {"run", "complex", "screen", "mature", "score", "report"})
                 if will_deliver:
@@ -564,6 +573,7 @@ def _execute_command(args) -> int:
         except BaseException as exc:
             if not dry:
                 state = RunState(run_dir)
+                _persist_prediction_stages(state, cfg)
                 from .utils.shell import ExecutionCancelled, ExecutionBudgetExceeded
                 status = ("cancelled" if isinstance(exc, (KeyboardInterrupt, ExecutionCancelled)) else
                           "budget_exhausted" if isinstance(exc, ExecutionBudgetExceeded) else "failed")
@@ -581,6 +591,23 @@ def _execute_command(args) -> int:
 
 def _is_mock(cfg: dict) -> bool:
     return bool(cfg_get(cfg, "run.mock", False))
+
+
+def _persist_prediction_stages(state, cfg):
+    from .utils.predictions import attempt_manifests, attempt_configuration
+    records = attempt_manifests(state.run_dir)
+    if records is None:
+        return
+    state.data["prediction_stages"] = {
+        "schema_version": 1, "mode": cfg_get(cfg, "run.mode"),
+        "cascade": bool(cfg_get(cfg, "screen.cascade.enabled", False)),
+        "comparison": bool(cfg_get(cfg, "screen.comparison.enabled", False)),
+        "manifests": records,
+    }
+    state.data["prediction_stages"].update(attempt_configuration(state.run_dir) or {})
+    if state.data.get("attempts"):
+        state.data["attempts"][-1]["stages_used"] = records
+    state.save()
 
 
 def _is_dry_run(cfg: dict) -> bool:
@@ -1278,6 +1305,7 @@ def _finalize(
     *, publish_report: bool = True,
 ) -> dict:
     """스코어링 결과 병합 → 개발가능성 → 랭킹/선별 → 합성시트 → 리포트."""
+    _persist_prediction_stages(state, cfg)
     score_dir = run_dir / "03_score"
     score_dir.mkdir(parents=True, exist_ok=True)
     final_dir = run_dir / "05_final"
@@ -2029,6 +2057,19 @@ def cmd_score(args) -> int:
     target = state.get_phase("target")
     if not target:
         raise RuntimeError("이 실행에 target 단계가 없습니다. 먼저 prepare/run 을 수행하세요.")
+    recorded_stages = state.data.get("prediction_stages")
+    if recorded_stages is not None and any(
+            recorded_stages.get(key) != value for key, value in {
+                "mode": cfg_get(cfg, "run.mode"),
+                "cascade": bool(cfg_get(cfg, "screen.cascade.enabled", False)),
+                "comparison": bool(cfg_get(cfg, "screen.comparison.enabled", False)),
+            }.items()):
+        raise ValueError("예측 단계 구성이 기록과 다릅니다. score는 새 엔진을 실행하지 않습니다. 변경한 설정으로 분석을 먼저 실행하세요.")
+    if recorded_stages is not None:
+        _load_prediction_manifests(run_dir, cfg)  # Verify every recorded stage before publication.
+        if state.data.get("attempts"):
+            state.data["attempts"][-1]["stages_used"] = recorded_stages["manifests"]
+            state.save()
     from . import cascade
     if cfg_get(cfg, "screen.cascade.enabled", False) and (run_dir / "03_score" / "cascade_candidates.csv").exists():
         mature_state = state.get_phase("mature")
@@ -2056,6 +2097,9 @@ def cmd_score(args) -> int:
 
 def _load_candidates(cfg, run_dir: Path, state: RunState) -> pd.DataFrame | None:
     predictions = _load_prediction_manifests(run_dir, cfg)
+    if state.data.get("attempts"):
+        state.data["attempts"][-1]["stages_used"] = predictions.attrs.get("stages_used", [])
+        state.save()
     design_state = state.get_phase("design") if cfg_get(cfg, "run.mode") == "design" else {}
     if design_state and (run_dir / "02_design" / "design_candidates.csv").exists():
         frame = pd.read_csv(run_dir / "02_design" / "design_candidates.csv", dtype={"design_id": str})
@@ -2115,14 +2159,37 @@ def _resolve_prediction_paths(frame: pd.DataFrame, run_dir: Path) -> pd.DataFram
 def _load_prediction_manifests(run_dir: Path, cfg: dict | None = None) -> pd.DataFrame:
     """모든 predictions.csv 를 읽어 후보 ID별로 중복 제거한다 (boltz2 우선)."""
     frames: list[pd.DataFrame] = []
+    stages_used = []
     from .utils.predictions import current_manifests
+    recorded = RunState(run_dir).data.get("prediction_stages") if (run_dir / "run_state.json").is_file() else None
+    used = None
+    if recorded is not None:
+        if not isinstance(recorded, dict) or not isinstance(recorded.get("manifests"), list):
+            raise ValueError("예측 단계 기록이 손상되었습니다. 원본 상태 파일을 복구하세요.")
+        used = {}
+        for item in recorded["manifests"]:
+            if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+                raise ValueError("예측 단계 기록이 손상되었습니다. 원본 상태 파일을 복구하세요.")
+            relative = Path(item["path"])
+            if relative.is_absolute() or ".." in relative.parts:
+                raise ValueError("예측 단계 기록은 실행 폴더 안의 상대 경로여야 합니다.")
+            path = resolve_run_artifact(run_dir, item["path"])
+            if (path is None or not path.resolve().is_relative_to(run_dir.resolve())
+                    or not path.is_file() or path.is_symlink()
+                    or hashlib.sha256(path.read_bytes()).hexdigest() != item.get("sha256")):
+                raise ValueError("기록된 예측 목록이 없거나 변경됐습니다. 원본을 복구하거나 분석을 재개하세요.")
+            used[path.resolve()] = item
     for manifest in sorted(current_manifests(run_dir)):
-        if cfg is not None and not cfg_get(cfg, "screen.cascade.enabled", False) and not cfg_get(cfg, "screen.comparison.enabled", False):
+        if used is not None:
+            if manifest.resolve() not in used:
+                continue
+        elif cfg is not None and not cfg_get(cfg, "screen.cascade.enabled", False) and not cfg_get(cfg, "screen.comparison.enabled", False):
             mode = cfg_get(cfg, "run.mode")
             stage = {"design": "02b_tier2", "mature": "02b_mature_complex"}.get(mode, "02_screen")
             allowed = {run_dir / stage / "predictions.csv"}
-            if mode in {"design", "screen"} and cfg_get(cfg, "screen.boltz2_rescore_top", 0) > 0:
-                allowed.add(run_dir / "02c_boltz2/predictions.csv")
+            # A score-only option cannot establish that an old rescore stage
+            # belonged to the current prediction. Legacy primary stages remain
+            # readable; additional stages need an actual attempt receipt.
             if manifest not in allowed:
                 continue
         try:
@@ -2134,6 +2201,7 @@ def _load_prediction_manifests(run_dir: Path, cfg: dict | None = None) -> pd.Dat
         if "pred_dir" in frame.columns:
             frame = frame[frame["pred_dir"].notna()]
             frames.append(frame)
+            stages_used.append({"path": manifest.relative_to(run_dir).as_posix(), "sha256": hashlib.sha256(manifest.read_bytes()).hexdigest()})
     if not frames:
         return pd.DataFrame()
     combined = pd.concat(frames, ignore_index=True)
@@ -2141,7 +2209,9 @@ def _load_prediction_manifests(run_dir: Path, cfg: dict | None = None) -> pd.Dat
     combined["_priority"] = combined.get("engine", pd.Series(index=combined.index)).map(priority).fillna(9)
     combined = combined.sort_values("_priority").drop_duplicates(subset=["design_id"], keep="first")
     combined = combined.drop(columns=["_priority"])
-    return _resolve_prediction_paths(combined, run_dir)
+    result = _resolve_prediction_paths(combined, run_dir)
+    result.attrs["stages_used"] = stages_used
+    return result
 
 
 def _resolve_prediction_dir(candidate_dir: Path) -> Path:

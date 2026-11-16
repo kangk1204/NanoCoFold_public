@@ -1,6 +1,7 @@
 """Build the self-contained explorer template from the same browser UI assets."""
 from pathlib import Path
 import re
+import sys
 
 root = Path(__file__).resolve().parents[1] / "nanocofold/templates"
 document = (root / "platform.html").read_text()
@@ -14,5 +15,12 @@ guide = (root / "metric-guide.js").read_text()
 i18n = (root / "platform-i18n.js").read_text()
 molstar_adapter = (root / "result-molstar.js").read_text()
 result = '''<!doctype html><html lang="en" data-renderer-version="nanocofold-results-v3"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NanoCoFold 오프라인 결과</title><style>__MOLSTAR_CSS__</style><style>''' + css + '''</style></head><body><header class="offline-header"><div class="offline-brand"><strong>NanoCoFold · 오프라인 결과 탐색</strong><span>전체 후보 · 관측 · 구조 · 출처 포함</span></div><div class="language-switch"><label for="language-select">Language</label> <select id="language-select" disabled aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div></header><main><div id="notice" role="status" aria-live="polite" hidden></div>''' + section + '''</main><script id="result-data" type="application/json">__RESULT_DATA__</script><script>window.NANOCOFOLD_OFFLINE=JSON.parse(document.getElementById("result-data").textContent);document.getElementById("result-data").textContent="";</script><script>__PLOTLY_JS__</script><script>__3DMOL_JS__</script><script>__MOLSTAR_JS__</script><script>''' + molstar_adapter + '</script><script>' + i18n + '</script><script data-ncf-metric-guide>' + guide + '</script><script>' + script + '</script></body></html>'
-(root / "platform_offline.html").write_text(result)
-print("Built platform_offline.html from shared UI")
+if sys.argv[1:] == ["--check"]:
+    if (root / "platform_offline.html").read_text() != result:
+        raise SystemExit("platform_offline.html is stale; run python scripts/build_platform_offline.py")
+    print("platform_offline.html matches shared UI")
+elif sys.argv[1:]:
+    raise SystemExit("Usage: build_platform_offline.py [--check]")
+else:
+    (root / "platform_offline.html").write_text(result)
+    print("Built platform_offline.html from shared UI")

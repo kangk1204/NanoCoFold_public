@@ -12,6 +12,78 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 @pytest.mark.skipif(os.environ.get("NANOCOFOLD_BROWSER_TEST") != "1",reason="Real Chromium UI gate")
+@pytest.mark.parametrize('language',['ko','en'])
+@pytest.mark.parametrize('fresh',[False,True])
+def test_variant_seed_and_visible_recompute_choice_reach_the_reviewed_request(supplied_server,language,fresh):
+    from playwright.sync_api import expect,sync_playwright
+    _,url=supplied_server;submitted=[];jobs=[]
+    def route_api(route):
+        path=urlsplit(route.request.url).path.removeprefix('/api/')
+        if path=='environment/status':route.fulfill(json={'ready':True,'reason':'passed'});return
+        if path=='jobs' and route.request.method=='POST':
+            submitted.append(route.request.post_data_json)
+            job={'id':'reuse-ui-fixture','name':'Synthetic UI only','kind':'analysis','mode':'mature','state':'running' if fresh else 'complete',
+                'phase':'screen' if fresh else 'reused','progress':{'completed':0,'total':None},'elapsed_seconds':0,
+                'reused_result_id':None if fresh else 'prior-fixture','source_elapsed_seconds':123,'mock':False,'result_id':None}
+            jobs.append(job);route.fulfill(json=job);return
+        if path=='jobs':route.fulfill(json={'jobs':jobs});return
+        if path.startswith('jobs/'):
+            route.fulfill(json={'text':'UI fixture only','next_offset':0} if path.endswith('/logs') else jobs[0]);return
+        route.continue_()
+    with sync_playwright() as pw:
+        browser=pw.chromium.launch();page=browser.new_page(viewport={'width':1366,'height':1000})
+        page.on('dialog',lambda dialog:dialog.accept())
+        page.route('**/api/**',route_api)
+        page.goto(url+'?lang='+language);expect(page.locator('body')).to_have_attribute('data-startup','ready')
+        page.locator('[data-purpose="mature"]').click() if page.locator('[data-purpose="mature"]').count() else page.locator('.novice-purpose-choice').nth(3).click()
+        page.locator('#load-tutorial').click();page.locator('#novice-next').click()
+        page.locator('#mutation-strategy').select_option('random')
+        for field,value in [('mutation-count','100'),('mutation-min','2'),('mutation-max','2'),('mutation-seed','43')]:page.locator('#'+field).fill(value)
+        page.locator('#mutation-region').select_option('cdr3');page.locator('#novice-msa').select_option('cache')
+        expect(page.locator('#mutation-seed-current')).to_contain_text('43')
+        force=page.locator('#force-rerun');expect(force).to_be_visible();force.set_checked(fresh)
+        page.locator('#novice-next').click();page.locator('#review-input').click()
+        expect(page.locator('#start-job')).to_be_enabled()
+        cfg=json.loads(page.locator('#resolved-config').text_content())
+        assert cfg['mature']['library']['seed']==43 and cfg['run']['seed']==42
+        page.locator('#start-job').click();expect(page.locator('#view-jobs')).to_be_visible()
+        assert len(submitted)==1 and submitted[0]['reuse_results'] is (not fresh)
+        if not fresh:
+            expect(page.locator('#job-detail')).to_contain_text('기존 결과 재사용' if language=='ko' else 'Previous result reused')
+            expect(page.locator('#job-detail')).to_contain_text('새 계산 없음' if language=='ko' else 'No new computation')
+            expect(page.locator('#job-detail')).not_to_contain_text('0/미기록')
+        browser.close()
+
+
+@pytest.mark.skipif(os.environ.get("NANOCOFOLD_BROWSER_TEST") != "1",reason="Real Chromium UI gate")
+def test_consent_keeps_requested_value_during_slow_save_and_reverts_on_failure(supplied_server):
+    from playwright.sync_api import expect,sync_playwright
+    _,url=supplied_server
+    with sync_playwright() as pw:
+        browser=pw.chromium.launch()
+        page=browser.new_page();pending=[]
+        def hold(route):
+            if route.request.method=='POST':pending.append(route)
+            else:route.continue_()
+        page.route('**/api/msa-consent',hold)
+        page.goto(url+'?lang=en')
+        expect(page.locator('body')).to_have_attribute('data-startup','ready')
+        page.locator('#open-environment').click()
+        consent=page.locator('#saved-msa-consent')
+        consent.check();expect(consent).to_be_checked();expect(consent).to_be_disabled()
+        assert len(pending)==1
+        pending.pop().fulfill(status=500,json={'detail':'Controlled save failure'})
+        expect(consent).to_be_enabled();expect(consent).not_to_be_checked()
+        consent.check();expect(consent).to_be_checked();expect(consent).to_be_disabled()
+        pending.pop().fulfill(json={'allowed':True,'scope':'installation'})
+        expect(consent).to_be_enabled();expect(consent).to_be_checked()
+        consent.uncheck();expect(consent).not_to_be_checked();expect(consent).to_be_disabled()
+        pending.pop().fulfill(json={'allowed':False,'scope':'installation'})
+        expect(consent).to_be_enabled();expect(consent).not_to_be_checked()
+        browser.close()
+
+
+@pytest.mark.skipif(os.environ.get("NANOCOFOLD_BROWSER_TEST") != "1",reason="Real Chromium UI gate")
 @pytest.mark.parametrize("language",["ko","en"])
 def test_environment_once_then_review_and_explicit_analysis(supplied_server,language):
     from playwright.sync_api import expect, sync_playwright
@@ -45,7 +117,7 @@ def test_environment_once_then_review_and_explicit_analysis(supplied_server,lang
         page.route("**/api/**",route_api);page.on("pageerror",lambda error:errors.append(str(error)))
         page.goto(url);expect(page.locator("body")).to_have_attribute("data-startup","ready")
         page.locator("#open-environment").click()
-        # The server is shared by both languages; reset only this test's saved preference.
+        # Each language has its own installation; revocation is tested below.
         saved_consent = page.locator("#saved-msa-consent")
         saved_consent.uncheck()
         expect(saved_consent).to_be_enabled()
@@ -66,7 +138,7 @@ def test_environment_once_then_review_and_explicit_analysis(supplied_server,lang
         expect(page.locator("#msa-transfer-note")).to_contain_text("캐시" if language=="ko" else "cache")
         msa.select_option("local_mmseqs2")
         expect(page.locator("#msa-transfer-note")).to_contain_text("데이터베이스" if language=="ko" else "database")
-        msa.select_option("public_api");consent.check();page.locator("#novice-next").click()
+        msa.select_option("public_api");consent.check();expect(consent).to_be_enabled();page.locator("#novice-next").click()
         page.locator("#review-input").click()
         expect(page.locator("#start-job")).to_be_enabled()
         assert posts.count("environment/check")==1 and "jobs" not in posts

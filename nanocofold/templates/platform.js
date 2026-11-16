@@ -48,6 +48,7 @@ const offline = Boolean(window.NANOCOFOLD_OFFLINE);
 const state = {
   publicMsaConsent: false,
   msaConsentSaving: false,
+  msaConsentPending: false,
   msaConsentRequest: 0,
   input: null,
   readiness: null,
@@ -239,6 +240,7 @@ const phaseLabel = (phase) => ({
   colabfold_screen: "ColabFold 예측", boltz_rescore: "Boltz-2 재평가",
 }[phase] || phase || "준비");
 function jobPhaseCaption(job) {
+  if (job.phase === "reused" || job.reused_result_id) return "기존 결과 재사용";
   if (job.phase === "complete" && job.state === "running") return "결과·보고서 저장 중";
   if (job.phase === "complete" && job.state === "cancelling") return "종료 정리 중";
   return phaseLabel(job.phase);
@@ -743,16 +745,20 @@ function matureInputSettings(cfg) {
   const count = value('mutation-count', Number.isSafeInteger(size) && size >= 2 && size <= 100000 ? size - 1 : null, 99999);
   const min = value('mutation-min', library.min_mutations ?? 1, 50);
   const max = value('mutation-max', library.max_mutations ?? 5, 50);
+  const seedText = $('mutation-seed')?.value?.trim() || '';
+  const seed = seedText ? Number(seedText) : library.seed ?? null;
+  if ($('mutation-seed')?.validity?.badInput || (seed !== null && (!Number.isSafeInteger(seed) || seed < 0 || seed > 2147483647)))
+    throw Error('변이 생성 Seed는 0–2147483647 정수로 입력하세요.');
   if (min > max) throw Error('최대 치환 수는 최소 치환 수 이상이어야 합니다.');
   if (!['all_cdr','cdr3','custom'].includes(region)) throw Error('치환 범위는 all_cdr, cdr3, custom 중 하나여야 합니다.');
   const ranges = region === 'custom' ? parseMutationRanges($('mutation-ranges')?.value?.trim()
     || (library.mutation_ranges || []).map(([start,end]) => `${start}-${end}`).join(', ')) : [];
   return merge(cfg, {mature: {library: {strategy, size: count + 1, min_mutations: min, max_mutations: max,
-    mutation_region: region, mutation_ranges: ranges},
+    mutation_region: region, mutation_ranges: ranges, ...(seedText ? {seed} : {})},
     prefilter: {mode: 'none'}, antifold: {enabled: false}}, rank: {weights: {esm_score: 0, antifold: 0}}});
 }
 function resetMutationControls() {
-  for (const id of ['mutation-strategy','mutation-count','mutation-min','mutation-max','mutation-wt','mutation-region','mutation-ranges'])
+  for (const id of ['mutation-strategy','mutation-count','mutation-min','mutation-max','mutation-seed','mutation-wt','mutation-region','mutation-ranges'])
     if ($(id)) $(id).value = '';
 }
 function noviceComplexSettings(cfg) {
@@ -882,6 +888,7 @@ function clearScalePreview() {
   if ($('quantity-breakdown')) I18N.text($('quantity-breakdown'), I18N.term('계획 미확정 · 입력과 적용 설정을 확인하세요.'));
   if ($('mutation-current')) I18N.text($('mutation-current'), I18N.term('적용값 미확정 · 설정을 확인하세요.'));
   if ($('mutation-scope-current')) I18N.text($('mutation-scope-current'), I18N.term('적용값 미확정 · 설정을 확인하세요.'));
+  if ($('mutation-seed-current')) I18N.text($('mutation-seed-current'), I18N.term('적용값 미확정 · 설정을 확인하세요.'));
 }
 function applyAnalysisSettings(cfg) {
   resetMutationControls();
@@ -1005,6 +1012,8 @@ function renderAnalysisScale(cfg, mode) {
     ]));
     for (const [id, value] of [['mutation-count', quantities.preparedVariants], ['mutation-min', mature.library?.min_mutations ?? 1], ['mutation-max', mature.library?.max_mutations ?? 5]])
       if ($(id)) I18N.attribute($(id), 'placeholder', known(value));
+    if ($('mutation-seed')) I18N.attribute($('mutation-seed'), 'placeholder', String(mature.library?.seed ?? cfg.run?.seed ?? 42));
+    if ($('mutation-seed-current')) I18N.text($('mutation-seed-current'), I18N.format('변이 생성 Seed: {0}', [mature.library?.seed ?? cfg.run?.seed ?? 42]));
     I18N.text($('mutation-current'), I18N.format('적용 방식: {0} · WT {1}',
       [I18N.term(mature.library?.strategy === 'random' ? 'CDR 무작위 다중 잔기 치환' : 'CDR 단일 잔기 치환 (DMS)'), I18N.term(quantities.wtIncluded ? '포함' : '제외')]));
   }
@@ -1562,13 +1571,14 @@ async function selectJob(identifier, remember = true) {
   await refreshJobs();
 }
 function jobProgressCaption(job) {
+  if (job.phase === "reused" || job.reused_result_id) return "새 계산 없음";
   const progress = job.progress || {};
   const count = value => Number.isInteger(value) && value >= 0 ? String(value) : "미기록";
   const counts = `${count(progress.completed)}/${count(progress.total)}`;
   const attempted = Object.hasOwn(progress, "succeeded") || Object.hasOwn(progress, "failed");
   // Structured model progress takes precedence, including partial/unknown outcomes.
   if (attempted)
-    return `처리 ${counts} · 성공 ${count(progress.succeeded)} · 실패 ${count(progress.failed)}`;
+    return `모델 계산 ${counts} · 계산 성공 ${count(progress.succeeded)} · 계산 실패 ${count(progress.failed)}`;
   const terminalNative = job.kind === "analysis" && job.mock === false &&
     ["screen", "mature", "design"].includes(job.mode) &&
     ["complete", "partial_failure"].includes(job.state);
@@ -1588,7 +1598,7 @@ function jobProgressCaption(job) {
           recorded(total) && succeeded <= models && failed <= models &&
           succeeded + failed === models && total >= models &&
           (job.state !== "complete" || (failed === 0 && total === models)))
-        return `처리 ${models}/${total} · 성공 ${succeeded} · 실패 ${failed}`;
+        return `모델 계산 ${models}/${total} · 계산 성공 ${succeeded} · 계산 실패 ${failed}`;
     }
     // Candidate/preparation totals are not model outcomes; keep explicit stage progress.
     return `단계 진행 ${counts}`;
@@ -1613,7 +1623,7 @@ async function refreshJobs() {
     if (state.environment?.reason === "status_unavailable") await refreshEnvironmentStatus();
     const jobButton = job => {
       const type = job.kind === "analysis" ? "분석" : job.kind === "diagnostics" ? "환경 확인" : "프로그램 설치";
-      const outcome = job.kind === "diagnostics" && job.state === "complete"
+      const outcome = job.phase === "reused" ? "기존 결과 재사용" : job.kind === "diagnostics" && job.state === "complete"
         ? job.diagnostics?.ok === true ? "환경 확인 통과" : "환경 확인 미충족"
         : states[job.state] || job.state;
       const button = el("button", I18N.concat([I18N.term(type), " · ", job.kind === "analysis" ? job.name : job.mode,
@@ -1664,6 +1674,8 @@ async function refreshJobs() {
         $("job-detail").append(note);
       }
       if (job.reused_result_id) $("job-detail").append(el("p", I18N.format("저장 결과 연결 · 새 계산 0초 · 원본 {0}{1}. 원래 계산 시간 {2}", [job.reused_result_id, job.reuse_kind === "view_only" ? I18N.term(" · 핵심 보관본") : "", job.source_elapsed_seconds === null ? I18N.term("미기록") : I18N.concat([Math.round(job.source_elapsed_seconds || 0), I18N.term("초")])])));
+      if (job.reused_result_id) $("job-detail").append(el("p", I18N.term("이전 결과를 사용했습니다. 새 계산은 하지 않았습니다. 다시 계산하려면 입력·실행의 실행 조건에서 ‘과거 결과를 재사용하지 않고 새로 계산’을 선택하세요. 다른 무작위 후보가 필요하면 변이 생성 Seed도 변경하세요."), "next-step"));
+      if (job.kind === "analysis" && job.state === "complete" && !job.reused_result_id) $("job-detail").append(el("p",I18N.term("계산 성공은 계산이 끝난 모델 수입니다. 서로 다른 후보 서열 수나 최종 적격 후보 수와 다릅니다. 결과에서 후보·모델 수와 판정·제외 이유를 확인하세요."),"muted"));
       if (etaText(job)) $("job-detail").append(el("p", I18N.term(etaText(job)), "eta-note"));
       if (job.mock)
         $("job-detail").append(el("span", I18N.term("MOCK · 합성 결과"), "badge"));
@@ -3513,7 +3525,7 @@ function syncBatchFields() {
 function syncMsaConsent() {
   for (const id of ["novice-consent", "batch-api-consent", "saved-msa-consent"]) {
     const input = $(id);
-    if (input) { input.checked = state.publicMsaConsent === true; input.disabled = state.msaConsentSaving; }
+    if (input) { input.checked = (state.msaConsentSaving ? state.msaConsentPending : state.publicMsaConsent) === true; input.disabled = state.msaConsentSaving; }
   }
   state.refreshNovice?.();
 }
@@ -3529,6 +3541,7 @@ async function refreshMsaConsent() {
 }
 async function saveMsaConsent(allowed) {
   if (state.msaConsentSaving) return;
+  state.msaConsentPending = allowed === true;
   state.msaConsentSaving = true;
   const token = ++state.msaConsentRequest;
   syncMsaConsent();
@@ -3538,7 +3551,7 @@ async function saveMsaConsent(allowed) {
     invalidateInput();
     resetBatchReview(false);
   } catch (error) { notice(I18N.value(I18N.term("MSA 전송 동의를 저장하지 못했습니다. 다시 시도하세요.")), true); }
-  finally { state.msaConsentSaving = false; syncMsaConsent(); }
+  finally { state.msaConsentPending = state.publicMsaConsent; state.msaConsentSaving = false; syncMsaConsent(); }
 }
 function resetBatchReview(clearExample = true) {
   batchInputRevision++;
@@ -4206,6 +4219,10 @@ async function initNoviceFlow() {
   const consent=el("input");consent.id="novice-consent";consent.type="checkbox";const cl=el("label",null,"check");cl.append(consent,el("span", I18N.term("API MSA 서열 전송에 동의하고 설정을 저장합니다.")));settingsCard.insertBefore(cl,advanced);consent.checked=state.publicMsaConsent===true;consent.addEventListener("change",event=>saveMsaConsent(event.target.checked));
   const demoMsaNote=el("p",I18N.term("CPU 합성 데모는 MSA를 준비하거나 외부 서버로 서열을 전송하지 않습니다."),"muted");settingsCard.insertBefore(demoMsaNote,advanced);
   const plan=el("p","","next-step");plan.id="novice-model-plan";settingsCard.insertBefore(controls,advanced);settingsCard.insertBefore(plan,advanced);
+  settingsCard.insertBefore(el("p",I18N.term("평가 엔진은 같은 후보 서열의 구조를 각각 예측합니다. 새 서열은 변이 생성·신규 설계 단계에서 만듭니다. 엔진별 구조·지표·선별 순위는 달라질 수 있습니다."),"muted"),advanced);
+  const reuseChoice=$("force-rerun").closest("label");
+  settingsCard.insertBefore(reuseChoice,advanced);
+  settingsCard.insertBefore(el("p",I18N.term("입력·설정·Seed가 같으면 저장된 결과를 사용합니다. 작업 이름만 바꾸면 새 계산을 하지 않습니다. 다시 계산하려면 위 항목을 선택하세요."),"muted"),advanced);
   plan.setAttribute("role", "status"); plan.setAttribute("aria-live", "polite");
   const scale = el("fieldset"); scale.id = "analysis-scale";
   scale.append(el("legend", I18N.term("분석 규모")));
@@ -4225,7 +4242,7 @@ async function initNoviceFlow() {
   const conditions = el("details"), conditionData = el("pre"); conditionData.id = "quantity-conditions";
   conditions.append(el("summary", I18N.term("평가 엔진별 Seed·샘플 설정")), conditionData);
   scale.append(selectionLabel, selection, selectionCurrent, selectionHelp, conditions); settingsCard.insertBefore(scale, advanced);
-  settingsCard.insertBefore(cl,advanced);consent.checked=state.publicMsaConsent===true;consent.addEventListener("change",event=>saveMsaConsent(event.target.checked));
+  settingsCard.insertBefore(cl,advanced);
   const complex=el("div");complex.id="novice-complex-fields";complex.hidden=true;
   const label=el("label",I18N.term("복합체 단백질 FASTA · 위에서 아래 순서로 체인 배정"));label.htmlFor="complex-fasta";const fasta=el("textarea");fasta.id="complex-fasta";fasta.rows=8;fasta.spellcheck=false;
   const copies=el("div");copies.id="novice-complex-copies";complex.append(label,fasta,copies);inputCard.insertBefore(complex,$("fasta-fields"));

@@ -217,7 +217,7 @@ class BatchManager:
         self._save(batch)
         return batch
 
-    def submit(self, identifier, payload, *, researcher=None, legacy_inputs=None):
+    def submit(self, identifier, payload, *, researcher=None, legacy_inputs=None, authorize=None):
         path = self.jobs.store.root / f"batch-{identifier}.lock"
         # Validate ID before using it as a filename.
         self.get(identifier)
@@ -259,6 +259,8 @@ class BatchManager:
                     value = legacy_inputs.get(row["input_id"])
                 if digest(value) != row["input_sha256"] or self._files(value["config"]) != row["input_files"] or sha256(Path(value["config_path"])) != row["config_file_sha256"]:
                     raise ValueError(f"{row['id']}: 검토 이후 입력 또는 설정이 바뀌었습니다.")
+                if authorize is not None:
+                    authorize(value["config"])
                 prepared[row["id"]] = value
             batch["selected"] = selected
             if researcher:
@@ -272,6 +274,8 @@ class BatchManager:
                     # Each job and its submission link commit atomically. get()
                     # recovers those links if this batch checkpoint is lost.
                     try:
+                        if authorize is not None:
+                            authorize(prepared[row["id"]]["config"])
                         job = self.jobs.create({**({"researcher": researcher} if researcher else {}), "config": prepared[row["id"]]["config"], "mode": batch["mode"], "name": f"{batch['name']} · {row['id']}"[:120], "submission_id": f"batch-{identifier}-{number:03d}", "budget_seconds": budget})
                         row.update(job_id=job["id"], submission_error=None)
                     except (ValueError, OSError) as exc:
@@ -307,7 +311,7 @@ class BatchManager:
                     raise ValueError("작업 상태가 바뀌었습니다. 현재 상태를 확인한 뒤 취소를 다시 선택하세요.")
                 owned_ids = {row["job_id"] for row in batch["rows"] if row.get("job") and (not researcher or row["job"].get("researcher") == researcher)}
                 self.jobs.cancel_many([item for item in expected_cancel["jobs"] if item["job_id"] in owned_ids],
-                                      batch_job_ids=[row["job_id"] for row in batch["rows"] if row.get("job_id")])
+                                      batch_job_ids=[row["job_id"] for row in batch["rows"] if row.get("job_id") in owned_ids])
                 return outcome()
             for row in batch["rows"]:
                 if row.get("job") and row["job"]["state"] not in TERMINAL and (not researcher or row["job"].get("researcher") == researcher):

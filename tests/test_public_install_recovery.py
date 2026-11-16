@@ -228,15 +228,29 @@ def test_forced_cli_exit_keeps_core_reserved_until_its_real_shell_child_exits(in
         stamp = process_stamp(pid)
         assert stamp and details["leases"]
         assert set(details["inodes"]) == {(owner / ".platform/public-install.lock").stat().st_ino}
+        with pytest.raises(ValueError):
+            update(repo, run=lambda *a, **kw: pytest.fail("updated core beside a running shell child"))
         wrapper.kill()  # SIGKILL only the owned CLI wrapper, not the child's session.
         wrapper.wait(timeout=5)
         assert wrapper.returncode == -9
-        assert process_stamp(pid) == stamp
-        with pytest.raises(ValueError):
-            update(repo, run=lambda *a, **kw: pytest.fail("updated core beside surviving shell child"))
+        if sys.platform.startswith("linux"):
+            # Linux's guardian reaps the owned child after the CLI lifeline
+            # closes. Requiring an orphan here contradicts that safety contract.
+            deadline = time.monotonic() + 8
+            while process_stamp(pid) == stamp and time.monotonic() < deadline:
+                time.sleep(.02)
+            assert process_stamp(pid) != stamp
+        else:
+            assert process_stamp(pid) == stamp
+            with pytest.raises(ValueError):
+                update(repo, run=lambda *a, **kw: pytest.fail("updated core beside surviving shell child"))
     finally:
         if wrapper.stdin:
-            wrapper.stdin.write(b"x"); wrapper.stdin.flush(); wrapper.stdin.close()
+            try:
+                wrapper.stdin.write(b"x"); wrapper.stdin.flush()
+            except BrokenPipeError:
+                pass
+            wrapper.stdin.close()
         if wrapper.poll() is None:
             wrapper.wait(timeout=5)
         deadline = time.monotonic() + 5

@@ -115,7 +115,7 @@ GitHub의 **Download ZIP**은 설치용 소스입니다. 아래의 샘플 ZIP은
 | screen·mature·design 개별 샘플 ZIP | `report.html` |
 | complex 샘플 ZIP | `START_HERE.html`에서 mock 실행 거부 기록 확인 |
 | 분석 후 내려받은 전달용 보고서 ZIP | `report.html` |
-| 운영 사이트의 전체 결과 ZIP | `exploration/report_offline.html`에서 결과 탐색. 원본은 `original/` 폴더에 보관 |
+| 운영 사이트의 전체 결과 ZIP | `exploration/`에 내보낸 데이터, `original/`에 원본 보관. **오프라인 HTML**은 화면에서 별도로 내려받아 엽니다. |
 
 위에 설명한 별도 샘플 묶음을 받았다면 해당 묶음은 CPU/mock 예제입니다. GitHub 소스 ZIP에는 계산을 마친 결과 ZIP이 포함되지 않습니다. 다른 보고서는 실제 GPU 결과일 수 있으므로 각 보고서의 실행 모드와 출처를 확인하세요. 보고서 상단 **Language**에서 한국어와 영어를 전환할 수 있습니다. 보고서와 관련 파일은 압축을 푼 폴더 구조 그대로 보관하세요. 저장된 보고서는 Windows·macOS의 웹브라우저에서도 열 수 있습니다.
 

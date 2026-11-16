@@ -21,7 +21,7 @@ browser_check = pytest.mark.skipif(
 )
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def analyses(supplied_server):
     workspace, url = supplied_server
     catalog = ResultCatalog(workspace)
@@ -105,6 +105,7 @@ def test_review_displays_the_selected_comparison_msa(analyses, page, language):
         page.locator("#novice-msa").select_option(source)
         if source == "public_api":
             page.locator("#novice-consent").check()
+            expect(page.locator("#novice-consent")).to_be_enabled()
         page.locator("#novice-next").click()
         with page.expect_response("**/api/inputs") as prepared:
             page.locator("#review-input").click()

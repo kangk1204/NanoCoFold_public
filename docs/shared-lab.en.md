@@ -45,6 +45,8 @@ After you click **Run analysis**, leave the tab open until the job appears. The 
 
 In Results database, search for a candidate ID or a VHH sequence fragment (three or more consecutive amino acids). Add a researcher filter if needed. Open a matching candidate to see its sequence and predicted structure. Identical sequences are stored once in the search database.
 
+Revoking consent also blocks submission or resumption of previously reviewed public-MSA analyses and batches. Cancel any already submitted jobs from the job list if you want to stop them. An explicit `api_consent: false` or `allow_public_msa_server: false` in imported settings takes precedence over saved approval.
+
 ## Shared execution policy
 
 Administrators can view all results and set sharing permissions. Only the submitter can cancel or resume an analysis. New analyses reuse results only from the same researcher. Previously shared records remain available.

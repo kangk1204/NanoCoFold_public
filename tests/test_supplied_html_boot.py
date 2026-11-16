@@ -55,7 +55,7 @@ def test_supplied_dom_and_generated_offline_contract():
         assert f'id="{name}"' in offline
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def supplied_server(tmp_path_factory):
     from nanocofold.install import init_workspace
     workspace = tmp_path_factory.mktemp("supplied-html")
@@ -109,10 +109,11 @@ def test_supplied_app_four_purposes_steps_and_menus(supplied_server,mode,title):
         assert page.locator("#novice-msa").evaluate("e=>getComputedStyle(e).outlineColor") == "rgb(133, 96, 30)"
         assert page.locator('.workflow-steps [aria-current="step"]').evaluate("e=>getComputedStyle(e).borderTopWidth") == "2px"
         page.screenshot(path=str(workspace.parent / ("supplied-"+mode+"-conditions.png")),full_page=True)
-        # Native public inputs require an explicit new consent, before review.
+        # Each case has a fresh installation; approval persists within a case.
         page.get_by_role("button",name="조건 확인 후 다음",exact=True).click()
         expect(page.locator("#novice-blocker")).to_contain_text("동의")
         page.locator("#novice-consent").check()
+        expect(page.locator("#novice-consent")).to_be_enabled()
         page.get_by_role("button",name="조건 확인 후 다음",exact=True).click()
         expect(page.locator(".novice-heading")).to_contain_text("4/4")
         expect(page.locator("#start-job")).to_be_disabled()

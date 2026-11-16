@@ -106,7 +106,7 @@ def test_every_starter_can_be_checked_without_input_or_transmission_consent(tmp_
         job=response.json()
         assert job["environment_only"] is True and job["result_id"] is None
         from nanocofold.config import load_config
-        snapshot=load_config(job["config_path"])
+        snapshot=load_config(tmp_path / job["config_path"])
         assert snapshot["screen"]["allow_public_msa_server"] is False
         assert snapshot["screen"]["colabfold"]["msa_source"]=="cache"
         assert job["environment_scope"]==status.json()["scope"]

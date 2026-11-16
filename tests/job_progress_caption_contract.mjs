@@ -7,16 +7,17 @@ import vm from 'node:vm';
 const source=readFileSync(new URL('../nanocofold/templates/platform.js',import.meta.url),'utf8'),c={};
 koreanContext(c);vm.runInContext(source.slice(source.indexOf('function jobProgressCaption('),source.indexOf('async function refreshJobs()')),c);
 const cases=[
+ ['reused results have no fabricated zero-stage progress',{phase:'reused',reused_result_id:'prior',progress:{completed:0,total:null}},'새 계산 없음'],
  ['known zero stage counts remain zero',{progress:{completed:0,total:0}},'진행 0/0'],
- ['known zero model outcomes remain zero',{progress:{completed:0,total:4,succeeded:0,failed:0}},'처리 0/4 · 성공 0 · 실패 0'],
- ['all processed models include both successful and failed attempts',{mode:'complex',progress:{completed:4,total:4,succeeded:2,failed:2}},'처리 4/4 · 성공 2 · 실패 2'],
+ ['known zero model outcomes remain zero',{progress:{completed:0,total:4,succeeded:0,failed:0}},'모델 계산 0/4 · 계산 성공 0 · 계산 실패 0'],
+ ['all processed models include both successful and failed attempts',{mode:'complex',progress:{completed:4,total:4,succeeded:2,failed:2}},'모델 계산 4/4 · 계산 성공 2 · 계산 실패 2'],
  ['null counts remain unknown',{progress:{completed:null,total:null}},'진행 미기록/미기록'],
  ['missing progress remains unknown',{},'진행 미기록/미기록'],
- ['unknown total does not conceal recorded model outcomes',{progress:{completed:4,total:null,succeeded:3,failed:1}},'처리 4/미기록 · 성공 3 · 실패 1'],
- ['partial outcome receipt does not invent the missing success count',{progress:{completed:1,total:4,failed:1}},'처리 1/4 · 성공 미기록 · 실패 1'],
+ ['unknown total does not conceal recorded model outcomes',{progress:{completed:4,total:null,succeeded:3,failed:1}},'모델 계산 4/미기록 · 계산 성공 3 · 계산 실패 1'],
+ ['partial outcome receipt does not invent the missing success count',{progress:{completed:1,total:4,failed:1}},'모델 계산 1/4 · 계산 성공 미기록 · 계산 실패 1'],
  ['diagnostic stages continue to display stage progress',{kind:'diagnostic',progress:{completed:1,total:3}},'진행 1/3'],
  ['mock CPU stages retain generic progress',{mock:true,phase:'target',progress:{completed:2,total:4}},'진행 2/4'],
- ['invalid count values are unknown rather than coerced',{progress:{completed:false,total:'4',succeeded:NaN,failed:-1}},'처리 미기록/미기록 · 성공 미기록 · 실패 미기록'],
+ ['invalid count values are unknown rather than coerced',{progress:{completed:false,total:'4',succeeded:NaN,failed:-1}},'모델 계산 미기록/미기록 · 계산 성공 미기록 · 계산 실패 미기록'],
 ];
 for(const [name,job,caption] of cases)test(name,()=>assert.equal(c.jobProgressCaption(job),caption));
 test('job detail uses the count helper and preserves the mock badge',()=>{
@@ -29,13 +30,13 @@ const terminalJob=(mode='screen',summary={model_record_total:4,scored_total:4,fa
  kind:'analysis',mode,mock:false,state:'complete',progress:{completed:mode==='design'?4:3,total:mode==='design'?4:3},summary,...extra,
 });
 const terminalCases=[
- ['native screen stage 3/3 reports its four completed models',terminalJob(),'처리 4/4 · 성공 4 · 실패 0'],
- ['native mature stage 3/3 reports eight models',terminalJob('mature',{model_record_total:8,scored_total:8,failed_candidates:0,expected_total:8}),'처리 8/8 · 성공 8 · 실패 0'],
- ['native design stage 4/4 reports eight models',terminalJob('design',{model_record_total:8,scored_total:8,failed_candidates:0,expected_total:null}),'처리 8/8 · 성공 8 · 실패 0'],
- ['partial failure includes two failed model records',terminalJob('screen',{model_record_total:4,scored_total:2,failed_candidates:2,expected_total:4},{state:'partial_failure'}),'처리 4/4 · 성공 2 · 실패 2'],
- ['partial failure preserves a recorded expected workload',terminalJob('screen',{model_record_total:4,scored_total:2,failed_candidates:2,expected_total:6},{state:'partial_failure'}),'처리 4/6 · 성공 2 · 실패 2'],
- ['known zero final models and outcomes remain explicit zero',terminalJob('screen',{model_record_total:0,scored_total:0,failed_candidates:0,expected_total:0}),'처리 0/0 · 성공 0 · 실패 0'],
- ['candidate population of thirty cannot inflate four model records',terminalJob('screen',{model_record_total:4,scored_total:4,failed_candidates:0,candidate_record_total:30,total:30}),'처리 4/4 · 성공 4 · 실패 0'],
+ ['native screen stage 3/3 reports its four completed models',terminalJob(),'모델 계산 4/4 · 계산 성공 4 · 계산 실패 0'],
+ ['native mature stage 3/3 reports eight models',terminalJob('mature',{model_record_total:8,scored_total:8,failed_candidates:0,expected_total:8}),'모델 계산 8/8 · 계산 성공 8 · 계산 실패 0'],
+ ['native design stage 4/4 reports eight models',terminalJob('design',{model_record_total:8,scored_total:8,failed_candidates:0,expected_total:null}),'모델 계산 8/8 · 계산 성공 8 · 계산 실패 0'],
+ ['partial failure includes two failed model records',terminalJob('screen',{model_record_total:4,scored_total:2,failed_candidates:2,expected_total:4},{state:'partial_failure'}),'모델 계산 4/4 · 계산 성공 2 · 계산 실패 2'],
+ ['partial failure preserves a recorded expected workload',terminalJob('screen',{model_record_total:4,scored_total:2,failed_candidates:2,expected_total:6},{state:'partial_failure'}),'모델 계산 4/6 · 계산 성공 2 · 계산 실패 2'],
+ ['known zero final models and outcomes remain explicit zero',terminalJob('screen',{model_record_total:0,scored_total:0,failed_candidates:0,expected_total:0}),'모델 계산 0/0 · 계산 성공 0 · 계산 실패 0'],
+ ['candidate population of thirty cannot inflate four model records',terminalJob('screen',{model_record_total:4,scored_total:4,failed_candidates:0,candidate_record_total:30,total:30}),'모델 계산 4/4 · 계산 성공 4 · 계산 실패 0'],
  ['candidate-only population never supplies missing model counts',terminalJob('screen',{candidate_record_total:30,total:30,scored_total:4,failed_candidates:0}),'단계 진행 3/3'],
  ['missing final summary remains explicitly stage progress',terminalJob('screen',undefined,{summary:undefined}),'단계 진행 3/3'],
  ['missing success count is not invented',terminalJob('screen',{model_record_total:4,failed_candidates:0}),'단계 진행 3/3'],
@@ -52,8 +53,8 @@ const terminalCases=[
  ['diagnostics retain generic stage progress despite a model-shaped summary',terminalJob('screen',undefined,{kind:'diagnostics'}),'진행 3/3'],
  ['mock CPU stages retain generic progress despite model-shaped summary',terminalJob('screen',undefined,{mock:true}),'진행 3/3'],
  ['unrecorded mock flag does not prove native execution',terminalJob('screen',undefined,{mock:undefined}),'진행 3/3'],
- ['structured complex progress always overrides final summary',terminalJob('complex',{model_record_total:8,scored_total:8,failed_candidates:0},{progress:{completed:4,total:4,succeeded:2,failed:2}}),'처리 4/4 · 성공 2 · 실패 2'],
- ['partial structured counts also override otherwise valid summary',terminalJob('screen',undefined,{progress:{completed:1,total:4,failed:1}}),'처리 1/4 · 성공 미기록 · 실패 1'],
+ ['structured complex progress always overrides final summary',terminalJob('complex',{model_record_total:8,scored_total:8,failed_candidates:0},{progress:{completed:4,total:4,succeeded:2,failed:2}}),'모델 계산 4/4 · 계산 성공 2 · 계산 실패 2'],
+ ['partial structured counts also override otherwise valid summary',terminalJob('screen',undefined,{progress:{completed:1,total:4,failed:1}}),'모델 계산 1/4 · 계산 성공 미기록 · 계산 실패 1'],
  ['array-shaped summary cannot supply model counts',terminalJob('screen',[]),'단계 진행 3/3'],
 ];
 for(const [name,job,caption] of terminalCases)test(name,()=>assert.equal(c.jobProgressCaption(job),caption));
