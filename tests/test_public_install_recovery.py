@@ -250,7 +250,8 @@ def test_forced_cli_exit_keeps_core_reserved_until_its_real_shell_child_exits(in
                 wrapper.stdin.write(b"x"); wrapper.stdin.flush()
             except BrokenPipeError:
                 pass
-            wrapper.stdin.close()
+            with contextlib.suppress(BrokenPipeError):
+                wrapper.stdin.close()
         if wrapper.poll() is None:
             wrapper.wait(timeout=5)
         deadline = time.monotonic() + 5
