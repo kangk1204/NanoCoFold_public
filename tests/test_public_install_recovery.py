@@ -1,5 +1,6 @@
 """No installers, servers, GPU commands or scientific engines run in these fixtures."""
 import argparse
+import contextlib
 import importlib.util
 import json
 import os
