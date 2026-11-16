@@ -2,7 +2,7 @@
 
 **English** · [한국어](README.ko.md)
 
-**[Current source](https://github.com/kangk1204/NanoCoFold_public/tree/main)** · Compute package `0.4.8rc12`
+**[Current source](https://github.com/kangk1204/NanoCoFold_public/tree/main)** · Compute package `0.4.8rc13`
 
 Predict protein complexes, design nanobodies, and compare existing candidates or variants. Explore the models in 3D and share an interactive report.
 

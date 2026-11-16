@@ -1,6 +1,6 @@
 # Update an existing installation
 
-Update in the original installation folder to keep your workspace, prediction engines and saved results. Use the current `main` revision for the latest input, resume and Excel corrections. The compute package reports **0.4.8rc12**; record the commit as well.
+Update in the original installation folder to keep your workspace, prediction engines and saved results. Use the current `main` revision for the latest consent, result reuse and score-only corrections. The compute package reports **0.4.8rc13**; record the commit as well.
 
 ## 1. Finish active jobs
 

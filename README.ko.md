@@ -2,7 +2,7 @@
 
 [English](README.md) · **한국어**
 
-**[최신 소스](https://github.com/kangk1204/NanoCoFold_public/tree/main)** · 계산 패키지 `0.4.8rc12`
+**[최신 소스](https://github.com/kangk1204/NanoCoFold_public/tree/main)** · 계산 패키지 `0.4.8rc13`
 
 단백질 복합체를 예측하고, 새 나노바디를 설계하거나 보유한 후보와 변이를 비교합니다. 결과는 3D로 살펴보고 대화형 보고서로 공유할 수 있습니다.
 
