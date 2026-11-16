@@ -302,3 +302,54 @@ def test_cpu_demo_review_needs_no_public_msa_consent(supplied_server):
         expect(page.locator("#start-job")).to_be_disabled()
         assert errors == []
         browser.close()
+
+
+@pytest.mark.skipif(os.environ.get("NANOCOFOLD_BROWSER_TEST") != "1", reason="Real Chromium release gate")
+@pytest.mark.parametrize("language", ["en", "ko"])
+def test_candidate_without_structure_retires_caption_and_downloads(tmp_path, language):
+    from nanocofold import mock
+    from nanocofold.platform.results import ResultReader
+    from playwright.sync_api import expect, sync_playwright
+    run = tmp_path / "saved-fixture"
+    (run / "03_score").mkdir(parents=True)
+    mock.write_cif(mock.build_complex_structure("ACDEFGHIKL", "ACCDEFGHIK", [], seed=42), run / "colabfold_model_0.cif")
+    np.savez(run / "pae_colabfold_model_0.npz", pae=np.arange(400, dtype=float).reshape(20, 20) / 20)
+    (run / "run_config.yaml").write_text(yaml.safe_dump({"run": {"mode": "screen", "mock": True}}))
+    (run / "run_state.json").write_text('{"phases":{"final":{}}}')
+    (run / "03_score/scored_candidates.csv").write_text(
+        "design_id,sequence,cif_path,target_chain,binder_chain,predictor_engine,ipsae,final_eligible\n"
+        "evaluated,ACCDEFGHIK,colabfold_model_0.cif,A,B,colabfold,0.4,false\n"
+        "unmodeled,ACFDEFGHIK,,A,B,colabfold,,false\n")
+    report = tmp_path / "report.html"
+    report.write_bytes(ResultReader(run).export("html")[0])
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(args=["--enable-unsafe-swiftshader"])
+        page = browser.new_page()
+        page.add_init_script(f"localStorage.setItem('nanocofold.language', '{language}')")
+        errors = []
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        page.goto(report.as_uri())
+        page.wait_for_function("()=>Boolean(state.viewer?.viewer.plugin.canvas3d)", timeout=30000)
+        expect(page.locator("#structure-source")).to_contain_text("evaluated")
+        expect(page.locator("#save-result-structure")).to_be_enabled()
+        expect(page.locator("#save-pae")).to_be_enabled()
+        page.get_by_role("button", name="unmodeled", exact=True).click()
+        page.wait_for_function("()=>state.candidate?.candidate_id==='unmodeled' && state.structure===null")
+        expect(page.locator("#structure-source")).to_be_empty()
+        expect(page.locator("#structure-data-note")).to_be_empty()
+        expect(page.locator("#structure-view canvas")).to_have_count(0)
+        for name in ("save-result-structure", "save-native-structure", "save-pae"):
+            expect(page.locator("#" + name)).to_be_disabled()
+        page.locator("#language-select").select_option("ko" if language == "en" else "en")
+        expect(page.locator("#structure-source")).to_be_empty()
+        # An unevaluated structure does not prevent downloading its known sequence.
+        with page.expect_download() as downloaded:
+            page.locator("#save-vhh-sequence").click()
+        assert Path(downloaded.value.path()).read_text().splitlines() == [">unmodeled", "ACFDEFGHIK"]
+        page.get_by_role("button", name="evaluated", exact=True).click()
+        page.wait_for_function("()=>Boolean(state.viewer?.viewer.plugin.canvas3d)", timeout=30000)
+        expect(page.locator("#structure-source")).to_contain_text("evaluated")
+        expect(page.locator("#save-result-structure")).to_be_enabled()
+        expect(page.locator("#save-pae")).to_be_enabled()
+        assert errors == []
+        browser.close()

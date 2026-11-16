@@ -7073,6 +7073,8 @@ function disposeResultViewer() {
   $("structure-view").replaceChildren();
   describeResultFigure("structure-view", "선택 후보 3D 구조", I18N.term("후보와 관측을 선택하면 구조를 표시합니다. 미평가 사유는 후보 상세에서 확인하세요."), "#report-provenance", true);
   syncResultChainControls();
+  for (const id of ["structure-source", "structure-data-note"]) I18N.text($(id), "");
+  for (const id of ["save-result-structure", "save-native-structure", "save-pae"]) $(id).disabled = true;
   for (const id of ["structure-actions", "cdr-actions"]) $(id).replaceChildren();
   I18N.text($("reference-note"), "");
   for (const id of ["residue-a", "residue-b"]) $(id).replaceChildren();
@@ -7189,11 +7191,11 @@ async function renderStructure() {
     setPaeErrorStatus(message);
   });
   const chains = (Array.isArray(data.chains) ? data.chains : []).filter(chain => chain && typeof chain.id === "string");
-  I18N.text($("structure-data-note"), localizedStructureDataNote(data));
   if (state.viewerData !== data) {
     disposeResultViewer();
     const request = state.viewerRequest;
     state.viewerData = data;
+    I18N.text($("structure-data-note"), localizedStructureDataNote(data));
     I18N.text($("structure-note"), I18N.term("MolStar 구조·서열 준비 중"));
     const host = el("div", undefined, "molstar-host");
     $("structure-view").replaceChildren(host);
@@ -7223,6 +7225,7 @@ async function renderStructure() {
     state.viewer = viewer;
     syncResultChainControls();
     if ($("structure-source")) I18N.text($("structure-source"), I18N.format("현재 모델 {0} · 체인 {1} · {2}", [data.candidate_id, chains.length ? chains.map(c=>c.id).join(", ") : I18N.term("미기록"), I18N.term(coordinatePresentation(data).caption)]));
+    if ($("save-result-structure")) $("save-result-structure").disabled = !data.content;
     if ($("save-native-structure")) $("save-native-structure").disabled = !coordinatePresentation(data).rawAvailable;
     if ($("save-pae")) $("save-pae").disabled = !data.pae;
   } else if (!state.viewer) {
