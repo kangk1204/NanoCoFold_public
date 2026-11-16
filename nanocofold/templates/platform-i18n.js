@@ -2571,13 +2571,15 @@ globalThis.I18N = (() => {
     for(const {pattern,keys,en,ko} of patterns){
       if(ko==='진행 {0}'&&!/^진행 (?:\d+|미기록)\/(?:\d+|미기록)$/.test(raw))continue;
       const match=pattern.exec(raw);if(!match)continue;
+      const modelCounts=ko==='모델 계산 {0}/{1} · 계산 성공 {2} · 계산 실패 {3}';
+      if(modelCounts&&match.slice(1).some(value=>!/^(?:\d+|미기록)$/.test(value)))continue;
       if (/^\{0\}: (?:매몰 잔기|구조에 존재하지 않음|pLDDT=|글리칸과)/.test(ko) &&
           !/^(?:[A-Za-z0-9]+:)?-?\d+[A-Za-z]?$/.test(match[1])) continue;
       // These parameters are configuration field paths, not arbitrary Korean
       // prose. Translate full authored descriptions via their explicit keys.
       if((ko==='{0} 허용값: {1}'||ko==='{0} 설정은 객체여야 합니다.'||ko==='{0} 설정은 true/false여야 합니다.'||ko==='{0}는 목록이어야 합니다.'||ko==="{0}는 문자열이어야 합니다. ':'를 포함하는 --set 값은 따옴표로 감싸세요.")&&
           !/^[A-Za-z_][A-Za-z0-9_.\[\]-]*$/.test(match[1]))continue;
-      const values=new Map(keys.map((k,i)=>[k,ko==='진행 {0}' ? match[i+1].replace(/미기록/g,'Not recorded') : match[i+1]]));
+      const values=new Map(keys.map((k,i)=>[k,ko==='진행 {0}' ? match[i+1].replace(/미기록/g,'Not recorded') : modelCounts&&match[i+1]==='미기록' ? 'Not recorded' : match[i+1]]));
       // One replacement pass: data containing {0} is not reinterpreted as a placeholder.
       return en.replace(/\{\d+\}/g,key=>values.get(key)??key);
     }

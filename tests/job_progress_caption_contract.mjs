@@ -20,6 +20,12 @@ const cases=[
  ['invalid count values are unknown rather than coerced',{progress:{completed:false,total:'4',succeeded:NaN,failed:-1}},'모델 계산 미기록/미기록 · 계산 성공 미기록 · 계산 실패 미기록'],
 ];
 for(const [name,job,caption] of cases)test(name,()=>assert.equal(c.jobProgressCaption(job),caption));
+test('English model counters translate each unrecorded count without rewriting data',()=>{
+ const caption=c.jobProgressCaption({progress:{completed:1,total:null,failed:1}});
+ assert.equal(c.I18N.term(caption).en,'Models processed 1/Not recorded · Computation succeeded Not recorded · Failed 1');
+ const data='모델 계산 candidate/미기록 · 계산 성공 미기록 · 계산 실패 1';
+ assert.equal(c.I18N.term(data).en,data);
+});
 test('job detail uses the count helper and preserves the mock badge',()=>{
  assert.match(source,/I18N\.term\(jobProgressCaption\(job\)\)/);
  assert.match(source,/if \(job\.mock\)\s+\$\("job-detail"\)\.append\(el\("span", I18N\.term\("MOCK · 합성 결과"\), "badge"\)\)/);
