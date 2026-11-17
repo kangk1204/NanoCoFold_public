@@ -13,6 +13,10 @@ The next-step button shows “Saving MSA preference…” until the preference i
 
 MSA 동의 저장 중에는 다음 버튼에 저장 상태를 표시합니다. 응답이 느릴 때 바로 다음을 눌러 이전 단계에 남는 문제를 고쳤습니다.
 
+Maturation re-scoring now retains the candidate's generation method (`dms` or `random`) separately from the prediction engine. Scores, rankings and selection criteria are unchanged.
+
+성숙화 재채점 시 후보 생성 방식(`dms` 또는 `random`)과 예측 엔진 출처를 각각 유지합니다. 점수·순위·선별 기준은 바뀌지 않습니다.
+
 ## 0.4.8rc13 — 2026-11-16
 
 MSA approval keeps the selected checkbox state while saving. Revocation blocks previously reviewed submissions and resumes, and imported refusals remain explicit. Score-only runs use recorded prediction stages and hashes rather than old folders selected by a new option. API responses use workspace-relative paths. The bilingual collaborator guide distinguishes result-data ZIPs from the separate offline HTML. Browser release checks and offline-template regeneration are part of the release procedure.

@@ -13,7 +13,7 @@ from audit121_fixtures import small_config, VHH
 
 
 def run_config(tmp_path, case):
-    mode = case if case in {"design", "mature"} else "screen"
+    mode = "mature" if case == "mature-random" else case if case in {"design", "mature"} else "screen"
     cfg = small_config(mode)
     cfg["screen"].update(engine="colabfold", tier2_n=2, restraint={"enabled": False})
     cfg["design"] = {"num_designs": 2, "mpnn": {"seqs_per_struct": 1},
@@ -21,6 +21,9 @@ def run_config(tmp_path, case):
     cfg["mature"]["library"] = {"max_variants": 2}
     cfg["mature"]["prefilter"]["top_n"] = 2
     cfg["mature"]["antifold"] = {"enabled": False}
+    if case == "mature-random":
+        cfg["mature"]["library"].update(strategy="random", size=3, min_mutations=1, max_mutations=1)
+        cfg["mature"]["prefilter"]["mode"] = "none"
     library = tmp_path / "library.fasta"
     library.write_text(f">first\n{VHH}\n>second\n{VHH[:-1]}A\n")
     cfg["screen"]["vhh_fasta"] = str(library)
@@ -41,18 +44,22 @@ def published(run):
     scored = pd.read_csv(run / "03_score/scored_candidates.csv", dtype={"design_id": str})
     # Predictor aliases were historically omitted by score. Compare the actual
     # engine, source and measured/decision columns rather than incidental schema.
-    fields = [c for c in ("design_id", "engine", "pred_dir", "cif_path", "iptm", "ipsae",
+    fields = [c for c in ("design_id", "source", "source_score", "engine", "pred_dir", "cif_path", "iptm", "ipsae",
                          "interface_pae", "ranking_status", "final_eligible", "final_evaluated",
-                         "selection_rank", "exclusion_reason") if c in scored]
+                         "rank", "composite_score", "selection_rank", "exclusion_reason") if c in scored]
     return scored[fields].sort_values("design_id").reset_index(drop=True)
 
 
-@pytest.mark.parametrize("case", ["screen", "design", "mature", "comparison", "chai1", "cascade", "rescore"])
+@pytest.mark.parametrize("case", ["screen", "design", "mature", "mature-random", "comparison", "chai1", "cascade", "rescore"])
 def test_score_twice_preserves_prediction_and_selection(tmp_path, case):
     mode, config = run_config(tmp_path, case)
     run = tmp_path / "run"
     assert cli.main([mode, "--config", str(config), "--run-dir", str(run), "--mock"]) == 0
     before = published(run)
+    if mode == "mature":
+        assert not before.empty
+        assert before["source"].eq("random" if case == "mature-random" else "dms").all()
+        assert before["source_score"].eq("colabfold").all()
     selected = pd.read_csv(run / "05_final/selected_candidates.csv").get("design_id", pd.Series(dtype=str)).tolist()
     state = json.loads((run / "run_state.json").read_text())
     records = state["prediction_stages"]["manifests"]
@@ -66,6 +73,26 @@ def test_score_twice_preserves_prediction_and_selection(tmp_path, case):
         pd.testing.assert_frame_equal(published(run), before)
         assert pd.read_csv(run / "05_final/selected_candidates.csv").get("design_id", pd.Series(dtype=str)).tolist() == selected
     assert cli.main(["report", "--run-dir", str(run)]) == 0
+
+
+@pytest.mark.parametrize("strategy", ["dms", "random"])
+@pytest.mark.parametrize("recorded_source", [None, "recorded-library"])
+def test_reload_mature_candidates_preserves_generation_source(tmp_path, strategy, recorded_source):
+    run = tmp_path / "run"
+    phase = run / "02_mature"
+    phase.mkdir(parents=True)
+    frame = pd.DataFrame({"variant_id": ["WT", "variant"], "sequence": [VHH, VHH[:-1] + "A"]})
+    if recorded_source is not None:
+        frame["source"] = recorded_source
+    path = phase / "prefiltered_candidates.csv"
+    frame.to_csv(path, index=False)
+    original = path.read_bytes()
+    cfg = {"run": {"mode": "mature"}, "mature": {"library": {"strategy": strategy}}}
+    loaded = cli._load_candidates(cfg, run, RunState(run))
+    assert loaded["source"].tolist() == [recorded_source or strategy] * 2
+    assert loaded["design_id"].tolist() == ["WT", "variant"]
+    assert loaded["sequence"].tolist() == frame["sequence"].tolist()
+    assert path.read_bytes() == original
 
 
 def test_empty_receipt_does_not_republish_older_or_design_stages(tmp_path):

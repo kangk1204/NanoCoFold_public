@@ -2129,6 +2129,10 @@ def _load_candidates(cfg, run_dir: Path, state: RunState) -> pd.DataFrame | None
             frame = pd.read_csv(path, dtype={"design_id": str, "variant_id": str})
             id_column = "design_id" if "design_id" in frame.columns else "variant_id"
             frame = frame.rename(columns={id_column: "design_id"})
+            if cfg_get(cfg, "run.mode") == "mature" and "source" not in frame.columns:
+                # cmd_mature adds this after saving the prefilter table. Restore
+                # the same generation provenance before merging prediction scores.
+                frame["source"] = cfg_get(cfg, "mature.library.strategy", "dms")
             if not predictions.empty:
                 frame = frame.merge(
                     predictions[["design_id", "pred_dir", "engine", "target_chain", "binder_chain"]],
