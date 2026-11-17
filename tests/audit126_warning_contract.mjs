@@ -70,3 +70,14 @@ test('new filename-bearing diagnostics preserve the supplied filename',()=>{
  const translated=term('FASTA 파일을 UTF-8로 다시 저장한 뒤 입력하세요: '+file).en;
  assert.equal(translated,'Save the FASTA file as UTF-8 and try again: '+file);
 });
+
+
+test('recorded RF2 evaluation-limit reason reaches the bilingual label without a generic fallback',()=>{
+ const ui=readFileSync(new URL('../nanocofold/templates/platform.js',import.meta.url),'utf8');
+ const body=ui.match(/function reportReasonLabel\(code\) \{([\s\S]*?)\n\}/)?.[0];assert.ok(body);
+ const label=vm.runInNewContext(body+'; reportReasonLabel');
+ const reason='RF2 사전 필터 또는 최종 복합체 평가 수 제한으로 재예측하지 않았습니다.';
+ assert.equal(label(reason),reason);
+ assert.equal(term(label(reason)).ko,reason);
+ assert.equal(term(label(reason)).en,'Not re-predicted because of the RF2 prefilter or the final complex evaluation limit.');
+});

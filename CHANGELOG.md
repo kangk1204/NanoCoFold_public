@@ -5,6 +5,10 @@
 
 ## 0.4.8rc13 source update — 2026-11-17
 
+The local and downloaded reports now show the same RF2 evaluation-limit reason as the hosted site, in Korean and English. Site release checks require an explicitly selected public package and run all cross-package checks. The private Linux process test is skipped on macOS. Existing results and selection criteria are unchanged.
+
+로컬·다운로드 보고서의 RF2 평가 수 제한 사유를 운영 사이트와 동일하게 표시합니다. 한영 표현을 함께 검증하며, 사이트 릴리스 검사는 지정한 공개 패키지와의 교차 검사를 모두 실행합니다. 비공개 Linux 프로세스 검사는 macOS에서 제외합니다. 기존 결과와 선별 기준은 변경하지 않습니다.
+
 ColabFold records its prediction manifests, and engine comparisons withdraw only manifests deliberately moved into query receipts. Re-scoring preserves prediction sources and values. Empty stage records stop re-scoring instead of falling back to design coordinates. A rejected re-score preserves an unchanged completed publication. All shipped Node contracts now run with pytest. Researcher input responses use portable paths; local owners and administrators retain installation paths.
 
 ColabFold 예측 목록과 엔진 비교의 파일 이동 기록을 바로잡아 재점수화 시 출처와 값을 유지합니다. 단계 기록이 비어 있으면 다른 단계로 대체하지 않고 복구 방법을 안내합니다. 결과를 바꾸기 전에 거부된 재점수화는 기존 완료 상태를 유지합니다. 모든 Node 계약 검사를 pytest에 연결했고, 일반 연구원에게는 서버 경로를 상대경로로 표시합니다. 개인 설치 소유자와 관리자는 설치 경로를 확인할 수 있습니다.
