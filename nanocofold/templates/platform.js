@@ -4293,7 +4293,7 @@ async function initNoviceFlow() {
       if (message) { field.setAttribute("aria-invalid", "true"); field.setAttribute("aria-errormessage", help.id); blocked = true; }
       else if (field.getAttribute("aria-errormessage") === help.id) { field.removeAttribute("aria-invalid"); field.removeAttribute("aria-errormessage"); }
     }
-    next.disabled = step === 1 && blocked;
+    next.disabled = state.msaConsentSaving || (step === 1 && blocked);
   }
   host.insertBefore(rail, task);
   const tasks=["목적을 고르세요. 필요한 입력과 결과를 확인하면 다음으로 이동합니다.","전체 서열·체인 순서·사본 수를 확인하세요. 오류 없는 필수 입력이면 다음으로 이동합니다.","계획 모델 수, 선택 엔진, MSA 전송 방식을 확인하세요.","입력 확인을 누르고 적용 조건을 읽은 뒤 분석 실행을 누르세요. 저장된 환경 확인 기록을 사용합니다."];
@@ -4322,6 +4322,7 @@ async function initNoviceFlow() {
       renderAnalysisScale(cfg, $("mode").value); I18N.text(plan, I18N.term(noviceModelPlan(cfg,$("mode").value,$("mode").value==="screen"?noviceFasta($("vhh-fasta").value).length:0)));}catch(e){clearScalePreview();I18N.text(plan, I18N.term(e.message));I18N.text(reason, I18N.term(e.message));}
     I18N.text($("review-input"), I18N.term("입력 확인"));I18N.text($("start-job"), I18N.term("분석 실행"));
     refreshSequenceHelp();
+    if (state.msaConsentSaving) I18N.text(next, I18N.term("MSA 동의 저장 중…"));
   }
   state.refreshNovice = render;
   function clearOptionErrors(){host.querySelectorAll('[aria-invalid="true"]').forEach(n=>n.removeAttribute("aria-invalid"));}

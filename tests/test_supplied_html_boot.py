@@ -296,7 +296,15 @@ def test_cpu_demo_review_needs_no_public_msa_consent(supplied_server):
         expect(page.locator("#novice-consent")).not_to_be_checked()
         page.get_by_role("button",name="조건 확인 후 다음",exact=True).click()
         expect(page.locator("#novice-blocker")).to_contain_text("동의")
+        pending_consent = []
+        page.route("**/api/msa-consent", lambda route: pending_consent.append(route)
+                   if route.request.method == "POST" else route.continue_())
         page.locator("#novice-consent").check()
+        expect(page.locator("#novice-next")).to_be_disabled()
+        expect(page.locator("#novice-next")).to_have_text("MSA 동의 저장 중…")
+        assert len(pending_consent) == 1
+        consent_request = pending_consent.pop()
+        consent_request.fulfill(response=consent_request.fetch())
         page.get_by_role("button",name="조건 확인 후 다음",exact=True).click()
         expect(page.locator(".novice-heading")).to_contain_text("4/4")
         expect(page.locator("#start-job")).to_be_disabled()

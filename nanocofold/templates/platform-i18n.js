@@ -75,6 +75,7 @@ const NCF_TRANSLATIONS = Object.freeze({
   "공용 MSA를 사용하려면 서열 전송에 처음 한 번 동의하세요.": "To use public MSA searches, approve sequence transfer once.",
   "MSA 전송 설정": "MSA transfer preference",
   "MSA 전송 동의를 저장하고 있습니다. 잠시 기다려 주세요.": "Saving your MSA transfer preference. Please wait.",
+  "MSA 동의 저장 중…": "Saving MSA preference…",
   "MSA 전송 동의를 저장하지 못했습니다. 다시 시도하세요.": "Could not save your MSA transfer preference. Please try again.",
   "기존 결과 재사용": "Previous result reused",
   "새 계산 없음": "No new computation",

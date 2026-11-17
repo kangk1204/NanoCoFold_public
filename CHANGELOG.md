@@ -9,6 +9,10 @@ ColabFold records its prediction manifests, and engine comparisons withdraw only
 
 ColabFold 예측 목록과 엔진 비교의 파일 이동 기록을 바로잡아 재점수화 시 출처와 값을 유지합니다. 단계 기록이 비어 있으면 다른 단계로 대체하지 않고 복구 방법을 안내합니다. 결과를 바꾸기 전에 거부된 재점수화는 기존 완료 상태를 유지합니다. 모든 Node 계약 검사를 pytest에 연결했고, 일반 연구원에게는 서버 경로를 상대경로로 표시합니다. 개인 설치 소유자와 관리자는 설치 경로를 확인할 수 있습니다.
 
+The next-step button shows “Saving MSA preference…” until the preference is saved. Slow responses no longer leave an immediate click on the previous step.
+
+MSA 동의 저장 중에는 다음 버튼에 저장 상태를 표시합니다. 응답이 느릴 때 바로 다음을 눌러 이전 단계에 남는 문제를 고쳤습니다.
+
 ## 0.4.8rc13 — 2026-11-16
 
 MSA approval keeps the selected checkbox state while saving. Revocation blocks previously reviewed submissions and resumes, and imported refusals remain explicit. Score-only runs use recorded prediction stages and hashes rather than old folders selected by a new option. API responses use workspace-relative paths. The bilingual collaborator guide distinguishes result-data ZIPs from the separate offline HTML. Browser release checks and offline-template regeneration are part of the release procedure.
