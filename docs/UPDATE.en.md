@@ -56,3 +56,5 @@ After updating, open a saved analysis in **Explore results** and select a **?** 
 **Check the update:** open Results database and save the complete Excel table again. “MSA used (recorded)” and “Requested MSA setting” are separate columns. Blank recorded cells mean that the original result did not record that value. Existing predictions and selection criteria are unchanged; no new GPU run is required.
 
 Approve public MSA sequence transfer once. Approval persists across single analyses, batches and reloads. It is saved per account, or per installation without login. Revoke it in Environment & setup. Cached and local MSA searches do not send sequences externally.
+
+This update also fixes re-scoring of ColabFold and multi-engine results. To re-score an older analysis, first read [saved-analysis recovery](rescoring.en.md). Updating alone does not recalculate existing results.

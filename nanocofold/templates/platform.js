@@ -1445,7 +1445,7 @@ async function refreshEnvironmentStatus() {
 }
 async function openEnvironment(current = false) {
   state.environmentTarget = current && state.input
-    ? {mode: state.input.config.run.mode, config: state.input.config} : null;
+    ? {mode: state.input.config.run.mode, input_id: state.input.id} : null;
   $("environment-mode").value = state.environmentTarget?.mode || $("mode").value;
   view("environment");
   await refreshEnvironmentStatus();
@@ -3693,7 +3693,7 @@ function initBatch(){
     } catch(error) {notice("파일을 읽지 못했습니다: "+error.message,true);}
   };
   $("batch-example").onclick=()=>{$("batch-format").value="json";$("batch-content").value=JSON.stringify({version:1,mode:"design",name:"CPU 배치 데모",mock:true,targets_fasta:">target-1\nACDEFGHIKLMNPQRSTVWY\n>target-2\nACDEFGHIKLMNPQRSTVWY\n",config:{design:{num_designs:1},screen:{tier2_n:1},rank:{final_n:1}}},null,2);reset();};
-  $("batch-review").onclick=()=>batchAction("배치 입력을 검토하고 있습니다. 계산은 시작하지 않습니다",async()=>{let payload;if($("batch-format").value==="json")payload=JSON.parse($("batch-content").value);else payload={version:1,mode:$("batch-mode").value,name:$("batch-name").value,targets_fasta:$("batch-content").value,...($("batch-mode").value==="screen"?{vhh_fasta:$("batch-library").value}:{}),...($("batch-mode").value==="mature"?{wt_fasta:$("batch-wt").value}:{}),...($("batch-mode").value==="complex"?{partners_fasta:$("batch-partners").value}:{})};if($("batch-use-config").checked){if(!state.input)throw Error("단일 분석에서 조건을 먼저 검토하세요.");payload.config=state.input.config;}payload.api_consent=$("batch-api-consent").checked;renderBatch(await api("/api/batches/review",payload));$("batch-content").removeAttribute("aria-invalid");await refreshBatchHistory();});
+  $("batch-review").onclick=()=>batchAction("배치 입력을 검토하고 있습니다. 계산은 시작하지 않습니다",async()=>{let payload;if($("batch-format").value==="json")payload=JSON.parse($("batch-content").value);else payload={version:1,mode:$("batch-mode").value,name:$("batch-name").value,targets_fasta:$("batch-content").value,...($("batch-mode").value==="screen"?{vhh_fasta:$("batch-library").value}:{}),...($("batch-mode").value==="mature"?{wt_fasta:$("batch-wt").value}:{}),...($("batch-mode").value==="complex"?{partners_fasta:$("batch-partners").value}:{})};if($("batch-use-config").checked){if(!state.input)throw Error("단일 분석에서 조건을 먼저 검토하세요.");delete payload.config;payload.input_id=state.input.id;}payload.api_consent=$("batch-api-consent").checked;renderBatch(await api("/api/batches/review",payload));$("batch-content").removeAttribute("aria-invalid");await refreshBatchHistory();});
   $("batch-submit").onclick=()=>batchAction("검토한 배치를 제출하고 있습니다",async()=>{if(!activeBatch)throw Error("배치를 먼저 검토하세요.");renderBatch(await api("/api/batches/"+activeBatch.id+"/submit",{review_sha256:activeBatch.review_sha256,selected:activeBatch.selected||batchSelected,...(activeBatch.budget_seconds!==undefined?{budget_seconds:activeBatch.budget_seconds}:{})},{timeoutMs:30000}));});
   $("batch-refresh").onclick=async()=>{try{if(activeBatch)renderBatch(await api("/api/batches/"+activeBatch.id));await refreshBatchHistory();}catch(e){notice(e.message,true);}};
   $("batch-cancel").onclick=async()=>{

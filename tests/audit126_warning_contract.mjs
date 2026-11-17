@@ -59,6 +59,7 @@ test('static warning list and authored selection status opt into explicit bindin
 });
 
 for(const warning of [
+ 'RF2 사전 필터 또는 최종 복합체 평가 수 제한으로 재예측하지 않았습니다.',
  'target.aux_chains는 보조 체인 목록이어야 합니다: [{name: ..., sequence: ...}]',
  "target.name는 문자열이어야 합니다. ':'를 포함하는 --set 값은 따옴표로 감싸세요.",
  'screen.extra는 목록이어야 합니다.',

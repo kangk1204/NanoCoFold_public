@@ -151,7 +151,8 @@ def build_parser(*, handoff_help_language: str = "en") -> argparse.ArgumentParse
     add_common(p_mature)
     p_mature.add_argument("--wt-fasta", required=False, help="Wild-type VHH FASTA")
 
-    p_score = sub.add_parser("score", help="Score complexes, assess developability, rank and report")
+    p_score = sub.add_parser("score", help="Score saved predictions, assess developability, rank and report",
+        description="Re-score recorded predictions without running an engine. See docs/rescoring.en.md (Korean: docs/rescoring.ko.md) for stage-record errors and recovery.")
     add_common(p_score)
 
     p_report = sub.add_parser("report", help="Regenerate only the HTML report of an existing run")
@@ -509,6 +510,7 @@ def _execute_command(args) -> int:
                 "comparison": bool(cfg_get(cfg, "screen.comparison.enabled", False)),
             }))
         previous_execution = dict(state.data.get("execution", {}))
+        previous_final = copy.deepcopy(state.get_phase("final"))
         if previous_execution and not dry:
             state.data["previous_execution"] = previous_execution
             if args.command == "report":
@@ -580,7 +582,16 @@ def _execute_command(args) -> int:
                 attempt = {"state": status, "started": started, "finished": time.time(),
                     "command": args.command, "error": f"{type(exc).__name__}: {exc}"}
                 source = state.data.get("report_source_execution", {})
-                if args.command == "report" and source.get("state") in {"cancelled", "interrupted", "budget_exhausted", "running", "failed", "partial_failure"}:
+                from .publication import tables_available
+                if (args.command == "score" and previous_execution.get("state") == "complete"
+                        and state.get_phase("final") == previous_final
+                        and tables_available(run_dir, previous_final)):
+                    # A rejected re-score leaves a completed publication usable.
+                    # Once _finalize starts changing it, its checkpoint and hash
+                    # guards remain authoritative; never relabel partial work.
+                    state.data["execution"] = previous_execution
+                    state.data["score_attempt"] = {**attempt, "state": "rejected"}
+                elif args.command == "report" and source.get("state") in {"cancelled", "interrupted", "budget_exhausted", "running", "failed", "partial_failure"}:
                     state.data["execution"] = dict(source)
                     state.data["report_attempt"] = {**attempt, "state": "rejected"}
                 else:
@@ -2058,6 +2069,8 @@ def cmd_score(args) -> int:
     if not target:
         raise RuntimeError("이 실행에 target 단계가 없습니다. 먼저 prepare/run 을 수행하세요.")
     recorded_stages = state.data.get("prediction_stages")
+    if recorded_stages is not None:
+        _load_prediction_manifests(run_dir, cfg)  # Validate shape and hashes before reading metadata.
     if recorded_stages is not None and any(
             recorded_stages.get(key) != value for key, value in {
                 "mode": cfg_get(cfg, "run.mode"),
@@ -2066,7 +2079,6 @@ def cmd_score(args) -> int:
             }.items()):
         raise ValueError("예측 단계 구성이 기록과 다릅니다. score는 새 엔진을 실행하지 않습니다. 변경한 설정으로 분석을 먼저 실행하세요.")
     if recorded_stages is not None:
-        _load_prediction_manifests(run_dir, cfg)  # Verify every recorded stage before publication.
         if state.data.get("attempts"):
             state.data["attempts"][-1]["stages_used"] = recorded_stages["manifests"]
             state.save()
@@ -2166,6 +2178,11 @@ def _load_prediction_manifests(run_dir: Path, cfg: dict | None = None) -> pd.Dat
     if recorded is not None:
         if not isinstance(recorded, dict) or not isinstance(recorded.get("manifests"), list):
             raise ValueError("예측 단계 기록이 손상되었습니다. 원본 상태 파일을 복구하세요.")
+        if not recorded["manifests"]:
+            # Absence of a receipt is a legacy format. An explicit empty receipt
+            # is a failed producer contract, never permission to use old stages
+            # or design coordinates. A fresh prediction attempt repairs it.
+            raise ValueError("예측 단계 기록이 비어 있습니다. 최신 코드로 분석을 재개한 뒤 score를 다시 실행하세요. 기존 결과는 유지됩니다.")
         used = {}
         for item in recorded["manifests"]:
             if not isinstance(item, dict) or not isinstance(item.get("path"), str):

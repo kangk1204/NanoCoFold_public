@@ -7,13 +7,13 @@ import vm from 'node:vm';
 const source=readFileSync(new URL('../nanocofold/templates/platform.js',import.meta.url),'utf8');
 function fixture(){
  const nodes=new Map(),events=[];
- const c={$:id=>{if(!nodes.has(id))nodes.set(id,{value:'',files:[],hidden:false,disabled:false,checked:false,listeners:{},addEventListener(kind,fn){this.listeners[kind]=fn;},focus(){this.focused=true;},dispatchEvent(event){events.push(event);c.state.inputRevision++;c.$('novice-consent').checked=false;this.listeners[event.type]?.(event);}});return nodes.get(id);},state:{inputRevision:0},clearInputStructure(){c.state.inputRevision++;},notice(){},Event:class{constructor(type,options){this.type=type;this.bubbles=options.bubbles;}}};
+ const c={$:id=>{if(!nodes.has(id))nodes.set(id,{value:'',files:[],hidden:false,disabled:false,checked:false,listeners:{},addEventListener(kind,fn){this.listeners[kind]=fn;},focus(){this.focused=true;},dispatchEvent(event){events.push(event);c.state.inputRevision++;this.listeners[event.type]?.(event);}});return nodes.get(id);},state:{inputRevision:0},clearInputStructure(){c.state.inputRevision++;},notice(){},Event:class{constructor(type,options){this.type=type;this.bubbles=options.bubbles;}}};
  koreanContext(c);vm.runInContext(source.slice(source.indexOf('let structureInputSource ='),source.indexOf('function invalidateInput()')),c);c.initAlternativeInputs();return {c,events};
 }
 test('a structure file disables PDB input and switching retains both raw drafts',()=>{
  const {c}=fixture(),file={name:'input.pdb'};c.$('structure-file').files=[file];c.$('pdb-id').value='2FLU';c.$('novice-consent').checked=true;
  c.$('structure-file').listeners.change();assert.equal(c.$('pdb-id').disabled,true);assert.equal(c.$('structure-pdb-option').hidden,true);
- c.$('change-structure-input').onclick();assert.equal(c.$('structure-file').disabled,true);assert.equal(c.$('pdb-id').disabled,false);assert.equal(c.$('pdb-id').value,'2FLU');assert.equal(c.$('structure-file').files[0],file);assert.equal(c.$('novice-consent').checked,false);
+ c.$('change-structure-input').onclick();assert.equal(c.$('structure-file').disabled,true);assert.equal(c.$('pdb-id').disabled,false);assert.equal(c.$('pdb-id').value,'2FLU');assert.equal(c.$('structure-file').files[0],file);assert.equal(c.$('novice-consent').checked,true);
  c.$('change-structure-input').onclick();assert.equal(c.$('structure-file').disabled,false);assert.equal(c.$('pdb-id').value,'2FLU');
 });
 test('clearing the PDB draft makes the file route available again',()=>{

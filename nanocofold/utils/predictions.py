@@ -30,6 +30,15 @@ def record_manifest(path):
     attempt["manifests"][relative] = {"path": relative, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
 
 
+def discard_manifest(path):
+    """Withdraw only a manifest deliberately moved by the current producer."""
+    attempt = _ATTEMPT.get()
+    if attempt is None:
+        return
+    relative = Path(path).resolve().relative_to(attempt["root"]).as_posix()
+    attempt["manifests"].pop(relative, None)
+
+
 def attempt_manifests(root):
     attempt = _ATTEMPT.get()
     if attempt is None or attempt["root"] != Path(root).resolve():

@@ -365,7 +365,7 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
 
     @app.post("/api/inputs/complex")
     async def complex_input(request: Request):
-        return await asyncio.to_thread(input_manager(request).complex, await body(request))
+        return present_input(await asyncio.to_thread(input_manager(request).complex, await body(request)), request)
 
     @app.get("/api/starter-presets")
     async def starter_presets():
@@ -452,7 +452,12 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
     @app.post("/api/batches/review")
     async def batch_review(request: Request):
         batch_manager = BatchManager(input_manager(request),manager) if request.state.researcher else batches
-        return present_metadata(await asyncio.to_thread(batch_manager.review, await body(request), researcher=request.state.researcher))
+        payload = await body(request)
+        source_id = payload.pop("input_id", None)
+        if source_id:
+            # Use the reviewed server copy, never redacted presentation paths.
+            payload["config"] = input_manager(request).reviewed(source_id)["config"]
+        return present_metadata(await asyncio.to_thread(batch_manager.review, payload, researcher=request.state.researcher))
 
     @app.get("/api/batches/{identifier}")
     def batch_get(identifier: str, request: Request):
@@ -727,14 +732,14 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
             # A broken installation remains inspectable through Environment.
             # Do not invent numeric defaults before input review succeeds.
             defaults = {}
-        return {"workspace": str(workspace), "researcher": request.state.researcher, "lab_admin":request.state.admin, "lab_shared":request.state.shared, "version": __version__, "modes": ["complex", "design", "screen", "mature"], "poll_interval_ms": 2000,
+        return {"workspace": "." if request.state.researcher and not request.state.admin else str(workspace), "researcher": request.state.researcher, "lab_admin":request.state.admin, "lab_shared":request.state.shared, "version": __version__, "modes": ["complex", "design", "screen", "mature"], "poll_interval_ms": 2000,
                 "public_msa_consent": saved_msa_consent(request) is True,
                 "presets": {"researcher_exploration": exploration_config(), "standard": {}},
                 "planning_defaults": defaults}
 
     @app.get("/api/inputs")
     def input_list(request: Request):
-        return native({"inputs": input_manager(request).list()})
+        return present_input({"inputs": input_manager(request).list()}, request)
 
     @app.get("/api/tutorials/{mode}")
     def public_tutorial(mode: str):
@@ -762,19 +767,19 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
         payload = await body(request)
         if payload.get("kind") != "fasta":
             raise ValueError("FASTA 입력은 kind=fasta로 지정하세요. 구조 파일은 /api/inputs/load를 사용하세요.")
-        return native(await asyncio.to_thread(input_manager(request).fasta, payload))
+        return present_input(await asyncio.to_thread(input_manager(request).fasta, payload), request)
 
     @app.post("/api/inputs/load")
     async def input_load(request: Request):
-        return native(await asyncio.to_thread(input_manager(request).load, await body(request)))
+        return present_input(await asyncio.to_thread(input_manager(request).load, await body(request)), request)
 
     @app.post("/api/inputs/analyze")
     async def input_analyze(request: Request):
-        return native(await asyncio.to_thread(input_manager(request).analyze, await body(request)))
+        return present_input(await asyncio.to_thread(input_manager(request).analyze, await body(request)), request)
 
     @app.post("/api/inputs/review")
     async def input_review(request: Request):
-        return native(await asyncio.to_thread(input_manager(request).review, await body(request)))
+        return present_input(await asyncio.to_thread(input_manager(request).review, await body(request)), request)
 
     @app.get("/api/inputs/{identifier}/structure")
     def input_structure(identifier: str, request: Request):
@@ -782,7 +787,12 @@ def create_app(workspace: str | Path, *, start_workers: bool = True) -> FastAPI:
 
     @app.get("/api/inputs/{identifier}")
     def input_get(identifier: str, request: Request):
-        return native(input_manager(request).get(identifier))
+        return present_input(input_manager(request).get(identifier), request)
+
+    def present_input(value, request):
+        # Administrators and local owners manage installed paths. Researchers
+        # receive a presentation copy; execution resolves the original by ID.
+        return present_metadata(value) if request.state.researcher and not request.state.admin else native(value)
 
     def present_metadata(value):
         from ..utils.presentation import portable_metadata

@@ -11,6 +11,8 @@ The browser flag is required. A run that skips the Chromium cases does not estab
 
 The Linux process tests verify cancellation of owned children and release of their reservations while an unrelated control process survives. Run them on Linux or confirm their results in public CI. A macOS skip does not close that check. The approved private remote-CI exception does not exempt public CI.
 
+`test_ui_node_contracts.py` discovers every `tests/*_contract.mjs`; new contracts are included automatically. `test_review128_republication.py` checks two consecutive score commands across modes and engines, missing/empty stage records, preserved prior stages, and publication failure boundaries. Node.js is required for the UI contracts.
+
 After package changes, compare and reseal the shared core against the other source repository, refresh the Site runtime fingerprint, then check the Site tests, type checker and production build. Publish the exact pushed source. Verify the deployed language controls, report and downloads using preserved results.
 
 ## 한국어

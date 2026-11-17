@@ -169,3 +169,17 @@ test('both complex comparison paths retain primary pair and symmetry without mut
     assert.deepEqual(settings.comparison_engines,preset==='legacy'?['chai1']:cfg.screen.comparison.engines);
   }
 });
+
+for (const format of ['json','fasta']) test('batch reuses reviewed settings by input ID: '+format,async()=>{
+ const {context:c}=tutorialFixture(),requests=[];
+ c.state.input={id:'reviewed-input',config:{screen:{boltz2_env:'[local path]'}}};
+ c.$('batch-format').value=format;c.$('batch-mode').value='screen';c.$('batch-use-config').checked=true;
+ c.$('batch-content').value=format==='json'?JSON.stringify({version:1,mode:'screen',config:{screen:{engine:'chai1'}}}):'>target\nACDE';
+ c.$('batch-library').value='>binder\nFGHI';
+ c.api=async(route,payload)=>{requests.push({route,payload});return {};};
+ c.batchAction=async(_message,work)=>work();c.renderBatch=()=>{};c.refreshBatchHistory=async()=>{};
+ c.initBatch();await c.$('batch-review').onclick();
+ assert.equal(requests.length,1);assert.equal(requests[0].route,'/api/batches/review');
+ assert.equal(requests[0].payload.input_id,'reviewed-input');assert.equal('config' in requests[0].payload,false);
+ assert.equal(c.state.input.config.screen.boltz2_env,'[local path]');
+});

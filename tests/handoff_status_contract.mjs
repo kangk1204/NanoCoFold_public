@@ -25,7 +25,9 @@ test('saved detailed status requires exact boolean, counts and agreement',()=>{
  assert.equal(c.resultHandoffView({mode:'screen',handoff_diagnostics:{...receipt,n_errors:1}}).status,'unknown');
 });
 test('saved empty MSA remains an independent limitation',()=>{
- assert.equal(c.resultHandoffView({...summary,config:{structure:{msa:{backend:'empty'}}}}).empty_msa,true);
+ assert.equal(c.resultHandoffView(summary,[{msa_used:'empty',model_record:true}]).empty_msa,true);
+ assert.equal(c.resultHandoffView(summary,[{msa_used:'empty'},{msa_used:'precomputed'}]).empty_msa,false);
+ assert.equal(c.resultHandoffView({...summary,config:{structure:{msa:{backend:'empty'}}}}).empty_msa,false,'A target default alone does not establish the complex MSA used');
  assert.equal(c.resultHandoffView(summary).empty_msa,false);
 });
 test('explicit bilingual text preserves arbitrary saved IDs and changes reversibly',()=>{

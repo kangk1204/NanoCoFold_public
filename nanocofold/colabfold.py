@@ -194,6 +194,8 @@ def predict(cfg, work_dir, target, candidates, *, mock=False, dry_run=False,
         _save(work_dir / "prediction_progress.json", progress)
         frame = pd.DataFrame([records[x] for x in identifiers])
         write_csv(work_dir / "predictions.csv", _predictions_manifest_frame(frame, work_dir.parent.resolve()))
+        from .utils.predictions import record_manifest
+        record_manifest(work_dir / "predictions.csv")
     publish()
     if mock:
         from .mock import make_mock_engine_output

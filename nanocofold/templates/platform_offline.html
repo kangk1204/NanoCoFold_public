@@ -1299,6 +1299,11 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "RF2 사전 필터 또는 최종 복합체 평가 수 제한으로 재예측하지 않았습니다.": "Not re-predicted because of the RF2 prefilter or the final complex evaluation limit.",
+  "예측 단계 기록이 비어 있습니다. 최신 코드로 분석을 재개한 뒤 score를 다시 실행하세요. 기존 결과는 유지됩니다.": "The prediction stage record is empty. Resume the analysis with the current code, then run score again. Existing results are preserved.",
+  "예측 단계 기록이 손상되었습니다. 원본 상태 파일을 복구하세요.": "The prediction stage record is damaged. Restore the original state file.",
+  "기록된 예측 목록이 없거나 변경됐습니다. 원본을 복구하거나 분석을 재개하세요.": "A recorded prediction manifest is missing or changed. Restore the original files or resume the analysis.",
+  "예측 단계 구성이 기록과 다릅니다. score는 새 엔진을 실행하지 않습니다. 변경한 설정으로 분석을 먼저 실행하세요.": "The prediction stage configuration differs from the record. score does not run a new engine. Run the analysis with the changed settings first.",
   "MSA 전송 동의는 true/false로 지정하세요.": "Set MSA transfer approval to true or false.",
   "API MSA 서열 전송에 동의하고 설정을 저장합니다.": "I agree to send sequences for public MSA searches and save this preference.",
   "API MSA 서열 전송에 동의하고 이 계정에 저장합니다.": "I agree to send sequences for public MSA searches and save this preference for my account.",
@@ -3813,7 +3818,7 @@ globalThis.I18N = (() => {
           !/^(?:[A-Za-z0-9]+:)?-?\d+[A-Za-z]?$/.test(match[1])) continue;
       // These parameters are configuration field paths, not arbitrary Korean
       // prose. Translate full authored descriptions via their explicit keys.
-      if((ko==='{0} 허용값: {1}'||ko==='{0} 설정은 객체여야 합니다.'||ko==='{0} 설정은 true/false여야 합니다.'||ko==='{0}는 목록이어야 합니다.'||ko==="{0}는 문자열이어야 합니다. ':'를 포함하는 --set 값은 따옴표로 감싸세요.")&&
+      if((ko==='{0}은 객체여야 합니다.'||ko==='{0} 허용값: {1}'||ko==='{0} 설정은 객체여야 합니다.'||ko==='{0} 설정은 true/false여야 합니다.'||ko==='{0}는 목록이어야 합니다.'||ko==="{0}는 문자열이어야 합니다. ':'를 포함하는 --set 값은 따옴표로 감싸세요.")&&
           !/^[A-Za-z_][A-Za-z0-9_.\[\]-]*$/.test(match[1]))continue;
       const values=new Map(keys.map((k,i)=>[k,ko==='진행 {0}' ? match[i+1].replace(/미기록/g,'Not recorded') : modelCounts&&match[i+1]==='미기록' ? 'Not recorded' : match[i+1]]));
       // One replacement pass: data containing {0} is not reinterpreted as a placeholder.
@@ -5530,7 +5535,7 @@ async function refreshEnvironmentStatus() {
 }
 async function openEnvironment(current = false) {
   state.environmentTarget = current && state.input
-    ? {mode: state.input.config.run.mode, config: state.input.config} : null;
+    ? {mode: state.input.config.run.mode, input_id: state.input.id} : null;
   $("environment-mode").value = state.environmentTarget?.mode || $("mode").value;
   view("environment");
   await refreshEnvironmentStatus();
@@ -7778,7 +7783,7 @@ function initBatch(){
     } catch(error) {notice("파일을 읽지 못했습니다: "+error.message,true);}
   };
   $("batch-example").onclick=()=>{$("batch-format").value="json";$("batch-content").value=JSON.stringify({version:1,mode:"design",name:"CPU 배치 데모",mock:true,targets_fasta:">target-1\nACDEFGHIKLMNPQRSTVWY\n>target-2\nACDEFGHIKLMNPQRSTVWY\n",config:{design:{num_designs:1},screen:{tier2_n:1},rank:{final_n:1}}},null,2);reset();};
-  $("batch-review").onclick=()=>batchAction("배치 입력을 검토하고 있습니다. 계산은 시작하지 않습니다",async()=>{let payload;if($("batch-format").value==="json")payload=JSON.parse($("batch-content").value);else payload={version:1,mode:$("batch-mode").value,name:$("batch-name").value,targets_fasta:$("batch-content").value,...($("batch-mode").value==="screen"?{vhh_fasta:$("batch-library").value}:{}),...($("batch-mode").value==="mature"?{wt_fasta:$("batch-wt").value}:{}),...($("batch-mode").value==="complex"?{partners_fasta:$("batch-partners").value}:{})};if($("batch-use-config").checked){if(!state.input)throw Error("단일 분석에서 조건을 먼저 검토하세요.");payload.config=state.input.config;}payload.api_consent=$("batch-api-consent").checked;renderBatch(await api("/api/batches/review",payload));$("batch-content").removeAttribute("aria-invalid");await refreshBatchHistory();});
+  $("batch-review").onclick=()=>batchAction("배치 입력을 검토하고 있습니다. 계산은 시작하지 않습니다",async()=>{let payload;if($("batch-format").value==="json")payload=JSON.parse($("batch-content").value);else payload={version:1,mode:$("batch-mode").value,name:$("batch-name").value,targets_fasta:$("batch-content").value,...($("batch-mode").value==="screen"?{vhh_fasta:$("batch-library").value}:{}),...($("batch-mode").value==="mature"?{wt_fasta:$("batch-wt").value}:{}),...($("batch-mode").value==="complex"?{partners_fasta:$("batch-partners").value}:{})};if($("batch-use-config").checked){if(!state.input)throw Error("단일 분석에서 조건을 먼저 검토하세요.");delete payload.config;payload.input_id=state.input.id;}payload.api_consent=$("batch-api-consent").checked;renderBatch(await api("/api/batches/review",payload));$("batch-content").removeAttribute("aria-invalid");await refreshBatchHistory();});
   $("batch-submit").onclick=()=>batchAction("검토한 배치를 제출하고 있습니다",async()=>{if(!activeBatch)throw Error("배치를 먼저 검토하세요.");renderBatch(await api("/api/batches/"+activeBatch.id+"/submit",{review_sha256:activeBatch.review_sha256,selected:activeBatch.selected||batchSelected,...(activeBatch.budget_seconds!==undefined?{budget_seconds:activeBatch.budget_seconds}:{})},{timeoutMs:30000}));});
   $("batch-refresh").onclick=async()=>{try{if(activeBatch)renderBatch(await api("/api/batches/"+activeBatch.id));await refreshBatchHistory();}catch(e){notice(e.message,true);}};
   $("batch-cancel").onclick=async()=>{

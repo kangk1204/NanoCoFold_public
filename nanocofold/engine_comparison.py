@@ -18,7 +18,7 @@ from . import provenance
 from .config import cfg_get, cfg_seed, dump_resolved, resolve_path
 from .utils import seq, shell
 from .utils.atomic import write_csv
-from .utils.predictions import record_manifest
+from .utils.predictions import record_manifest, discard_manifest
 
 LEGACY_ENGINES = ("colabfold", "boltz2", "chai1")
 ENGINES = (*LEGACY_ENGINES, "opendde")
@@ -424,6 +424,7 @@ def run(cfg, run_dir, state, target, candidates, cdr_ranges=None, *, predict, fi
                     receipt_dir = root / engine / "query_receipts"
                     receipt_dir.mkdir(exist_ok=True)
                     local_manifest.replace(receipt_dir / (identifier + ".csv"))
+                    discard_manifest(local_manifest)
                 reported_error = prediction.pop("error", None)
                 row = {**query, **prediction, "engine": engine, "predictor_engine": engine,
                        "mock": bool(cfg_get(cfg, "run.mock", False)),

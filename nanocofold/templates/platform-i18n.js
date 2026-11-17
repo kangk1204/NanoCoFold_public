@@ -64,6 +64,11 @@ const NCF_LEGACY_TERMS = Object.freeze({
   "분석 구간·Hotspot 제외 영역": "분석 구간·결합 부위 제외 영역"
 });
 const NCF_TRANSLATIONS = Object.freeze({
+  "RF2 사전 필터 또는 최종 복합체 평가 수 제한으로 재예측하지 않았습니다.": "Not re-predicted because of the RF2 prefilter or the final complex evaluation limit.",
+  "예측 단계 기록이 비어 있습니다. 최신 코드로 분석을 재개한 뒤 score를 다시 실행하세요. 기존 결과는 유지됩니다.": "The prediction stage record is empty. Resume the analysis with the current code, then run score again. Existing results are preserved.",
+  "예측 단계 기록이 손상되었습니다. 원본 상태 파일을 복구하세요.": "The prediction stage record is damaged. Restore the original state file.",
+  "기록된 예측 목록이 없거나 변경됐습니다. 원본을 복구하거나 분석을 재개하세요.": "A recorded prediction manifest is missing or changed. Restore the original files or resume the analysis.",
+  "예측 단계 구성이 기록과 다릅니다. score는 새 엔진을 실행하지 않습니다. 변경한 설정으로 분석을 먼저 실행하세요.": "The prediction stage configuration differs from the record. score does not run a new engine. Run the analysis with the changed settings first.",
   "MSA 전송 동의는 true/false로 지정하세요.": "Set MSA transfer approval to true or false.",
   "API MSA 서열 전송에 동의하고 설정을 저장합니다.": "I agree to send sequences for public MSA searches and save this preference.",
   "API MSA 서열 전송에 동의하고 이 계정에 저장합니다.": "I agree to send sequences for public MSA searches and save this preference for my account.",
@@ -2578,7 +2583,7 @@ globalThis.I18N = (() => {
           !/^(?:[A-Za-z0-9]+:)?-?\d+[A-Za-z]?$/.test(match[1])) continue;
       // These parameters are configuration field paths, not arbitrary Korean
       // prose. Translate full authored descriptions via their explicit keys.
-      if((ko==='{0} 허용값: {1}'||ko==='{0} 설정은 객체여야 합니다.'||ko==='{0} 설정은 true/false여야 합니다.'||ko==='{0}는 목록이어야 합니다.'||ko==="{0}는 문자열이어야 합니다. ':'를 포함하는 --set 값은 따옴표로 감싸세요.")&&
+      if((ko==='{0}은 객체여야 합니다.'||ko==='{0} 허용값: {1}'||ko==='{0} 설정은 객체여야 합니다.'||ko==='{0} 설정은 true/false여야 합니다.'||ko==='{0}는 목록이어야 합니다.'||ko==="{0}는 문자열이어야 합니다. ':'를 포함하는 --set 값은 따옴표로 감싸세요.")&&
           !/^[A-Za-z_][A-Za-z0-9_.\[\]-]*$/.test(match[1]))continue;
       const values=new Map(keys.map((k,i)=>[k,ko==='진행 {0}' ? match[i+1].replace(/미기록/g,'Not recorded') : modelCounts&&match[i+1]==='미기록' ? 'Not recorded' : match[i+1]]));
       // One replacement pass: data containing {0} is not reinterpreted as a placeholder.
