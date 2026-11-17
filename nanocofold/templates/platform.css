@@ -565,3 +565,8 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
 #vhh-structure-feedback:empty { display:none; }
 #vhh-sequence-value::selection { color:#123c43; background:#c3e8e1; }
 #vhh-sequence-help { margin:.4rem 0; font-size:.9rem; }
+
+.decision-guide { margin:.5rem 0 1rem; font-size:.9rem; }
+.decision-guide summary { cursor:pointer; width:fit-content; padding:.35rem 0; }
+.decision-guide dl { display:grid; grid-template-columns:minmax(0,8rem) minmax(0,1fr); gap:.35rem 1rem; margin:.5rem 0; }
+.decision-guide :is(dt,dd) { margin:0; overflow-wrap:anywhere; }

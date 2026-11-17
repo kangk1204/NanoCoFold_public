@@ -8,12 +8,17 @@ from test_reassessment_presentation import _payload,_write_document
 
 @pytest.mark.skipif(os.environ.get('NANOCOFOLD_BROWSER_TEST')!='1',reason='Real Chromium caption gate')
 @pytest.mark.parametrize('basis',['recorded','quality'])
-@pytest.mark.parametrize('eligible',[True,False,None])
+@pytest.mark.parametrize('eligible',[True,False,None,'held'])
 def test_real_caption_round_trip_preserves_model_and_numeric_payload(tmp_path,basis,eligible):
     from playwright.sync_api import sync_playwright,expect
     payload=_payload(tmp_path)
     row=payload['candidates']['rows'][0]
-    row.update(final_eligible=eligible,quality_eligible=eligible)
+    decision=False if eligible=='held' else eligible
+    row.update(final_eligible=decision,quality_eligible=decision)
+    if eligible=='held':
+        row.update(dev_assessment_policy='sequence_liability_screen_v2',
+                   dev_assessment_status='review_required',
+                   exclusion_reasons=['developability_review_required'])
     document=_write_document(tmp_path,payload)
     with sync_playwright() as pw:
         browser=pw.chromium.launch(args=['--enable-unsafe-swiftshader'])
@@ -30,16 +35,18 @@ def test_real_caption_round_trip_preserves_model_and_numeric_payload(tmp_path,ba
         assert page.locator('#result-data').text_content()==''
         ko_basis='실행 당시 기록 판정' if basis=='recorded' else '품질 판정 (결합 부위 제외)'
         en_basis='Assessment recorded at execution' if basis=='recorded' else 'Quality assessment (excluding hotspots)'
-        en_status={True:'Eligible',False:'Ineligible',None:'Not evaluated'}[eligible]
-        ko_status={True:'적격',False:'부적격',None:'미평가'}[eligible]
+        en_status={True:'Eligible',False:'Criteria not met',None:'Not evaluated','held':'Held for review'}[eligible]
+        ko_status={True:'적격',False:'기준 미충족',None:'미평가','held':'검토 보류'}[eligible]
         for language in ['en','ko','en']:
             page.locator('#language-select').select_option(language)
             expect(page.locator('#candidate-status')).to_contain_text(
                 f'{en_basis}: {en_status}' if language=='en' else f'{ko_basis}: {ko_status}')
+            expect(page.locator('#candidate-detail > p').first).to_have_text(
+                f'Assessment under selected criteria: {en_status}' if language=='en' else f'선택한 기준의 판정: {ko_status}')
             expect(page.locator('#viewer-candidate-select')).to_have_value(row['candidate_id'])
             assert page.evaluate('JSON.stringify(window.NANOCOFOLD_OFFLINE)')==original
             assert page.locator('#result-data').text_content()==''
         assert document.read_bytes()==saved_document
-        assert json.loads(original)['candidates']['rows'][0]['final_eligible'] is eligible
+        assert json.loads(original)['candidates']['rows'][0]['final_eligible'] is decision
         assert errors==[]
         browser.close()

@@ -80,14 +80,14 @@ test('candidate eligibility captions translate composed UI terms and preserve ra
  const context={I18N:i,state:{result:{mode:'screen'},candidate:row,filtered:[row]},
   $:get,options(){},fmt:String,metricCaption:()=> '표적–VHH ipTM',
   recordedEvaluationError:()=>false,modelAssessmentCaption:()=>'',
-  decisionCaption:value=>value===true?'적격':value===false?'부적격':'미평가',
   candidateEligibility:()=>row.final_eligible};
  vm.createContext(context);
+ vm.runInContext(ui.slice(ui.indexOf('function developabilityReviewOnly(row)'),ui.indexOf('const offline =')),context);
  vm.runInContext(ui.slice(ui.indexOf('function syncCandidateNavigation()'),ui.indexOf('function stepCandidate(')),context);
  const original=JSON.stringify(row);
  for(const [basis,ko,en] of [['recorded','실행 당시 기록 판정','Assessment recorded at execution'],['quality','품질 판정 (결합 부위 제외)','Quality assessment (excluding hotspots)']]){
   get('eligibility-basis').value=basis;
-  for(const [value,koStatus,enStatus] of [[true,'적격','Eligible'],[false,'부적격','Ineligible'],[null,'미평가','Not evaluated']]){
+  for(const [value,koStatus,enStatus] of [[true,'적격','Eligible'],[false,'기준 미충족','Criteria not met'],[null,'미평가','Not evaluated']]){
    row.final_eligible=value;
    const saved=JSON.stringify(row);
    context.syncCandidateNavigation();

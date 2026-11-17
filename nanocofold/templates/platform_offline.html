@@ -565,6 +565,11 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
 #vhh-structure-feedback:empty { display:none; }
 #vhh-sequence-value::selection { color:#123c43; background:#c3e8e1; }
 #vhh-sequence-help { margin:.4rem 0; font-size:.9rem; }
+
+.decision-guide { margin:.5rem 0 1rem; font-size:.9rem; }
+.decision-guide summary { cursor:pointer; width:fit-content; padding:.35rem 0; }
+.decision-guide dl { display:grid; grid-template-columns:minmax(0,8rem) minmax(0,1fr); gap:.35rem 1rem; margin:.5rem 0; }
+.decision-guide :is(dt,dd) { margin:0; overflow-wrap:anywhere; }
 </style></head><body><header class="offline-header"><div class="offline-brand"><strong>NanoCoFold · 오프라인 결과 탐색</strong><span>전체 후보 · 관측 · 구조 · 출처 포함</span></div><div class="language-switch"><label for="language-select">Language</label> <select id="language-select" disabled aria-label="Language / 언어"><option value="en" lang="en">English</option><option value="ko" lang="ko">한국어</option></select></div></header><main><div id="notice" role="status" aria-live="polite" hidden></div><section id="view-results">
 
         <h1>분석 결과 보고서</h1><p class="muted">NanoCoFold · 저장된 분석 결과</p><nav class="report-nav" aria-label="보고서 내 탐색"><a href="#report-input">01 입력·설정</a><a href="#result-summary">02 후보·모델 수</a><a href="#report-comparison">03 후보 비교</a><a href="#report-exclusions">04 제외·미평가</a><a href="#candidate-title">05 구조·PAE</a><a href="#report-provenance">06 출처·산출물</a></nav>
@@ -615,6 +620,13 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
           <div class="card">
             <h2 id="report-comparison">03 후보 비교</h2>
             <p class="muted" data-vhh-results>결합 부위 접촉 수와 판정을 함께 확인하세요. 지표는 같은 엔진·실행 조건 안에서 비교하며, 정렬은 현재 표의 탐색 순서입니다.</p>
+            <details class="decision-guide" data-vhh-results><summary>판정 안내</summary><dl>
+              <dt>적격</dt><dd>자동 선별 기준 충족</dd>
+              <dt>기준 미충족</dt><dd>자동 선별 기준 미달</dd>
+              <dt>검토 보류</dt><dd>추가 검토 필요</dd>
+              <dt>미평가</dt><dd>판정에 필요한 평가 미완료</dd>
+              <dt>평가 오류</dt><dd>계산 중 오류 발생</dd>
+            </dl></details>
             <div class="candidate-filters">
               <div class="filter-field"><label for="candidate-search">후보 검색</label
               ><input
@@ -629,7 +641,7 @@ body{font-size:18px}input:not([type=checkbox]):not([type=radio]),select,textarea
               ><select id="eligibility">
                 <option value="all">전체</option>
                 <option value="true">적격</option>
-                <option value="false">부적격</option>
+                <option value="false">기준 미충족·검토 보류</option>
                 <option value="missing">미평가</option></select
               ></div><div class="filter-field"><label for="sort-metric">정렬</label
               ><select id="sort-metric">
@@ -1472,6 +1484,15 @@ const NCF_TRANSLATIONS = Object.freeze({
   "기존 계산 결과에 MSA 출처와 WT 참조 구조를 연결한 사본입니다. 점수·순위·선별 판정은 그대로입니다.": "This copy links MSA provenance and the WT reference to the saved results. Scores, ranks and selection decisions are unchanged.",
 
   "검토 보류": "Held for review",
+  "기준 미충족": "Criteria not met",
+  "기준 미충족·검토 보류": "Criteria not met / held",
+  "선택한 기준의 판정: {0}": "Assessment under selected criteria: {0}",
+  "판정 안내": "Decision guide",
+  "자동 선별 기준 충족": "Meets the automatic selection criteria",
+  "자동 선별 기준 미달": "Does not meet the automatic selection criteria",
+  "추가 검토 필요": "Needs further review",
+  "판정에 필요한 평가 미완료": "Required assessments are incomplete",
+  "계산 중 오류 발생": "An error occurred during calculation",
   "v2 서열 검토 보류는 fallback 설정으로 해제되지 않습니다.": "Fallback does not override v2 sequence review holds.",
   "서열 검토 항목 수": "Sequence review count",
   "서열 평가 정책": "Sequence assessment policy",
@@ -4134,7 +4155,7 @@ function developabilityReviewOnly(row) {
   const reasons = Array.isArray(row?.exclusion_reasons) ? row.exclusion_reasons : String(row?.exclusion_reason || "").split(";").filter(Boolean);
   return row?.dev_assessment_policy === "sequence_liability_screen_v2" && row.dev_assessment_status === "review_required" && reasons.length > 0 && reasons.every(code => code === "developability_review_required");
 }
-const decisionCaption = (value, row) => typeof value === "boolean" ? value ? "적격" : developabilityReviewOnly(row) ? "검토 보류" : "부적격" : "미평가";
+const decisionCaption = (value, row) => typeof value === "boolean" ? value ? "적격" : developabilityReviewOnly(row) ? "검토 보류" : "기준 미충족" : "미평가";
 const offline = Boolean(window.NANOCOFOLD_OFFLINE);
 const state = {
   publicMsaConsent: false,
@@ -4572,7 +4593,7 @@ async function refreshCatalog() {
 const vhhGrid = {sort:"created", descending:true, offset:0, revision:0, applied:null};
 const vhhColumns = [["candidate_id","후보 ID"],["name","분석"],["target","표적"],["researchers","담당자"],["engine","예측 엔진"],
   ["decision","기록 판정"],["selection_rank","최종 선별 순위"],["ipsae","ipSAE"],["iptm","ipTM"],["interface_pae","계면 PAE (Å)"],["sequence","VHH 서열"],["created","실행일"]];
-const vhhDecisions = {eligible:"적격",ineligible:"부적격",unassessed:"미평가",held:"검토 보류",failed:"평가 오류",control:"WT·대조군"};
+const vhhDecisions = {eligible:"적격",ineligible:"기준 미충족",unassessed:"미평가",held:"검토 보류",failed:"평가 오류",control:"WT·대조군"};
 function vhhParams() {
   const p = new URLSearchParams({sort:vhhGrid.sort,descending:String(vhhGrid.descending)});
   for (const [key,id] of [["search","search"],["target","target"],["researcher","owner"],["engine","engine"],["decision","decision"]]) {
@@ -6717,7 +6738,7 @@ async function selectCandidate(id) {
   detail.replaceChildren(
     el(
       "p",
-      recordedEvaluationError(row) ? I18N.term(modelAssessmentCaption(row)) : state.result.mode === 'complex' ? I18N.term(modelAssessmentCaption(row)) : row.evaluated ? candidateEligibility(row) === true ? I18N.term("선택한 판정 기준 적격") : candidateEligibility(row) === false ? I18N.term("선택한 판정 기준 부적격") : I18N.term("필수 지표 판정 미평가") : I18N.term("구조 점수 미평가"),
+      recordedEvaluationError(row) ? I18N.term(modelAssessmentCaption(row)) : state.result.mode === 'complex' ? I18N.term(modelAssessmentCaption(row)) : row.evaluated ? I18N.format("선택한 기준의 판정: {0}", [I18N.term(decisionCaption(candidateEligibility(row), row))]) : I18N.term("구조 점수 미평가"),
     ),
   );
   if(state.result.mode !== "complex") {

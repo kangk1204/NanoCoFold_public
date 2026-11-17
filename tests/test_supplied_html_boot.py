@@ -186,7 +186,7 @@ def test_supplied_offline_structure_pae_columns_and_focus(tmp_path):
         assert page.locator("#candidate-table th").evaluate_all(
             "headers => headers.map(header => header.dataset.columnKey)") == core_columns
         expect(page.locator('#candidate-table td[data-column-key="seed"]')).to_have_text("미기록")
-        expect(page.locator("#candidate-table")).to_contain_text("부적격")
+        expect(page.locator("#candidate-table")).to_contain_text("기준 미충족")
         page.locator("#candidate-extra-columns").check()
         expanded_columns = page.locator("#candidate-table th").evaluate_all(
             "headers => headers.map(header => header.dataset.columnKey)")

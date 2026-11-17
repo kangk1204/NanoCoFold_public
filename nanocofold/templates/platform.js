@@ -43,7 +43,7 @@ function developabilityReviewOnly(row) {
   const reasons = Array.isArray(row?.exclusion_reasons) ? row.exclusion_reasons : String(row?.exclusion_reason || "").split(";").filter(Boolean);
   return row?.dev_assessment_policy === "sequence_liability_screen_v2" && row.dev_assessment_status === "review_required" && reasons.length > 0 && reasons.every(code => code === "developability_review_required");
 }
-const decisionCaption = (value, row) => typeof value === "boolean" ? value ? "적격" : developabilityReviewOnly(row) ? "검토 보류" : "부적격" : "미평가";
+const decisionCaption = (value, row) => typeof value === "boolean" ? value ? "적격" : developabilityReviewOnly(row) ? "검토 보류" : "기준 미충족" : "미평가";
 const offline = Boolean(window.NANOCOFOLD_OFFLINE);
 const state = {
   publicMsaConsent: false,
@@ -481,7 +481,7 @@ async function refreshCatalog() {
 const vhhGrid = {sort:"created", descending:true, offset:0, revision:0, applied:null};
 const vhhColumns = [["candidate_id","후보 ID"],["name","분석"],["target","표적"],["researchers","담당자"],["engine","예측 엔진"],
   ["decision","기록 판정"],["selection_rank","최종 선별 순위"],["ipsae","ipSAE"],["iptm","ipTM"],["interface_pae","계면 PAE (Å)"],["sequence","VHH 서열"],["created","실행일"]];
-const vhhDecisions = {eligible:"적격",ineligible:"부적격",unassessed:"미평가",held:"검토 보류",failed:"평가 오류",control:"WT·대조군"};
+const vhhDecisions = {eligible:"적격",ineligible:"기준 미충족",unassessed:"미평가",held:"검토 보류",failed:"평가 오류",control:"WT·대조군"};
 function vhhParams() {
   const p = new URLSearchParams({sort:vhhGrid.sort,descending:String(vhhGrid.descending)});
   for (const [key,id] of [["search","search"],["target","target"],["researcher","owner"],["engine","engine"],["decision","decision"]]) {
@@ -2626,7 +2626,7 @@ async function selectCandidate(id) {
   detail.replaceChildren(
     el(
       "p",
-      recordedEvaluationError(row) ? I18N.term(modelAssessmentCaption(row)) : state.result.mode === 'complex' ? I18N.term(modelAssessmentCaption(row)) : row.evaluated ? candidateEligibility(row) === true ? I18N.term("선택한 판정 기준 적격") : candidateEligibility(row) === false ? I18N.term("선택한 판정 기준 부적격") : I18N.term("필수 지표 판정 미평가") : I18N.term("구조 점수 미평가"),
+      recordedEvaluationError(row) ? I18N.term(modelAssessmentCaption(row)) : state.result.mode === 'complex' ? I18N.term(modelAssessmentCaption(row)) : row.evaluated ? I18N.format("선택한 기준의 판정: {0}", [I18N.term(decisionCaption(candidateEligibility(row), row))]) : I18N.term("구조 점수 미평가"),
     ),
   );
   if(state.result.mode !== "complex") {

@@ -24,7 +24,7 @@ FIELDS = {
 }
 DECISIONS = {
     "eligible": ("적격", "Eligible"),
-    "ineligible": ("부적격", "Ineligible"),
+    "ineligible": ("기준 미충족", "Criteria not met"),
     "held": ("검토 보류", "Held for review"),
     "unassessed": ("미평가", "Not evaluated"),
     "control": ("WT·대조군", "WT / control"),

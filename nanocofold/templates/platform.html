@@ -420,7 +420,7 @@
             <label>표적 이름<input id="db-vhh-target"></label>
             <label id="db-vhh-owner-label" hidden>담당자<input id="db-vhh-owner" maxlength="48"></label>
             <label>예측 엔진<select id="db-vhh-engine"><option value="">전체 엔진</option><option value="boltz2">Boltz-2</option><option value="chai1">Chai-1</option><option value="colabfold">ColabFold</option><option value="opendde">OpenDDE</option></select></label>
-            <label>기록 판정<select id="db-vhh-decision"><option value="">전체</option><option value="eligible">적격</option><option value="held">검토 보류</option><option value="ineligible">부적격</option><option value="unassessed">미평가</option><option value="control">WT·대조군</option><option value="failed">평가 오류</option></select></label>
+            <label>기록 판정<select id="db-vhh-decision"><option value="">전체</option><option value="eligible">적격</option><option value="held">검토 보류</option><option value="ineligible">기준 미충족</option><option value="unassessed">미평가</option><option value="control">WT·대조군</option><option value="failed">평가 오류</option></select></label>
             <label class="check"><input id="db-vhh-mock" type="checkbox">연습 결과 포함</label>
             <button id="db-vhh-apply">검색</button><button id="db-vhh-export" class="secondary" disabled>검색 결과 전체 Excel 저장</button>
           </div><p id="db-vhh-status" role="status" aria-live="polite"></p><div class="table-scroll" id="db-vhh-table" tabindex="0" role="region" aria-label="후보 검색 결과"></div>
@@ -497,6 +497,13 @@
           <div class="card">
             <h2 id="report-comparison">03 후보 비교</h2>
             <p class="muted" data-vhh-results>결합 부위 접촉 수와 판정을 함께 확인하세요. 지표는 같은 엔진·실행 조건 안에서 비교하며, 정렬은 현재 표의 탐색 순서입니다.</p>
+            <details class="decision-guide" data-vhh-results><summary>판정 안내</summary><dl>
+              <dt>적격</dt><dd>자동 선별 기준 충족</dd>
+              <dt>기준 미충족</dt><dd>자동 선별 기준 미달</dd>
+              <dt>검토 보류</dt><dd>추가 검토 필요</dd>
+              <dt>미평가</dt><dd>판정에 필요한 평가 미완료</dd>
+              <dt>평가 오류</dt><dd>계산 중 오류 발생</dd>
+            </dl></details>
             <div class="candidate-filters">
               <div class="filter-field"><label for="candidate-search">후보 검색</label
               ><input
@@ -511,7 +518,7 @@
               ><select id="eligibility">
                 <option value="all">전체</option>
                 <option value="true">적격</option>
-                <option value="false">부적격</option>
+                <option value="false">기준 미충족·검토 보류</option>
                 <option value="missing">미평가</option></select
               ></div><div class="filter-field"><label for="sort-metric">정렬</label
               ><select id="sort-metric">

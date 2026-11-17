@@ -5,6 +5,10 @@
 
 ## 0.4.8rc13 source update — 2026-11-17
 
+Reports and result tables use “Criteria not met” for candidates below the automatic selection criteria. A collapsed decision guide explains this separately from review holds, incomplete assessments and calculation errors. Scores and selection rules are unchanged.
+
+보고서와 결과 표의 ‘부적격’을 ‘기준 미충족’으로 바꿨습니다. 접힌 ‘판정 안내’에서 검토 보류·미평가·계산 오류와의 차이를 확인할 수 있습니다. 점수와 선별 기준은 그대로입니다.
+
 The local and downloaded reports now show the same RF2 evaluation-limit reason as the hosted site, in Korean and English. Site release checks require an explicitly selected public package and run all cross-package checks. The private Linux process test is skipped on macOS. Existing results and selection criteria are unchanged.
 
 로컬·다운로드 보고서의 RF2 평가 수 제한 사유를 운영 사이트와 동일하게 표시합니다. 한영 표현을 함께 검증하며, 사이트 릴리스 검사는 지정한 공개 패키지와의 교차 검사를 모두 실행합니다. 비공개 Linux 프로세스 검사는 macOS에서 제외합니다. 기존 결과와 선별 기준은 변경하지 않습니다.
