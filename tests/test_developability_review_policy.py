@@ -153,8 +153,8 @@ def test_bilingual_review_reason_and_evidence_are_present():
     i18n = (root / "templates/platform-i18n.js").read_text()
     assert 'developability_review_required:' in js
     assert 'Sequence review required · Automatic selection held' in i18n
-    assert 'Surface hydrophobicity, degradation and aggregation require separate assessment.' in i18n
-    assert 'v2 sequence review holds' in i18n
+    assert 'Sequence review: motifs, Cys count, and hydrophobic regions' in i18n
+    assert 'dev_flags is a ranking weight. Sequence review holds are assessed separately.' in i18n
 
 
 @pytest.mark.parametrize("fallback", [False, True])

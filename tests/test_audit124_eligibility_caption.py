@@ -16,6 +16,9 @@ def test_real_caption_round_trip_preserves_model_and_numeric_payload(tmp_path,ba
     row=payload['candidates']['rows'][0]
     decision=False if eligible in ('held','wt_control','parent_control') else eligible
     row.update(final_eligible=decision,quality_eligible=decision)
+    row.update(pose_assessment_policy='pose_assessment_v3',
+               site_selection_eligible=False,design_consistency_status='not_applicable',
+               design_binder_rmsd_A=None,pose_assessment={'policy_version':'pose_assessment_v3'})
     if eligible=='held':
         row.update(dev_assessment_policy='sequence_liability_screen_v2',
                    dev_assessment_status='review_required',
@@ -46,6 +49,9 @@ def test_real_caption_round_trip_preserves_model_and_numeric_payload(tmp_path,ba
                 f'{en_basis}: {en_status}' if language=='en' else f'{ko_basis}: {ko_status}')
             expect(page.locator('#candidate-detail > p').first).to_have_text(
                 f'Assessment under selected criteria: {en_status}' if language=='en' else f'선택한 기준의 판정: {ko_status}')
+            expect(page.locator('#candidate-detail .pose-assessment')).to_contain_text(en_status if language=='en' else ko_status)
+            rmsd=page.locator('#candidate-detail .pose-assessment > p').filter(has_text='RMSD')
+            expect(rmsd).to_contain_text('Not evaluated Å' if language=='en' else '미평가 Å')
             expect(page.locator('#viewer-candidate-select')).to_have_value(row['candidate_id'])
             assert page.evaluate('JSON.stringify(window.NANOCOFOLD_OFFLINE)')==original
             assert page.locator('#result-data').text_content()==''

@@ -153,6 +153,9 @@ const fmt = (value) =>
       : typeof value === "object"
         ? JSON.stringify(value)
         : String(value);
+// Keep missing values bilingual when used inside a bound message.
+const metricValue = (value) => value == null || (typeof value === "number" && !Number.isFinite(value))
+  ? I18N.term("미평가") : fmt(value);
 /* REPORT_SEMANTICS_START */
 function recordedEvaluationError(row) {
   for (const error of [row?.error, row?.prediction_error]) {
@@ -2086,9 +2089,9 @@ async function loadResult(id) {
   for (const [caption,value] of [[generalComplex?"고유 입력 단백질 서열":"원본 후보",generalComplex?counts.unique_sequences:counts.source_candidates],["전체 모델 기록",summary.model_record_total ?? counts.model_total],["평가 완료 모델",counts.evaluated_total],["기록 적격 모델",generalComplex?"적용 안 함":counts.eligible_total]]) {
     const stat=el("div","","report-stat");stat.append(el("span",I18N.term(caption)),el("strong",value === null ? I18N.term("미평가·미기록") : I18N.term(String(value))));stats.append(stat);
   }
-  $("result-summary").append(stats,el("p", generalComplex ? I18N.format("평가 미완료 {0} 모델. 일반 복합체에는 VHH 적격 판정을 적용하지 않습니다.", [counts.evaluation_missing]) : I18N.format("고유 후보 서열 {0}종 · 평가 미완료 {1} · 적격 판정 미평가 {2} · 기록 선별 {3} 모델. 원본 후보는 source_sequence_id 및 원본 ID의 엔진 접두어로 구분합니다. 서열이 모두 기록된 경우에만 고유 서열 수를 계산합니다.", [counts.unique_sequences === null ? I18N.term("미기록") : counts.unique_sequences, counts.evaluation_missing, counts.eligibility_missing, fmt(summary.selected_total)]), "muted"));
+  $("result-summary").append(stats,el("p", generalComplex ? I18N.format("평가 미완료 {0} 모델. 일반 복합체에는 VHH 적격 판정을 적용하지 않습니다.", [counts.evaluation_missing]) : I18N.format("고유 후보 서열 {0}종 · 평가 미완료 {1} · 적격 판정 미평가 {2} · 기록 선별 {3} 모델. 원본 후보는 source_sequence_id 및 원본 ID의 엔진 접두어로 구분합니다. 서열이 모두 기록된 경우에만 고유 서열 수를 계산합니다.", [counts.unique_sequences === null ? I18N.term("미기록") : counts.unique_sequences, counts.evaluation_missing, counts.eligibility_missing, metricValue(summary.selected_total)]), "muted"));
   if (!generalComplex && summary.quality_eligible_total !== null && summary.quality_eligible_total !== undefined)
-    $("result-summary").append(el("p", I18N.format("실행 기록 요약: 기록 적격 {0} · 품질 적격 {1} (결합 부위 제외). 품질 적격은 원본 선별을 바꾸지 않는 탐색 값입니다.", [fmt(summary.eligible_total), fmt(summary.quality_eligible_total)]), "muted"));
+    $("result-summary").append(el("p", I18N.format("실행 기록 요약: 기록 적격 {0} · 품질 적격 {1} (결합 부위 제외). 품질 적격은 원본 선별을 바꾸지 않는 탐색 값입니다.", [metricValue(summary.eligible_total), metricValue(summary.quality_eligible_total)]), "muted"));
   const expected = summary.expected_total;
   $("result-summary").append(el("p", I18N.format("기록된 계획 모델 {0} · 실제 모델 기록 {1} · 평가 완료 {2} · 전체 후보·모델 기록 {3} · 예측 전 준비·미선정 {4}", [expected == null ? I18N.term("미기록") : expected, (summary.model_record_total != null ? summary.model_record_total : counts.model_total), counts.evaluated_total, (summary.candidate_record_total != null ? summary.candidate_record_total : counts.prepared_record_total), (summary.preprediction_record_total != null ? summary.preprediction_record_total : counts.preprediction_record_total)]), "muted"));
   $("result-summary").append(el("p", I18N.term("저장된 전체 후보·모델을 집계합니다. 예측 전 준비·미선정 후보와 평가 미완료 모델은 따로 계산합니다."), "muted"));
@@ -2305,7 +2308,7 @@ function syncCandidateNavigation() {
     const basis = $("eligibility-basis").value === "quality" ? "품질 판정 (결합 부위 제외)" : "실행 당시 기록 판정";
     const assessment = recordedEvaluationError(row) ? I18N.term(modelAssessmentCaption(row)) : !row.evaluated ? I18N.term("미평가") : state.result.mode === "complex" ? I18N.term(modelAssessmentCaption(row))
       : I18N.concat([I18N.term(basis), ": ", I18N.term(decisionCaption(eligibility, row))]);
-    I18N.text($("candidate-status"), I18N.format("{0} · ipSAE {1} · {2} {3} · {4}", [(row.predictor_engine ? row.predictor_engine : I18N.term("엔진 미기록")), fmt(row.ipsae), I18N.term(metricCaption("iptm", row)), fmt(row.iptm), assessment]));
+    I18N.text($("candidate-status"), I18N.format("{0} · ipSAE {1} · {2} {3} · {4}", [(row.predictor_engine ? row.predictor_engine : I18N.term("엔진 미기록")), metricValue(row.ipsae), I18N.term(metricCaption("iptm", row)), metricValue(row.iptm), assessment]));
   } else I18N.text($("candidate-status"), I18N.term("현재 목록에서 후보를 선택하세요."));
 }
 function stepCandidate(offset) {
@@ -2542,7 +2545,7 @@ function renderCandidates() {
         else if(key === "error") I18N.text(td, I18N.term(evaluationErrorCaption(row)));
         else if(key === "selected") I18N.text(td, typeof row[key]==="boolean" ? row[key] ? I18N.term("선별") : I18N.term("미선별") : I18N.term("미기록"));
         else if(key === "exclusion_reasons") I18N.text(td, (row[key]||[]).length ? I18N.concat(row[key].flatMap((code,index) => [index ? " · " : "", I18N.term(reportReasonLabel(code))])) : I18N.term("없음"));
-        else if(key === "ipsae" && state.result.mode === "complex") I18N.text(td, I18N.concat([fmt(row[key]), row.ipsae_chain_a && row.ipsae_chain_b ? I18N.format(" ({0}–{1} 체인쌍)", [row.ipsae_chain_a, row.ipsae_chain_b]) : I18N.term(" (적용 체인 미기록)")]));
+        else if(key === "ipsae" && state.result.mode === "complex") I18N.text(td, I18N.concat([metricValue(row[key]), row.ipsae_chain_a && row.ipsae_chain_b ? I18N.format(" ({0}–{1} 체인쌍)", [row.ipsae_chain_a, row.ipsae_chain_b]) : I18N.term(" (적용 체인 미기록)")]));
         else if(key === "hotspot_site_status") I18N.text(td, I18N.term(hotspotSite(row).label));
         else if(Object.hasOwn(poseStatusLabels,key)||["site_satisfied","site_selection_eligible","candidate_review_priority"].includes(key))I18N.text(td, I18N.term(poseStatusLabel(row,key)));
         else if(key === "n_hotspots_contacted") I18N.text(td, hotspotSite(row).contacts);
@@ -2639,19 +2642,19 @@ async function selectCandidate(id) {
     const h=hotspotSite(row),note=el("div");note.setAttribute("role","status");
     note.append(el("h3",I18N.term("결합 위치 · 신뢰도와 별도 확인")),el("p",I18N.concat([I18N.term(h.label)," · ",I18N.term(h.contacts)])));
     if(h.status==='no_contact')note.append(el("p",I18N.term("지정 결합 부위에 접촉하지 않은 예측입니다. 후보 구조와 접촉 잔기를 확인하세요.")));
-    note.append(el("p",I18N.term("PAE는 상대 위치의 불확실성, pDockQ2는 구조 품질 추정값입니다. 결합 부위 진단은 원래 점수·제외 사유와 함께 확인하세요."),"muted"));detail.append(note);
+    note.append(el("p",I18N.term("PAE: 상대 위치의 불확실성 · pDockQ2: 계면 품질"),"muted"));detail.append(note);
   }
   if(state.result.mode!=="complex"&&hasPoseAssessment([row])) {
     const panel=el("div");panel.setAttribute("role","status");panel.className="pose-assessment";
     panel.append(el("h3",I18N.term("신뢰도 · 지정 결합 부위 · 자세 일관성")));
     panel.append(el("p",I18N.format("실행 당시 기록 적격: {0} · 지정 결합 부위 포함 적격: {1}", [I18N.term(decisionCaption(row.final_eligible, row)), I18N.term(poseStatusLabel(row,"site_selection_eligible"))])));
-    panel.append(el("p",I18N.format("동일 후보 자세 일치: {0} · 자세 일치 엔진 {1}개 · 기록 적격 지지 {2}개", [I18N.term(poseStatusLabel(row,"pose_consensus_status")), fmt(row.pose_supporting_engines), fmt(row.pose_quality_supporting_engines)])));
-    panel.append(el("p",I18N.format("설계·재예측: {0} · 표적 정렬 후 VHH RMSD {1} Å", [I18N.term(poseStatusLabel(row,"design_consistency_status")), fmt(row.design_binder_rmsd_A)])));
-    panel.append(el("p",I18N.format("검토 순위: {0} · 범위 {1} · 1위도 보류일 수 있으며 동률을 허용합니다.", [fmt(row.review_rank), fmt(row.review_rank_scope)])));
+    panel.append(el("p",I18N.format("동일 후보 자세 일치: {0} · 자세 일치 엔진 {1}개 · 기록 적격 지지 {2}개", [I18N.term(poseStatusLabel(row,"pose_consensus_status")), metricValue(row.pose_supporting_engines), metricValue(row.pose_quality_supporting_engines)])));
+    panel.append(el("p",I18N.format("설계·재예측: {0} · 표적 정렬 후 VHH RMSD {1} Å", [I18N.term(poseStatusLabel(row,"design_consistency_status")), metricValue(row.design_binder_rmsd_A)])));
+    panel.append(el("p",I18N.format("검토 순위: {0}", [metricValue(row.review_rank)])));
     panel.append(el("p",I18N.format("후보 검토 판정: {0} · 모델 검토 판정: {1}", [I18N.term(poseStatusLabel(row,"candidate_review_priority")), I18N.term(poseStatusLabel(row,"review_priority"))])));
     panel.append(el("p",I18N.format("후보 검토 판정 이유: {0}", [I18N.term(poseStatusLabel(row,"review_priority_reason"))])));
-    panel.append(el("p",I18N.term("검토 정책 v3: 품질·지정 결합 부위 기준을 충족한 예측을 엔진별로 표시합니다. 두 엔진 이상이 같은 자세에서 기준을 충족하면 다중 엔진 지지로 표시합니다. 자세 차이와 설계·재예측 불일치는 별도 진단에서 확인하세요."),"muted"));
-    panel.append(el("p",I18N.term("동일 후보의 표적 구조를 정렬한 뒤 자세를 비교합니다. 점수와 지지 엔진 수는 엔진별 예측 결과로 표시합니다. 탐색 우선순위와 기존 적격·선별 기록은 각각 확인할 수 있습니다."),"muted"));
+    panel.append(el("p",I18N.term("엔진별 판정과 구조 일치를 함께 확인하세요."),"muted"));
+    panel.append(el("p",I18N.term("같은 후보의 구조는 표적을 기준으로 정렬해 비교합니다."),"muted"));
     if(row.pose_assessment&&typeof row.pose_assessment==="object") {const raw=el("details");raw.append(el("summary",I18N.term("자세 평가 조건·출처")),el("pre",JSON.stringify(row.pose_assessment,null,2)));panel.append(raw);}
     detail.append(panel);
   }
@@ -2660,7 +2663,7 @@ async function selectCandidate(id) {
   detail.append(original);
   if (state.result.mode !== "complex") detail.append(el("p", I18N.format("품질 적격 (결합 부위 제외): {0} · 실행 당시 기록 적격: {1}", [I18N.term(decisionCaption(row.quality_eligible, row)), I18N.term(decisionCaption(row.final_eligible, row))])));
   if (row.quality_eligibility_source === "hotspot_only_exclusion_removed")
-    detail.append(el("p", I18N.term("실행 당시 결합 부위 조건만으로 제외됐습니다. 나머지 기록 기준은 통과했으며 원본 판정·선별 목록은 보존됩니다.")));
+    detail.append(el("p", I18N.term("결합 부위 접촉 기준만 미달했습니다.")));
   warnings(detail.appendChild(el("div")), [
     ...(row.primary_pair_warning ? [row.primary_pair_warning] : []),
     ...(row.exclusion_reasons || []).map((r) => I18N.concat([I18N.term("기록 제외 사유: "), I18N.term(reportReasonLabel(r)), " (", r, ")"])),
@@ -2670,7 +2673,7 @@ async function selectCandidate(id) {
       : []),
   ]);
   const dl = el("dl");
-  if (row.structure_stage === "rf2") detail.append(el("p", I18N.format("RF2 설계 단계 구조 · PAE {0} Å · pLDDT {1} · 설계–RF2 RMSD {2} Å. 최종 복합체 재예측 지표와 구분하세요.", [fmt(row.rf2_pae), fmt(row.rf2_plddt), fmt(row.rmsd)]), "muted"));
+  if (row.structure_stage === "rf2") detail.append(el("p", I18N.format("RF2 설계 단계 구조 · PAE {0} Å · pLDDT {1} · 설계–RF2 RMSD {2} Å. 최종 복합체 재예측 지표와 구분하세요.", [metricValue(row.rf2_pae), metricValue(row.rf2_plddt), metricValue(row.rmsd)]), "muted"));
   for (const key of metricKeys) {
     const term = el("dt", I18N.term(metricCaption(key, row, state.result.mode)));term.dataset.columnKey = key;
     globalThis.NanoMetricGuide?.decorate(term, key, row[key] == null);
@@ -2682,10 +2685,10 @@ async function selectCandidate(id) {
   confidenceScope.append(el("p",I18N.term(state.result?.mode === "complex" ? "요약 ipSAE는 명시한 체인쌍 또는 검토 순서의 첫 쌍입니다. 전체 평균·최솟값과 구분하고 모든 체인쌍의 결과는 상세 표·CSV에서 확인하세요. ipTM은 기록된 적용 범위로 해석하며, 범위가 없으면 전체 복합체 값으로 추정하지 않습니다." : "일반 복합체의 요약 ipSAE는 기본적으로 검토한 체인 순서의 첫 쌍이며, 체인쌍을 명시한 실행에서는 해당 쌍입니다. 전체 평균·최솟값과 구분하고 모든 체인 쌍의 결과는 상세 표·CSV에서 확인합니다. ipTM 전체 값과 선택 표적–VHH 쌍 값은 구분하며, 범위가 없으면 전체 복합체로 추정하지 않습니다."),"muted"));
   if (state.result?.mode === "complex") {
     const selection = row.ipsae_selection === "explicit_primary_pair" ? "명시한 체인쌍" : row.ipsae_selection === "first_pair_in_reviewed_chain_order" ? "검토 순서의 첫 체인쌍" : "선택 기준 미기록";
-    confidenceScope.append(el("p", I18N.format("요약 쌍 선택: {0} · 유한한 기록값의 최솟값 {1} / 최댓값 {2} · 평가 쌍 {3} / 전체 쌍 {4}. 미평가 체인쌍은 최솟값·최댓값에서 제외됩니다.", [I18N.term(selection), fmt(row.min_pair_ipsae), fmt(row.max_pair_ipsae), fmt(row.pair_ipsae_assessed_count), fmt(row.pair_ipsae_total_count)])));
+    confidenceScope.append(el("p", I18N.format("요약 쌍 선택: {0} · 유한한 기록값의 최솟값 {1} / 최댓값 {2} · 평가 쌍 {3} / 전체 쌍 {4}. 미평가 체인쌍은 최솟값·최댓값에서 제외됩니다.", [I18N.term(selection), metricValue(row.min_pair_ipsae), metricValue(row.max_pair_ipsae), metricValue(row.pair_ipsae_assessed_count), metricValue(row.pair_ipsae_total_count)])));
   }
   confidenceScope.append(el("pre",JSON.stringify(Object.fromEntries(Object.entries(row).filter(([key])=>/^ipsae_(scope|chain|source|selection)|^iptm_(scope|source|unavailable)|^(primary_pair|(max|min)_pair_ipsae|pair_ipsae_)/.test(key))),null,2)));detail.append(confidenceScope);
-  if (row.dev_assessment_policy === "sequence_liability_screen_v2") detail.append(el("p", I18N.term("v2 서열 검토는 모티프, Cys 개수와 선형 소수성 창을 검사합니다. 상한 초과는 검토 보류이며 실험적 개발 불가를 뜻하지 않습니다. 구조 표면의 소수성이나 실제 분해·응집은 별도 평가가 필요합니다."), "report-interpretation"));
+  if (row.dev_assessment_policy === "sequence_liability_screen_v2") detail.append(el("p", I18N.term("서열 검토 항목: 모티프·Cys 개수·소수성 구간"), "report-interpretation"));
   const methodReceipts = Object.entries(row.metric_provenance || {});
   if (methodReceipts.length) {
     const methods = el("details");
@@ -2699,10 +2702,10 @@ async function selectCandidate(id) {
     }
     detail.append(methods);
   }
-  detail.append(el("p", I18N.term("PAE는 상대 위치의 불확실성을 Å 단위로 나타냅니다. pDockQ2는 CA 8 Å 접촉과 방향별 PAE로 계산하며, 두 체인 중 낮은 값을 표시합니다. AlphaFold-Multimer에서 보정된 지표로, Boltz·Chai·OpenDDE 결과는 탐색용으로 사용합니다."), "muted"));
-  detail.append(el("p", I18N.term("종합점수는 같은 엔진·후보 집합 안에서 비교합니다. 가중치는 ranking_policy에서 확인하세요. dev_severe는 선별용 서열 검토 항목 수이며 항목 정의는 기록된 정책을 따릅니다. 접촉·충돌은 거리 기준 원자쌍 수입니다."), "muted"));
-  detail.append(el("p", I18N.term("재현 조건은 엔진·장치·seed·실행 설정을 함께 확인하세요. 엄격한 CUDA 결정론 설정과 동일 환경 반복 검증은 Chai 경로에서 지원합니다. 결합 부위 OFF/ON 실행의 난수 조건은 각각 확인하세요."), "muted"));
-  detail.append(el("p", I18N.term("dev_flags는 종합점수 가중치입니다. CDR 미평가와 v2 서열 검토 보류는 fallback 설정으로 해제되지 않습니다."), "muted"));
+  detail.append(el("p", I18N.term("pDockQ2: Cα 8 Å 접촉·방향별 PAE · 두 체인 중 낮은 값"), "muted"));
+  detail.append(el("p", I18N.term("같은 엔진·후보 집합 안에서 종합점수를 비교하세요. 가중치: ranking_policy"), "muted"));
+  detail.append(el("p", I18N.term("실행 조건: 엔진·장치·Seed·설정"), "muted"));
+  detail.append(el("p", I18N.term("dev_flags는 순위 가중치입니다. 서열 검토 보류는 별도 판정입니다."), "muted"));
   if (row.threshold_checks !== undefined) {
     const facts = el("details"),
       caption = el("summary", I18N.term(row.assessment_status ? "현재 평가 기준" : "지표 해석·실행 당시 선별 기준"));
@@ -3205,9 +3208,9 @@ async function renderStructure() {
   }
   if (reference?.chains) {
     details.append(el("h3", I18N.term("기준 체인 정렬 후 참조 비교")));
-    details.append(el("p", I18N.format("기준 체인 {0} → 참조 체인 {1} · 전체 복합체 최적 중첩 RMSD {2} Å. 화면은 기준 체인 정렬 좌표입니다.", [reference.anchor_chain || I18N.term("미기록"), reference.reference_anchor_chain || reference.chain_permutation_map?.[reference.anchor_chain] || I18N.term("미기록"), fmt(reference.complex_rmsd ?? reference.all_chain_ca_rmsd_angstrom)])));
+    details.append(el("p", I18N.format("기준 체인 {0} → 참조 체인 {1} · 전체 복합체 최적 중첩 RMSD {2} Å. 화면은 기준 체인 정렬 좌표입니다.", [reference.anchor_chain || I18N.term("미기록"), reference.reference_anchor_chain || reference.chain_permutation_map?.[reference.anchor_chain] || I18N.term("미기록"), metricValue(reference.complex_rmsd ?? reference.all_chain_ca_rmsd_angstrom)])));
     table(details.appendChild(el("div")), reference.chains, ["chain", "reference_chain", "matched_ca", "ca_rmsd_angstrom", "interest_ca_rmsd_angstrom"]);
-    details.append(el("p", I18N.format("5 Å 접촉 회복률: {0} ({1}/{2})", [fmt(reference.fnat_5A), reference.recovered_contacts_5A, reference.reference_contacts_5A])));
+    details.append(el("p", I18N.format("5 Å 접촉 회복률: {0} ({1}/{2})", [metricValue(reference.fnat_5A), reference.recovered_contacts_5A, reference.reference_contacts_5A])));
   }
   details.append(el("h3", I18N.term("접촉")));
   table(details.appendChild(el("div")), data.contacts || [], [

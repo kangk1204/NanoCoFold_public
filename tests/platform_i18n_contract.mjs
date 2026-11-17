@@ -4,6 +4,22 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 const source=readFileSync(new URL('../nanocofold/templates/platform-i18n.js',import.meta.url),'utf8');
 function fixture(){const context={};vm.createContext(context);vm.runInContext(source,context);return context.I18N;}
+test('numeric message placeholders retain missing-value translation across language changes',()=>{
+ const i=fixture(),ui=readFileSync(new URL('../nanocofold/templates/platform.js',import.meta.url),'utf8');
+ const context=vm.createContext({I18N:i});
+ vm.runInContext(ui.slice(ui.indexOf('const fmt ='),ui.indexOf('/* REPORT_SEMANTICS_START */')),context);
+ for(const initial of ['ko','en'])for(const value of [null,undefined,NaN,Infinity,0,.12345]){
+  i.setLanguage(initial,{persist:false});context.input=value;
+  vm.runInContext('message=I18N.format("설계·재예측: {0} · 표적 정렬 후 VHH RMSD {1} Å",[I18N.term("적용 안 함"),metricValue(input)])',context);
+  for(const language of ['en','ko','en']){
+   i.setLanguage(language,{persist:false});
+   const missing=value==null||!Number.isFinite(value);
+   const expected=missing?(language==='en'?'Not evaluated':'미평가'):value===0?'0':'0.123';
+   assert.ok(i.value(context.message).endsWith(expected+' Å'));
+  }
+  assert.equal(typeof vm.runInContext('fmt(input)',context),'string');
+ }
+});
 test('decision guides define every displayed decision in both languages, including static reports',()=>{
  const i=fixture(),ui=readFileSync(new URL('../nanocofold/templates/platform.js',import.meta.url),'utf8');
  const caption=ui.match(/const decisionCaption = [^;]+;/)?.[0];assert.ok(caption);
@@ -100,6 +116,7 @@ test('candidate eligibility captions translate composed UI terms and preserve ra
   recordedEvaluationError:()=>false,modelAssessmentCaption:()=>'',
   candidateEligibility:()=>row.final_eligible};
  vm.createContext(context);
+ vm.runInContext(ui.slice(ui.indexOf('const metricValue ='),ui.indexOf('/* REPORT_SEMANTICS_START */')),context);
  vm.runInContext(ui.slice(ui.indexOf('function developabilityReviewOnly(row)'),ui.indexOf('const offline =')),context);
  vm.runInContext(ui.slice(ui.indexOf('function syncCandidateNavigation()'),ui.indexOf('function stepCandidate(')),context);
  const original=JSON.stringify(row);

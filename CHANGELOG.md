@@ -5,6 +5,10 @@
 
 ## 0.4.8rc13 source update — 2026-11-17
 
+Report details now label controls consistently and keep missing metric values translated after language changes. Repeated explanations are shorter in both languages.
+
+보고서 상세의 대조군 표시와 미평가 값의 언어 전환을 바로잡았습니다. 한영 반복 안내를 간결하게 줄였습니다.
+
 WT and parent controls now have a separate caption and filter. Decision guides cover all six statuses in Korean and English, including static reports. Warnings use the same criteria terminology. Stored scores, flags and selection rules are unchanged.
 
 WT·원본 대조군을 별도 표시·필터로 구분합니다. 정적 보고서를 포함한 한영 판정 안내에 여섯 상태를 설명하고, 경고의 용어를 맞췄습니다. 저장된 점수·판정값·선별 기준은 유지합니다.
