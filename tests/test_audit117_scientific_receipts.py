@@ -254,7 +254,7 @@ def test_all_unassessed_cdr_rankings_and_fallback_are_explicitly_held(tmp_path):
     assert ranked["ranking_status"].eq("held").all()
     document = report.generate_report(tmp_path, cfg, {}, scored=ranked, selected=pd.DataFrame()).read_text()
     assert "종합점수·기록 순위 보류 3/3개 모델" in document
-    assert "종합점수가 있는 부적격 후보에만 적용" in document
+    assert "종합점수가 있는 기준 미충족 후보에만 적용" in document
 
 
 @pytest.mark.parametrize("value", [0, 1.5, -1, True, "0.85", ".nan", ".inf"])

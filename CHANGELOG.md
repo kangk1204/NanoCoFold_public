@@ -5,6 +5,10 @@
 
 ## 0.4.8rc13 source update — 2026-11-17
 
+WT and parent controls now have a separate caption and filter. Decision guides cover all six statuses in Korean and English, including static reports. Warnings use the same criteria terminology. Stored scores, flags and selection rules are unchanged.
+
+WT·원본 대조군을 별도 표시·필터로 구분합니다. 정적 보고서를 포함한 한영 판정 안내에 여섯 상태를 설명하고, 경고의 용어를 맞췄습니다. 저장된 점수·판정값·선별 기준은 유지합니다.
+
 Reports and result tables use “Criteria not met” for candidates below the automatic selection criteria. A collapsed decision guide explains this separately from review holds, incomplete assessments and calculation errors. Scores and selection rules are unchanged.
 
 보고서와 결과 표의 ‘부적격’을 ‘기준 미충족’으로 바꿨습니다. 접힌 ‘판정 안내’에서 검토 보류·미평가·계산 오류와의 차이를 확인할 수 있습니다. 점수와 선별 기준은 그대로입니다.

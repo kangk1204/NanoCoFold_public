@@ -39,7 +39,7 @@ def test_cdr_guidance_distinguishes_ranking_weight_from_final_selection(tmp_path
     message = next(value for value in state.warnings if "CDR 의존 liability" in value)
     assert "rank.weights.dev_flags가 0이 아니면 CDR 미평가로 종합 순위를 보류" in message
     assert "rank.weights.dev_flags=0으로 바꾸어도 CDR 평가가 없으면 최종 적격은 통과하지 않으며, 기본 선별은 계속 보류" in message
-    assert any("부적격 진단 목록은 발주 승인이 아닙니다" in notice for notice in state.warnings) is fallback
+    assert any("기준 미충족 진단 목록은 발주 승인이 아닙니다" in notice for notice in state.warnings) is fallback
 
 
 def test_mature_mock_plan_reports_actual_count_and_preserves_explicit_configuration(tmp_path, monkeypatch, capsys):

@@ -12,8 +12,8 @@ const scientificWarnings=[
  'mock/dry-run'+cdrBody,
  'ANARCI 환경 없음'+cdrBody,
  'final_eligible 후보가 0종입니다. 합성 목록은 비어 있습니다. 임계값/예측 품질을 점검하세요.',
- 'final_eligible 후보가 0종입니다. rank.fallback_to_ineligible=true는 종합점수가 있는 부적격 후보만 포함하며 미평가 보류 후보에는 적용되지 않습니다.',
- '전체 성공 후보에서 미평가인 순위 지표: hotspot_contact_frac, antifold. 해당 가중치를 제외하고 나머지 지표로 순위를 계산했습니다. 미평가를 0점이나 부적격으로 해석하지 마세요.',
+ 'final_eligible 후보가 0종입니다. rank.fallback_to_ineligible=true는 종합점수가 있는 기준 미충족 후보만 포함하며 미평가 보류 후보에는 적용되지 않습니다.',
+ '전체 성공 후보에서 미평가인 순위 지표: hotspot_contact_frac, antifold. 해당 가중치를 제외하고 나머지 지표로 순위를 계산했습니다. 미평가를 0점이나 기준 미충족으로 해석하지 마세요.',
  'handoff 게이트 미통과(7건): 발주 목록은 확정할 수 없습니다. `nanocofold validate-handoff` 로 항목을 확인하세요.',
 ];
 for(const warning of scientificWarnings)test('authored science warning has an English rendering: '+warning.slice(0,36),()=>{
@@ -27,7 +27,7 @@ test('MSA warning preserves captured Korean path byte for byte',()=>{
 });
 
 test('composite ranking notice translates all authored clauses including partial mapping',()=>{
- const warning='종합점수·기록 순위 보류 3/9개 모델. 이 중 1개는 CDR 개발가능성이 미평가입니다. ANARCI 환경 또는 서열에 맞는 CDR 범위를 확인하세요. 이 중 2개는 요청한 결합 부위의 구조 대응이 불완전하여 접촉률을 순위에 사용하지 않고 보류합니다. fallback_to_ineligible=true는 종합점수가 있는 부적격 후보에만 적용됩니다. 실패 예측이나 가중 CDR 미평가로 보류된 후보는 포함하지 않습니다.';
+ const warning='종합점수·기록 순위 보류 3/9개 모델. 이 중 1개는 CDR 개발가능성이 미평가입니다. ANARCI 환경 또는 서열에 맞는 CDR 범위를 확인하세요. 이 중 2개는 요청한 결합 부위의 구조 대응이 불완전하여 접촉률을 순위에 사용하지 않고 보류합니다. fallback_to_ineligible=true는 종합점수가 있는 기준 미충족 후보에만 적용됩니다. 실패 예측이나 가중 CDR 미평가로 보류된 후보는 포함하지 않습니다.';
  const result=term(warning);assert.equal(result.ko,warning);assert.doesNotMatch(result.en,/[가-힣]/);assert.match(result.en,/3\/9/);assert.match(result.en,/mapping is incomplete for 2/);
 });
 

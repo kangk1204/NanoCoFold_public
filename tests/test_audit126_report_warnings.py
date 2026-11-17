@@ -18,7 +18,7 @@ SCIENCE_WARNINGS = [
     "결합 부위를 지정하지 않았습니다. 결합 위치를 제한하지 않고 탐색합니다.",
     "캐시된 MSA가 없습니다: msa/saved_{0}.a3m. 서열만 입력으로 단일서열 모드(msa=empty)로 진행합니다. 정확도를 높이려면 structure.msa.backend=colabfold_search 로 MSA를 먼저 생성하세요.",
     "final_eligible 후보가 0종입니다. 합성 목록은 비어 있습니다. 임계값/예측 품질을 점검하세요.",
-    "전체 성공 후보에서 미평가인 순위 지표: esm_score, antifold. 해당 가중치를 제외하고 나머지 지표로 순위를 계산했습니다. 미평가를 0점이나 부적격으로 해석하지 마세요.",
+    "전체 성공 후보에서 미평가인 순위 지표: esm_score, antifold. 해당 가중치를 제외하고 나머지 지표로 순위를 계산했습니다. 미평가를 0점이나 기준 미충족으로 해석하지 마세요.",
     "handoff 게이트 미통과(2건): 발주 목록은 확정할 수 없습니다. `nanocofold validate-handoff` 로 항목을 확인하세요.",
     "mock/dry-run: CDR 의존 liability 는 미평가로 기록됩니다. rank.weights.dev_flags가 0이 아니면 종합 순위와 최종 선별을 보류합니다. 실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. 미평가를 위험 없음으로 처리하지 않습니다.",
     "ANARCI 환경 없음: CDR 의존 liability 는 미평가로 기록됩니다. rank.weights.dev_flags가 0이 아니면 종합 순위와 최종 선별을 보류합니다. 실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. 미평가를 위험 없음으로 처리하지 않습니다.",

@@ -320,7 +320,7 @@ def ranking_warnings(frame: pd.DataFrame, cfg: dict) -> list[str]:
                 for notice in ranking_warnings(frame.loc[labels.eq(engine)], cfg)]
     _, ignored = _available_weights(frame, cfg)
     notices = (["전체 성공 후보에서 미평가인 순위 지표: " + ", ".join(ignored)
-                + ". 해당 가중치를 제외하고 나머지 지표로 순위를 계산했습니다. 미평가를 0점이나 부적격으로 해석하지 마세요."]
+                + ". 해당 가중치를 제외하고 나머지 지표로 순위를 계산했습니다. 미평가를 0점이나 기준 미충족으로 해석하지 마세요."]
                if any(ignored.values()) else [])
     held = frame["composite_score"].isna() & ~_failed_prediction_rows(frame)
     if not held.any():
@@ -351,7 +351,7 @@ def ranking_warnings(frame: pd.DataFrame, cfg: dict) -> list[str]:
     elif not cdr_held.any() and not interface_held.any() and not hotspot_held.any():
         message += "저장된 종합점수가 없어 순위·선별을 추정하지 않습니다. "
     if cfg_get(cfg, "rank.fallback_to_ineligible", False):
-        message += ("fallback_to_ineligible=true는 종합점수가 있는 부적격 후보에만 적용됩니다. "
+        message += ("fallback_to_ineligible=true는 종합점수가 있는 기준 미충족 후보에만 적용됩니다. "
                     "실패 예측이나 가중 CDR 미평가로 보류된 후보는 포함하지 않습니다.")
     return notices + [message.strip()]
 

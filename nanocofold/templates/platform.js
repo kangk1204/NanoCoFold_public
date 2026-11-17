@@ -43,7 +43,12 @@ function developabilityReviewOnly(row) {
   const reasons = Array.isArray(row?.exclusion_reasons) ? row.exclusion_reasons : String(row?.exclusion_reason || "").split(";").filter(Boolean);
   return row?.dev_assessment_policy === "sequence_liability_screen_v2" && row.dev_assessment_status === "review_required" && reasons.length > 0 && reasons.every(code => code === "developability_review_required");
 }
-const decisionCaption = (value, row) => typeof value === "boolean" ? value ? "적격" : developabilityReviewOnly(row) ? "검토 보류" : "기준 미충족" : "미평가";
+function referenceControl(row) {
+  // The recorded reason identifies a reference excluded from selection by design.
+  const reasons = Array.isArray(row?.exclusion_reasons) ? row.exclusion_reasons : String(row?.exclusion_reason || "").split(";").filter(Boolean);
+  return reasons.length > 0 && reasons.every(code => code === "parent_control" || code === "wt_control");
+}
+const decisionCaption = (value, row) => typeof value === "boolean" ? value ? "적격" : referenceControl(row) ? "WT·대조군" : developabilityReviewOnly(row) ? "검토 보류" : "기준 미충족" : "미평가";
 const offline = Boolean(window.NANOCOFOLD_OFFLINE);
 const state = {
   publicMsaConsent: false,
@@ -2439,9 +2444,10 @@ function renderCandidates() {
       (f.engine_filter === "all" || row.predictor_engine === f.engine_filter) &&
       (!search || (catalogSearch ? row.candidate_id.toLowerCase().includes(search) ||
         (fragment.length >= 3 && row.sequence?.toLowerCase().includes(fragment)) : candidateSearchText(row).includes(search))) &&
-      (status === "all" || status === "missing"
-        ? status === "all" || candidateEligibility(row) == null
-        : candidateEligibility(row) === f.eligible) &&
+      (status === "control" ? referenceControl(row)
+        : status === "all" || status === "missing"
+          ? status === "all" || candidateEligibility(row) == null
+          : candidateEligibility(row) === f.eligible && (status !== "false" || !referenceControl(row))) &&
       (f.hotspot_min === null || hotspotMatchesMinimum(row,f.hotspot_min)),
   );
   const keyed = state.filtered.map((row,position)=>({row,position,value:siteValue(row,f.sort)}));

@@ -497,12 +497,13 @@
           <div class="card">
             <h2 id="report-comparison">03 후보 비교</h2>
             <p class="muted" data-vhh-results>결합 부위 접촉 수와 판정을 함께 확인하세요. 지표는 같은 엔진·실행 조건 안에서 비교하며, 정렬은 현재 표의 탐색 순서입니다.</p>
-            <details class="decision-guide" data-vhh-results><summary>판정 안내</summary><dl>
-              <dt>적격</dt><dd>자동 선별 기준 충족</dd>
-              <dt>기준 미충족</dt><dd>자동 선별 기준 미달</dd>
-              <dt>검토 보류</dt><dd>추가 검토 필요</dd>
-              <dt>미평가</dt><dd>판정에 필요한 평가 미완료</dd>
-              <dt>평가 오류</dt><dd>계산 중 오류 발생</dd>
+            <details class="decision-guide" data-vhh-results><summary data-report-i18n>판정 안내</summary><dl>
+              <dt data-report-i18n>적격</dt><dd data-report-i18n>자동 선별 기준 충족</dd>
+              <dt data-report-i18n>기준 미충족</dt><dd data-report-i18n>자동 선별 기준 미달</dd>
+              <dt data-report-i18n>검토 보류</dt><dd data-report-i18n>추가 검토 필요</dd>
+              <dt data-report-i18n>WT·대조군</dt><dd data-report-i18n>선별 대상이 아닌 참조 후보</dd>
+              <dt data-report-i18n>미평가</dt><dd data-report-i18n>판정에 필요한 평가 미완료</dd>
+              <dt data-report-i18n>평가 오류</dt><dd data-report-i18n>계산 중 오류 발생</dd>
             </dl></details>
             <div class="candidate-filters">
               <div class="filter-field"><label for="candidate-search">후보 검색</label
@@ -519,6 +520,7 @@
                 <option value="all">전체</option>
                 <option value="true">적격</option>
                 <option value="false">기준 미충족·검토 보류</option>
+                <option value="control">WT·대조군</option>
                 <option value="missing">미평가</option></select
               ></div><div class="filter-field"><label for="sort-metric">정렬</label
               ><select id="sort-metric">

@@ -4,6 +4,24 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 const source=readFileSync(new URL('../nanocofold/templates/platform-i18n.js',import.meta.url),'utf8');
 function fixture(){const context={};vm.createContext(context);vm.runInContext(source,context);return context.I18N;}
+test('decision guides define every displayed decision in both languages, including static reports',()=>{
+ const i=fixture(),ui=readFileSync(new URL('../nanocofold/templates/platform.js',import.meta.url),'utf8');
+ const caption=ui.match(/const decisionCaption = [^;]+;/)?.[0];assert.ok(caption);
+ const shown=new Set((caption.match(/"[^"]+"/g)||[]).map(v=>v.slice(1,-1)).filter(v=>/[가-힣]/.test(v)));
+ shown.add('평가 오류');assert.equal(shown.size,6);
+ for(const filename of ['platform.html','report.html.j2']){
+  const html=readFileSync(new URL('../nanocofold/templates/'+filename,import.meta.url),'utf8');
+  const block=html.match(/<details class="decision-guide"[\s\S]*?<\/details>/)?.[0];assert.ok(block,filename);
+  const pairs=[...block.matchAll(/<dt data-report-i18n>([^<]+)<\/dt><dd data-report-i18n>([^<]+)<\/dd>/g)].map(m=>[m[1],m[2]]);
+  const captions=new Set(pairs.map(([name])=>name));assert.equal(captions.size,6);
+  for(const value of shown)assert.ok(captions.has(value),'the guide must explain '+value);
+  for(const value of ['판정 안내',...pairs.flat()]){
+   const translated=i.term(value);assert.equal(translated.ko,value);
+   assert.notEqual(translated.en,value,'needs an English definition: '+value);
+   assert.doesNotMatch(translated.en,/[가-힣]/);
+  }
+ }
+});
 test('mature model plans translate the optional preparation prefix and preserve counts',()=>{
  const ui=readFileSync(new URL('../nanocofold/templates/platform.js',import.meta.url),'utf8');
  const i=fixture(),context={I18N:i};vm.createContext(context);

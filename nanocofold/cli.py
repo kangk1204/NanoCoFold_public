@@ -1416,7 +1416,7 @@ def _finalize(
             "미평가를 위험 없음으로 처리하지 않습니다."
         )
         if cfg_get(cfg, "rank.fallback_to_ineligible", False):
-            state.add_warnings("fallback_to_ineligible=true의 부적격 진단 목록은 발주 승인이 아닙니다.")
+            state.add_warnings("fallback_to_ineligible=true의 기준 미충족 진단 목록은 발주 승인이 아닙니다.")
     liability_columns = {
         "n_cys", "pI", "net_charge", "mw_kda", "gravy",
         "n_hydrophobic_patches", "cdr_hydrophobic_patches",
@@ -1482,7 +1482,7 @@ def _finalize(
         state.add_warnings(
             "자동 선별 후보가 0종입니다. 서열 검토 보류와 구조 기준 미통과 사유를 구분해 확인하세요. 서열 검토 보류는 실험적 개발 불가 판정이 아닙니다."
             if merged.get("dev_assessment_status", pd.Series(dtype=str)).eq("review_required").any() else "final_eligible 후보가 0종입니다. "
-            + ("rank.fallback_to_ineligible=true는 종합점수가 있는 부적격 후보만 포함하며 미평가 보류 후보에는 적용되지 않습니다." if fallback
+            + ("rank.fallback_to_ineligible=true는 종합점수가 있는 기준 미충족 후보만 포함하며 미평가 보류 후보에는 적용되지 않습니다." if fallback
                else "합성 목록은 비어 있습니다. 임계값/예측 품질을 점검하세요.")
         )
     from . import engine_comparison

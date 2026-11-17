@@ -136,8 +136,8 @@ def _exploration(filters):
             allowed[key] = filters[key]
     if "eligibility" in filters:
         value = filters["eligibility"]
-        if value not in ("all", "true", "false", "missing"):
-            raise ValueError("적격 탐색 조건은 all/true/false/missing 중 하나여야 합니다.")
+        if value not in ("all", "true", "false", "missing", "control"):
+            raise ValueError("적격 탐색 조건은 all/true/false/missing/control 중 하나여야 합니다.")
         allowed["eligibility"] = value
     if "eligibility_basis" in filters:
         if filters["eligibility_basis"] not in ("recorded", "quality"):
@@ -1406,7 +1406,7 @@ class ResultReader:
         allowed = _exploration({} if filters is None else filters)
         query = {key: value for key, value in allowed.items() if key in {"search", "sort", "descending", "eligible", "eligibility_basis", "hotspot_min", "engine_filter"}}
         eligibility = allowed.get("eligibility")
-        if eligibility in {"all", "missing"}:
+        if eligibility in {"all", "missing", "control"}:
             query.pop("eligible", None)
         elif eligibility in {"true", "false"}:
             query["eligible"] = eligibility == "true"
@@ -1414,6 +1414,12 @@ class ResultReader:
         if eligibility == "missing":
             column = "quality_eligible" if allowed.get("eligibility_basis") == "quality" else "final_eligible"
             table["rows"] = [row for row in table["rows"] if row.get(column) is None]
+            table["filtered_total"] = len(table["rows"])
+        if eligibility in {"false", "control"}:
+            def reference_control(row):
+                reasons = row.get("exclusion_reasons") or str(row.get("exclusion_reason") or "").split(";")
+                return bool(reasons) and all(code in {"wt_control", "parent_control"} for code in reasons)
+            table["rows"] = [row for row in table["rows"] if reference_control(row) == (eligibility == "control")]
             table["filtered_total"] = len(table["rows"])
         # Export the entire candidate set and preserve exploration criteria independently.
         all_table = self.candidates(limit=None)
