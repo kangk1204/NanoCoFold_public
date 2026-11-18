@@ -709,6 +709,11 @@ def _threshold_check_rows(rows: list[dict], recorded_cfg: dict) -> list[dict]:
                 check = dict(check)
                 if check.get("metric") == "hotspot_contact_frac" and _recorded_bool(row.get("hotspot_mapping_failed")) is True:
                     check.update(diagnostic_value=check.get("value"), value=None, reason="결합 부위 번호 대응 실패")
+                # Derived display state only; retain the recorded gate and threshold.
+                if check.get("metric") == "hotspot_contact_frac" and hotspot_assessment(row)["status"] == "not_requested":
+                    check["display_status"] = "not_applicable"
+                elif check.get("value") is None:
+                    check["display_status"] = "not_assessed"
                 result.append({"model": _display_identity(row), **check})
     return to_native(result)
 

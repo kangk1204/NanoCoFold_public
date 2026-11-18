@@ -1,7 +1,13 @@
 # 변경 기록
 
-영어를 README와 웹 플랫폼의 기본 언어로 사용합니다. README 상단에서 한국어판으로 이동할 수 있고, 플랫폼 및 새 오프라인 보고서는 English/한국어를 즉시 전환하고 선택을 저장합니다. 입력·후보 ID·서열·수치·원본 로그·설정은 번역하거나 변경하지 않습니다. 언어 전환 시 사본 수 입력·체인 체크박스·선택한 모델과 PAE를 유지합니다. (2026-10-15)
+README 기본판은 영어입니다. 웹은 첫 방문 시 브라우저의 한국어·영어 설정을 따르며, 저장된 선택과 URL의 언어 지정이 우선합니다. README 상단에서 한국어판으로 이동할 수 있고, 플랫폼 및 새 오프라인 보고서는 English/한국어를 즉시 전환하고 선택을 저장합니다. 입력·후보 ID·서열·수치·원본 로그·설정은 번역하거나 변경하지 않습니다. 언어 전환 시 사본 수 입력·체인 체크박스·선택한 모델과 PAE를 유지합니다. (2026-10-15)
 
+
+## 0.4.8rc13 source update — 2026-11-18
+
+First visits follow the browser’s Korean or English preference. Input guidance matches each analysis mode, and environment checks give the installer command. Unrequested hotspot checks display “Not applicable”; original thresholds and decisions remain available. Initialization reports the files it creates, and report warnings are translated.
+
+첫 방문은 브라우저 언어를 따릅니다. 분석 목적별 입력 안내와 환경 설치 명령을 표시하고, 요청하지 않은 결합 부위 기준은 ‘해당 없음’으로 구분합니다. 초기화의 생성 파일 보고와 한영 경고도 바로잡았습니다. 원본 기준과 판정은 유지합니다.
 
 ## 0.4.8rc13 source update — 2026-11-17
 

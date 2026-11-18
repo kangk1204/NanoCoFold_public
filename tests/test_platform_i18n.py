@@ -24,7 +24,7 @@ def test_actual_translator_preserves_user_data_and_logs():
 
 @pytest.mark.skipif(os.environ.get('NANOCOFOLD_BROWSER_TEST') != '1', reason='Real Chromium release gate')
 @pytest.mark.parametrize("mode,title", [("complex","Predict protein complexes"),("design","Design new nanobodies"),("screen","Compare existing nanobodies"),("mature","Evaluate nanobody variants")])
-def test_english_default_korean_toggle_persistence_and_input_integrity(supplied_server, mode, title):
+def test_english_browser_korean_toggle_persistence_and_input_integrity(supplied_server, mode, title):
     from playwright.sync_api import expect, sync_playwright
     _, url = supplied_server
     with sync_playwright() as pw:
@@ -35,17 +35,23 @@ def test_english_default_korean_toggle_persistence_and_input_integrity(supplied_
         page.goto(url)
         expect(page.locator('body')).to_have_attribute('data-startup', 'ready')
         expect(page.locator('html')).to_have_attribute('lang', 'en')
-        expect(page.locator('#view-input > p.next-step')).to_contain_text('Choose a purpose.')
+        expect(page.locator('#view-input > p.next-step')).to_have_text('Choose an analysis purpose.')
         page.get_by_role('button', name=title+' · Enter input', exact=True).click()
         page.get_by_role('button', name='Load public example for this purpose', exact=True).click()
         expect(page.locator('#tutorial-status')).to_have_text('Public input loaded. Computation has not started.')
-        expect(page.locator('#view-input > p.next-step')).to_contain_text('Check full sequences, chain order, and copy counts.')
+        input_guidance = {
+            'complex': ('Check the full sequences, chain order, and copy counts.', '단백질별 전체 서열·체인 순서·사본 수를 확인하세요.'),
+            'design': ('Enter the target sequence or structure and set the hotspots.', '표적 서열 또는 구조를 넣고 결합 부위를 설정하세요.'),
+            'screen': ('Enter the target and the VHH sequences to compare.', '표적과 비교할 VHH 서열을 입력하세요.'),
+            'mature': ('Enter the target and WT VHH sequences. Set the variant count and mutation region in the next step.', '표적과 WT VHH 서열을 입력하세요. 다음 단계에서 변이 수와 치환 구간을 설정합니다.'),
+        }
+        expect(page.locator('#view-input > p.next-step')).to_have_text(input_guidance[mode][0])
         field = '#complex-fasta' if mode == 'complex' else '#target-fasta'
         fasta = page.locator(field).input_value()
         page.locator('#job-name').fill("완료_나노바디2(A3);O'Neil")
         page.locator('#language-select').select_option('ko')
         expect(page.get_by_role('button', name='입력 확인 후 다음', exact=True)).to_be_visible()
-        expect(page.locator('#view-input > p.next-step')).to_contain_text('전체 서열·체인 순서·사본 수')
+        expect(page.locator('#view-input > p.next-step')).to_have_text(input_guidance[mode][1])
         assert page.locator(field).input_value() == fasta
         if mode == 'complex':
             expect(page.locator('#novice-complex-copies input')).to_have_count(2)
@@ -63,9 +69,9 @@ def test_english_default_korean_toggle_persistence_and_input_integrity(supplied_
         page.locator('#novice-consent').check()
         expect(page.locator('#novice-consent')).to_be_enabled()
         page.get_by_role('button', name='조건 확인 후 다음', exact=True).click()
-        expect(page.locator('#view-input > p.next-step')).to_contain_text('저장된 환경 확인 기록을 사용')
+        expect(page.locator('#view-input > p.next-step')).to_have_text('입력 확인 후 적용 조건을 검토하고 분석 실행을 누르세요.')
         page.locator('#language-select').select_option('en')
-        expect(page.locator('#view-input > p.next-step')).to_contain_text('The saved environment check is used')
+        expect(page.locator('#view-input > p.next-step')).to_have_text('Check the input, review the settings, then select Run analysis.')
         expect(page.locator('#novice-consent')).to_be_checked()
         page.locator('#language-select').select_option('ko')
         page.reload(); expect(page.locator('html')).to_have_attribute('lang', 'ko')

@@ -47,11 +47,8 @@ def test_start_before_install_explains_next_step_without_internal_error(source):
     before = snapshot(source)
     result = launch(source, "--port", "18765")
     assert result.returncode == 1
-    # The launch banner explains an in-progress startup. A failed installation
-    # check must still fail, give the next command, and never claim a ready URL.
-    assert "Starting the NanoCoFold web server." in result.stdout
-    assert "웹 서버를 시작합니다." in result.stdout
-    assert "Keep this terminal open" in result.stdout
+    # Failed validation gives the next command without a premature startup banner.
+    assert result.stdout == ""
     assert not re.search(r"^NanoCoFold:\s*https?://", result.stdout, re.MULTILINE)
     assert "먼저 bash install.sh" in result.stderr
     assert "First run bash install.sh" in result.stderr

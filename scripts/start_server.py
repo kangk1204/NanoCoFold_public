@@ -46,6 +46,8 @@ def start(root=ROOT, arguments=None, *, call=subprocess.call):
             environment["PATH"] = str(uv_binary.parent) + os.pathsep + environment.get("PATH", "")
         if receipt.get("gpu"):
             environment.update(NANOCOFOLD_GPU=receipt["gpu"], CUDA_VISIBLE_DEVICES=receipt["gpu"])
+        print("NanoCoFold 웹 서버를 시작합니다. / Starting the NanoCoFold web server.", flush=True)
+        print("NanoCoFold: 뒤의 주소를 브라우저로 여세요. 사용하는 동안 이 터미널을 열어 두세요. / Open the URL after NanoCoFold: and keep this terminal open.", flush=True)
         # The product CLI defaults to localhost. User options remain CLI args.
         return call([str(binary), "serve", "--workspace", str(workspace), *(arguments or [])],
                     env=environment, pass_fds=(descriptor,))

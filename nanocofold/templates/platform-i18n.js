@@ -553,8 +553,8 @@ const NCF_TRANSLATIONS = Object.freeze({
   "성숙화 라이브러리 {0}개에서 평가 후보 선별 중": "Selecting evaluation candidates from {0} variants",
   "후보 {0}/{1} 점수 계산 중 · {2}": "Scoring candidate {0}/{1} · {2}",
   "dev_flags 가중치는 종합점수에만 적용됩니다. CDR 미평가는 가중치가 0이어도 최종 적격을 통과하지 않습니다. fallback_to_ineligible=true로 만든 부적격 진단 목록은 발주 승인이 아닙니다.": "The dev_flags weight affects the composite score. An unevaluated CDR does not pass final eligibility even if this weight is zero. An ineligible diagnostic list created with fallback_to_ineligible=true is not approval for a synthesis order.",
-  "mock/dry-run: CDR 의존 liability 는 미평가로 기록됩니다. rank.weights.dev_flags가 0이 아니면 CDR 미평가로 종합 순위를 보류합니다. rank.weights.dev_flags=0으로 바꾸어도 CDR 평가가 없으면 최종 적격은 통과하지 않으며, 기본 선별은 계속 보류합니다. 실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. 미평가를 위험 없음으로 처리하지 않습니다.": "mock/dry-run: CDR-dependent liabilities are recorded as unevaluated. If rank.weights.dev_flags is nonzero, the composite ranking is held because CDR assessment is missing. Setting rank.weights.dev_flags=0 does not pass final eligibility without CDR assessment; default selection remains held. For actual analysis, install ANARCI with envs/setup_antibody.sh or set mature.cdr.source=config with validated 1-based CDR ranges. Unevaluated does not mean risk-free.",
-  "ANARCI 환경 없음: CDR 의존 liability 는 미평가로 기록됩니다. rank.weights.dev_flags가 0이 아니면 CDR 미평가로 종합 순위를 보류합니다. rank.weights.dev_flags=0으로 바꾸어도 CDR 평가가 없으면 최종 적격은 통과하지 않으며, 기본 선별은 계속 보류합니다. 실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. 미평가를 위험 없음으로 처리하지 않습니다.": "ANARCI environment unavailable: CDR-dependent liabilities are recorded as unevaluated. If rank.weights.dev_flags is nonzero, the composite ranking is held because CDR assessment is missing. Setting rank.weights.dev_flags=0 does not pass final eligibility without CDR assessment; default selection remains held. For actual analysis, install ANARCI with envs/setup_antibody.sh or set mature.cdr.source=config with validated 1-based CDR ranges. Unevaluated does not mean risk-free.",
+  "mock/dry-run: CDR 의존 liability 는 미평가로 기록됩니다. rank.weights.dev_flags가 0이 아니면 CDR 미평가로 종합 순위를 보류합니다. rank.weights.dev_flags=0으로 바꾸어도 CDR 평가가 없으면 최종 적격은 통과하지 않으며, 기본 선별은 계속 보류합니다. 실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. 미평가를 위험 없음으로 처리하지 않습니다.": "mock/dry-run: CDR liabilities are unevaluated. A nonzero rank.weights.dev_flags holds the composite rank. Even rank.weights.dev_flags=0 does not pass final eligibility without a CDR assessment. Install ANARCI with envs/setup_antibody.sh or supply verified 1-based ranges using mature.cdr.source=config.",
+  "ANARCI 환경 없음: CDR 의존 liability 는 미평가로 기록됩니다. rank.weights.dev_flags가 0이 아니면 CDR 미평가로 종합 순위를 보류합니다. rank.weights.dev_flags=0으로 바꾸어도 CDR 평가가 없으면 최종 적격은 통과하지 않으며, 기본 선별은 계속 보류합니다. 실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. 미평가를 위험 없음으로 처리하지 않습니다.": "ANARCI unavailable: CDR liabilities are unevaluated. A nonzero rank.weights.dev_flags holds the composite rank. Even rank.weights.dev_flags=0 does not pass final eligibility without a CDR assessment. Install ANARCI with envs/setup_antibody.sh or supply verified 1-based ranges using mature.cdr.source=config.",
   "정리 보관본은 읽기 전용입니다. 재분석에는 정리 전 전체 원본 결과가 필요합니다.": "The compact archive is read-only. Reanalysis requires the complete original results from before cleanup.",
   "현재 평가 기준": "Current assessment criteria",
   "원래 예측 설정": "Original prediction settings",
@@ -2597,7 +2597,30 @@ const NCF_TRANSLATIONS = Object.freeze({
   "분석 규모": "Analysis size",
   "최종 선별 상한 · 여러 엔진 비교는 엔진별": "Final selection limit · Per engine when comparing engines",
   "서열 입력의 구조와 결합 부위는 예측됩니다. 실험 구조 확인과 구분하세요.": "Sequence input produces predicted structures and hotspots.",
-  "구조 입력은 결합 부위(hotspot) 위치에서 잔기를 지정합니다. 서열만 입력하면 예측 구조에서 결합 부위를 자동 추천합니다. 분석 시작·끝은 사용할 표적 서열 구간이며, 번호는 입력 서열의 첫 잔기를 1로 셉니다.": "For structure input, specify residues in the hotspot position field. Sequence-only input selects hotspots automatically from the predicted structure. Region start and end select the target segment; positions start at 1 in the input sequence."
+  "구조 입력은 결합 부위(hotspot) 위치에서 잔기를 지정합니다. 서열만 입력하면 예측 구조에서 결합 부위를 자동 추천합니다. 분석 시작·끝은 사용할 표적 서열 구간이며, 번호는 입력 서열의 첫 잔기를 1로 셉니다.": "For structure input, specify residues in the hotspot position field. Sequence-only input selects hotspots automatically from the predicted structure. Region start and end select the target segment; positions start at 1 in the input sequence.",
+  "mature.library.strategy=dms에서는 mature.library.size를 사용하지 않습니다. 실제 변이 생성 상한은 mature.library.max_variants로 설정하세요(WT는 별도 포함).": "DMS ignores mature.library.size. Set mature.library.max_variants to limit variants; WT is included separately.",
+  "기본 설정에 없는 키입니다. 효과가 있는 옵션인지 확인하세요: {0}": "Unrecognized setting: {0}. Check the option name.",
+  "자세 진단 미평가: {0}": "Pose assessment unavailable: {0}",
+  "screen.restraint.enabled=true 이므로 결합 부위 접촉률이 restraint 로 유도된 값입니다. decoy 에서도 함께 오르므로 결합자/비결합자 판별 근거로 쓰지 마세요. 판별이 목적이면 restraint 를 끄고 비교하거나(specificity 캠페인 기본) Boltz-2 재평가를 사용하세요.": "screen.restraint.enabled=true: restraints influence hotspot contacts in both candidates and decoys. For discrimination, compare without restraints (the specificity default) or reassess with Boltz-2.",
+  "적용 순위 정책은 미기록입니다. 현재 기본값으로 과거 정책을 추정하거나 점수·선별을 다시 계산하지 않았습니다. 이전 정책 파일이 있으면 history에 보존합니다.": "Ranking policy was not recorded. Saved scores and selections are unchanged. Any previous policy file remains in history.",
+  "mature.cdr.source=config 이지만 유효한 CDR 범위가 없어 CDR 개발가능성을 미평가합니다.": "mature.cdr.source=config has no valid CDR ranges. CDR developability is not evaluated.",
+  "보고서 생성에 실패했습니다. 계산 CSV와 합성 기록은 저장되었습니다. 원인을 복구한 뒤 `nanocofold report --run-dir`로 보고서만 다시 생성하세요.": "Report generation failed. Calculation CSVs and synthesis records are saved. Resolve the error, then rerun `nanocofold report --run-dir`.",
+  "타깃 설정/서열/결합 부위가 이전 실행과 달라 target 캐시와 모델 출력을 무효화하고 다시 계산합니다.": "Target settings, sequence, or hotspots changed. The target cache and model outputs will be recalculated.",
+  "mature.cdr.regions 의 최대 위치({0})가 후보 {1}종의 서열 길이를 넘어 CDR 의존 liability 를 미평가로 기록하고 기본 선별에서 제외합니다({2}). 서열마다 길이가 다르면 설정 범위 하나로는 맞출 수 없습니다. envs/setup_antibody.sh 로 ANARCI 를 설치해 mature.cdr.source=auto 를 쓰거나, 각 서열에 맞는 범위를 확인하세요.": "The last mature.cdr.regions position ({0}) exceeds the sequence length of {1} candidates ({2}). Their CDR liabilities remain unevaluated and they are excluded from default selection. Install ANARCI with envs/setup_antibody.sh and use mature.cdr.source=auto, or check each sequence’s ranges.",
+  "ANARCI CDR 주석: {0}/{1} 후보 성공. 실패 후보의 CDR 의존 liability 는 '미평가'로 기록됩니다.": "ANARCI CDR annotation succeeded for {0}/{1} candidates. CDR liabilities remain unevaluated for the others.",
+  "{0}: CDR 의존 liability 는 미평가로 기록됩니다. rank.weights.dev_flags가 0이 아니면 CDR 미평가로 종합 순위를 보류합니다. rank.weights.dev_flags=0으로 바꾸어도 CDR 평가가 없으면 최종 적격은 통과하지 않으며, 기본 선별은 계속 보류합니다. 실제 분석은 envs/setup_antibody.sh로 ANARCI를 설치하거나 mature.cdr.source=config와 검증한 1-based CDR 범위를 지정하세요. 미평가를 위험 없음으로 처리하지 않습니다.": "{0}: CDR liabilities are unevaluated. A nonzero rank.weights.dev_flags holds the composite rank. Even rank.weights.dev_flags=0 does not pass final eligibility without a CDR assessment. Install ANARCI with envs/setup_antibody.sh or supply verified 1-based ranges using mature.cdr.source=config.",
+  "순위 정책 영수증을 저장하지 못했습니다. 계산 CSV와 설정은 보존했으며, 이전 ranking_policy.json이 남아 있어도 새 표의 정책으로 확정하지 않습니다.": "Could not save the ranking policy receipt. Calculation CSVs and settings are saved; any existing ranking_policy.json does not establish the policy for the new table.",
+  "예측 목록을 읽지 못했습니다: {0}: {1}": "Could not read the prediction list: {0}: {1}",
+  "rank.weights 의 '{0}' 지표가 전체 성공 후보에서 미평가여서 가중치를 제외합니다.": "Metric '{0}' is unevaluated across all successful candidates; its rank.weights weight is omitted.",
+  "설치 폴더에서 {0} 실행 후 다시 확인하세요.": "In the installation folder, run {0}, then check again.",
+  "분석 목적을 선택하세요.": "Choose an analysis purpose.",
+  "단백질별 전체 서열·체인 순서·사본 수를 확인하세요.": "Check the full sequences, chain order, and copy counts.",
+  "표적 서열 또는 구조를 넣고 결합 부위를 설정하세요.": "Enter the target sequence or structure and set the hotspots.",
+  "표적과 비교할 VHH 서열을 입력하세요.": "Enter the target and the VHH sequences to compare.",
+  "표적과 WT VHH 서열을 입력하세요. 다음 단계에서 변이 수와 치환 구간을 설정합니다.": "Enter the target and WT VHH sequences. Set the variant count and mutation region in the next step.",
+  "입력 확인 후 적용 조건을 검토하고 분석 실행을 누르세요.": "Check the input, review the settings, then select Run analysis.",
+  "{0}: 서열이 A/C/G/T와 일부 N 문자로 이루어져 DNA 서열일 가능성이 있습니다. 단백질 아미노산 서열인지 확인하세요. 이 문자들은 아미노산으로도 유효하므로 서열을 삭제하거나 임의 번역하지 않았습니다.": "{0}: This sequence contains A/C/G/T and some N characters. Check that it is a protein sequence rather than DNA. The input is unchanged because these letters are also valid amino acids.",
+  "스코어링 실패 {0}종 (예: {1})": "Scoring failed for {0} candidates (examples: {1})."
 });
 
 /* Explicit presentation bindings; no DOM observer, input rewriting, or API mutation. */
@@ -2716,7 +2739,9 @@ globalThis.I18N = (() => {
     let saved;try{saved=localStorage.getItem(storageKey);}catch{}
     const query=new URLSearchParams(location.search).get('lang');
     const delivered=document.documentElement.dataset?.nanocofoldReportLanguage;
-    language=['en','ko'].includes(query)?query:['en','ko'].includes(delivered)?delivered:['en','ko'].includes(saved)?saved:'en';
+    const preferred=typeof navigator==='undefined'?[]:navigator.languages?.length?navigator.languages:[navigator.language];
+    const browser=preferred.find(value=>/^(ko|en)(-|$)/i.test(value || ''))?.split('-')[0].toLowerCase() || 'en';
+    language=['en','ko'].includes(query)?query:['en','ko'].includes(delivered)?delivered:['en','ko'].includes(saved)?saved:browser;
     if(explicit)document.documentElement.dataset.nanocofoldReportLanguage=language;
     // Server-rendered reports mark only template-owned captions. Never walk
     // their original IDs, notes, JSON, filenames, or other saved user data.

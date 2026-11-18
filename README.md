@@ -120,7 +120,7 @@ bash start.sh --port 0
 
 When using `--port 0` on a remote server, set up SSH forwarding with the server port printed in the terminal.
 
-Select an analysis purpose when the interface is ready. For a loading error, click **Reload interface**. The interface opens in English; use **Language → 한국어** to switch. The browser saves your language choice.
+Select an analysis purpose when the interface is ready. For a loading error, click **Reload interface**. On your first visit, the interface follows your browser’s Korean or English language. Use **Language** to change it; your choice is saved.
 
 <details>
 <summary>Using a remote Ubuntu server from your own PC</summary>

@@ -46,7 +46,7 @@ def installed(tmp_path, monkeypatch):
     return repo, owner, marker, protected
 
 
-def test_start_keeps_workspace_options_environment_and_existing_results(installed):
+def test_start_keeps_workspace_options_environment_and_existing_results(installed, capsys):
     repo, owner, _, protected = installed
     def child(argv, **kwargs):
         assert argv == [str(owner / ".venv-dev/bin/nanocofold"), "serve", "--workspace", str(owner),
@@ -55,7 +55,14 @@ def test_start_keeps_workspace_options_environment_and_existing_results(installe
         assert len(kwargs["pass_fds"]) == 1
         return 7
     assert start(repo, ["--no-browser", "--port", "18765"], call=child) == 7
+    assert "Starting the NanoCoFold web server" in capsys.readouterr().out
     assert {p: p.read_bytes() for p in protected} == protected
+
+
+def test_start_has_no_optimistic_message_before_installation_validation(tmp_path, capsys):
+    with pytest.raises(ValueError, match="install.sh"):
+        start(tmp_path, call=lambda *a, **kw: pytest.fail("uninstalled program started"))
+    assert capsys.readouterr().out == ""
 
 
 @pytest.mark.parametrize("interrupted", [False, True])

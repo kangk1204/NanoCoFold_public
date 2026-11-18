@@ -373,13 +373,29 @@ def _preflight_input_files(cfg: dict, args, *, required=False) -> None:
             records = seq_utils.read_fasta(path, candidate_ids=setting == "screen.vhh_fasta")
             if setting != "screen.vhh_fasta" and len(records) != 1:
                 raise ValueError(f"{setting}에는 서열을 1개만 넣으세요.")
-            for sequence in records.values():
+            for identifier, sequence in records.items():
                 seq_utils.clean_sequence(sequence)
+                if setting in {"screen.vhh_fasta", "mature.wt_fasta"}:
+                    _sequence_input_hint(args, setting + "/" + identifier, sequence)
+    if mode == "mature" and cfg_get(cfg, "mature.wt_sequence"):
+        _sequence_input_hint(args, "mature.wt_sequence", cfg_get(cfg, "mature.wt_sequence"))
     if required and getattr(args, "command", None) != "prepare":
         if mode == "screen" and not cfg_get(cfg, "screen.vhh_fasta") and not _is_mock(cfg):
             raise FileNotFoundError("screen 모드에는 --vhh-fasta (후보 나노바디 FASTA)가 필요합니다.")
         if mode == "mature":
             mature.resolve_wt_sequence(cfg)
+
+
+def _sequence_input_hint(args, label: str, sequence: str) -> None:
+    """Warn once, without rejecting valid A/C/G/T amino-acid input."""
+    hint = seq_utils.nucleotide_ambiguity_hint(sequence)
+    if hint:
+        message = label + ": " + hint
+        notices = list(getattr(args, "config_warnings", []))
+        if message not in notices:
+            notices.append(message)
+            args.config_warnings = notices
+            print("[경고] " + message)
 
 
 def _preflight_comparison_reuse(cfg, run_dir, command):

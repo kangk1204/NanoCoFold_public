@@ -43,3 +43,14 @@ test('unknown checks remain literal and missing details retain the readiness hea
  c.renderDiagnostics({ok:false});assert.match(output.textContent,/환경 확인 기록/);assert.doesNotMatch(output.textContent,/실행 준비 미충족/);assert.match(output.textContent,/아직 없습니다/);
  c.I18N.setLanguage('en',{persist:false});assert.match(output.textContent,/not available yet|No detailed environment/);
 });
+test('required engine blockers give an existing installer profile in both languages',()=>{
+ const {c}=fixture();
+ for(const [engine,profile] of Object.entries({colabfold:'colabfold',opendde:'opendde',boltzgen:'boltzgen',rfantibody:'design',boltz2:'complex',chai1:'complex',antifold:'mature',esm:'mature'})) {
+  const action=c.diagnosticAction({name:engine+'.env_imports',ok:false,required:true});
+  for(const language of ['ko','en']) {
+   c.I18N.setLanguage(language,{persist:false});
+   assert.ok(c.I18N.value(action).includes('bash install.sh --profile '+profile));
+   if(language==='en')assert.doesNotMatch(c.I18N.value(action),/[가-힣]/);
+  }
+ }
+});

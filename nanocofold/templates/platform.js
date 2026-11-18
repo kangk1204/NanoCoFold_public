@@ -2356,6 +2356,13 @@ function hotspotSite(row) {
  return {status,label,requested,contacted,contacts:assessed?`${contacted}/${requested}개`:'—',
   contact_fraction:assessed?fraction:null,passed:assessed?passed:null,threshold:check?.threshold??null};
 }
+function thresholdPresentation(check, row) {
+  const notApplicable = check.metric === "hotspot_contact_frac" && hotspotSite(row).status === "not_requested";
+  const missing = check.value == null || (typeof check.value === "number" && !Number.isFinite(check.value))
+    || (check.metric === "hotspot_contact_frac" && row.hotspot_mapping_failed === true);
+  return {notApplicable, decision: notApplicable ? "해당 없음" : missing ? "미평가"
+    : check.passed === true ? "통과" : check.passed === false ? "미통과" : "미평가"};
+}
 /* POSE_PRESENTATION_START */
 const poseStatusLabels = Object.freeze({
  pose_consensus_status:{multi_engine_supported:"다중 엔진 지지·탐색용",single_engine_promising:"엔진별 단독 유망·탐색용",supported:"여러 엔진 자세 일치",quality_support_insufficient:"자세 일치·기록 적격 지지 부족",single_engine:"단일 엔진·비교 부족",discordant:"엔진 간 자세 불일치",not_assessed:"미평가",disabled:"평가 비활성"},
@@ -2719,13 +2726,13 @@ async function selectCandidate(id) {
       (Array.isArray(row.threshold_checks)?row.threshold_checks:[]).filter(c=>c&&typeof c==="object"&&!Array.isArray(c)).map((c) => ({
         지표: metricCaption(c.metric, row),
         값: c.value,
-        조건: c.operator,
-        기준: c.threshold,
-        통과: c.passed === true ? "통과" : c.passed === false ? "미통과" : "미평가",
+        조건: thresholdPresentation(c, row).notApplicable ? "" : c.operator,
+        기준: thresholdPresentation(c, row).notApplicable ? "해당 없음" : c.threshold,
+        통과: thresholdPresentation(c, row).decision,
         출처: c.threshold_source,
       })),
       ["지표", "값", "조건", "기준", "통과", "출처"],
-      {localizedValues: ["지표", "통과"]},
+      {localizedValues: ["지표", "기준", "통과"]},
     );
     facts.append(
       el(
@@ -3396,7 +3403,10 @@ function diagnosticAction(check) {
   if (name.startsWith("report.")) return "프로그램을 업데이트한 뒤 환경 확인을 다시 실행하세요.";
   if (name.endsWith(".framework") || name.endsWith(".scaffold"))
     return "선택한 프레임워크 구조 파일을 확인하세요.";
-  return "환경·설치에서 이 엔진의 설치 프로필을 설치한 뒤 다시 확인하세요.";
+  const profile = {colabfold:"colabfold", opendde:"opendde", boltzgen:"boltzgen", rfantibody:"design",
+    boltz2:"complex", chai1:"complex", antifold:"mature", esm:"mature"}[name.split(".")[0]];
+  return profile ? I18N.format("설치 폴더에서 {0} 실행 후 다시 확인하세요.", ["bash install.sh --profile " + profile])
+    : "선택한 모드의 설치 프로필을 설치하고 작업 로그를 확인하세요.";
 }
 function renderDiagnostics(diagnosis) {
   if (!diagnosis) return;
@@ -4305,10 +4315,16 @@ async function initNoviceFlow() {
     next.disabled = state.msaConsentSaving || (step === 1 && blocked);
   }
   host.insertBefore(rail, task);
-  const tasks=["목적을 고르세요. 필요한 입력과 결과를 확인하면 다음으로 이동합니다.","전체 서열·체인 순서·사본 수를 확인하세요. 오류 없는 필수 입력이면 다음으로 이동합니다.","계획 모델 수, 선택 엔진, MSA 전송 방식을 확인하세요.","입력 확인을 누르고 적용 조건을 읽은 뒤 분석 실행을 누르세요. 저장된 환경 확인 기록을 사용합니다."];
+  const inputTasks = {
+    complex:"단백질별 전체 서열·체인 순서·사본 수를 확인하세요.",
+    design:"표적 서열 또는 구조를 넣고 결합 부위를 설정하세요.",
+    screen:"표적과 비교할 VHH 서열을 입력하세요.",
+    mature:"표적과 WT VHH 서열을 입력하세요. 다음 단계에서 변이 수와 치환 구간을 설정합니다.",
+  };
+  const tasks=["분석 목적을 선택하세요.",null,"계획 모델 수, 선택 엔진, MSA 전송 방식을 확인하세요.","입력 확인 후 적용 조건을 검토하고 분석 실행을 누르세요."];
   function render(){
     host.querySelector(".setup-entry").hidden = step !== 0;
-    [purposeCard,inputCard,settingsCard,reviewCard].forEach((n,i)=>n.hidden=i!==step);I18N.text(heading, I18N.format("{0}/4 · {1}", [step+1, I18N.term(state.starter.steps[step])]));I18N.text(task, I18N.term(tasks[step]));prev.hidden=step===0;next.hidden=step===0||step===3;I18N.text(next, step===1 ? I18N.term("입력 확인 후 다음") : I18N.term("조건 확인 후 다음"));
+    [purposeCard,inputCard,settingsCard,reviewCard].forEach((n,i)=>n.hidden=i!==step);I18N.text(heading, I18N.format("{0}/4 · {1}", [step+1, I18N.term(state.starter.steps[step])]));I18N.text(task, I18N.term(step===1 ? inputTasks[$("mode").value] : tasks[step]));prev.hidden=step===0;next.hidden=step===0||step===3;I18N.text(next, step===1 ? I18N.term("입력 확인 후 다음") : I18N.term("조건 확인 후 다음"));
     [...rail.children].forEach((n,i)=>n.setAttribute("aria-current",i===step?"step":"false"));
     const isComplex=$("mode").value==="complex";
     complex.hidden=!isComplex||$("input-kind").value!=="fasta";$("fasta-fields").hidden=isComplex||$("input-kind").value!=="fasta";
@@ -4335,7 +4351,7 @@ async function initNoviceFlow() {
   }
   state.refreshNovice = render;
   function clearOptionErrors(){host.querySelectorAll('[aria-invalid="true"]').forEach(n=>n.removeAttribute("aria-invalid"));}
-  function jump(n){step=n;clearOptionErrors();I18N.text(reason, "");render();heading.focus();}
+  function jump(n){step=Math.max(0,Math.min(3,n));clearOptionErrors();I18N.text(reason, "");render();heading.focus();}
   state.nextAnalysis = () => {
     invalidateInput();
     step = 0;

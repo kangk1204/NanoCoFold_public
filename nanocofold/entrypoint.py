@@ -51,7 +51,7 @@ def _main(argv=None):
                 workspace = Path(item.split("=", 1)[1]).expanduser().resolve()
                 args[i] = "--workspace=" + str(workspace)
         if workspace is not None:
-            if args[0] in {"init", "setup", "serve", "batch"}:
+            if args[0] in {"setup", "serve", "batch"}:
                 from .install import init_workspace
                 init_workspace(workspace)
             if workspace.is_dir():
