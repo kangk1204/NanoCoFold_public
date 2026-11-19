@@ -208,11 +208,11 @@ def test_offline_coordinate_source_and_download_bytes(tmp_path, mode):
             expect(page.locator("#save-result-structure")).to_have_text("선택한 표시 좌표 저장")
             if relation == "unverified_legacy":
                 expect(page.locator("#save-native-structure")).to_be_disabled()
-                expect(page.locator("#structure-source")).to_contain_text("검증된 원본 엔진 좌표가 없습니다")
-                expect(page.locator("#structure-data-note")).to_contain_text("검증된 원본 엔진 좌표가 없습니다")
+                expect(page.locator("#structure-source")).to_contain_text("검증된 원본 미기록")
+                expect(page.locator("#structure-data-note")).to_contain_text("검증된 원본 미기록")
             else:
                 expect(page.locator("#save-native-structure")).to_be_enabled()
-                text = "동일합니다" if relation == "native_identical" else "변환된 표시 좌표"
+                text = "원본 엔진 좌표 표시 중" if relation == "native_identical" else "변환된 표시 좌표"
                 expect(page.locator("#structure-source")).to_contain_text(text)
                 expect(page.locator("#structure-data-note")).to_contain_text(text)
                 with page.expect_download() as downloaded:

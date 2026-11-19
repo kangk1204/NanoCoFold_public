@@ -8,7 +8,7 @@ Predict protein complexes, design nanobodies, and compare existing candidates or
 
 **Installing for the first time?** Follow [1. Prepare and install](#1-prepare-and-install). **Already installed?** Follow the [update guide](docs/UPDATE.en.md) in the original installation folder. **Joining a shared lab server?** Use the account your administrator provides and [connect from your desk](docs/shared-lab.en.md#at-each-desk).
 
-**Start with a result:** Extract the entire [example report ZIP](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8-install.12/NanoCoFold-EGFR-10-metric-guide.zip) and open **report.html** in your browser. No installation or GPU is needed. The [new hands-on video](https://kangk1204.github.io/NanoCoFold_public/quickstart/?lang=en) also shows how to run your own analysis, find a candidate sequence and structure, and save your search to Excel.
+**Explore an example** · Extract the [report ZIP](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8-install.13/NanoCoFold-EGFR-10-interactive-report.zip) and open `report.html` in your browser. Click a VHH residue to zoom in on it in 3D.
 
 **For the full installation and input tutorial, [follow one EGFR nanobody experiment](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=en).** The 27-minute video has 17 chapters. Install NanoCoFold on Ubuntu, enter the target sequence and binding site, and compare ten CDR3 variants with the original nanobody (WT). Each variant has two substitutions. Follow the same analysis through database search, handoff review and opening the report ZIP. [Download the exercise inputs](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-inputs.zip) · [Download the video](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-first-run-en.mp4) · [Start at input preparation](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=en&chapter=inputs) · [Open the recorded result](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-report.zip)
 
@@ -33,7 +33,7 @@ For an overview of the four analysis modes, watch the **four-mode overview**. Th
 
 **Environment check → prepare input → review settings → run once → Open results.**
 
-**After the environment check, click Prepare analysis.** `diagnostics · Complete` is the environment-check record. Start the analysis in [section 3](#3-try-the-first-public-example).
+**After the environment check, click Prepare analysis.** **Environment check · Complete** is the environment-check record. Start the analysis in [section 3](#3-try-the-first-public-example).
 
 If a required check needs attention, follow its **Next step** before running an analysis. **Technical diagnostic record** contains the original details for your server administrator.
 
@@ -394,7 +394,7 @@ If PyMOL materials are provided, extract the **whole folder** and open `.pml` th
 
 </details>
 
-Select candidates by reviewing engine-specific scores, ipTM, interface pLDDT, interface PAE, and structures together. Use WT controls for variant comparisons, then test selected candidates for binding, KD, and expression. See [metrics and result interpretation](docs/RESULTS.md).
+Compare ipTM, ipSAE, interface pLDDT, PAE and structures within the same engine and conditions. For variants, use WT as the reference. [Read the metrics](docs/RESULTS.md)
 
 
 [Score cohorts, comparison conditions, and statistical interpretation](docs/STATISTICAL_INTERPRETATION.md).

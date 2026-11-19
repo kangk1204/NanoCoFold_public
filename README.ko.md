@@ -8,7 +8,7 @@
 
 **처음 설치하는 컴퓨터**에서는 [1. 준비와 설치](#1-준비와-설치)부터 진행하세요. **이미 설치했다면** 처음 설치한 폴더에서 [기존 설치 업데이트](docs/UPDATE.ko.md)를 따라 하세요. **연구실 서버를 함께 쓰는 분**은 관리자가 알려준 계정으로 [내 자리에서 접속](docs/shared-lab.ko.md#사용자-pc)하세요.
 
-**결과부터 보려면:** [예제 보고서 ZIP](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8-install.12/NanoCoFold-EGFR-10-metric-guide.zip) 전체를 압축 해제한 뒤 **report.html**을 브라우저로 여세요. 설치나 GPU가 필요 없습니다. [새 실습 영상](https://kangk1204.github.io/NanoCoFold_public/quickstart/?lang=ko)에서 같은 방식으로 결과를 열고, 새 분석의 후보 서열과 3D 구조를 찾아 Excel로 저장하는 과정을 볼 수 있습니다.
+**예제 결과 보기** · [보고서 ZIP](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8-install.13/NanoCoFold-EGFR-10-interactive-report.zip) 전체를 풀고 `report.html`을 브라우저에서 여세요. VHH 서열의 잔기를 클릭하면 3D에서 확대됩니다.
 
 **상세 설치와 입력 설명은 [EGFR 나노바디 변이 10종 실습 영상](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=ko)을 보세요.** 영상은 27분, 17개 장입니다. Ubuntu에서 설치한 뒤 표적 서열과 결합 부위를 입력하고, 후보마다 CDR3 잔기 두 곳을 바꾼 변이 10종을 원래 나노바디(WT)와 비교합니다. 같은 작업을 결과 DB에서 찾아 전달 상태를 확인하고 보고서 ZIP을 여는 과정까지 담았습니다. [실습 입력 ZIP](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-inputs.zip) · [영상 MP4](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-first-run-en.mp4) · [입력 준비 장부터 보기](https://kangk1204.github.io/NanoCoFold_public/watch/?v=first-run&lang=ko&chapter=inputs) · [영상의 결과 보고서 ZIP](https://github.com/kangk1204/NanoCoFold_public/releases/download/v0.4.8/NanoCoFold-EGFR-10-report.zip)
 
@@ -33,7 +33,7 @@
 
 **환경 확인 → 입력 준비 → 조건 확인 → 분석 한 번 실행 → 결과 열기** 순서입니다.
 
-**환경 확인을 마치면 분석 준비하기를 누르세요.** `diagnostics · 완료`는 환경 확인 기록입니다. 분석은 [3번](#3-첫-공개-예제-따라-하기)에서 시작합니다.
+**환경 확인을 마치면 분석 준비하기를 누르세요.** **환경 확인 · 완료**는 장치와 엔진을 점검한 기록입니다. 분석은 [3번](#3-첫-공개-예제-따라-하기)에서 시작합니다.
 
 필수 항목에 **필수 확인**이 표시되면 **다음 단계**의 안내를 처리한 뒤 분석하세요. **기술 진단 원문**은 서버 관리자에게 전달할 상세 기록입니다.
 
@@ -394,7 +394,7 @@ PyMOL 자료가 함께 제공되면 **폴더 전체**를 풀고 PyMOL의 **File 
 
 </details>
 
-후보는 엔진별 점수, ipTM·계면 pLDDT·계면 PAE, 구조를 함께 검토해 선정합니다. 변이 평가에서는 WT를 대조군으로 비교하세요. 선정한 후보의 결합·KD·발현은 실험으로 확인합니다. [지표와 결과 읽기](docs/RESULTS.md)
+같은 엔진과 조건에서 후보의 ipTM·ipSAE·계면 pLDDT·PAE와 구조를 비교하세요. 변이 평가는 WT를 기준으로 봅니다. [지표와 결과 읽기](docs/RESULTS.md)
 
 
 [점수 집합·비교조건과 통계 해석](docs/STATISTICAL_INTERPRETATION.ko.md)을 함께 확인하세요.

@@ -1674,7 +1674,7 @@ async function refreshJobs() {
       const chosen = state.job, selection = state.jobSelectionVersion;
       const job = await api("/api/jobs/" + chosen, undefined, {timeoutMs: 15000});
       if (state.job !== chosen || state.jobSelectionVersion !== selection) return;
-      I18N.text($("job-title"), job.name);
+      I18N.text($("job-title"), job.kind === "diagnostics" ? I18N.term("환경 확인") : job.kind === "setup" ? I18N.term("프로그램 설치") : job.name);
       if (state.submissionNoticeJob === job.id && !["queued","running","cancelling"].includes(job.state)) {
         notice(I18N.format(job.result_id ? "{0} · 결과 열기로 결과를 확인하세요." : "{0} · 작업 상세와 로그에서 종료 사유를 확인하세요.", [I18N.term(states[job.state] || job.state)]), job.state!=="complete");
         state.submissionNoticeJob=null;
@@ -1700,7 +1700,7 @@ async function refreshJobs() {
       }
       if (job.reused_result_id) $("job-detail").append(el("p", I18N.format("저장 결과 연결 · 새 계산 0초 · 원본 {0}{1}. 원래 계산 시간 {2}", [job.reused_result_id, job.reuse_kind === "view_only" ? I18N.term(" · 핵심 보관본") : "", job.source_elapsed_seconds === null ? I18N.term("미기록") : I18N.concat([Math.round(job.source_elapsed_seconds || 0), I18N.term("초")])])));
       if (job.reused_result_id) $("job-detail").append(el("p", I18N.term("이전 결과를 사용했습니다. 새 계산은 하지 않았습니다. 다시 계산하려면 입력·실행의 실행 조건에서 ‘과거 결과를 재사용하지 않고 새로 계산’을 선택하세요. 다른 무작위 후보가 필요하면 변이 생성 Seed도 변경하세요."), "next-step"));
-      if (job.kind === "analysis" && job.state === "complete" && !job.reused_result_id) $("job-detail").append(el("p",I18N.term("계산 성공은 계산이 끝난 모델 수입니다. 서로 다른 후보 서열 수나 최종 적격 후보 수와 다릅니다. 결과에서 후보·모델 수와 판정·제외 이유를 확인하세요."),"muted"));
+      if (job.kind === "analysis" && job.state === "complete" && !job.reused_result_id) $("job-detail").append(el("p",I18N.term("계산 완료는 모델 수입니다. 최종 선별과 제외 사유는 결과에서 확인하세요."),"muted"));
       if (etaText(job)) $("job-detail").append(el("p", I18N.term(etaText(job)), "eta-note"));
       if (job.mock)
         $("job-detail").append(el("span", I18N.term("MOCK · 합성 결과"), "badge"));
@@ -1909,14 +1909,13 @@ function renderHandoffStatus(summary) {
   if (!gate.visible) return;
   const panel = el("section", undefined, "report-guide");
   panel.setAttribute("data-handoff-status", gate.status);
-  panel.append(el("h3", I18N.term("계산 상태와 별도의 인계 확인")));
-  panel.append(el("strong", I18N.term(gate.status === "passed" ? "저장된 인계 검사 통과" : gate.status === "blocked" ? "인계 미완료" : "인계 준비 상태 미확인")));
+  panel.append(el("h3", I18N.term("전달 점검")));
+  panel.append(el("strong", I18N.term(gate.status === "passed" ? "전달 점검 통과" : gate.status === "blocked" ? "전달 확인 필요" : "전달 점검 기록 없음")));
   panel.append(el("p", I18N.format("기록 오류 {0}건 · 경고 {1}건", [gate.n_errors ?? I18N.term("미기록"), gate.n_warnings ?? I18N.term("미기록")])));
-  panel.append(el("p", I18N.term("계산 완료는 인계 승인이나 실험 검증을 뜻하지 않습니다. 저장된 판정만 표시하며 재검증·자동 승인을 하지 않습니다.")));
-  if (gate.empty_msa) panel.append(el("p", I18N.term("MSA 없이 실행한 기록입니다. 예측 품질의 한계이며 인계 확인으로 해소되지 않습니다."), "warning"));
+  if (gate.empty_msa) panel.append(el("p", I18N.term("MSA 미사용"), "warning"));
   if (gate.detail_status !== "available") panel.append(el("p", I18N.term(gate.detail_status === "missing"
-    ? "상세 인계 JSON이 없어 항목별 이유를 확인할 수 없습니다. 미확인을 오류 0건이나 통과로 해석하지 마세요."
-    : "상세 인계 JSON을 신뢰할 수 없습니다. 파일 형식·접근 상태 또는 기록 요약과의 불일치를 확인하세요."), "warning"));
+    ? "상세 점검 기록 없음"
+    : "상세 점검 파일과 요약 기록을 확인하세요."), "warning"));
   for (const [key, label] of [["errors", "인계 차단 사유"], ["warnings", "저장된 인계 경고"]]) {
     if (!gate[key].length) continue;
     panel.append(el("h4", I18N.term(label)));
@@ -2071,12 +2070,12 @@ async function loadResult(id) {
     const evidence = el("details"); evidence.id = "msa-provenance";
     evidence.append(el("summary", I18N.term("MSA 출처")));
     if (summary.msa_provenance.method === "shared_parent_homologs")
-      evidence.append(el("p", I18N.term("공개 표적·WT 서열로 확보한 MSA를 사용했습니다. 변이별 첫 서열만 바꾸고 WT 상동 서열은 유지했습니다. 변이별 독립 검색은 하지 않았습니다.")));
+      evidence.append(el("p", I18N.term("변이는 WT의 MSA를 사용하고 첫 서열만 바꿉니다. 표적은 자체 MSA를 사용했습니다.")));
     evidence.append(el("pre", JSON.stringify(summary.msa_provenance, null, 2)));
     $("result-input").append(evidence);
   }
   if (summary.reference_provenance?.role === "comparison_only")
-    $("result-input").append(el("p", I18N.format("WT 참조 구조: {0}. 구조 화면에서 ‘참조 구조’를 켜면 표적에 정렬해 비교합니다. 예측 입력이나 선별 기준으로 사용하지 않았습니다.", [summary.reference_provenance.source_id || I18N.term("미기록")])));
+    $("result-input").append(el("p", I18N.format("비교용 WT 참조 {0} · 구조 화면에서 ‘참조 구조’를 켜세요.", [summary.reference_provenance.source_id || I18N.term("미기록")])));
   const mockNotice = mockZeroSelectionNotice(summary, state.rows);
   if (mockNotice) $("result-input").prepend(mockNotice);
   I18N.text($("result-input-config"), JSON.stringify(summary.assessment
@@ -2084,14 +2083,14 @@ async function loadResult(id) {
     : {conditions: summary.conditions, config: summary.config}, null, 2));
   $("result-summary").replaceChildren(el("h2", I18N.term("02 후보·모델 수")), el("p", I18N.format("분석: {0}", [(summary.name || summary.id ? (summary.name ? summary.name : summary.id) : I18N.term("미기록"))]), "muted"));
   $("result-summary").append(el("p", I18N.term("결과 탐색기는 소수 3자리, 정적 보고서는 유효숫자 8자리까지 표시합니다. 원값은 툴팁과 CSV에서 확인하세요. 순위와 적격 판정은 저장된 값을 사용합니다."), "muted"));
-  if (summary.retention === "minimal") $("result-summary").append(el("p", I18N.term("핵심 보관본 · 서열·점수·모든 최종 구조를 유지했습니다. PAE 배열·MSA·중간 파일은 용량 정리로 삭제되어, 이 상세 자료가 필요하면 전체 분석을 새로 실행해야 합니다."), "report-interpretation"));
+  if (summary.retention === "minimal") $("result-summary").append(el("p", I18N.term("핵심 보관본 · 서열·점수·최종 구조 포함. PAE·MSA·중간 파일이 필요하면 분석을 다시 실행하세요."), "report-interpretation"));
   const stats = el("div", "", "report-stats");
   for (const [caption,value] of [[generalComplex?"고유 입력 단백질 서열":"원본 후보",generalComplex?counts.unique_sequences:counts.source_candidates],["전체 모델 기록",summary.model_record_total ?? counts.model_total],["평가 완료 모델",counts.evaluated_total],["기록 적격 모델",generalComplex?"적용 안 함":counts.eligible_total]]) {
     const stat=el("div","","report-stat");stat.append(el("span",I18N.term(caption)),el("strong",value === null ? I18N.term("미평가·미기록") : I18N.term(String(value))));stats.append(stat);
   }
-  $("result-summary").append(stats,el("p", generalComplex ? I18N.format("평가 미완료 {0} 모델. 일반 복합체에는 VHH 적격 판정을 적용하지 않습니다.", [counts.evaluation_missing]) : I18N.format("고유 후보 서열 {0}종 · 평가 미완료 {1} · 적격 판정 미평가 {2} · 기록 선별 {3} 모델. 원본 후보는 source_sequence_id 및 원본 ID의 엔진 접두어로 구분합니다. 서열이 모두 기록된 경우에만 고유 서열 수를 계산합니다.", [counts.unique_sequences === null ? I18N.term("미기록") : counts.unique_sequences, counts.evaluation_missing, counts.eligibility_missing, metricValue(summary.selected_total)]), "muted"));
+  $("result-summary").append(stats,el("p", generalComplex ? I18N.format("평가 미완료 {0} 모델 · 일반 복합체의 VHH 판정은 해당 없음", [counts.evaluation_missing]) : I18N.format("고유 후보 서열 {0}종 · 평가 미완료 {1} · 판정 미평가 {2} · 기록 선별 {3} 모델", [counts.unique_sequences === null ? I18N.term("미기록") : counts.unique_sequences, counts.evaluation_missing, counts.eligibility_missing, metricValue(summary.selected_total)]), "muted"));
   if (!generalComplex && summary.quality_eligible_total !== null && summary.quality_eligible_total !== undefined)
-    $("result-summary").append(el("p", I18N.format("실행 기록 요약: 기록 적격 {0} · 품질 적격 {1} (결합 부위 제외). 품질 적격은 원본 선별을 바꾸지 않는 탐색 값입니다.", [metricValue(summary.eligible_total), metricValue(summary.quality_eligible_total)]), "muted"));
+    $("result-summary").append(el("p", I18N.format("실행 기록 적격 {0} · 결합 부위 조건을 뺀 품질 적격 {1}", [metricValue(summary.eligible_total), metricValue(summary.quality_eligible_total)]), "muted"));
   const expected = summary.expected_total;
   $("result-summary").append(el("p", I18N.format("기록된 계획 모델 {0} · 실제 모델 기록 {1} · 평가 완료 {2} · 전체 후보·모델 기록 {3} · 예측 전 준비·미선정 {4}", [expected == null ? I18N.term("미기록") : expected, (summary.model_record_total != null ? summary.model_record_total : counts.model_total), counts.evaluated_total, (summary.candidate_record_total != null ? summary.candidate_record_total : counts.prepared_record_total), (summary.preprediction_record_total != null ? summary.preprediction_record_total : counts.preprediction_record_total)]), "muted"));
   $("result-summary").append(el("p", I18N.term("저장된 전체 후보·모델을 집계합니다. 예측 전 준비·미선정 후보와 평가 미완료 모델은 따로 계산합니다."), "muted"));
@@ -2106,7 +2105,7 @@ async function loadResult(id) {
   }
   $("result-summary").append(engineSummary,el("p",I18N.term("같은 후보의 엔진별 예측을 별도로 표시합니다. 순위는 같은 엔진·후보 집합 안에서 비교하세요. 이전 결과의 비교 범위는 ranking_policy에서 확인할 수 있습니다."),"report-interpretation"));
   renderReportReasons(state.rows, summary.mode);
-  const guide=el("details","","report-guide");guide.append(el("summary",I18N.term("지표 읽는 법과 평가 한계")));
+  const guide=el("details","","report-guide");guide.append(el("summary",I18N.term("지표 보는 법")));
   const list=el("ul");
   for(const text of ["ipTM·ipSAE: 높을수록 예측 신뢰도가 높습니다. 같은 엔진·조건 안에서 비교하세요.","pLDDT: 국소 구조 신뢰도. PAE: 상대 배치 오차(Å)로 낮을수록 좋으며, 행→열의 방향별 값이 다를 수 있습니다.","pDockQ2: CA 8 Å 접촉과 방향별 PAE를 사용합니다. AlphaFold-Multimer 보정이며 Boltz·Chai·OpenDDE 값은 탐색용입니다.","적격 0건은 실행 실패와 구분합니다. 미평가 항목은 0점이나 판정 통과로 취급하지 않습니다.","현재 필터를 바꿔도 원래 적격 판정·선별 목록·전체 모델과 출처는 내보내기에 보존됩니다."])list.append(el("li",I18N.term(text)));
   guide.append(list);$("result-summary").append(guide);
@@ -2169,7 +2168,7 @@ function renderSelectionLeads(summary, rows) {
     const link = el("a", I18N.term(exclusions ? "04 제외·미평가" : "03 후보 비교"));
     link.href = exclusions ? "#report-exclusions" : "#report-comparison"; list.append(link); return [];
   }
-  list.append(el("p", I18N.term("최종 선별표에 기록된 1위입니다. 여러 엔진을 사용한 경우 엔진별로 표시합니다. 실제 결합력은 실험으로 확인하세요.")));
+  list.append(el("p", I18N.term("실행 기록의 엔진별 선별 1위입니다.")));
   for (const row of leads) {
     const line = el("p"), button = el("button", I18N.term("서열과 예측 구조 보기"), "secondary");
     line.append(el("strong", row.candidate_id), el("span", " · " + row.predictor_engine + " · ipSAE " + fmt(row.ipsae) + " "));
@@ -2223,7 +2222,7 @@ function showVhhSequence(row) {
   I18N.text(status, "");
   I18N.text($("vhh-structure-feedback"), "");
   let selectionRequest = 0;
-  const selectSequence = async () => {
+  const selectSequence = async (reveal = false) => {
     const request = ++selectionRequest, viewer = state.viewer, data = state.structure;
     const feedback = $("vhh-structure-feedback");
     if (!sequence || state.candidate !== row) return;
@@ -2237,12 +2236,13 @@ function showVhhSequence(row) {
       if (!labels || request !== selectionRequest || state.candidate !== row || state.viewer !== viewer || state.structure !== data) return;
       const toggle = document.querySelector('[data-layer="binder"]'); if (toggle) toggle.checked = true;
       I18N.text(feedback, I18N.format("서열 위치 {0}–{1} · 구조 잔기 {2}", [start + 1, end, labels.join(", ")]));
+      if (reveal) $("structure-view").scrollIntoView({block: "nearest"});
     } catch (error) {
       if (request === selectionRequest && state.candidate === row && state.viewer === viewer && state.structure === data)
         I18N.text(feedback, I18N.term(error.message));
     }
   };
-  value.onpointerup = event => { if (event.button === 0) selectSequence(); };
+  value.onpointerup = event => { if (event.button === 0) selectSequence(true); };
   value.onkeyup = event => { if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) selectSequence(); };
   if (panel.hidden) return;
   const id = row.candidate_id;
@@ -2689,7 +2689,7 @@ async function selectCandidate(id) {
   detail.append(dl);
   const confidenceScope=el("details");confidenceScope.append(el("summary",I18N.term("ipSAE·ipTM 적용 체인과 출처")));
   confidenceScope.append(el("p", I18N.format("ipSAE 적용 체인: {0}–{1} · {2}", [(row.ipsae_chain_a ? row.ipsae_chain_a : I18N.term("미기록")), (row.ipsae_chain_b ? row.ipsae_chain_b : I18N.term("미기록")), ["selected_chain_pair","legacy_first_recorded_pair"].includes(row.ipsae_scope) ? I18N.term("표시된 체인 쌍") : I18N.term("범위 미기록·상세 원문 확인")])));
-  confidenceScope.append(el("p",I18N.term(state.result?.mode === "complex" ? "요약 ipSAE는 명시한 체인쌍 또는 검토 순서의 첫 쌍입니다. 전체 평균·최솟값과 구분하고 모든 체인쌍의 결과는 상세 표·CSV에서 확인하세요. ipTM은 기록된 적용 범위로 해석하며, 범위가 없으면 전체 복합체 값으로 추정하지 않습니다." : "일반 복합체의 요약 ipSAE는 기본적으로 검토한 체인 순서의 첫 쌍이며, 체인쌍을 명시한 실행에서는 해당 쌍입니다. 전체 평균·최솟값과 구분하고 모든 체인 쌍의 결과는 상세 표·CSV에서 확인합니다. ipTM 전체 값과 선택 표적–VHH 쌍 값은 구분하며, 범위가 없으면 전체 복합체로 추정하지 않습니다."),"muted"));
+  confidenceScope.append(el("p",I18N.term(state.result?.mode === "complex" ? "요약 ipSAE는 지정한 체인 쌍 또는 검토 순서의 첫 쌍입니다. 전체 체인 쌍은 상세 표·CSV에서 확인하세요. ipTM 범위는 각 모델에 표시됩니다." : "일반 복합체의 요약 ipSAE는 기본적으로 검토한 체인 순서의 첫 쌍이며, 체인쌍을 명시한 실행에서는 해당 쌍입니다. 전체 평균·최솟값과 구분하고 모든 체인 쌍의 결과는 상세 표·CSV에서 확인합니다. ipTM 전체 값과 선택 표적–VHH 쌍 값은 구분하며, 범위가 없으면 전체 복합체로 추정하지 않습니다."),"muted"));
   if (state.result?.mode === "complex") {
     const selection = row.ipsae_selection === "explicit_primary_pair" ? "명시한 체인쌍" : row.ipsae_selection === "first_pair_in_reviewed_chain_order" ? "검토 순서의 첫 체인쌍" : "선택 기준 미기록";
     confidenceScope.append(el("p", I18N.format("요약 쌍 선택: {0} · 유한한 기록값의 최솟값 {1} / 최댓값 {2} · 평가 쌍 {3} / 전체 쌍 {4}. 미평가 체인쌍은 최솟값·최댓값에서 제외됩니다.", [I18N.term(selection), metricValue(row.min_pair_ipsae), metricValue(row.max_pair_ipsae), metricValue(row.pair_ipsae_assessed_count), metricValue(row.pair_ipsae_total_count)])));
@@ -3039,19 +3039,19 @@ function coordinatePresentation(data) {
   const verified = source?.schema_version === 2 && source.raw_preserved === true &&
     source.verification?.status === "verified" && typeof data.raw_content === "string" && data.raw_content.length > 0;
   if (verified && source.display_relation === "native_identical" && data.content === data.raw_content)
-    return {rawAvailable:true, caption:"검증된 원본 엔진 좌표와 표시 좌표가 동일합니다."};
+    return {rawAvailable:true, caption:"원본 엔진 좌표 표시 중 · 해시 확인 완료"};
   if (verified && source.display_relation === "transformed_display") {
     const transforms = {"native origin not verified":"원본 좌표 출처 미확인", "none":"변환 없음",
       "display differs from verified native bytes; transform not recorded":"검증된 원본과 다른 표시 좌표 · 변환 과정 미기록",
       "coordinate serialization and recorded numbering mapping":"좌표 직렬화와 기록된 잔기 번호 대응",
       "coordinate serialization and recorded numbering mapping; recorded reference alignment":"좌표 직렬화·기록된 잔기 번호 대응·참조 구조 정렬"};
-    return {rawAvailable:true, caption:`검증된 원본 엔진 좌표를 별도로 보존합니다. 화면은 변환된 표시 좌표입니다 · ${transforms[source.display_transform] || source.display_transform || "변환 종류 미기록"}`};
+    return {rawAvailable:true, caption:"변환된 표시 좌표 · 원본 다운로드 가능", transform:transforms[source.display_transform] || source.display_transform || "변환 종류 미기록"};
   }
   if (verified)
-    return {rawAvailable:true, caption:"검증된 원본 엔진 좌표를 별도로 보존합니다. 표시 좌표와 원본의 관계는 미확인입니다."};
+    return {rawAvailable:true, caption:"검증된 원본 좌표 저장됨 · 표시 좌표와의 관계 미기록"};
   if (source?.verification?.status === "hash_mismatch")
-    return {rawAvailable:false, caption:"저장된 표시 좌표 · 원본 좌표의 해시가 검증 기록과 불일치하여 원본 다운로드를 제공하지 않습니다."};
-  return {rawAvailable:false, caption:"저장된 표시 좌표 · 이 보고서에는 검증된 원본 엔진 좌표가 없습니다. 원본이 없거나 검증 근거가 미기록입니다."};
+    return {rawAvailable:false, caption:"저장 표시 좌표 · 원본 해시 불일치"};
+  return {rawAvailable:false, caption:"저장 표시 좌표 · 검증된 원본 미기록"};
 }
 function structureDataNote(data) {
   const metrics = [];
@@ -3061,8 +3061,8 @@ function structureDataNote(data) {
     if (Number.isFinite(pair.interface_plddt)) metrics.push(`계면 pLDDT ${pair.interface_plddt.toFixed(1)}`);
     if (Number.isFinite(pair.interface_pae)) metrics.push(`계면 PAE ${pair.interface_pae.toFixed(1)} Å`);
   }
-  return coordinatePresentation(data).caption + " " + (metrics.length ? metrics.join(" · ") + ". " : "") +
-    "후보의 신뢰도 지표·PAE·계면 접촉을 함께 확인하세요.";
+  const presentation=coordinatePresentation(data);
+  return [presentation.caption, presentation.transform, ...metrics].filter(Boolean).join(" · ");
 }
 function localizedStructureDataNote(data) {
   const metrics=[];
@@ -3072,10 +3072,10 @@ function localizedStructureDataNote(data) {
     if (Number.isFinite(pair.interface_plddt)) metrics.push(I18N.format("계면 pLDDT {0}", [pair.interface_plddt.toFixed(1)]));
     if (Number.isFinite(pair.interface_pae)) metrics.push(I18N.format("계면 PAE {0} Å", [pair.interface_pae.toFixed(1)]));
   }
-  const parts=[I18N.term(coordinatePresentation(data).caption), " "];
-  metrics.forEach((metric,index)=>parts.push(index ? " · " : "",metric));
-  if(metrics.length)parts.push(". ");
-  parts.push(I18N.term("후보의 신뢰도 지표·PAE·계면 접촉을 함께 확인하세요."));
+  const presentation=coordinatePresentation(data);
+  const parts=[I18N.term(presentation.caption)];
+  if(presentation.transform)parts.push(" · ",I18N.term(presentation.transform));
+  for(const metric of metrics)parts.push(" · ",metric);
   return I18N.concat(parts);
 }
 function resultChain(role) {
@@ -3149,7 +3149,7 @@ async function renderStructure() {
     const host = el("div", undefined, "molstar-host");
     $("structure-view").replaceChildren(host);
     const residueCount = chains.reduce((count, chain) => count + (Array.isArray(chain.residues) ? chain.residues.length : 0), 0);
-    describeResultFigure("structure-view", "선택 후보 3D 구조", I18N.format("3D 모델 {0} · 기록된 체인 {1}개 · 잔기 메타데이터 {2}개 · 접촉 잔기쌍 {3}개 · 충돌 잔기쌍 {4}개. 원본 좌표·잔기 대응 표와 CSV를 함께 확인하세요. 미기록 메타데이터를 0접촉이나 비결합으로 해석하지 않습니다.", [data.candidate_id, chains.length, residueCount, data.contacts?.length ?? I18N.term("미기록"), data.clashes?.length ?? I18N.term("미기록")]), "#structure-details");
+    describeResultFigure("structure-view", "선택 후보 3D 구조", I18N.format("모델 {0} · 체인 {1}개 · 기록 잔기 {2}개 · 접촉 잔기쌍 {3} · 충돌 잔기쌍 {4}", [data.candidate_id, chains.length, residueCount, data.contacts?.length ?? I18N.term("미기록"), data.clashes?.length ?? I18N.term("미기록")]), "#structure-details");
     state.viewerReady = NanoCoFoldResultViewer.create(host, data, location => {
       if (state.structure !== data) return;
       const original = location.mapping ? `${location.mapping.author_chain || location.mapping.source_chain}:${location.mapping.source_residue || "미관측"}` : null;

@@ -141,6 +141,6 @@ For a source ZIP, retain the commit/tag download URL and the archive. After inst
 
 If you chose a custom workspace, replace `.nanocofold/workspace` with the `workspace` path in `.nanocofold/install-location.json`. A source checkout's `python -m nanocofold --version` can differ from the installed command. Keep the job ID, input/configuration and execution mode with the report; its recorded computation version and rendering version can also differ after an update.
 
-An environment-check pass confirms readiness for the checked configuration. A CPU/mock result tests the software workflow. Neither demonstrates successful GPU prediction or binding. Interpret scores within the same engine, chain pair and conditions; missing/unevaluated values are not negative binding results. Confirm binding, affinity/KD, expression and specificity experimentally. See [statistical interpretation](STATISTICAL_INTERPRETATION.md).
+The environment check shows whether the selected setup is ready. Use the CPU demo to practice the workflow from inputs to report. Compare scores within the same engine and conditions, using WT as a reference when available. [Statistical interpretation](STATISTICAL_INTERPRETATION.md)
 
 NanoCoFold does not grant a general public software license. Agree the intended research use with the owner and retain the [external component notices](../LICENSE_MANIFEST.md); a repository link or installation instruction does not expand those permissions. A hosted Site or private compute server also needs its own access from the administrator.

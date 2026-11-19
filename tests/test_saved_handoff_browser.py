@@ -43,18 +43,18 @@ def test_saved_handoff_keyboard_languages_and_missing_corrupt_states(tmp_path):
                 path.write_text(document)
                 page.goto(path.as_uri())
                 panel = page.locator('[data-handoff-status="blocked"]')
-                expect(panel).to_contain_text('Handoff incomplete')
+                expect(panel).to_contain_text('Delivery needs review')
                 expect(panel).to_contain_text('Recorded errors: 6 · Warnings: 1')
-                expect(panel).to_contain_text('without an MSA')
+                expect(panel).to_contain_text('No MSA used')
                 page.select_option('#language-select', 'ko')
-                expect(panel).to_contain_text('인계 미완료')
+                expect(panel).to_contain_text('전달 확인 필요')
                 expect(panel).to_contain_text('기록 오류 6건 · 경고 1건')
                 if status == 'available':
                     expect(panel.locator('li')).to_have_count(7)
                     expect(panel).to_contain_text('expression.vector')
                 else:
                     expect(panel.locator('li')).to_have_count(0)
-                    expect(panel).to_contain_text('상세 인계 JSON')
+                    expect(panel).to_contain_text('상세 점검 기록 없음' if status == 'missing' else '상세 점검 파일과 요약 기록을 확인하세요.')
                 toggle = panel.locator('details > summary')
                 toggle.focus()
                 page.keyboard.press('Enter')
@@ -63,7 +63,7 @@ def test_saved_handoff_keyboard_languages_and_missing_corrupt_states(tmp_path):
                     toggle.press('Enter')
                     page.screenshot(path=str(tmp_path / 'handoff-native-ko.png'), full_page=True)
                 page.select_option('#language-select', 'en')
-                expect(panel).to_contain_text('Handoff incomplete')
+                expect(panel).to_contain_text('Delivery needs review')
             assert requests == [] and errors == []
         finally:
             browser.close()

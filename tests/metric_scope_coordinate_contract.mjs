@@ -57,7 +57,7 @@ for(const mode of ['complex','screen','mature','design'])for(const relation of [
    coordinate_source:{schema_version:2,display_relation:relation,display_transform:'renumbering',raw_preserved:relation!=='unverified_legacy',verification:{status:relation==='unverified_legacy'?'unavailable':'verified'}}};
  const before=JSON.stringify(data),result=c.coordinatePresentation(data);
  assert.equal(result.rawAvailable,relation!=='unverified_legacy');
- assert.match(result.caption,relation==='native_identical'?/동일/:relation==='transformed_display'?/변환된 표시 좌표/:/검증된 원본 엔진 좌표가 없습니다/);
+ assert.match(result.caption,relation==='native_identical'?/원본 엔진 좌표 표시 중 · 해시 확인 완료/:relation==='transformed_display'?/변환된 표시 좌표/:/검증된 원본 미기록/);
  assert.equal(JSON.stringify(data),before);
  assert.equal(c.structureDataNote(data).includes('원본 예측 좌표를 표시합니다'),false);
 });
@@ -68,7 +68,7 @@ for(const [name,data] of [
 ])test(name+' cannot enable original download',()=>assert.equal(c.coordinatePresentation(data).rawAvailable,false));
 test('native-identical metadata cannot mislabel different displayed bytes',()=>{
  const result=c.coordinatePresentation({content:'display',raw_content:'raw',coordinate_source:{schema_version:2,raw_preserved:true,verification:{status:'verified'},display_relation:'native_identical'}});
- assert.equal(result.rawAvailable,true);assert.match(result.caption,/관계는 미확인/);
+ assert.equal(result.rawAvailable,true);assert.match(result.caption,/표시 좌표와의 관계 미기록/);
 });
 
 test('localized structure note preserves global ipTM scope and the original Korean numerical content',()=>{

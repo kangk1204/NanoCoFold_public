@@ -47,7 +47,8 @@ for (const interruption of ['disposed','newer selection']) test('pending sequenc
 
 for (const surface of ['platform.js','platform_offline.html']) test(surface + ': observation loading retires old coordinates before sequence input',async()=>{
  const source=readFileSync(new URL('../nanocofold/templates/'+surface,import.meta.url),'utf8'),nodes=new Map();
- const get=id=>{if(!nodes.has(id))nodes.set(id,{value:'',selectionStart:0,selectionEnd:1,textContent:'',replaceChildren(){}});return nodes.get(id);};
+ const reveals=[];
+ const get=id=>{if(!nodes.has(id))nodes.set(id,{value:'',selectionStart:0,selectionEnd:1,textContent:'',replaceChildren(){},scrollIntoView(opts){reveals.push([id,opts.block]);}});return nodes.get(id);};
  const row={candidate_id:'candidate',sequence:'AC'},old={candidate_id:'candidate',observation_id:'old'},next={candidate_id:'candidate',observation_id:'new'},focused=[];
  let resolve;const pending=new Promise(done=>{resolve=done;});
  const c={state:{candidate:row,result:{id:'saved',mode:'screen'},structure:old,structureRequest:0,
@@ -61,8 +62,11 @@ for (const surface of ['platform.js','platform_offline.html']) test(surface + ':
  vm.runInContext(source.slice(source.indexOf('async function loadStructure('),source.indexOf('function labelSelection(')),c);
  c.showVhhSequence(row);get('observation-select').value='new';const switching=c.loadStructure();
  get('vhh-sequence-value').onpointerup({button:0});for(let n=0;n<5;n++)await Promise.resolve();
- assert.deepEqual(focused,[]);assert.match(get('vhh-structure-feedback').textContent,/기다리세요/);
+ assert.deepEqual(focused,[]);assert.deepEqual(reveals,[]);assert.match(get('vhh-structure-feedback').textContent,/기다리세요/);
  resolve(next);await switching;assert.equal(c.state.structure.observation_id,'new');assert.equal(get('vhh-structure-feedback').textContent,'');
  get('vhh-sequence-value').onpointerup({button:0});for(let n=0;n<5;n++)await Promise.resolve();
  assert.deepEqual(focused,['new']);assert.match(get('vhh-structure-feedback').textContent,/B:90/);
+ assert.deepEqual(reveals,[['structure-view','nearest']]);
+ get('vhh-sequence-value').onkeyup({key:'ArrowRight'});for(let n=0;n<5;n++)await Promise.resolve();
+ assert.deepEqual(focused,['new','new']);assert.equal(reveals.length,1);
 });
